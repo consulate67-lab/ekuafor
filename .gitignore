@@ -1,0 +1,37 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+# Note: dist is needed for gh-pages deployment, but we ignore it in main branch
+*.local
+.env
+.env.local
+.env.*.local
+
+# Database
+server/database.sqlite
+server/database.sqlite-journal
+server/database.sqlite-wal
+server/database.sqlite-shm
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
