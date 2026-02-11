@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: saloon-db
+    restart: always
+    environment:
+      POSTGRES_DB: saloon_db
+      POSTGRES_USER: saloon_user
+      POSTGRES_PASSWORD: saloon_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./server/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: saloon-backend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: saloon_db
+      DB_USER: saloon_user
+      DB_PASSWORD: saloon_password
+      JWT_SECRET: your_jwt_secret_here
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: saloon-frontend
+    restart: always
+    ports:
+      - "80:80"
+    environment:
+      VITE_API_URL: http://localhost:3000/api
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
