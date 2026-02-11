@@ -1,49 +1,46 @@
-# 💇 Saloon - Güzellik Merkezi Randevu Sistemi
+# 💇‍♂️ Saloon (E-Kuaför) Randevu Sistemi
 
-Modern, kullanıcı dostu ve kapsamlı bir güzellik merkezi yönetim ve randevu sistemi.
+Saloon, güzellik merkezleri ve kuaförler için geliştirilmiş, kapsamlı bir randevu ve yönetim sistemidir.
 
-![Status](https://img.shields.io/badge/Status-Faz%201%20Tamamlandı-success)
-![Version](https://img.shields.io/badge/Version-1.0.0-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
+[![Status](https://img.shields.io/badge/Status-Phase_1_Complete-green.svg)](https://github.com/consulate67-lab/ekuafor)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/Version-1.0.0-orange.svg)](https://github.com/consulate67-lab/ekuafor)
 
-## 📋 Proje Özeti
+## 🌟 Proje Özeti (Faz 1)
 
-Saloon, erkek ve kadın kuaförler için geliştirilmiş, modern bir randevu yönetim sistemidir. Firma yönetiminden randevu almaya, ödeme sisteminden çalışan yönetimine kadar tüm ihtiyaçları karşılar.
+Bu aşamada projenin temel altyapısı, firma yönetim sistemi ve adres/harita entegrasyonu tamamlanmıştır.
 
-## 👥 Kullanıcı Tipleri
+### 🚩 Tamamlanan Özellikler
 
-1. **Super Admin**: Sistem yöneticisi, tüm firmaları yönetir
-2. **Firma Yöneticisi**: Kendi firmasını, çalışanlarını ve randevularını yönetir
-3. **Müşteri**: Randevu alır ve geçmişini görüntüler
+#### 🏢 Firma Yönetimi
+- ✅ Firma kaydı oluşturma, düzenleme ve silme
+- ✅ Firma doğrulama (verification) sistemi
+- ✅ Detaylı firma profili (Telefon, E-posta, Website)
+- ✅ **Banka Bilgileri**: IBAN ve hesap sahibi yönetimi
+- ✅ **Finansman**: Komisyon oranı belirleme ve ödeme durumu
 
-## ✨ Özellikler (Faz 1 - Tamamlandı)
-
-### 🏢 Firma Yönetimi
-- ✅ Kapsamlı firma profili oluşturma
-- ✅ Firma bilgileri (isim, açıklama, iletişim)
-- ✅ **Türkiye Adres Sistemi**: 81 il, tüm ilçe ve mahalleler
-- ✅ **İnteraktif Harita**: Leaflet ile konum belirleme
-- ✅ Banka bilgileri (IBAN, banka adı, şube)
-- ✅ Firma onaylama sistemi
-- ✅ Komisyon oranı belirleme
-
-### 🔐 Güvenlik ve Yetkilendirme
-- ✅ JWT tabanlı authentication
-- ✅ Rol bazlı yetkilendirme
-- ✅ Güvenli şifre saklama (bcrypt)
-- ✅ Input validation (Zod)
-
-### 🎨 Modern Kullanıcı Arayüzü
-- ✅ Responsive tasarım (mobil uyumlu)
-- ✅ TailwindCSS ile modern görünüm
-- ✅ Kullanıcı dostu formlar
-- ✅ Gerçek zamanlı validasyon
-
-### 🗺️ Harita Entegrasyonu
-- ✅ OpenStreetMap ile ücretsiz harita
-- ✅ Tıklayarak konum seçimi
+#### 📍 Adres ve Konum Sistemi
+- ✅ **Türkiye API Entegrasyonu**: 81 il, tüm ilçe ve mahallelerin dinamik seçimi
+- ✅ **Harita Entegrasyonu**: Leaflet ile harita üzerinden konum seçme (Latitude/Longitude)
 - ✅ Marker ile konum gösterimi
-- ✅ Koordinat bilgisi saklama
+
+#### 👥 Kullanıcı ve Rol Yönetimi
+- ✅ **Authentication**: JWT tabanlı güvenli giriş sistemi
+- ✅ **Roller**: Super Admin, Firma Sahibi (Company Admin), Müşteri
+- ✅ **Çalışan Yönetimi**: Firmaya benzersiz ID'si ile çalışan ekleme sistemi altyapısı hazırlandı.
+
+## 🚀 Deployment
+
+### Frontend (GitHub Pages)
+Frontend otomatik olarak GitHub Pages üzerinden yayınlanmaktadır. 
+[https://consulate67-lab.github.io/ekuafor/](https://consulate67-lab.github.io/ekuafor/)
+
+### Backend (Railway / Render)
+Backend'i canlıya almak için:
+1. GitHub deponuzu [Railway](https://railway.app/) veya [Render](https://render.com/)'a bağlayın.
+2. **Root Directory** olarak `server` klasörünü seçin.
+3. Gerekli **Environment Variables** (DB_HOST, JWT_SECRET vb.) değerlerini girin.
+4. Veritabanı için **Supabase** veya **Railway PostgreSQL** kullanmanızı öneririz.
 
 ## 🚀 Teknoloji Stack
 
@@ -74,110 +71,46 @@ Saloon, erkek ve kadın kuaförler için geliştirilmiş, modern bir randevu yö
 
 ## 📦 Kurulum
 
-Detaylı kurulum talimatları için [SETUP.md](SETUP.md) dosyasına bakın.
-
-### Hızlı Başlangıç
-
-1. **Veritabanı Oluştur**
+1. **Repo'yu Klonlayın**
 ```bash
-createdb saloon_db
-psql -d saloon_db -f server/database/schema.sql
+git clone https://github.com/consulate67-lab/ekuafor.git
+cd ekuafor
 ```
 
-2. **Backend Kurulum**
+2. **Backend Hazırlığı**
 ```bash
 cd server
 npm install
-cp .env.example .env
-# .env dosyasını düzenleyin
+# psql -d saloon_db -f database/schema.sql
 npm run dev
 ```
 
-3. **Frontend Kurulum**
+3. **Frontend Hazırlığı**
 ```bash
 cd client
 npm install
 npm run dev
 ```
 
-4. **Tarayıcıda Aç**
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:3000
-
-### 🔑 Varsayılan Giriş
-- **Email**: admin@saloon.com
-- **Şifre**: admin123
-
 ## 📁 Proje Yapısı
 
 ```
-saloon/
-├── server/                 # Backend
-│   ├── src/
-│   │   ├── config/        # Database config
-│   │   ├── routes/        # API endpoints
-│   │   │   ├── auth.routes.ts
-│   │   │   ├── company.routes.ts
-│   │   │   └── address.routes.ts
-│   │   ├── services/      # Business logic
-│   │   │   ├── company.service.ts
-│   │   │   └── address.service.ts
-│   │   └── index.ts       # Main server file
-│   ├── database/          # SQL schemas
-│   └── package.json
-│
-├── client/                # Frontend
-│   ├── src/
-│   │   ├── pages/        # Page components
-│   │   │   ├── Login.tsx
-│   │   │   ├── Dashboard.tsx
-│   │   │   ├── CompanyList.tsx
-│   │   │   └── CompanyForm.tsx
-│   │   ├── store/        # Zustand stores
-│   │   ├── lib/          # Utilities
-│   │   ├── types/        # TypeScript types
-│   │   └── App.tsx
-│   └── package.json
-│
-├── README.md             # Bu dosya
-├── SETUP.md              # Kurulum kılavuzu
-└── DEVELOPMENT.md        # Geliştirme notları
+d:\Saloon/
+├── 📂 server/         # Node.js + Express API
+├── 📂 client/         # React + Vite Uygulaması
+├── 📄 SETUP.md        # Detaylı Kurulum Kılavuzu
+├── 📄 DEVELOPMENT.md  # Teknik Geliştirme Notları
+└── 📄 README.md       # Proje Özeti
 ```
 
-## 🔄 Sonraki Aşamalar (Faz 2)
+## 🗺️ Yol Haritası (Faz 2)
 
-- [ ] **Firma Çalışanları**: Çalışan ekleme, düzenleme, rol yönetimi
-- [ ] **Hizmet Yönetimi**: Kesim, boyama, manikür vb. hizmet tanımları
-- [ ] **Çalışma Saatleri**: Firma ve çalışan bazlı çalışma saatleri
-- [ ] **Randevu Sistemi**: Müşteri randevu alma, takvim görünümü
-- [ ] **Ödeme Entegrasyonu**: Online ödeme, otomatik transfer
-- [ ] **Bildirimler**: SMS/Email bildirimleri
-- [ ] **Müşteri Paneli**: Müşteri kayıt, randevu alma
-- [ ] **Raporlama**: Gelir, randevu istatistikleri
-
-## 📚 Dokümantasyon
-
-- [Kurulum Kılavuzu](SETUP.md) - Detaylı kurulum adımları
-- [Geliştirme Notları](DEVELOPMENT.md) - Teknik detaylar ve yol haritası
-
-## 🤝 Katkıda Bulunma
-
-1. Fork yapın
-2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
-3. Commit yapın (`git commit -m 'Add amazing feature'`)
-4. Push yapın (`git push origin feature/amazing-feature`)
-5. Pull Request açın
-
-## 📝 Lisans
-
-Bu proje MIT lisansı altında lisanslanmıştır.
-
-## 📞 İletişim
-
-Sorularınız için GitHub Issues kullanabilirsiniz.
+- [ ] Çalışan paneli ve profil yönetimi
+- [ ] Hizmet (Service) bazlı çalışma saatleri
+- [ ] Randevu (Appointment) oluşturma ve takvim
+- [ ] Müşteri bildirimleri (E-posta/SMS)
+- [ ] Ödeme sistemleri (iyzico Entegrasyonu)
 
 ---
-
-**Geliştirme Durumu**: Aktif Geliştirme  
-**Son Güncelleme**: 11 Şubat 2026  
-**Versiyon**: 1.0.0 (Faz 1)
+**Geliştirici**: Antigravity AI
+**Tarih**: Şubat 2026
