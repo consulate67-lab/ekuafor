@@ -4,8 +4,8 @@ services:
     env: node
     plan: free
     rootDir: server
-    buildCommand: npm install && npm run build && npm run db:migrate && npx tsx scripts/seed-admin.ts
-    startCommand: npm start
+    buildCommand: npm install && npm run build
+    startCommand: npm run db:migrate && npx tsx scripts/seed-admin.ts && npm start
     envVars:
       - key: NODE_ENV
         value: production

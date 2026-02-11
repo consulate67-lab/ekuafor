@@ -23,7 +23,7 @@ export default function Login() {
             navigate('/');
         } catch (err: any) {
             if (!err.response) {
-                setError('Sunucuya bağlanılamadı. Lütfen VITE_API_URL Secret ayarını ve internet bağlantınızı kontrol edin.');
+                setError(`Sunucuya bağlanılamadı. Hedef Adres: ${api.defaults.baseURL}. Lütfen VITE_API_URL Secret ayarını kontrol edin.`);
                 console.error('Network Error:', err);
             } else {
                 setError(err.response?.data?.error || 'Giriş yapılırken bir hata oluştu');
