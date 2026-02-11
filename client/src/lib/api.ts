@@ -1,7 +1,14 @@
 import axios from 'axios';
 
+let baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
+// URL sonundaki /api kontrolü ve düzeltmesi
+if (!baseUrl.endsWith('/api') && !baseUrl.endsWith('/api/')) {
+    baseUrl = baseUrl.endsWith('/') ? `${baseUrl}api` : `${baseUrl}/api`;
+}
+
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
+    baseURL: baseUrl,
     headers: {
         'Content-Type': 'application/json',
     },

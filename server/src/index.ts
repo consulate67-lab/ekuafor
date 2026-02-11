@@ -41,9 +41,18 @@ app.get('/health', (req: Request, res: Response) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Welcome Message
+app.get('/', (req: Request, res: Response) => {
+    res.send('<h1>Saloon Backend is Live!</h1><p>Visit <a href="/api">/api</a> for more info.</p>');
+});
+
 // Root API Check
 app.get('/api', (req: Request, res: Response) => {
-    res.json({ message: 'Saloon API is running', version: '1.0.0' });
+    res.json({
+        message: 'Saloon API is running',
+        version: '1.0.0',
+        environment: process.env.NODE_ENV || 'development'
+    });
 });
 
 // API Routes
@@ -53,7 +62,11 @@ app.use('/api/address', addressRoutes);
 
 // 404 Handler
 app.use((req: Request, res: Response) => {
-    res.status(404).json({ error: 'Route not found' });
+    res.status(404).json({
+        error: 'Route not found',
+        path: req.path,
+        method: req.method
+    });
 });
 
 // Error Handler
