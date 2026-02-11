@@ -4,7 +4,7 @@ services:
     env: node
     plan: free
     rootDir: server
-    buildCommand: npm install && npm run build && npm run db:migrate
+    buildCommand: npm install && npm run build && npm run db:migrate && npx tsx scripts/seed-admin.ts
     startCommand: npm start
     envVars:
       - key: NODE_ENV
