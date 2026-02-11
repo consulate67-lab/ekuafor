@@ -41,6 +41,11 @@ app.get('/health', (req: Request, res: Response) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Root API Check
+app.get('/api', (req: Request, res: Response) => {
+    res.json({ message: 'Saloon API is running', version: '1.0.0' });
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/companies', companyRoutes);
