@@ -28,32 +28,33 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Request logging (Only in dev)
-if (process.env.NODE_ENV !== 'production') {
-    app.use((req: Request, res: Response, next: NextFunction) => {
-        console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-        next();
-    });
-}
+// Request logging (Always)
+app.use((req: Request, res: Response, next: NextFunction) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    next();
+});
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.1' });
 });
 
 // Welcome Message
 app.get('/', (req: Request, res: Response) => {
-    res.send('<h1>Saloon Backend is Live!</h1><p>Visit <a href="/api">/api</a> for more info.</p>');
+    res.send('<h1>Saloon Backend is Live! (v1.0.1)</h1><p>Visit <a href="/api">/api</a> for more info.</p>');
 });
 
 // Root API Check
-app.get('/api', (req: Request, res: Response) => {
+const apiInfo = (req: Request, res: Response) => {
     res.json({
         message: 'Saloon API is running',
-        version: '1.0.0',
+        version: '1.0.1',
         environment: process.env.NODE_ENV || 'development'
     });
-});
+};
+
+app.get('/api', apiInfo);
+app.get('/api/', apiInfo);
 
 // API Routes
 app.use('/api/auth', authRoutes);
