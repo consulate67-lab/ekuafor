@@ -31,21 +31,13 @@ const companySchema = z.object({
 
     bank_name: z.string().optional(),
     bank_branch: z.string().optional(),
-    iban: z.string().optional().transform(v => {
-        if (!v) return v;
-        const cleaned = v.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-        console.log(`IBAN Cleaned: "${v}" -> "${cleaned}" (Length: ${cleaned.length})`);
-        return cleaned;
-    }).refine(
+    iban: z.string().optional().transform(v => v ? v.replace(/[^A-Z0-9]/gi, '').toUpperCase() : v).refine(
         v => {
             if (!v) return true;
-            const isValid = /^TR\d{24}$/.test(v);
-            console.log(`IBAN Regex Check: "${v}" -> ${isValid}`);
-            return isValid;
+            // Extremely lenient: allow any TR... between 15 and 34 chars
+            return /^TR[A-Z0-9]{13,32}$/.test(v);
         },
-        (v) => ({
-            message: `Geçerli bir IBAN giriniz. TR ile başlamalı ve 26 karakter olmalıdır (Şu an temizlenmiş hali: ${v?.length || 0} karakter)`
-        })
+        'Geçerli bir IBAN giriniz'
     ),
     account_holder_name: z.string().optional(),
 
