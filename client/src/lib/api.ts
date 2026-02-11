@@ -1,16 +1,20 @@
 import axios from 'axios';
 
-let baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+let baseUrl = import.meta.env.VITE_API_URL;
 
-// Debug logging for URL
-console.log('--- Saloon API Config ---');
-console.log('Raw VITE_API_URL:', import.meta.env.VITE_API_URL);
-console.log('Original BaseUrl:', baseUrl);
-
-// URL sonundaki /api kontrolü ve düzeltmesi
-if (!baseUrl.endsWith('/api') && !baseUrl.endsWith('/api/')) {
-    baseUrl = baseUrl.endsWith('/') ? `${baseUrl}api` : `${baseUrl}/api`;
+// Akıllı Otomatik Bağlantı: Canlıda mıyız?
+if (!baseUrl && window.location.hostname.includes('github.io')) {
+    baseUrl = 'https://ekuafor-backend.onrender.com/api';
 }
+
+// Varsayılan (Yerel) Değer
+baseUrl = baseUrl || 'http://localhost:3000/api';
+
+// Debug logging
+console.log('--- Saloon API Connection ---');
+console.log('Hostname:', window.location.hostname);
+console.log('Target API:', baseUrl);
+console.log('-----------------------------');
 
 console.log('Final API BaseUrl:', baseUrl);
 console.log('-------------------------');
