@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useAuthStore } from './store/authStore';
 import api from './lib/api';
 import Login from './pages/Login';
+import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import CompanyForm from './pages/CompanyForm';
 import CompanyList from './pages/CompanyList';
@@ -53,6 +54,7 @@ function App() {
         <Router basename="/ekuafor">
             <Routes>
                 <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
+                <Route path="/register" element={isAuthenticated ? <Navigate to="/" replace /> : <Register />} />
 
                 {isAuthenticated ? (
                     <>

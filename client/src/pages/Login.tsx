@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import api from '../lib/api';
 
@@ -111,7 +111,7 @@ export default function Login() {
                     <div className="mt-8 pt-6 border-t border-gray-100 text-center">
                         <p className="text-sm text-gray-500">
                             Hesabınız yok mu?{' '}
-                            <a href="#" className="font-bold text-secondary-600 hover:text-secondary-700 transition-colors">Hemen Kaydolun</a>
+                            <Link to="/register" className="font-bold text-secondary-600 hover:text-secondary-700 transition-colors">Hemen Kaydolun</Link>
                         </p>
                     </div>
                 </div>
