@@ -8,18 +8,41 @@ export default {
         extend: {
             colors: {
                 primary: {
-                    50: '#fef2f2',
-                    100: '#fee2e2',
-                    200: '#fecaca',
-                    300: '#fca5a5',
-                    400: '#f87171',
-                    500: '#ef4444',
-                    600: '#dc2626',
-                    700: '#b91c1c',
-                    800: '#991b1b',
-                    900: '#7f1d1d',
+                    50: '#fdf2f8',
+                    100: '#fce7f3',
+                    200: '#fbcfe8',
+                    300: '#f9a8d4',
+                    400: '#f472b6',
+                    500: '#ec4899',
+                    600: '#db2777',
+                    700: '#be185d',
+                    800: '#9d174d',
+                    900: '#831843',
                 },
+                secondary: {
+                    50: '#f5f3ff',
+                    100: '#ede9fe',
+                    200: '#ddd6fe',
+                    300: '#c4b5fd',
+                    400: '#a78bfa',
+                    500: '#8b5cf6',
+                    600: '#7c3aed',
+                    700: '#6d28d9',
+                    800: '#5b21b6',
+                    900: '#4c1d95',
+                },
+                accent: {
+                    gold: '#D4AF37',
+                    deep: '#1e1b4b',
+                }
             },
+            fontFamily: {
+                sans: ['Outfit', 'Inter', 'sans-serif'],
+                serif: ['Playfair Display', 'serif'],
+            },
+            backgroundImage: {
+                'mesh-gradient': "radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%)",
+            }
         },
     },
     plugins: [],
