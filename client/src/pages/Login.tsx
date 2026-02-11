@@ -22,7 +22,12 @@ export default function Login() {
             login(user, token);
             navigate('/');
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Giriş yapılırken bir hata oluştu');
+            if (!err.response) {
+                setError('Sunucuya bağlanılamadı. Lütfen VITE_API_URL Secret ayarını ve internet bağlantınızı kontrol edin.');
+                console.error('Network Error:', err);
+            } else {
+                setError(err.response?.data?.error || 'Giriş yapılırken bir hata oluştu');
+            }
         } finally {
             setLoading(false);
         }
