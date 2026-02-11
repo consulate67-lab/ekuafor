@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../lib/api';
 import { Company, CompanyEmployee } from '../types';
@@ -81,6 +81,11 @@ export default function CompanyDetail() {
             </header>
 
             <main className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {error && (
+                    <div className="lg:col-span-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                        {error}
+                    </div>
+                )}
                 {/* Sol Kolon: Firma Bilgileri */}
                 <div className="lg:col-span-1 space-y-6">
                     <div className="card">
@@ -164,8 +169,8 @@ export default function CompanyDetail() {
                                             </td>
                                             <td className="px-4 py-3">
                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${emp.role === 'owner' ? 'bg-purple-100 text-purple-800' :
-                                                        emp.role === 'manager' ? 'bg-blue-100 text-blue-800' :
-                                                            'bg-gray-100 text-gray-800'
+                                                    emp.role === 'manager' ? 'bg-blue-100 text-blue-800' :
+                                                        'bg-gray-100 text-gray-800'
                                                     }`}>
                                                     {emp.role.toUpperCase()}
                                                 </span>
