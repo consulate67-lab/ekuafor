@@ -36,7 +36,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.1' });
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), version: '1.0.2' });
 });
 
 // Welcome Message
