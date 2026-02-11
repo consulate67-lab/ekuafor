@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
 import addressService from '../services/address.service';
-
 const router = Router();
 
 /**
@@ -57,6 +56,9 @@ router.get('/provinces/:id', async (req: Request, res: Response) => {
 router.get('/provinces/:provinceId/districts', async (req: Request, res: Response) => {
     try {
         const provinceId = parseInt(req.params.provinceId);
+        if (isNaN(provinceId)) {
+            return res.status(400).json({ success: false, error: 'Geçersiz il ID' });
+        }
         const districts = await addressService.getDistricts(provinceId);
 
         res.json({
@@ -80,6 +82,9 @@ router.get('/provinces/:provinceId/districts/:districtId/neighborhoods',
         try {
             const provinceId = parseInt(req.params.provinceId);
             const districtId = parseInt(req.params.districtId);
+            if (isNaN(provinceId) || isNaN(districtId)) {
+                return res.status(400).json({ success: false, error: 'Geçersiz il veya ilçe ID' });
+            }
             const neighborhoods = await addressService.getNeighborhoods(provinceId, districtId);
 
             res.json({

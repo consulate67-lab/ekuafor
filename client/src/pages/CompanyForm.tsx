@@ -7,19 +7,16 @@ import api from '../lib/api';
 import { Company, Province, District, Neighborhood } from '../types';
 
 // Leaflet marker icon fix
+// Leaflet marker icon fix
 import L from 'leaflet';
-// @ts-ignore
-import icon from 'leaflet/dist/images/marker-icon.png';
-// @ts-ignore
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
-
-let DefaultIcon = L.icon({
-    iconUrl: icon,
-    shadowUrl: iconShadow,
+const DefaultIcon = L.icon({
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
     iconSize: [25, 41],
-    iconAnchor: [12, 41]
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
 });
-
 L.Marker.prototype.options.icon = DefaultIcon;
 
 function LocationMarker({ position, setPosition }: {
@@ -103,9 +100,10 @@ export default function CompanyForm() {
     };
 
     const fetchDistricts = async (provinceId: number) => {
+        if (!provinceId || isNaN(provinceId)) return;
         try {
             const response = await api.get(`/address/provinces/${provinceId}/districts`);
-            setDistricts(response.data.data);
+            setDistricts(response.data.data || []);
             setNeighborhoods([]);
         } catch (err) {
             console.error('İlçeler yüklenirken hata:', err);
@@ -113,11 +111,12 @@ export default function CompanyForm() {
     };
 
     const fetchNeighborhoods = async (provinceId: number, districtId: number) => {
+        if (!provinceId || isNaN(provinceId) || !districtId || isNaN(districtId)) return;
         try {
             const response = await api.get(
                 `/address/provinces/${provinceId}/districts/${districtId}/neighborhoods`
             );
-            setNeighborhoods(response.data.data);
+            setNeighborhoods(response.data.data || []);
         } catch (err) {
             console.error('Mahalleler yüklenirken hata:', err);
         }
@@ -171,7 +170,18 @@ export default function CompanyForm() {
 
             navigate('/companies');
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Firma kaydedilirken hata oluştu');
+            if (!err.response) {
+                setError(`Sunucuya bağlanılamadı. Hedef Adres: ${api.defaults.baseURL}. Lütfen bağlantınızı kontrol edin.`);
+            } else {
+                const apiError = err.response?.data?.error;
+                const details = err.response?.data?.details;
+
+                if (details && Array.isArray(details)) {
+                    setError(`${apiError}: ${details.map((d: any) => d.message).join(', ')}`);
+                } else {
+                    setError(apiError || 'Firma kaydedilirken hata oluştu');
+                }
+            }
         } finally {
             setLoading(false);
         }

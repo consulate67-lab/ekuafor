@@ -31,7 +31,10 @@ const companySchema = z.object({
 
     bank_name: z.string().optional(),
     bank_branch: z.string().optional(),
-    iban: z.string().regex(/^TR\d{24}$/, 'Geçerli bir IBAN giriniz (TR ile başlamalı)').optional(),
+    iban: z.string().optional().transform(v => v ? v.replace(/\s+/g, '') : v).refine(
+        v => !v || /^TR\d{24}$/.test(v),
+        'Geçerli bir IBAN giriniz (TR ile başlayan 26 haneli numara)'
+    ),
     account_holder_name: z.string().optional(),
 
     commission_rate: z.number().min(0).max(100).optional(),
