@@ -75,7 +75,9 @@ class AddressService {
      */
     async getDistricts(provinceId: number): Promise<District[]> {
         try {
-            const response = await axios.get(`${TURKEY_API_BASE}/provinces/${provinceId}/districts`);
+            const response = await axios.get(`${TURKEY_API_BASE}/districts`, {
+                params: { provinceId }
+            });
             return response.data.data || [];
         } catch (error) {
             console.error(`Error fetching districts for province ${provinceId}:`, error);
@@ -88,9 +90,9 @@ class AddressService {
      */
     async getNeighborhoods(provinceId: number, districtId: number): Promise<Neighborhood[]> {
         try {
-            const response = await axios.get(
-                `${TURKEY_API_BASE}/provinces/${provinceId}/districts/${districtId}/neighborhoods`
-            );
+            const response = await axios.get(`${TURKEY_API_BASE}/neighborhoods`, {
+                params: { districtId }
+            });
             return response.data.data || [];
         } catch (error) {
             console.error(`Error fetching neighborhoods:`, error);
