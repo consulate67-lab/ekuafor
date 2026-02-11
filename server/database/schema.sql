@@ -1,10 +1,15 @@
 -- Saloon Randevu Sistemi Veritabanı Şeması
 
--- Kullanıcı Rolleri
-CREATE TYPE user_role AS ENUM ('super_admin', 'company_admin', 'customer');
+-- Kullanıcı Rolleri (Eğer yoksa oluştur)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+        CREATE TYPE user_role AS ENUM ('super_admin', 'company_admin', 'customer');
+    END IF;
+END$$;
 
 -- Kullanıcılar Tablosu
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -18,7 +23,7 @@ CREATE TABLE users (
 );
 
 -- Firmalar Tablosu
-CREATE TABLE companies (
+CREATE TABLE IF NOT EXISTS companies (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     description TEXT,
@@ -62,19 +67,19 @@ CREATE TABLE companies (
     created_by INTEGER REFERENCES users(id)
 );
 
--- Firma-Kullanıcı İlişkisi (Firma yöneticileri ve çalışanları)
-CREATE TABLE company_users (
+-- Firma-Kullanıcı İlişkisi
+CREATE TABLE IF NOT EXISTS company_users (
     id SERIAL PRIMARY KEY,
     company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    role VARCHAR(50) DEFAULT 'staff', -- 'owner', 'manager', 'staff'
+    role VARCHAR(50) DEFAULT 'staff',
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(company_id, user_id)
 );
 
 -- Hizmetler Tablosu
-CREATE TABLE services (
+CREATE TABLE IF NOT EXISTS services (
     id SERIAL PRIMARY KEY,
     company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
@@ -87,10 +92,10 @@ CREATE TABLE services (
 );
 
 -- Çalışma Saatleri
-CREATE TABLE working_hours (
+CREATE TABLE IF NOT EXISTS working_hours (
     id SERIAL PRIMARY KEY,
     company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
-    day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6), -- 0=Pazar, 6=Cumartesi
+    day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
     start_time TIME NOT NULL,
     end_time TIME NOT NULL,
     is_active BOOLEAN DEFAULT true,
@@ -98,7 +103,7 @@ CREATE TABLE working_hours (
 );
 
 -- Randevular
-CREATE TABLE appointments (
+CREATE TABLE IF NOT EXISTS appointments (
     id SERIAL PRIMARY KEY,
     company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
     customer_id INTEGER REFERENCES users(id),
@@ -109,20 +114,19 @@ CREATE TABLE appointments (
     start_time TIME NOT NULL,
     end_time TIME NOT NULL,
     
-    status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'confirmed', 'completed', 'cancelled'
+    status VARCHAR(50) DEFAULT 'pending',
     notes TEXT,
     
-    -- Ödeme Bilgileri
     price DECIMAL(10, 2),
-    payment_status VARCHAR(50) DEFAULT 'unpaid', -- 'unpaid', 'paid', 'refunded'
-    payment_method VARCHAR(50), -- 'cash', 'card', 'online'
+    payment_status VARCHAR(50) DEFAULT 'unpaid',
+    payment_method VARCHAR(50),
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Ödemeler Tablosu
-CREATE TABLE payments (
+CREATE TABLE IF NOT EXISTS payments (
     id SERIAL PRIMARY KEY,
     appointment_id INTEGER REFERENCES appointments(id),
     company_id INTEGER REFERENCES companies(id),
@@ -132,7 +136,7 @@ CREATE TABLE payments (
     net_amount DECIMAL(10, 2) NOT NULL,
     
     payment_method VARCHAR(50),
-    payment_status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'completed', 'failed', 'refunded'
+    payment_status VARCHAR(50) DEFAULT 'pending',
     
     transaction_id VARCHAR(255),
     transaction_date TIMESTAMP,
@@ -142,16 +146,16 @@ CREATE TABLE payments (
 );
 
 -- İndeksler
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_role ON users(role);
-CREATE INDEX idx_companies_active ON companies(is_active);
-CREATE INDEX idx_companies_location ON companies(latitude, longitude);
-CREATE INDEX idx_appointments_date ON appointments(appointment_date);
-CREATE INDEX idx_appointments_company ON appointments(company_id);
-CREATE INDEX idx_appointments_customer ON appointments(customer_id);
-CREATE INDEX idx_payments_company ON payments(company_id);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_companies_active ON companies(is_active);
+CREATE INDEX IF NOT EXISTS idx_companies_location ON companies(latitude, longitude);
+CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date);
+CREATE INDEX IF NOT EXISTS idx_appointments_company ON appointments(company_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_customer ON appointments(customer_id);
+CREATE INDEX IF NOT EXISTS idx_payments_company ON payments(company_id);
 
--- Trigger: updated_at otomatik güncelleme
+-- Trigger Function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -160,24 +164,24 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Triggers (Eksikse oluştur)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_users_updated_at') THEN
+        CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_companies_updated_at') THEN
+        CREATE TRIGGER update_companies_updated_at BEFORE UPDATE ON companies FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_services_updated_at') THEN
+        CREATE TRIGGER update_services_updated_at BEFORE UPDATE ON services FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_appointments_updated_at') THEN
+        CREATE TRIGGER update_appointments_updated_at BEFORE UPDATE ON appointments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+END$$;
 
-CREATE TRIGGER update_companies_updated_at BEFORE UPDATE ON companies
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_services_updated_at BEFORE UPDATE ON services
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_appointments_updated_at BEFORE UPDATE ON appointments
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
--- Varsayılan Super Admin Kullanıcısı (şifre: admin123)
+-- Varsayılan Admin (Çakışma varsa yapma)
 INSERT INTO users (email, password_hash, role, first_name, last_name) 
-VALUES (
-    'admin@saloon.com',
-    '$2a$10$YourHashedPasswordHere', -- Bu şifreyi bcrypt ile hash'lemeniz gerekiyor
-    'super_admin',
-    'Super',
-    'Admin'
-);
+VALUES ('admin@saloon.com', '$2a$10$YourHashedPasswordHere', 'super_admin', 'Super', 'Admin')
+ON CONFLICT (email) DO NOTHING;
