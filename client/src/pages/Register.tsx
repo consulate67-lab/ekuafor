@@ -33,9 +33,16 @@ export default function Register() {
             navigate('/');
         } catch (err: any) {
             if (!err.response) {
-                setError('Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.');
+                setError(`Sunucuya bağlanılamadı. Hedef Adres: ${api.defaults.baseURL}. Lütfen internet bağlantınızı kontrol edin.`);
             } else {
-                setError(err.response?.data?.error || 'Kayıt sırasında bir hata oluştu');
+                const apiError = err.response?.data?.error;
+                const details = err.response?.data?.details;
+
+                if (details && Array.isArray(details)) {
+                    setError(`${apiError}: ${details.map((d: any) => d.message).join(', ')}`);
+                } else {
+                    setError(apiError || 'Kayıt sırasında bir hata oluştu');
+                }
             }
         } finally {
             setLoading(false);

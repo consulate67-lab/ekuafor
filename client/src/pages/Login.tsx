@@ -37,9 +37,15 @@ export default function Login() {
         } catch (err: any) {
             if (!err.response) {
                 setError(`Sunucuya bağlanılamadı. Hedef Adres: ${api.defaults.baseURL}. Lütfen VITE_API_URL Secret ayarını kontrol edin.`);
-                console.error('Network Error:', err);
             } else {
-                setError(err.response?.data?.error || 'Giriş yapılırken bir hata oluştu');
+                const apiError = err.response?.data?.error;
+                const details = err.response?.data?.details;
+
+                if (details && Array.isArray(details)) {
+                    setError(`${apiError}: ${details.map((d: any) => d.message).join(', ')}`);
+                } else {
+                    setError(apiError || 'Giriş yapılırken bir hata oluştu');
+                }
             }
         } finally {
             setLoading(false);
