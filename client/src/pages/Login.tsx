@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 import api from '../lib/api';
 
@@ -10,6 +11,18 @@ export default function Login() {
     const [error, setError] = useState('');
     const navigate = useNavigate();
     const login = useAuthStore((state) => state.login);
+
+    const [pingStatus, setPingStatus] = useState<'idle' | 'checking' | 'online' | 'offline'>('idle');
+
+    const checkServer = async () => {
+        setPingStatus('checking');
+        try {
+            await axios.get(api.defaults.baseURL + '/health', { timeout: 5000 });
+            setPingStatus('online');
+        } catch (e) {
+            setPingStatus('offline');
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -49,6 +62,28 @@ export default function Login() {
                 </div>
 
                 <div className="card glass-card">
+                    {/* Connectivity Badge */}
+                    <div className="flex justify-end mb-4">
+                        <button
+                            onClick={checkServer}
+                            className={`text-[10px] font-bold px-2 py-1 rounded-full transition-all flex items-center gap-1.5 ${pingStatus === 'online' ? 'bg-green-100 text-green-700' :
+                                pingStatus === 'offline' ? 'bg-red-100 text-red-700' :
+                                    pingStatus === 'checking' ? 'bg-blue-100 text-blue-700 animate-pulse' :
+                                        'bg-gray-100 text-gray-500'
+                                }`}
+                        >
+                            <span className={`w-1.5 h-1.5 rounded-full ${pingStatus === 'online' ? 'bg-green-500' :
+                                pingStatus === 'offline' ? 'bg-red-500' :
+                                    'bg-gray-400'
+                                }`}></span>
+                            API: {
+                                pingStatus === 'online' ? 'Aktif' :
+                                    pingStatus === 'offline' ? 'Hata' :
+                                        pingStatus === 'checking' ? 'Kontrol Ediliyor' : 'Bağlantıyı Test Et'
+                            }
+                        </button>
+                    </div>
+
                     {error && (
                         <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-r-lg animate-shake text-sm">
                             <p className="font-medium">Hata!</p>
