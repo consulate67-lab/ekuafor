@@ -31,9 +31,14 @@ const companySchema = z.object({
 
     bank_name: z.string().optional(),
     bank_branch: z.string().optional(),
-    iban: z.string().optional().transform(v => v ? v.replace(/\s+/g, '') : v).refine(
-        v => !v || /^TR\d{24}$/.test(v),
-        'Geçerli bir IBAN giriniz (TR ile başlayan 26 haneli numara)'
+    iban: z.string().optional().transform(v => v ? v.replace(/[^A-Z0-9]/gi, '').toUpperCase() : v).refine(
+        v => {
+            if (!v) return true;
+            return /^TR\d{24}$/.test(v);
+        },
+        (v) => ({
+            message: `Geçerli bir IBAN giriniz. TR ile başlamalı ve 26 karakter olmalıdır (Şu an: ${v?.length || 0} karakter)`
+        })
     ),
     account_holder_name: z.string().optional(),
 
