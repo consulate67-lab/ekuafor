@@ -8,6 +8,10 @@ import Dashboard from './pages/Dashboard';
 import CompanyForm from './pages/CompanyForm';
 import CompanyList from './pages/CompanyList';
 import CompanyDetail from './pages/CompanyDetail';
+import ServiceManagement from './pages/ServiceManagement';
+import AppointmentManagement from './pages/AppointmentManagement';
+import CustomerHome from './pages/CustomerHome';
+import BookingPage from './pages/BookingPage';
 
 function App() {
     const { isAuthenticated, initialized, setUser, setInitialized } = useAuthStore();
@@ -43,7 +47,7 @@ function App() {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
                 <div className="text-center">
-                    <div className="w-12 h-12 border-4 border-primary-100 border-t-primary-600 rounded-full animate-spin mx-auto"></div>
+                    <div className="w-12 h-12 border-4 border-pink-100 border-t-pink-600 rounded-full animate-spin mx-auto"></div>
                     <p className="mt-4 text-gray-500 font-bold tracking-widest uppercase text-[10px]">Oturum Kontrol Ediliyor...</p>
                 </div>
             </div>
@@ -53,20 +57,31 @@ function App() {
     return (
         <Router basename="/ekuafor">
             <Routes>
-                <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
-                <Route path="/register" element={isAuthenticated ? <Navigate to="/" replace /> : <Register />} />
+                {/* Public Routes */}
+                <Route path="/" element={<CustomerHome />} />
+                <Route path="/book/:id" element={<BookingPage />} />
+                <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
+                <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />} />
 
+                {/* Protected Routes */}
                 {isAuthenticated ? (
                     <>
-                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/companies" element={<CompanyList />} />
                         <Route path="/companies/new" element={<CompanyForm />} />
                         <Route path="/companies/:id" element={<CompanyDetail />} />
                         <Route path="/companies/:id/edit" element={<CompanyForm />} />
-                        <Route path="*" element={<Navigate to="/" replace />} />
+                        <Route path="/services" element={<ServiceManagement />} />
+                        <Route path="/appointments" element={<AppointmentManagement />} />
+                        <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </>
                 ) : (
-                    <Route path="*" element={<Navigate to="/login" replace />} />
+                    <>
+                        <Route path="/dashboard" element={<Navigate to="/login" replace />} />
+                        <Route path="/services" element={<Navigate to="/login" replace />} />
+                        <Route path="/appointments" element={<Navigate to="/login" replace />} />
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                    </>
                 )}
             </Routes>
         </Router>

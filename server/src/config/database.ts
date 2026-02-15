@@ -5,6 +5,13 @@ dotenv.config();
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+console.log('--- Database Configuration ---');
+console.log('Host:', process.env.DB_HOST || 'localhost');
+console.log('Port:', process.env.DB_PORT || '5432');
+console.log('Database:', process.env.DB_NAME || 'saloon_db');
+console.log('User:', process.env.DB_USER || 'postgres');
+console.log('------------------------------');
+
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     host: process.env.DATABASE_URL ? undefined : (process.env.DB_HOST || 'localhost'),
@@ -12,10 +19,10 @@ const pool = new Pool({
     database: process.env.DATABASE_URL ? undefined : (process.env.DB_NAME || 'saloon_db'),
     user: process.env.DATABASE_URL ? undefined : (process.env.DB_USER || 'postgres'),
     password: process.env.DATABASE_URL ? undefined : process.env.DB_PASSWORD,
-    ssl: isProduction ? { rejectUnauthorized: false } : false,
+    ssl: { rejectUnauthorized: false }, // Force SSL for Railway/Render
     max: 20,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
+    connectionTimeoutMillis: 10000, // Increased timeout
 });
 
 pool.on('connect', () => {

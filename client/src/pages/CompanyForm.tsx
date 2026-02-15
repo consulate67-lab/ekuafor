@@ -198,14 +198,12 @@ export default function CompanyForm() {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
-            <header className="bg-white shadow-sm">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                    <Link to="/companies" className="text-primary-600 hover:text-primary-700 text-sm mb-2 inline-block">
-                        ← Firma Listesine Dön
+            <header className="bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-gray-100">
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                    <Link to="/companies" className="text-pink-600 hover:text-pink-700 text-xs font-bold uppercase tracking-widest mb-1 inline-block">
+                        ← Firmalar
                     </Link>
-                    <h1 className="text-2xl font-bold text-gray-900">
-                        {isEdit ? 'Firma Düzenle' : 'Yeni Firma Ekle'}
-                    </h1>
+                    <h1 className="text-2xl font-bold heading-serif">{id ? 'Firmayı Düzenle' : 'Yeni Firma Ekle'}</h1>
                 </div>
             </header>
 
@@ -288,6 +286,32 @@ export default function CompanyForm() {
                                     onChange={handleChange}
                                     className="input-field"
                                     placeholder="https://www.example.com"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Mesai Başlangıç
+                                </label>
+                                <input
+                                    type="time"
+                                    name="work_start_time"
+                                    value={formData.work_start_time || '09:00'}
+                                    onChange={handleChange}
+                                    className="input-field"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Mesai Bitiş
+                                </label>
+                                <input
+                                    type="time"
+                                    name="work_end_time"
+                                    value={formData.work_end_time || '20:00'}
+                                    onChange={handleChange}
+                                    className="input-field"
                                 />
                             </div>
                         </div>
@@ -494,7 +518,7 @@ export default function CompanyForm() {
                                     name="payment_enabled"
                                     checked={formData.payment_enabled}
                                     onChange={(e) => setFormData(prev => ({ ...prev, payment_enabled: e.target.checked }))}
-                                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                                    className="w-4 h-4 text-pink-600 border-gray-300 rounded focus:ring-pink-500"
                                 />
                                 <label className="ml-2 text-sm text-gray-700">
                                     Ödeme sistemi aktif

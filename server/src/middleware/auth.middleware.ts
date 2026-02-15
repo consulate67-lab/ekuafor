@@ -5,6 +5,7 @@ interface JwtPayload {
     userId: number;
     email: string;
     role: string;
+    companyId?: number;
 }
 
 declare global {
@@ -29,7 +30,7 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
         const token = authHeader.split(' ')[1];
         const decoded = jwt.verify(
             token,
-            process.env.JWT_SECRET || 'your-super-secret-jwt-key'
+            process.env.JWT_SECRET || 'your-secret-key'
         ) as JwtPayload;
 
         req.user = decoded;

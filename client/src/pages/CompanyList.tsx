@@ -7,6 +7,7 @@ export default function CompanyList() {
     const [companies, setCompanies] = useState<Company[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [selectedQR, setSelectedQR] = useState<number | null>(null);
 
     useEffect(() => {
         fetchCompanies();
@@ -47,7 +48,7 @@ export default function CompanyList() {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
                 <div className="text-center">
-                    <div className="w-16 h-16 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto"></div>
+                    <div className="w-16 h-16 border-4 border-pink-200 border-t-pink-600 rounded-full animate-spin mx-auto"></div>
                     <p className="mt-6 text-gray-500 font-bold tracking-widest uppercase text-xs">Yükleniyor...</p>
                 </div>
             </div>
@@ -61,7 +62,7 @@ export default function CompanyList() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <div className="flex justify-between items-center text-center sm:text-left">
                         <div>
-                            <Link to="/" className="text-primary-600 hover:text-primary-700 text-xs font-bold uppercase tracking-widest mb-1 inline-block">
+                            <Link to="/" className="text-pink-600 hover:text-pink-700 text-xs font-bold uppercase tracking-widest mb-1 inline-block">
                                 ← Dashboard
                             </Link>
                             <h1 className="text-2xl font-bold heading-serif">Firmalar</h1>
@@ -105,24 +106,29 @@ export default function CompanyList() {
                                 <div className="flex justify-between items-start">
                                     <div className="flex-1">
                                         <div className="flex items-center gap-3 mb-4">
-                                            <Link to={`/companies/${company.id}`} className="hover:text-primary-600 transition-colors">
-                                                <h3 className="text-2xl font-bold text-gray-900 group-hover:text-primary-700 transition-colors">{company.name}</h3>
+                                            <Link to={`/companies/${company.id}`} className="hover:text-pink-600 transition-colors">
+                                                <h3 className="text-2xl font-bold text-gray-900 group-hover:text-pink-700 transition-colors">{company.name}</h3>
                                             </Link>
                                             <div className="flex gap-2">
-                                                {company.is_verified ? (
-                                                    <span className="bg-green-100 text-green-700 text-[10px] uppercase font-bold px-2 py-0.5 rounded tracking-tighter">
-                                                        ONAYLI
+                                                <div className="flex gap-2 items-center">
+                                                    <span className="bg-slate-900 text-white text-[10px] font-black px-2 py-1 rounded shadow-sm">
+                                                        FIRMA NO: {company.id}
                                                     </span>
-                                                ) : (
-                                                    <span className="bg-amber-100 text-amber-700 text-[10px] uppercase font-bold px-2 py-0.5 rounded tracking-tighter">
-                                                        BEKLEMEDE
-                                                    </span>
-                                                )}
-                                                {!company.is_active && (
-                                                    <span className="bg-red-100 text-red-700 text-[10px] uppercase font-bold px-2 py-0.5 rounded tracking-tighter">
-                                                        PASİF
-                                                    </span>
-                                                )}
+                                                    {company.is_verified ? (
+                                                        <span className="bg-green-100 text-green-700 text-[10px] uppercase font-bold px-2 py-1 rounded tracking-tighter">
+                                                            ONAYLI
+                                                        </span>
+                                                    ) : (
+                                                        <span className="bg-amber-100 text-amber-700 text-[10px] uppercase font-bold px-2 py-1 rounded tracking-tighter">
+                                                            BEKLEMEDE
+                                                        </span>
+                                                    )}
+                                                    {!company.is_active && (
+                                                        <span className="bg-red-100 text-red-700 text-[10px] uppercase font-bold px-2 py-1 rounded tracking-tighter">
+                                                            PASİF
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
 
@@ -132,7 +138,7 @@ export default function CompanyList() {
 
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6 text-xs font-semibold">
                                             {company.email && (
-                                                <div className="flex items-center gap-2 text-gray-600 hover:text-primary-600 transition-colors">
+                                                <div className="flex items-center gap-2 text-gray-600 hover:text-pink-600 transition-colors">
                                                     <div className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center">
                                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -143,7 +149,7 @@ export default function CompanyList() {
                                             )}
 
                                             {company.phone && (
-                                                <div className="flex items-center gap-2 text-gray-600 hover:text-primary-600 transition-colors">
+                                                <div className="flex items-center gap-2 text-gray-600 hover:text-pink-600 transition-colors">
                                                     <div className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center">
                                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -154,7 +160,7 @@ export default function CompanyList() {
                                             )}
 
                                             {company.province_name && (
-                                                <div className="flex items-center gap-2 text-gray-600 hover:text-primary-600 transition-colors">
+                                                <div className="flex items-center gap-2 text-gray-600 hover:text-pink-600 transition-colors">
                                                     <div className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center">
                                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -166,7 +172,7 @@ export default function CompanyList() {
                                             )}
 
                                             {company.iban && (
-                                                <div className="flex items-center gap-2 text-gray-600 hover:text-primary-600 transition-colors">
+                                                <div className="flex items-center gap-2 text-gray-600 hover:text-pink-600 transition-colors">
                                                     <div className="w-7 h-7 bg-gray-50 rounded-lg flex items-center justify-center">
                                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
@@ -179,6 +185,15 @@ export default function CompanyList() {
                                     </div>
 
                                     <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
+                                        {/* QR Button */}
+                                        <button
+                                            onClick={() => setSelectedQR(company.id!)}
+                                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-violet-50 text-violet-600 hover:bg-violet-600 hover:text-white transition-all duration-300"
+                                            title="Karekod"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 12v1m0 0v3m0-3h3m-3 0h-3m3 3v-3m-9 3v-3m0 3h3m-3 0h-3m3 3v-3m0 3v-3m-3 3h3m3 0h3" /></svg>
+                                        </button>
+
                                         {!company.is_verified && (
                                             <button
                                                 onClick={() => handleVerify(company.id!)}
@@ -207,17 +222,49 @@ export default function CompanyList() {
                                     </div>
                                 </div>
                                 <div className="mt-8 pt-6 border-t border-gray-50 flex justify-between items-center">
-                                    <Link to={`/companies/${company.id}`} className="text-secondary-600 hover:text-secondary-700 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                                    <Link to={`/companies/${company.id}`} className="text-violet-600 hover:text-violet-700 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
                                         Detayları Görüntüle
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                                     </Link>
-                                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">ID: #{company.id}</span>
                                 </div>
                             </div>
                         ))}
                     </div>
                 )}
             </main>
+
+            {/* QR Modal */}
+            {selectedQR && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="card w-full max-w-sm shadow-2xl scale-in-center animate-in zoom-in-95 duration-300 bg-white p-8 text-center relative">
+                        <button onClick={() => setSelectedQR(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+
+                        <h3 className="text-2xl font-black text-gray-900 mb-2">Firma Karekodu</h3>
+                        <p className="text-sm text-gray-500 font-medium mb-6">Müşterileriniz bu kodu okutarak randevu alabilir.</p>
+
+                        <div className="bg-white p-4 rounded-xl border-2 border-dashed border-gray-200 inline-block mb-6">
+                            <img
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`${window.location.origin}/ekuafor/book/${selectedQR}`)}`}
+                                alt="QR Code"
+                                className="w-48 h-48"
+                            />
+                        </div>
+
+                        <div className="flex gap-3">
+                            <a
+                                href={`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(`${window.location.origin}/ekuafor/book/${selectedQR}`)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex-1 btn-primary py-3 text-sm font-bold"
+                            >
+                                İndir / Yazdır
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

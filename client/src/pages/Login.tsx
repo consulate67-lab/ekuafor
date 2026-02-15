@@ -24,6 +24,10 @@ export default function Login() {
         }
     };
 
+    React.useEffect(() => {
+        checkServer();
+    }, []);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
@@ -55,12 +59,12 @@ export default function Login() {
     return (
         <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-slate-50">
             {/* Background Orbs */}
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-200/30 rounded-full blur-[120px] animate-pulse"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary-200/30 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-pink-200/30 rounded-full blur-[120px] animate-pulse"></div>
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-violet-200/30 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
 
             <div className="max-w-md w-full px-6 relative z-10">
                 <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-primary-600 to-secondary-600 shadow-xl shadow-primary-500/30 mb-6 rotate-3 hover:rotate-0 transition-transform duration-500">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-pink-600 to-violet-600 shadow-xl shadow-pink-500/30 mb-6 rotate-3 hover:rotate-0 transition-transform duration-500">
                         <span className="text-white text-3xl font-serif">S</span>
                     </div>
                     <h1 className="text-4xl font-bold heading-serif mb-2 tracking-tight">Saloon</h1>
@@ -113,7 +117,7 @@ export default function Login() {
                         <div>
                             <div className="flex justify-between items-center mb-1.5 ml-1">
                                 <label className="block text-sm font-semibold text-gray-700">Şifre</label>
-                                <a href="#" className="text-xs font-semibold text-primary-600 hover:text-primary-700 transition-colors">Şifremi Unuttum</a>
+                                <a href="#" className="text-xs font-semibold text-pink-600 hover:text-pink-700 transition-colors">Şifremi Unuttum</a>
                             </div>
                             <input
                                 type="password"
@@ -126,7 +130,7 @@ export default function Login() {
                         </div>
 
                         <div className="flex items-center mb-2 ml-1">
-                            <input type="checkbox" id="remember" className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer" />
+                            <input type="checkbox" id="remember" className="w-4 h-4 text-pink-600 border-gray-300 rounded focus:ring-pink-500 cursor-pointer" />
                             <label htmlFor="remember" className="ml-2 text-sm text-gray-600 cursor-pointer select-none">Beni hatırla</label>
                         </div>
 
@@ -152,7 +156,7 @@ export default function Login() {
                     <div className="mt-8 pt-6 border-t border-gray-100 text-center">
                         <p className="text-sm text-gray-500">
                             Hesabınız yok mu?{' '}
-                            <Link to="/register" className="font-bold text-secondary-600 hover:text-secondary-700 transition-colors">Hemen Kaydolun</Link>
+                            <Link to="/register" className="font-bold text-violet-600 hover:text-violet-700 transition-colors">Hemen Kaydolun</Link>
                         </p>
                     </div>
                 </div>

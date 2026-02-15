@@ -11,6 +11,7 @@
         "server:dev": "npm run dev --workspace=server",
         "build": "npm run build --workspaces",
         "deploy": "npm run deploy --workspace=client",
+        "deploy:all": "npm run deploy --workspace=client && git push",
         "install:all": "npm install && npm install --workspaces"
     }
 }

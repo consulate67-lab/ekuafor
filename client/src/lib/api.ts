@@ -4,7 +4,7 @@ let baseUrl = import.meta.env.VITE_API_URL;
 
 // Akıllı Otomatik Bağlantı: Canlıda mıyız?
 if (!baseUrl && window.location.hostname.includes('github.io')) {
-    baseUrl = 'https://ekuafor-backend.onrender.com/api';
+    baseUrl = 'https://web-production-db847.up.railway.app/api';
 }
 
 // Varsayılan (Yerel) Değer
@@ -19,6 +19,13 @@ console.log('-----------------------------');
 console.log('Final API BaseUrl:', baseUrl);
 console.log('-------------------------');
 
+// MOCK SERVER ENTEGRASYONU (Tarayıcı Veritabanı)
+// Sunucu hatalarından kurtulmak için tarayıcı içi veritabanı kullanımı.
+import { mockAdapter } from './mock-server';
+
+// Mock Sunucuyu Devreye Al (Her zaman veya sadece canlıda)
+const USE_MOCK_SERVER = false; // RAILWAY AKTİF (Gerçek Veri)
+
 const api = axios.create({
     baseURL: baseUrl,
     headers: {
@@ -26,13 +33,69 @@ const api = axios.create({
     },
 });
 
-// Request interceptor - token ekle
+// Request interceptor - token ekle ve MOCK YÖNLENDİRME
 api.interceptors.request.use(
-    (config) => {
+    async (config) => {
+        // Token ekle
         const token = localStorage.getItem('token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+
+        // MOCK SERVER KONTROLÜ
+        if (USE_MOCK_SERVER) {
+            console.log('⚡ Mock Server İsteği:', config.url);
+
+            // Sadece desteklenen rotaları mockla, diğerleri (örn dış api) geçsin
+            const mockedRoutes = ['/auth', '/services', '/users', '/companies', '/appointments'];
+            if (mockedRoutes.some(r => config.url?.includes(r))) {
+                config.adapter = async (cfg) => {
+                    try {
+                        const response = await mockAdapter({
+                            method: cfg.method!,
+                            url: cfg.url!,
+                            data: cfg.data,
+                            headers: cfg.headers
+                        });
+
+
+                        const axiosResponse = {
+                            data: response.data,
+                            status: response.status || 200,
+                            statusText: response.status === 200 ? 'OK' : 'Error',
+                            headers: {},
+                            config: cfg,
+                            request: {}
+                        };
+
+                        // Manually reject if status involves error (Axios validateStatus logic simulation)
+                        if (response.status >= 300) {
+                            return Promise.reject({
+                                message: 'Request failed with status code ' + response.status,
+                                name: 'AxiosError',
+                                code: 'ERR_BAD_REQUEST',
+                                config: cfg,
+                                request: {},
+                                response: axiosResponse
+                            });
+                        }
+
+                        return axiosResponse;
+                    } catch (err: any) {
+                        return Promise.reject({
+                            response: {
+                                data: err.response?.data || { error: 'Mock Server Error' },
+                                status: err.response?.status || 500,
+                                statusText: 'Internal Server Error',
+                                headers: {},
+                                config: cfg
+                            }
+                        });
+                    }
+                };
+            }
+        }
+
         return config;
     },
     (error) => {

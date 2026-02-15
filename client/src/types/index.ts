@@ -4,7 +4,8 @@ export interface User {
     first_name: string;
     last_name: string;
     phone?: string;
-    role: 'super_admin' | 'company_admin' | 'customer';
+    role: 'super_admin' | 'company_admin' | 'staff' | 'customer';
+    company_id?: number;
     created_at: string;
 }
 
@@ -39,6 +40,10 @@ export interface Company {
     // Ödeme
     commission_rate?: number;
     payment_enabled?: boolean;
+
+    // Çalışma Saatleri
+    work_start_time?: string;
+    work_end_time?: string;
 
     // Durum
     is_active?: boolean;
@@ -80,4 +85,30 @@ export interface CompanyEmployee {
     created_at: string;
     // İlişkili kullanıcı bilgileri
     user?: User;
+}
+
+export interface Service {
+    id?: number;
+    company_id: number;
+    name: string;
+    description?: string;
+    duration_minutes: number;
+    price: number;
+    is_active?: boolean;
+}
+
+export interface Appointment {
+    id?: number;
+    company_id: number;
+    customer_id?: number;
+    service_id: number;
+    staff_id?: number;
+    appointment_date: string;
+    start_time: string;
+    end_time: string;
+    status: 'pending' | 'approved' | 'cancelled' | 'completed';
+    notes?: string;
+    price?: number;
+    customer_name?: string;
+    service_name?: string;
 }

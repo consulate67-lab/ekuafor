@@ -4,13 +4,22 @@ import { useAuthStore } from '../store/authStore';
 import api from '../lib/api';
 
 export default function Register() {
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<{
+        email: string;
+        password: string;
+        first_name: string;
+        last_name: string;
+        phone: string;
+        role: string;
+        company_id?: number;
+    }>({
         email: '',
         password: '',
         first_name: '',
         last_name: '',
         phone: '',
-        role: 'company_admin' // Varsayılan olarak işletme sahibi
+        role: 'company_admin',
+        company_id: undefined
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -52,12 +61,12 @@ export default function Register() {
     return (
         <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-slate-50 py-12 px-4">
             {/* Background Orbs */}
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-200/30 rounded-full blur-[120px] animate-pulse"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary-200/30 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-pink-200/30 rounded-full blur-[120px] animate-pulse"></div>
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-violet-200/30 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
 
             <div className="max-w-md w-full relative z-10">
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-primary-600 to-secondary-600 shadow-xl shadow-primary-500/30 mb-6 rotate-3 hover:rotate-0 transition-transform duration-500">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-pink-600 to-violet-600 shadow-xl shadow-pink-500/30 mb-6 rotate-3 hover:rotate-0 transition-transform duration-500">
                         <span className="text-white text-3xl font-serif">S</span>
                     </div>
                     <h1 className="text-3xl font-bold heading-serif mb-2 tracking-tight">Hesap Oluştur</h1>
@@ -139,6 +148,21 @@ export default function Register() {
                         </div>
 
                         <div>
+                            <label className="block text-xs font-bold text-gray-700 mb-1 ml-1 uppercase">Firma ID (İsteğe Bağlı)</label>
+                            <input
+                                type="number"
+                                name="company_id"
+                                className="input-field py-2"
+                                placeholder="Firma numaranız"
+                                value={formData.company_id || ''}
+                                onChange={(e) => {
+                                    const val = parseInt(e.target.value);
+                                    setFormData({ ...formData, company_id: isNaN(val) ? undefined : val });
+                                }}
+                            />
+                        </div>
+
+                        <div>
                             <label className="block text-xs font-bold text-gray-700 mb-1 ml-1 uppercase">Hesap Türü</label>
                             <select
                                 name="role"
@@ -173,7 +197,7 @@ export default function Register() {
                     <div className="mt-6 pt-4 border-t border-gray-100 text-center">
                         <p className="text-sm text-gray-500">
                             Zaten hesabınız var mı?{' '}
-                            <Link to="/login" className="font-bold text-primary-600 hover:text-primary-700 transition-colors">Giriş Yapın</Link>
+                            <Link to="/login" className="font-bold text-pink-600 hover:text-pink-700 transition-colors">Giriş Yapın</Link>
                         </p>
                     </div>
                 </div>

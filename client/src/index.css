@@ -19,7 +19,7 @@ body {
 
 @layer components {
   .btn-primary {
-    @apply bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white font-medium py-2.5 px-6 rounded-xl transition-all duration-300 shadow-lg shadow-primary-500/20 active:scale-[0.98] disabled:opacity-50;
+    @apply bg-gradient-to-r from-pink-600 to-violet-600 hover:from-pink-700 hover:to-violet-700 text-white font-medium py-2.5 px-6 rounded-xl transition-all duration-300 shadow-lg shadow-pink-500/20 active:scale-[0.98] disabled:opacity-50;
   }
 
   .btn-secondary {
@@ -27,7 +27,7 @@ body {
   }
 
   .input-field {
-    @apply w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200 placeholder:text-gray-400;
+    @apply w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 transition-all duration-200 placeholder:text-gray-400;
   }
 
   .card {
@@ -39,7 +39,7 @@ body {
   }
 
   .heading-serif {
-    @apply font-serif text-accent-deep;
+    @apply font-serif text-indigo-950;
   }
 }
 

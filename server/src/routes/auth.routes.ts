@@ -17,7 +17,8 @@ const registerSchema = z.object({
     first_name: z.string().min(2, 'Ad en az 2 karakter olmalıdır'),
     last_name: z.string().min(2, 'Soyad en az 2 karakter olmalıdır'),
     phone: z.string().optional(),
-    role: z.enum(['super_admin', 'company_admin', 'customer']).default('customer')
+    role: z.enum(['super_admin', 'company_admin', 'customer']).default('customer'),
+    company_id: z.number().optional()
 });
 
 /**
@@ -46,16 +47,17 @@ router.post('/register', async (req: Request, res: Response) => {
 
         // Kullanıcıyı oluştur
         const result = await pool.query(
-            `INSERT INTO users (email, password_hash, first_name, last_name, phone, role)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, email, first_name, last_name, phone, role, created_at`,
+            `INSERT INTO users (email, password_hash, first_name, last_name, phone, role, company_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, email, first_name, last_name, phone, role, company_id, created_at`,
             [
                 validatedData.email,
                 passwordHash,
                 validatedData.first_name,
                 validatedData.last_name,
-                validatedData.phone,
-                validatedData.role
+                validatedData.phone || null,
+                validatedData.role,
+                validatedData.company_id || null
             ]
         );
 
@@ -63,7 +65,7 @@ router.post('/register', async (req: Request, res: Response) => {
 
         // JWT token oluştur
         const token = jwt.sign(
-            { userId: user.id, email: user.email, role: user.role },
+            { userId: user.id, email: user.email, role: user.role, companyId: user.company_id },
             process.env.JWT_SECRET || 'your-secret-key',
             { expiresIn: '7d' }
         );
@@ -126,7 +128,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
         // JWT token oluştur
         const token = jwt.sign(
-            { userId: user.id, email: user.email, role: user.role },
+            { userId: user.id, email: user.email, role: user.role, companyId: user.company_id },
             process.env.JWT_SECRET || 'your-secret-key',
             { expiresIn: '7d' }
         );
@@ -175,7 +177,7 @@ router.get('/me', async (req: Request, res: Response) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
 
         const result = await pool.query(
-            'SELECT id, email, first_name, last_name, phone, role, created_at FROM users WHERE id = $1 AND is_active = true',
+            'SELECT id, email, first_name, last_name, phone, role, company_id, created_at FROM users WHERE id = $1 AND is_active = true',
             [decoded.userId]
         );
 
@@ -195,6 +197,53 @@ router.get('/me', async (req: Request, res: Response) => {
             success: false,
             error: 'Geçersiz token'
         });
+    }
+});
+
+// Update user company (Fix for missing company_id) - Support both POST and PUT
+router.all('/update-company', async (req: Request, res: Response) => {
+    if (req.method !== 'POST' && req.method !== 'PUT') return res.status(405).json({ error: 'Method not allowed' });
+
+    try {
+        const token = req.headers.authorization?.replace('Bearer ', '');
+        if (!token) return res.status(401).json({ success: false, error: 'Token bulunamadı' });
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
+        const { company_id } = req.body;
+
+        if (!company_id) {
+            return res.status(400).json({ success: false, error: 'Firma ID gereklidir' });
+        }
+
+        // Update user
+        const result = await pool.query(
+            'UPDATE users SET company_id = $1 WHERE id = $2 RETURNING *',
+            [company_id, decoded.userId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
+        }
+
+        const user = result.rows[0];
+
+        // Generate new token with updated companyId
+        const newToken = jwt.sign(
+            { userId: user.id, email: user.email, role: user.role, companyId: user.company_id },
+            process.env.JWT_SECRET || 'your-secret-key',
+            { expiresIn: '7d' }
+        );
+
+        // Remove password from response
+        const { password_hash, ...userWithoutPassword } = user;
+
+        res.json({
+            success: true,
+            data: { user: userWithoutPassword, token: newToken }
+        });
+    } catch (error: any) {
+        console.error('Update Company Error:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
