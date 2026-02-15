@@ -44,7 +44,14 @@ const healthHandler = async (req: Request, res: Response) => {
         res.json({ success: true, db: 'Connected', time: result.rows[0].now });
     } catch (error: any) {
         console.error('Health Check Error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({
+            success: false,
+            error: error.message || String(error) || 'Unknown Error',
+            debug: {
+                has_db_url: !!process.env.DATABASE_URL,
+                node_env: process.env.NODE_ENV
+            }
+        });
     }
 };
 
