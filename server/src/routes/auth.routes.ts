@@ -47,7 +47,7 @@ router.post('/register', async (req: Request, res: Response) => {
 
         // Kullanıcıyı oluştur
         const result = await pool.query(
-            `INSERT INTO users (email, password_hash, first_name, last_name, phone, role, company_id)
+            `INSERT INTO users (email, password, first_name, last_name, phone, role, company_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id, email, first_name, last_name, phone, role, company_id, created_at`,
             [
@@ -103,7 +103,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
         // Kullanıcıyı bul
         const result = await pool.query(
-            'SELECT * FROM users WHERE email = $1 AND is_active = true',
+            'SELECT * FROM users WHERE email = $1',
             [validatedData.email]
         );
 
@@ -117,7 +117,8 @@ router.post('/login', async (req: Request, res: Response) => {
         const user = result.rows[0];
 
         // Şifreyi kontrol et
-        const isPasswordValid = await bcrypt.compare(validatedData.password, user.password_hash);
+        // DİKKAT: Veritabanında sütun adı 'password'
+        const isPasswordValid = await bcrypt.compare(validatedData.password, user.password);
 
         if (!isPasswordValid) {
             return res.status(401).json({
@@ -133,8 +134,8 @@ router.post('/login', async (req: Request, res: Response) => {
             { expiresIn: '7d' }
         );
 
-        // Şifreyi response'dan çıkar
-        const { password_hash, ...userWithoutPassword } = user;
+        // Şifreyi response'dan çıkar (Güvenlik)
+        const { password, ...userWithoutPassword } = user;
 
         res.json({
             success: true,
@@ -152,6 +153,7 @@ router.post('/login', async (req: Request, res: Response) => {
             });
         }
 
+        console.error('Login Error:', error); // Detaylı log
         res.status(500).json({
             success: false,
             error: error instanceof Error ? error.message : 'Giriş sırasında hata oluştu'
@@ -177,7 +179,7 @@ router.get('/me', async (req: Request, res: Response) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
 
         const result = await pool.query(
-            'SELECT id, email, first_name, last_name, phone, role, company_id, created_at FROM users WHERE id = $1 AND is_active = true',
+            'SELECT id, email, first_name, last_name, phone, role, company_id, created_at FROM users WHERE id = $1',
             [decoded.userId]
         );
 
@@ -235,7 +237,7 @@ router.all('/update-company', async (req: Request, res: Response) => {
         );
 
         // Remove password from response
-        const { password_hash, ...userWithoutPassword } = user;
+        const { password, ...userWithoutPassword } = user;
 
         res.json({
             success: true,
