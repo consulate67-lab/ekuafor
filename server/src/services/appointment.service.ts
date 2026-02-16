@@ -65,7 +65,7 @@ class AppointmentService {
 
     async updateAppointmentStatus(id: number, status: string): Promise<Appointment | null> {
         const result = await pool.query(
-            'UPDATE appointments SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+            'UPDATE appointments SET status = $1 WHERE id = $2 RETURNING *',
             [status, id]
         );
         return result.rows[0] || null;

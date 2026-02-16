@@ -79,7 +79,16 @@ export default function AppointmentManagement() {
         e.preventDefault();
         setFormError(''); // Clear previous errors
         try {
-            await api.post('/appointments', { ...newAppointment, status: 'approved' });
+            // Append customer name to notes manually if backend doesn't support customer_name column
+            const customerName = (newAppointment as any).customer_name;
+            const finalNotes = customerName ? `Müşteri: ${customerName} | ${newAppointment.notes}` : newAppointment.notes;
+
+            await api.post('/appointments', {
+                ...newAppointment,
+                company_id: company?.id, // Fix: send company_id
+                notes: finalNotes,
+                status: 'approved'
+            });
             setShowAddForm(false);
             fetchData();
         } catch (err: any) {
@@ -480,10 +489,22 @@ export default function AppointmentManagement() {
                                 </div>
                             </div>
                             <div>
+                                <label className="block text-xs font-bold text-gray-700 mb-2 uppercase ml-1 tracking-wider">Müşteri Adı</label>
+                                <input
+                                    type="text"
+                                    required
+                                    className="input-field py-3 font-bold text-gray-900"
+                                    placeholder="Ad Soyad"
+                                    value={(newAppointment as any).customer_name || ''}
+                                    onChange={(e) => setNewAppointment({ ...newAppointment, customer_name: e.target.value } as any)}
+                                />
+                            </div>
+
+                            <div>
                                 <label className="block text-xs font-bold text-gray-700 mb-2 uppercase ml-1 tracking-wider">Not (Opsiyonel)</label>
                                 <textarea
                                     className="input-field py-3 min-h-[80px]"
-                                    placeholder="Müşteri talebi, özel notlar..."
+                                    placeholder="Özel notlar..."
                                     value={newAppointment.notes}
                                     onChange={(e) => setNewAppointment({ ...newAppointment, notes: e.target.value })}
                                 />
