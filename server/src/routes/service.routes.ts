@@ -25,6 +25,7 @@ router.get('/ping', (req, res) => {
 
 // Tüm hizmetleri listele (Firma bazlı) - Hem '/' hem de boş string '' yakalasın
 // Tüm hizmetleri listele (Firma bazlı) - Hem '/' hem de boş string '' yakalasın
+// Tüm hizmetleri listele (Firma bazlı) - Hem '/' hem de boş string '' yakalasın
 router.get(['/', ''], async (req: Request, res: Response) => {
     try {
         // 1. Public Access (Booking Page)
@@ -35,18 +36,23 @@ router.get(['/', ''], async (req: Request, res: Response) => {
         }
 
         // 2. Private Access (Dashboard) - Manually check auth
-        // We need to invoke authMiddleware manually or replicate its logic
-        // Since we removed it from the route definition to allow public access.
+        // Use a wrapper to handle the middleware async flow
         authMiddleware(req, res, async () => {
-            const companyId = req.user?.companyId;
-            if (!companyId) {
-                return res.status(403).json({ success: false, error: 'Firma ID bulunamadı' });
+            try {
+                const companyId = req.user?.companyId;
+                if (!companyId) {
+                    return res.status(403).json({ success: false, error: 'Firma ID bulunamadı' });
+                }
+                const services = await serviceService.getServicesByCompany(companyId);
+                res.json({ success: true, data: services });
+            } catch (innerError) {
+                console.error('Service Fetch Error (Inner):', innerError);
+                res.status(500).json({ success: false, error: 'Hizmetler yüklenirken hata oluştu' });
             }
-            const services = await serviceService.getServicesByCompany(companyId);
-            res.json({ success: true, data: services });
         });
 
     } catch (error) {
+        console.error('Service Fetch Error (Outer):', error);
         res.status(500).json({ success: false, error: 'Hizmetler yüklenirken hata oluştu' });
     }
 });
