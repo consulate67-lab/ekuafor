@@ -18,11 +18,11 @@ const companySchema = z.object({
     website: z.string().url('Geçerli bir website adresi giriniz').optional(),
 
     address_line: z.string().optional(),
-    province_id: z.number().optional(),
+    province_id: z.coerce.number().optional(),
     province_name: z.string().optional(),
-    district_id: z.number().optional(),
+    district_id: z.coerce.number().optional(),
     district_name: z.string().optional(),
-    neighborhood_id: z.number().optional(),
+    neighborhood_id: z.coerce.number().optional(),
     neighborhood_name: z.string().optional(),
     postal_code: z.string().optional(),
 
@@ -41,7 +41,7 @@ const companySchema = z.object({
     ),
     account_holder_name: z.string().optional(),
 
-    commission_rate: z.number().min(0).max(100).optional(),
+    commission_rate: z.coerce.number().min(0).max(100).optional(),
     payment_enabled: z.boolean().optional(),
 });
 
