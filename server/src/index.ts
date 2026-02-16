@@ -51,11 +51,20 @@ const healthHandler = async (req: Request, res: Response) => {
             }
         } catch (e) { dbHost = 'Parse Error'; }
 
+        // Check for critical tables
+        const tableCheck = await pool.query(`
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+        `);
+        const tableList = tableCheck.rows.map(r => r.table_name);
+
         res.json({
             success: true,
             db: 'Connected',
             time: result.rows[0].now,
-            connected_host: dbHost, // Shows which DB server we are talking to
+            connected_host: dbHost,
+            tables_found: tableList, // Verify if company_users is here
             env: process.env.NODE_ENV
         });
     } catch (error: any) {
