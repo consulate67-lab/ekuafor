@@ -18,6 +18,33 @@ export interface Appointment {
 
 class AppointmentService {
     async createAppointment(appointment: Appointment): Promise<Appointment> {
+        // 1. Check for overlapping appointments (Conflict Prevention)
+        const conflictQuery = `
+            SELECT id FROM appointments 
+            WHERE company_id = $1 
+            AND appointment_date = $2 
+            AND status != 'cancelled'
+            AND (
+                (start_time < $4 AND end_time > $3)
+            )
+            ${appointment.staff_id ? 'AND staff_id = $5' : 'AND staff_id IS NULL'}
+            LIMIT 1
+        `;
+
+        const conflictValues = [
+            appointment.company_id,
+            appointment.appointment_date,
+            appointment.start_time,
+            appointment.end_time
+        ];
+        if (appointment.staff_id) conflictValues.push(appointment.staff_id);
+
+        const conflictResult = await pool.query(conflictQuery, conflictValues);
+
+        if (conflictResult.rowCount && conflictResult.rowCount > 0) {
+            throw new Error('Bu saat diliminde zaten başka bir randevu bulunuyor.');
+        }
+
         const query = `
       INSERT INTO appointments (
         company_id, customer_id, service_id, staff_id, 

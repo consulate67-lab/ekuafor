@@ -93,6 +93,18 @@ export default function AppointmentManagement() {
                 notes: finalNotes,
                 status: 'approved'
             });
+
+            // RESET FORM
+            setNewAppointment({
+                service_id: 0,
+                appointment_date: new Date().toISOString().split('T')[0],
+                start_time: '09:00',
+                end_time: '10:00',
+                notes: ''
+            });
+            // Clear customer_name specifically since it's added via casting
+            (newAppointment as any).customer_name = '';
+
             setShowAddForm(false);
 
             // Check what status was actually saved
