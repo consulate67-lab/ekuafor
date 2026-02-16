@@ -112,11 +112,24 @@ app.use((req: Request, res: Response) => {
 });
 
 // Error Handler
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-    console.error('Error:', err);
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    console.error('------------------------------------------------');
+    console.error(`[Global Error Handler] Error at ${req.method} ${req.originalUrl}`);
+    console.error('Message:', err.message);
+    if (err.stack) console.error('Stack:', err.stack);
+    if (err.response) console.error('Axios/Ext Response:', err.response.data);
+    console.error('------------------------------------------------');
+
+    // Prevent crashing if headers sent
+    if (res.headersSent) {
+        return next(err);
+    }
+
     res.status(500).json({
-        error: 'Internal server error',
-        message: process.env.NODE_ENV === 'development' ? err.message : undefined
+        success: false,
+        error: 'Internal Server Error',
+        message: err.message || 'Sunucu hatası',
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
 });
 
