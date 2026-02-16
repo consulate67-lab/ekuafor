@@ -254,7 +254,10 @@ export default function AppointmentManagement() {
                             {days.map(day => {
                                 const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                                 const isSelected = selectedDate === dateStr;
-                                const hasApproved = appointments.some(a => a.status === 'approved' && a.appointment_date === dateStr);
+                                const hasApproved = appointments.some(a =>
+                                    a.status === 'approved' &&
+                                    (a.appointment_date.toString().split('T')[0] === dateStr)
+                                );
                                 const isToday = new Date().toISOString().split('T')[0] === dateStr;
 
                                 return (
@@ -314,7 +317,7 @@ export default function AppointmentManagement() {
                                     // Filter appointments for this day
                                     const dayAppointments = appointments.filter(a =>
                                         a.status === 'approved' &&
-                                        a.appointment_date === dateStr
+                                        (a.appointment_date.toString().split('T')[0] === dateStr)
                                     );
 
                                     return (
