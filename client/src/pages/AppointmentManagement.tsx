@@ -23,6 +23,8 @@ export default function AppointmentManagement() {
 
     const [company, setCompany] = useState<Company | null>(null);
 
+    const [isListening, setIsListening] = useState(false);
+
     const fetchData = async () => {
         try {
             // 1. Get User & Company
@@ -66,6 +68,92 @@ export default function AppointmentManagement() {
     useEffect(() => {
         fetchData();
     }, []);
+
+    // Voice Recognition Logic
+    const startVoiceCommand = () => {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert('Tarayıcınız sesli komut özelliğini desteklemiyor.');
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'tr-TR';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = () => setIsListening(true);
+        recognition.onend = () => setIsListening(false);
+
+        recognition.onresult = async (event: any) => {
+            const transcript = event.results[0][0].transcript.toLowerCase();
+            console.log('Sesli Komut:', transcript);
+
+            try {
+                // Parse logic (Simple NLP)
+                let date = new Date().toISOString().split('T')[0];
+                if (transcript.includes('yarın')) {
+                    const tomorrow = new Date();
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    date = tomorrow.toISOString().split('T')[0];
+                }
+
+                // Time Parsing
+                let time = '09:00';
+                const timeMatch = transcript.match(/(\d{1,2})[:\s](\d{2})/); // 17:00 or 17 00
+                const hourOnlyMatch = transcript.match(/saat\s?(\d{1,2})/); // saat 5
+
+                if (timeMatch) {
+                    time = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+                } else if (hourOnlyMatch) {
+                    let h = parseInt(hourOnlyMatch[1]);
+                    if (transcript.includes('akşam') && h < 12) h += 12;
+                    time = `${String(h).padStart(2, '0')}:00`;
+                }
+
+                // Service Matching
+                const matchedService = services.find(s => transcript.includes(s.name.toLowerCase()));
+                if (!matchedService) {
+                    alert(`Hizmet anlaşılamadı. Şu hizmetlerden birini söyleyin: ${services.map(s => s.name).join(', ')}`);
+                    return;
+                }
+
+                // Customer Name (Experimental)
+                // Try to get text after "için" or before "için" or simply last words
+                let customerPart = transcript.split('randevu')[0].split('için').pop()?.trim() || 'Sesli Müşteri';
+                customerPart = customerPart.replace(matchedService.name.toLowerCase(), '').trim();
+
+                // Validation
+                const duration = matchedService.duration_minutes || 30;
+                const [h, m] = time.split(':').map(Number);
+                const totalMin = h * 60 + m + duration;
+                const endH = Math.floor(totalMin / 60);
+                const endM = totalMin % 60;
+                const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+                if (window.confirm(`${date} tarihinde saat ${time} için ${matchedService.name} (Müşteri: ${customerPart}) randevusu oluşturulsun mu?`)) {
+                    const finalNotes = `Sesli Komut: ${transcript} | Müşteri: ${customerPart}`;
+                    await api.post('/appointments', {
+                        company_id: company?.id,
+                        service_id: matchedService.id,
+                        appointment_date: date,
+                        start_time: time,
+                        end_time: endTime,
+                        notes: finalNotes,
+                        status: 'approved'
+                    });
+                    fetchData();
+                    alert('Randevu başarıyla eklendi.');
+                }
+
+            } catch (err) {
+                console.error('Voice parse error', err);
+                alert('Komut anlaşılamadı. Lütfen örneğe uygun söyleyin: "Bugün akşam 5 için Saç Kesim Ahmet Yılmaza randevu oluştur"');
+            }
+        };
+
+        recognition.start();
+    };
 
     const handleStatusUpdate = async (id: number, status: string) => {
         try {
@@ -196,12 +284,24 @@ export default function AppointmentManagement() {
                         })()}
                     </div>
                 )}
-                <button
-                    onClick={() => { setShowAddForm(true); setFormError(''); setError(''); }}
-                    className="btn-primary py-3 px-6 shadow-xl shadow-pink-500/20 font-bold"
-                >
-                    Manuel Randevu Ekle
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={startVoiceCommand}
+                        className={`
+                            flex items-center gap-2 py-3 px-6 rounded-2xl font-bold transition-all
+                            ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-white text-pink-600 border border-pink-100 shadow-sm hover:shadow-md'}
+                        `}
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m8 0h-8m4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+                        <span>{isListening ? 'Dinleniyor...' : 'Sesle Ekle'}</span>
+                    </button>
+                    <button
+                        onClick={() => { setShowAddForm(true); setFormError(''); setError(''); }}
+                        className="btn-primary py-3 px-6 shadow-xl shadow-pink-500/20 font-bold"
+                    >
+                        Manuel Randevu Ekle
+                    </button>
+                </div>
             </div>
 
             {error && (
@@ -293,128 +393,145 @@ export default function AppointmentManagement() {
                 </div>
 
                 {/* Right Column: Calendar & Daily View */}
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-2 space-y-8">
+                    <div>
+                        <div className="flex items-center gap-2 mb-4">
+                            <div className="w-2 h-8 bg-pink-600 rounded-full"></div>
+                            <h3 className="text-xl font-bold text-gray-900 uppercase tracking-tight">
+                                Günlük Plan ({new Date(selectedDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })})
+                            </h3>
+                        </div>
 
-
-                    <div className="flex items-center gap-2 mb-4">
-                        <div className="w-2 h-8 bg-pink-600 rounded-full"></div>
-                        <h3 className="text-xl font-bold text-gray-900 uppercase tracking-tight">
-                            Günlük Plan ({new Date(selectedDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })})
-                        </h3>
-                    </div>
-
-                    <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <div className="min-w-[800px]">
-                                {/* Timeline Header */}
-                                <div className="flex border-b border-gray-200 bg-gray-50/50">
-                                    <div className="w-32 flex-shrink-0 p-3 border-r border-gray-200">
-                                        <span className="text-xs font-black text-gray-400 uppercase">Zaman</span>
+                        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <div className="min-w-[800px]">
+                                    {/* Timeline Header */}
+                                    <div className="flex border-b border-gray-200 bg-gray-50/50">
+                                        <div className="w-32 flex-shrink-0 p-3 border-r border-gray-200">
+                                            <span className="text-xs font-black text-gray-400 uppercase">Zaman</span>
+                                        </div>
+                                        <div className="flex-1 flex relative h-10">
+                                            {Array.from({ length: 13 }, (_, i) => i + 8).map(hour => (
+                                                <div key={hour} className="flex-1 border-r border-gray-100 flex items-center justify-start pl-1">
+                                                    <span className="text-[10px] font-bold text-gray-400">{String(hour).padStart(2, '0')}:00</span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
-                                    <div className="flex-1 flex relative h-10">
-                                        {Array.from({ length: 13 }, (_, i) => i + 8).map(hour => (
-                                            <div key={hour} className="flex-1 border-r border-gray-100 flex items-center justify-start pl-1">
-                                                <span className="text-[10px] font-bold text-gray-400">{String(hour).padStart(2, '0')}:00</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
 
-                                {/* Day Row (Single) */}
-                                {(() => {
-                                    const d = new Date(selectedDate);
-                                    // No day shifting logic needed anymore, we use selectedDate directly
-                                    const dateStr = selectedDate;
-                                    const isToday = new Date().toISOString().split('T')[0] === dateStr;
+                                    {/* Day Row (Single) */}
+                                    {(() => {
+                                        const d = new Date(selectedDate);
+                                        const dateStr = selectedDate;
+                                        const isToday = new Date().toISOString().split('T')[0] === dateStr;
 
-                                    // Filter appointments for this day
-                                    const dayAppointments = appointments.filter(a =>
-                                        a.status === 'approved' &&
-                                        (a.appointment_date.toString().split('T')[0] === dateStr)
-                                    );
+                                        const dayAppointments = appointments.filter(a =>
+                                            a.status === 'approved' &&
+                                            (a.appointment_date.toString().split('T')[0] === dateStr)
+                                        );
 
-                                    return (
-                                        <div className="flex border-b border-gray-100 transition-colors bg-white">
-                                            {/* Day Label Column */}
-                                            <div className={`w-32 flex-shrink-0 p-3 border-r border-gray-200 flex flex-col justify-center ${isToday ? 'bg-pink-100/50' : ''}`}>
-                                                <span className={`text-xs font-bold uppercase ${isToday ? 'text-pink-600' : 'text-gray-500'}`}>
-                                                    {d.toLocaleDateString('tr-TR', { weekday: 'long' })}
-                                                </span>
-                                                <span className={`text-sm font-black ${isToday ? 'text-pink-700' : 'text-gray-900'}`}>
-                                                    {d.getDate()} {d.toLocaleDateString('tr-TR', { month: 'short' })}
-                                                </span>
-                                            </div>
-
-                                            {/* Timeline Area */}
-                                            <div className="flex-1 relative h-32 bg-repeating-linear-gradient-to-r from-transparent to-transparent via-gray-50/50" style={{ backgroundImage: 'linear-gradient(to right, transparent 0%, transparent 95%, #f3f4f6 100%)', backgroundSize: `${100 / 12}% 100%` }}>
-                                                {/* Vertical Grid Lines */}
-                                                <div className="absolute inset-0 flex pointer-events-none">
-                                                    {Array.from({ length: 12 }).map((_, idx) => (
-                                                        <div key={idx} className="flex-1 border-r border-gray-100/50 h-full"></div>
-                                                    ))}
+                                        return (
+                                            <div className="flex border-b border-gray-100 transition-colors bg-white">
+                                                <div className={`w-32 flex-shrink-0 p-3 border-r border-gray-200 flex flex-col justify-center ${isToday ? 'bg-pink-100/50' : ''}`}>
+                                                    <span className={`text-xs font-bold uppercase ${isToday ? 'text-pink-600' : 'text-gray-500'}`}>
+                                                        {d.toLocaleDateString('tr-TR', { weekday: 'long' })}
+                                                    </span>
+                                                    <span className={`text-sm font-black ${isToday ? 'text-pink-700' : 'text-gray-900'}`}>
+                                                        {d.getDate()} {d.toLocaleDateString('tr-TR', { month: 'short' })}
+                                                    </span>
                                                 </div>
 
-                                                {dayAppointments.length === 0 && (
-                                                    <div className="absolute inset-0 flex items-center justify-center">
-                                                        <span className="text-gray-300 font-bold text-sm bg-gray-50 px-3 py-1 rounded-full">Bugün için randevu yok</span>
-                                                    </div>
-                                                )}
-
-                                                {dayAppointments.map(app => {
-                                                    const [startH, startM] = app.start_time.split(':').map(Number);
-                                                    const [endH, endM] = app.end_time.split(':').map(Number); // Assuming end_time exists
-
-                                                    // Calculate position relative to 08:00 - 20:00 (12 hours = 720 minutes)
-                                                    const startTotalM = (startH * 60) + startM;
-                                                    const endTotalM = (endH * 60) + endM;
-                                                    const dayStartM = 8 * 60; // 08:00
-
-                                                    // Convert to percentage
-                                                    // Clamping to 0-100% to avoid overflow if time is out of 08:00-20:00 range
-                                                    let leftPercent = ((startTotalM - dayStartM) / 720) * 100;
-
-                                                    // Calculate width
-                                                    let durationM = endTotalM - startTotalM;
-                                                    let widthPercent = (durationM / 720) * 100;
-
-                                                    // Adjust if out of bounds (visual fix)
-                                                    if (leftPercent < 0) {
-                                                        widthPercent += leftPercent; // Reduce width
-                                                        leftPercent = 0;
-                                                    }
-                                                    if (leftPercent + widthPercent > 100) {
-                                                        widthPercent = 100 - leftPercent;
-                                                    }
-
-                                                    if (widthPercent <= 0) return null; // Don't render if invalid
-
-                                                    return (
-                                                        <div
-                                                            key={app.id}
-                                                            className="absolute top-2 bottom-2 bg-pink-500 border-2 border-white shadow-md rounded-md z-10 hover:z-20 group transition-all cursor-pointer hover:bg-pink-600 flex overflow-hidden"
-                                                            style={{ left: `${leftPercent}%`, width: `${widthPercent}%`, minWidth: '4px' }}
-                                                            title={`${app.start_time} - ${app.end_time}: ${app.customer_name} (${app.service_name})`}
-                                                            onClick={() => setSelectedAppointment(app)}
-                                                        >
-                                                            <div className="px-2 py-1 text-white text-[10px] leading-tight flex flex-col overflow-hidden w-full">
-                                                                <span className="font-bold truncate">{app.customer_name || 'Misafir'}</span>
-                                                                <span className="truncate opacity-90 text-[9px]">{app.service_name}</span>
-                                                                <span className="text-[8px] opacity-75 mt-auto">{app.start_time} - {app.end_time}</span>
-                                                            </div>
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleStatusUpdate(app.id!, 'cancelled'); }}
-                                                                className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 bg-white text-red-500 rounded-full p-0.5 shadow-sm transform scale-75 hover:scale-100 transition-all border border-gray-200"
-                                                            >
-                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                                            </button>
+                                                <div className="flex-1 relative h-32" style={{ backgroundImage: 'linear-gradient(to right, #f8fafc 1px, transparent 1px)', backgroundSize: `${100 / 12}% 100%` }}>
+                                                    {dayAppointments.length === 0 && (
+                                                        <div className="absolute inset-0 flex items-center justify-center">
+                                                            <span className="text-gray-300 font-bold text-sm bg-gray-50 px-3 py-1 rounded-full">Bugün için randevu yok</span>
                                                         </div>
-                                                    );
-                                                })}
+                                                    )}
+
+                                                    {dayAppointments.map(app => {
+                                                        const [startH, startM] = app.start_time.split(':').map(Number);
+                                                        const [endH, endM] = (app.end_time || app.start_time).split(':').map(Number);
+                                                        const startTotalM = (startH * 60) + startM;
+                                                        const endTotalM = (endH * 60) + endM;
+                                                        const dayStartM = 8 * 60;
+                                                        let leftPercent = ((startTotalM - dayStartM) / 720) * 100;
+                                                        let widthPercent = ((endTotalM - startTotalM) / 720) * 100;
+                                                        if (leftPercent < 0) { widthPercent += leftPercent; leftPercent = 0; }
+                                                        return (
+                                                            <div
+                                                                key={app.id}
+                                                                className="absolute top-2 bottom-2 bg-pink-500 border-2 border-white shadow-md rounded-md z-10 hover:z-20 group transition-all cursor-pointer hover:bg-pink-600 flex overflow-hidden"
+                                                                style={{ left: `${leftPercent}%`, width: `${widthPercent}%`, minWidth: '4px' }}
+                                                                onClick={() => setSelectedAppointment(app)}
+                                                            >
+                                                                <div className="px-2 py-1 text-white text-[10px] leading-tight flex flex-col overflow-hidden w-full">
+                                                                    <span className="font-bold truncate">{app.customer_name || 'Misafir'}</span>
+                                                                    <span className="truncate opacity-90 text-[9px]">{app.service_name}</span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
-                                        </div>
-                                    );
-                                })()}
+                                        );
+                                    })()}
+                                </div>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* DataGrid View (Daily List) */}
+                    <div>
+                        <div className="flex items-center gap-2 mb-4">
+                            <div className="w-2 h-8 bg-blue-600 rounded-full"></div>
+                            <h3 className="text-xl font-bold text-gray-900 uppercase tracking-tight">Günlük Liste</h3>
+                        </div>
+                        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50 border-b border-gray-100">
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Saat</th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Müşteri</th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Hizmet</th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Fiyat</th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Durum</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {appointments
+                                        .filter(a => a.appointment_date.toString().split('T')[0] === selectedDate && a.status === 'approved')
+                                        .sort((a, b) => a.start_time.localeCompare(b.start_time))
+                                        .map(app => (
+                                            <tr key={app.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors cursor-pointer group" onClick={() => setSelectedAppointment(app)}>
+                                                <td className="px-6 py-4">
+                                                    <span className="text-xs font-black text-gray-900">{app.start_time} - {app.end_time}</span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-bold text-xs uppercase">
+                                                            {(app.customer_name?.[0] || 'M')}
+                                                        </div>
+                                                        <span className="text-sm font-bold text-gray-900">{app.customer_name || 'Misafir Müşteri'}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="text-xs font-bold text-pink-600">{app.service_name}</span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <span className="text-sm font-black text-gray-900">₺{app.price || 0}</span>
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <span className="inline-block px-2 py-1 rounded-md bg-emerald-100 text-emerald-600 text-[9px] font-black uppercase tracking-wider">ONAYLANDI</span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    {appointments.filter(a => a.appointment_date.toString().split('T')[0] === selectedDate && a.status === 'approved').length === 0 && (
+                                        <tr>
+                                            <td colSpan={5} className="px-6 py-12 text-center text-gray-400 font-bold italic">Seçili gün için kayıtlı randevu bulunamadı.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
