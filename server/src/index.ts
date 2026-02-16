@@ -119,4 +119,17 @@ const shutdown = async () => {
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
+process.on('uncaughtException', (err) => {
+    console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
+    console.error(err.name, err.message);
+    console.error(err.stack);
+    // Keep running if possible or exit gracefully
+    // process.exit(1); // Standard practice is to exit, but for debugging connection refused, let's see.
+});
+
+process.on('unhandledRejection', (err: any) => {
+    console.error('UNHANDLED REJECTION! 💥');
+    console.error(err.name, err.message);
+});
+
 export default app;

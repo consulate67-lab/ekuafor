@@ -32,17 +32,21 @@ const publicServiceHandler = async (req: Request, res: Response, next: any) => {
         try {
             const companyId = parseInt(req.query.company_id as string);
             console.log(`[GET /services] Public Access: Company=${companyId}`);
+            if (isNaN(companyId)) {
+                return res.status(400).json({ success: false, error: 'Geçersiz firma ID' });
+            }
             const services = await serviceService.getServicesByCompany(companyId);
             return res.json({ success: true, data: services });
         } catch (error) {
             console.error('[GET /services] Public Error:', error);
-            return res.status(500).json({ success: false, error: 'Hizmetler yüklenirken hata oluştu' });
+            // Pass to error handler
+            return next(error);
         }
     }
     next();
 };
 
-const privateServiceHandler = async (req: Request, res: Response) => {
+const privateServiceHandler = async (req: Request, res: Response, next: any) => {
     try {
         const companyId = req.user?.companyId;
         console.log(`[GET /services] Private Access: Company=${companyId}`);
@@ -54,7 +58,7 @@ const privateServiceHandler = async (req: Request, res: Response) => {
         res.json({ success: true, data: services });
     } catch (error) {
         console.error('[GET /services] Private Error:', error);
-        res.status(500).json({ success: false, error: 'Hizmetler yüklenirken hata oluştu' });
+        next(error);
     }
 };
 
