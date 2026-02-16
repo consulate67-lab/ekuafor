@@ -26,8 +26,8 @@ const companySchema = z.object({
     neighborhood_name: z.string().optional(),
     postal_code: z.string().optional(),
 
-    latitude: z.number().min(-90).max(90).optional(),
-    longitude: z.number().min(-180).max(180).optional(),
+    latitude: z.coerce.number().min(-90).max(90).optional(),
+    longitude: z.coerce.number().min(-180).max(180).optional(),
 
     bank_name: z.string().optional(),
     bank_branch: z.string().optional(),
