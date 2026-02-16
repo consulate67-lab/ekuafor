@@ -17,7 +17,8 @@ export default function AppointmentManagement() {
         appointment_date: new Date().toISOString().split('T')[0],
         start_time: '09:00',
         end_time: '10:00',
-        notes: ''
+        notes: '',
+        price: 0
     });
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
 
@@ -140,6 +141,7 @@ export default function AppointmentManagement() {
                         start_time: time,
                         end_time: endTime,
                         notes: finalNotes,
+                        price: matchedService.price,
                         status: 'approved'
                     });
                     fetchData();
@@ -191,7 +193,8 @@ export default function AppointmentManagement() {
                 appointment_date: new Date().toISOString().split('T')[0],
                 start_time: '09:00',
                 end_time: '10:00',
-                notes: ''
+                notes: '',
+                price: 0
             });
             // Clear customer_name specifically since it's added via casting
             (newAppointment as any).customer_name = '';
@@ -518,7 +521,9 @@ export default function AppointmentManagement() {
                                                     <span className="text-xs font-bold text-pink-600">{app.service_name}</span>
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
-                                                    <span className="text-sm font-black text-gray-900">₺{app.price || 0}</span>
+                                                    <span className="text-sm font-black text-gray-900">
+                                                        ₺{app.price || services.find(s => s.id === app.service_id)?.price || 0}
+                                                    </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
                                                     <span className="inline-block px-2 py-1 rounded-md bg-emerald-100 text-emerald-600 text-[9px] font-black uppercase tracking-wider">ONAYLANDI</span>
@@ -568,15 +573,19 @@ export default function AppointmentManagement() {
                                         const serviceId = parseInt(e.target.value);
                                         const service = services.find(s => s.id === serviceId);
                                         let newEndTime = newAppointment.end_time;
+                                        let price = newAppointment.price;
 
-                                        if (service && newAppointment.start_time) {
-                                            const [h, m] = newAppointment.start_time.split(':').map(Number);
-                                            const totalMin = h * 60 + m + (service.duration_minutes || 30);
-                                            const endH = Math.floor(totalMin / 60);
-                                            const endM = totalMin % 60;
-                                            newEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+                                        if (service) {
+                                            price = service.price || 0;
+                                            if (newAppointment.start_time) {
+                                                const [h, m] = newAppointment.start_time.split(':').map(Number);
+                                                const totalMin = h * 60 + m + (service.duration_minutes || 30);
+                                                const endH = Math.floor(totalMin / 60);
+                                                const endM = totalMin % 60;
+                                                newEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+                                            }
                                         }
-                                        setNewAppointment({ ...newAppointment, service_id: serviceId, end_time: newEndTime });
+                                        setNewAppointment({ ...newAppointment, service_id: serviceId, end_time: newEndTime, price: price });
                                     }}
                                 >
                                     <option value="">Seçiniz...</option>
@@ -643,6 +652,16 @@ export default function AppointmentManagement() {
                                     placeholder="Ad Soyad"
                                     value={(newAppointment as any).customer_name || ''}
                                     onChange={(e) => setNewAppointment({ ...newAppointment, customer_name: e.target.value } as any)}
+                                />
+                            </div>
+
+                            <div className="hidden">
+                                <label className="block text-xs font-bold text-gray-700 mb-2 uppercase ml-1 tracking-wider">Fiyat</label>
+                                <input
+                                    type="number"
+                                    className="input-field py-3 font-bold text-pink-600"
+                                    value={newAppointment.price}
+                                    onChange={(e) => setNewAppointment({ ...newAppointment, price: parseFloat(e.target.value) })}
                                 />
                             </div>
 
