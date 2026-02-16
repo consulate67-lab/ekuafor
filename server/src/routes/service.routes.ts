@@ -24,14 +24,28 @@ router.get('/ping', (req, res) => {
 });
 
 // Tüm hizmetleri listele (Firma bazlı) - Hem '/' hem de boş string '' yakalasın
-router.get(['/', ''], authMiddleware, async (req: Request, res: Response) => {
+// Tüm hizmetleri listele (Firma bazlı) - Hem '/' hem de boş string '' yakalasın
+router.get(['/', ''], async (req: Request, res: Response) => {
     try {
-        const companyId = req.user?.companyId;
-        if (!companyId) {
-            return res.status(403).json({ success: false, error: 'Firma ID bulunamadı' });
+        // 1. Public Access (Booking Page)
+        if (req.query.company_id) {
+            const companyId = parseInt(req.query.company_id as string);
+            const services = await serviceService.getServicesByCompany(companyId);
+            return res.json({ success: true, data: services });
         }
-        const services = await serviceService.getServicesByCompany(companyId);
-        res.json({ success: true, data: services });
+
+        // 2. Private Access (Dashboard) - Manually check auth
+        // We need to invoke authMiddleware manually or replicate its logic
+        // Since we removed it from the route definition to allow public access.
+        authMiddleware(req, res, async () => {
+            const companyId = req.user?.companyId;
+            if (!companyId) {
+                return res.status(403).json({ success: false, error: 'Firma ID bulunamadı' });
+            }
+            const services = await serviceService.getServicesByCompany(companyId);
+            res.json({ success: true, data: services });
+        });
+
     } catch (error) {
         res.status(500).json({ success: false, error: 'Hizmetler yüklenirken hata oluştu' });
     }

@@ -41,7 +41,7 @@ export default function BookingPage() {
                 const [compRes, allServicesRes, allUsersRes, allAppsRes] = await Promise.all([
                     api.get(`/companies/${id}`),
                     api.get('/services', { params: { company_id: id } }),
-                    api.get('/users', { params: { company_id: id } }),
+                    api.get(`/companies/${id}/employees`),
                     api.get('/appointments', { params: { company_id: id } })
                 ]);
 

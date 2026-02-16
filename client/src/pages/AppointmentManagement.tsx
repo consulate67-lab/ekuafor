@@ -257,7 +257,7 @@ export default function AppointmentManagement() {
                     <div className="flex items-center gap-2 mb-4">
                         <div className="w-2 h-8 bg-pink-600 rounded-full"></div>
                         <h3 className="text-xl font-bold text-gray-900 uppercase tracking-tight">
-                            Haftalık Plan ({new Date(selectedDate).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })})
+                            Günlük Plan ({new Date(selectedDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })})
                         </h3>
                     </div>
 
@@ -267,7 +267,7 @@ export default function AppointmentManagement() {
                                 {/* Timeline Header */}
                                 <div className="flex border-b border-gray-200 bg-gray-50/50">
                                     <div className="w-32 flex-shrink-0 p-3 border-r border-gray-200">
-                                        <span className="text-xs font-black text-gray-400 uppercase">Günler</span>
+                                        <span className="text-xs font-black text-gray-400 uppercase">Zaman</span>
                                     </div>
                                     <div className="flex-1 flex relative h-10">
                                         {Array.from({ length: 13 }, (_, i) => i + 8).map(hour => (
@@ -278,14 +278,11 @@ export default function AppointmentManagement() {
                                     </div>
                                 </div>
 
-                                {/* Days Rows */}
-                                {Array.from({ length: 7 }).map((_, i) => {
+                                {/* Day Row (Single) */}
+                                {(() => {
                                     const d = new Date(selectedDate);
-                                    const day = d.getDay();
-                                    const diff = d.getDate() - day + (day === 0 ? -6 : 1) + i;
-                                    const dayDate = new Date(d.setDate(diff));
-                                    const dateStr = dayDate.toISOString().split('T')[0];
-                                    const isSelected = dateStr === selectedDate;
+                                    // No day shifting logic needed anymore, we use selectedDate directly
+                                    const dateStr = selectedDate;
                                     const isToday = new Date().toISOString().split('T')[0] === dateStr;
 
                                     // Filter appointments for this day
@@ -295,29 +292,35 @@ export default function AppointmentManagement() {
                                     );
 
                                     return (
-                                        <div key={i} className={`flex border-b border-gray-100 transition-colors hover:bg-gray-50 ${isSelected ? 'bg-pink-50/30' : ''}`}>
+                                        <div className="flex border-b border-gray-100 transition-colors bg-white">
                                             {/* Day Label Column */}
                                             <div className={`w-32 flex-shrink-0 p-3 border-r border-gray-200 flex flex-col justify-center ${isToday ? 'bg-pink-100/50' : ''}`}>
                                                 <span className={`text-xs font-bold uppercase ${isToday ? 'text-pink-600' : 'text-gray-500'}`}>
-                                                    {dayDate.toLocaleDateString('tr-TR', { weekday: 'long' })}
+                                                    {d.toLocaleDateString('tr-TR', { weekday: 'long' })}
                                                 </span>
                                                 <span className={`text-sm font-black ${isToday ? 'text-pink-700' : 'text-gray-900'}`}>
-                                                    {dayDate.getDate()} {dayDate.toLocaleDateString('tr-TR', { month: 'short' })}
+                                                    {d.getDate()} {d.toLocaleDateString('tr-TR', { month: 'short' })}
                                                 </span>
                                             </div>
 
                                             {/* Timeline Area */}
-                                            <div className="flex-1 relative h-20 bg-repeating-linear-gradient-to-r from-transparent to-transparent via-gray-50/50" style={{ backgroundImage: 'linear-gradient(to right, transparent 0%, transparent 95%, #f3f4f6 100%)', backgroundSize: `${100 / 12}% 100%` }}>
-                                                {/* Vertical Grid Lines (visual redundant helper) */}
+                                            <div className="flex-1 relative h-32 bg-repeating-linear-gradient-to-r from-transparent to-transparent via-gray-50/50" style={{ backgroundImage: 'linear-gradient(to right, transparent 0%, transparent 95%, #f3f4f6 100%)', backgroundSize: `${100 / 12}% 100%` }}>
+                                                {/* Vertical Grid Lines */}
                                                 <div className="absolute inset-0 flex pointer-events-none">
                                                     {Array.from({ length: 12 }).map((_, idx) => (
                                                         <div key={idx} className="flex-1 border-r border-gray-100/50 h-full"></div>
                                                     ))}
                                                 </div>
 
+                                                {dayAppointments.length === 0 && (
+                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                        <span className="text-gray-300 font-bold text-sm bg-gray-50 px-3 py-1 rounded-full">Bugün için randevu yok</span>
+                                                    </div>
+                                                )}
+
                                                 {dayAppointments.map(app => {
                                                     const [startH, startM] = app.start_time.split(':').map(Number);
-                                                    const [endH, endM] = app.end_time.split(':').map(Number);
+                                                    const [endH, endM] = app.end_time.split(':').map(Number); // Assuming end_time exists
 
                                                     // Calculate position relative to 08:00 - 20:00 (12 hours = 720 minutes)
                                                     const startTotalM = (startH * 60) + startM;
@@ -325,8 +328,23 @@ export default function AppointmentManagement() {
                                                     const dayStartM = 8 * 60; // 08:00
 
                                                     // Convert to percentage
-                                                    const leftPercent = ((startTotalM - dayStartM) / 720) * 100;
-                                                    const widthPercent = ((endTotalM - startTotalM) / 720) * 100;
+                                                    // Clamping to 0-100% to avoid overflow if time is out of 08:00-20:00 range
+                                                    let leftPercent = ((startTotalM - dayStartM) / 720) * 100;
+
+                                                    // Calculate width
+                                                    let durationM = endTotalM - startTotalM;
+                                                    let widthPercent = (durationM / 720) * 100;
+
+                                                    // Adjust if out of bounds (visual fix)
+                                                    if (leftPercent < 0) {
+                                                        widthPercent += leftPercent; // Reduce width
+                                                        leftPercent = 0;
+                                                    }
+                                                    if (leftPercent + widthPercent > 100) {
+                                                        widthPercent = 100 - leftPercent;
+                                                    }
+
+                                                    if (widthPercent <= 0) return null; // Don't render if invalid
 
                                                     return (
                                                         <div
@@ -336,9 +354,10 @@ export default function AppointmentManagement() {
                                                             title={`${app.start_time} - ${app.end_time}: ${app.customer_name} (${app.service_name})`}
                                                             onClick={() => setSelectedAppointment(app)}
                                                         >
-                                                            <div className="px-2 py-1 text-white text-[10px] leading-tight flex flex-col overflow-hidden">
+                                                            <div className="px-2 py-1 text-white text-[10px] leading-tight flex flex-col overflow-hidden w-full">
                                                                 <span className="font-bold truncate">{app.customer_name || 'Misafir'}</span>
                                                                 <span className="truncate opacity-90 text-[9px]">{app.service_name}</span>
+                                                                <span className="text-[8px] opacity-75 mt-auto">{app.start_time} - {app.end_time}</span>
                                                             </div>
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); handleStatusUpdate(app.id!, 'cancelled'); }}
@@ -352,7 +371,7 @@ export default function AppointmentManagement() {
                                             </div>
                                         </div>
                                     );
-                                })}
+                                })()}
                             </div>
                         </div>
                     </div>

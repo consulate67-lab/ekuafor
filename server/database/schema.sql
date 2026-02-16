@@ -12,7 +12,7 @@ END$$;
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    password VARCHAR(255) NOT NULL,
     role user_role NOT NULL DEFAULT 'customer',
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
@@ -40,6 +40,9 @@ CREATE TABLE IF NOT EXISTS companies (
     district_name VARCHAR(100),
     neighborhood_id INTEGER,
     neighborhood_name VARCHAR(100),
+    street_name VARCHAR(100),
+    building_no VARCHAR(20),
+    apartment_no VARCHAR(20),
     postal_code VARCHAR(10),
     
     -- Konum Bilgileri
@@ -51,6 +54,10 @@ CREATE TABLE IF NOT EXISTS companies (
     bank_branch VARCHAR(255),
     iban VARCHAR(34),
     account_holder_name VARCHAR(255),
+    
+    -- Vergi Bilgileri
+    tax_number VARCHAR(20),
+    tax_office VARCHAR(100),
     
     -- Ödeme Ayarları
     commission_rate DECIMAL(5, 2) DEFAULT 0.00,
@@ -183,6 +190,6 @@ BEGIN
 END$$;
 
 -- Varsayılan Admin (Çakışma varsa yapma)
-INSERT INTO users (email, password_hash, role, first_name, last_name) 
+INSERT INTO users (email, password, role, first_name, last_name) 
 VALUES ('admin@saloon.com', '$2a$10$YourHashedPasswordHere', 'super_admin', 'Super', 'Admin')
 ON CONFLICT (email) DO NOTHING;

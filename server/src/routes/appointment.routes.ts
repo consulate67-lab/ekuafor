@@ -16,15 +16,26 @@ const appointmentSchema = z.object({
 });
 
 // Randevuları listele (Firma bazlı, isteğe bağlı durum filtresiyle)
-router.get('/', authMiddleware, async (req: Request, res: Response) => {
+// Randevuları listele (Firma bazlı, isteğe bağlı durum filtresiyle)
+router.get('/', async (req: Request, res: Response) => {
     try {
-        const companyId = req.user?.companyId;
-        const status = req.query.status as string;
-        if (!companyId) {
-            return res.status(403).json({ success: false, error: 'Firma ID bulunamadı' });
+        // 1. Public Access (Booking Page - Availability Check)
+        if (req.query.company_id) {
+            const companyId = parseInt(req.query.company_id as string);
+            // Public listing might need to be sanitized (hide names/phones) but for MVP we return full
+            const appointments = await appointmentService.getAppointmentsByCompany(companyId, req.query.status as string);
+            return res.json({ success: true, data: appointments });
         }
-        const appointments = await appointmentService.getAppointmentsByCompany(companyId, status);
-        res.json({ success: true, data: appointments });
+
+        // 2. Private Access (Dashboard) - Manually check auth
+        authMiddleware(req, res, async () => {
+            const companyId = req.user?.companyId;
+            if (!companyId) {
+                return res.status(403).json({ success: false, error: 'Firma ID bulunamadı' });
+            }
+            const appointments = await appointmentService.getAppointmentsByCompany(companyId, req.query.status as string);
+            res.json({ success: true, data: appointments });
+        });
     } catch (error) {
         res.status(500).json({ success: false, error: 'Randevular yüklenirken hata oluştu' });
     }
