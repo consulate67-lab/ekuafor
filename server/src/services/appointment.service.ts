@@ -88,10 +88,12 @@ class AppointmentService {
       WHERE a.company_id = $1 AND a.appointment_date BETWEEN $2 AND $3
     `;
         const values: any[] = [companyId, startDate, endDate];
+        let paramIndex = 4;
 
         if (staffId) {
-            query += ' AND (a.staff_id = $4 OR a.staff_id IS NULL)';
+            query += ` AND (a.staff_id = $${paramIndex} OR a.staff_id IS NULL)`;
             values.push(staffId);
+            paramIndex++;
         }
 
         query += ' ORDER BY a.appointment_date, a.start_time';
