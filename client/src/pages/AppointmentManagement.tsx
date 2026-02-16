@@ -6,6 +6,7 @@ import { Appointment, Service, Company } from '../types';
 export default function AppointmentManagement() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [services, setServices] = useState<Service[]>([]);
+    const [employees, setEmployees] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [formError, setFormError] = useState('');
@@ -13,6 +14,7 @@ export default function AppointmentManagement() {
     const [showAddForm, setShowAddForm] = useState(false);
     const [newAppointment, setNewAppointment] = useState({
         service_id: 0,
+        staff_id: 0,
         appointment_date: new Date().toISOString().split('T')[0],
         start_time: '09:00',
         end_time: '10:00',
@@ -54,6 +56,16 @@ export default function AppointmentManagement() {
                 setServices([]);
             }
 
+            if (companyId) {
+                try {
+                    const empResponse = await api.get(`/companies/${companyId}/employees`);
+                    setEmployees(empResponse.data?.data || []);
+                } catch (err) {
+                    console.warn('Employees fetch failed', err);
+                    setEmployees([]);
+                }
+            }
+
         } catch (err) {
             console.error('General fetch error', err);
             setError('Veriler yüklenirken hata oluştu. Lütfen sayfayı yenileyin.');
@@ -89,6 +101,7 @@ export default function AppointmentManagement() {
 
             const res = await api.post('/appointments', {
                 ...newAppointment,
+                staff_id: newAppointment.staff_id === 0 ? undefined : newAppointment.staff_id,
                 company_id: company?.id, // Fix: send company_id
                 notes: finalNotes,
                 status: 'approved'
@@ -97,6 +110,7 @@ export default function AppointmentManagement() {
             // RESET FORM
             setNewAppointment({
                 service_id: 0,
+                staff_id: 0,
                 appointment_date: new Date().toISOString().split('T')[0],
                 start_time: '09:00',
                 end_time: '10:00',
@@ -461,6 +475,22 @@ export default function AppointmentManagement() {
                                 >
                                     <option value="">Seçiniz...</option>
                                     {services.map(s => <option key={s.id} value={s.id}>{s.name} - ₺{s.price}</option>)}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 mb-2 uppercase ml-1 tracking-wider">Personel Seçimi</label>
+                                <select
+                                    className="input-field py-3 bg-gray-50 appearance-none font-bold text-gray-900"
+                                    value={newAppointment.staff_id}
+                                    onChange={(e) => setNewAppointment({ ...newAppointment, staff_id: parseInt(e.target.value) })}
+                                >
+                                    <option value="0">Herhangi Biri / Genel</option>
+                                    {employees.map(emp => (
+                                        <option key={emp.user_id} value={emp.user_id}>
+                                            {emp.first_name} {emp.last_name} ({emp.role})
+                                        </option>
+                                    ))}
                                 </select>
                             </div>
 
