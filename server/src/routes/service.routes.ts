@@ -26,36 +26,39 @@ router.get('/ping', (req, res) => {
 // Tüm hizmetleri listele (Firma bazlı) - Hem '/' hem de boş string '' yakalasın
 // Tüm hizmetleri listele (Firma bazlı) - Hem '/' hem de boş string '' yakalasın
 // Tüm hizmetleri listele (Firma bazlı) - Hem '/' hem de boş string '' yakalasın
-router.get(['/', ''], async (req: Request, res: Response) => {
-    try {
-        // 1. Public Access (Booking Page)
-        if (req.query.company_id) {
+// Tüm hizmetleri listele (Firma bazlı) - Hem '/' hem de boş string '' yakalasın
+const publicServiceHandler = async (req: Request, res: Response, next: any) => {
+    if (req.query.company_id) {
+        try {
             const companyId = parseInt(req.query.company_id as string);
+            console.log(`[GET /services] Public Access: Company=${companyId}`);
             const services = await serviceService.getServicesByCompany(companyId);
             return res.json({ success: true, data: services });
+        } catch (error) {
+            console.error('[GET /services] Public Error:', error);
+            return res.status(500).json({ success: false, error: 'Hizmetler yüklenirken hata oluştu' });
         }
+    }
+    next();
+};
 
-        // 2. Private Access (Dashboard) - Manually check auth
-        // Use a wrapper to handle the middleware async flow
-        authMiddleware(req, res, async () => {
-            try {
-                const companyId = req.user?.companyId;
-                if (!companyId) {
-                    return res.status(403).json({ success: false, error: 'Firma ID bulunamadı' });
-                }
-                const services = await serviceService.getServicesByCompany(companyId);
-                res.json({ success: true, data: services });
-            } catch (innerError) {
-                console.error('Service Fetch Error (Inner):', innerError);
-                res.status(500).json({ success: false, error: 'Hizmetler yüklenirken hata oluştu' });
-            }
-        });
+const privateServiceHandler = async (req: Request, res: Response) => {
+    try {
+        const companyId = req.user?.companyId;
+        console.log(`[GET /services] Private Access: Company=${companyId}`);
 
+        if (!companyId) {
+            return res.status(403).json({ success: false, error: 'Firma ID bulunamadı' });
+        }
+        const services = await serviceService.getServicesByCompany(companyId);
+        res.json({ success: true, data: services });
     } catch (error) {
-        console.error('Service Fetch Error (Outer):', error);
+        console.error('[GET /services] Private Error:', error);
         res.status(500).json({ success: false, error: 'Hizmetler yüklenirken hata oluştu' });
     }
-});
+};
+
+router.get(['/', ''], publicServiceHandler, authMiddleware, privateServiceHandler);
 
 // Yeni hizmet ekle
 router.post('/', authMiddleware, async (req: Request, res: Response) => {
