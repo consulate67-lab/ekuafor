@@ -161,22 +161,19 @@ export default function AppointmentManagement() {
                             const effectiveStart = Math.max(currentMinutes, startTotalMinutes);
                             const remainingMinutes = Math.max(0, endTotalMinutes - effectiveStart);
 
-                            // Estimate capacity (avg 45 mins per client)
-                            const possibleClients = Math.floor(remainingMinutes / 45);
-
                             return (
                                 <>
                                     <div className="bg-white/50 backdrop-blur-sm px-5 py-3 rounded-2xl border border-pink-100 shadow-sm flex flex-col items-center min-w-[100px]">
-                                        <p className="text-[10px] font-bold text-pink-500 uppercase tracking-widest mb-1">DOLU</p>
+                                        <p className="text-[10px] font-bold text-pink-500 uppercase tracking-widest mb-1">HARCANAN</p>
                                         <p className="text-2xl font-black text-gray-800">{(totalBusyMinutes / 60).toFixed(1)}<span className="text-sm text-gray-400 font-medium ml-1">sa</span></p>
                                     </div>
                                     <div className="bg-white/50 backdrop-blur-sm px-5 py-3 rounded-2xl border border-blue-100 shadow-sm flex flex-col items-center min-w-[100px]">
-                                        <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1">KALAN</p>
+                                        <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1">BOŞ ZAMAN</p>
                                         <p className="text-2xl font-black text-gray-800">{(remainingMinutes / 60).toFixed(1)}<span className="text-sm text-gray-400 font-medium ml-1">sa</span></p>
                                     </div>
                                     <div className="bg-white/50 backdrop-blur-sm px-5 py-3 rounded-2xl border border-emerald-100 shadow-sm flex flex-col items-center min-w-[100px]">
-                                        <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1">KAPASİTE</p>
-                                        <p className="text-2xl font-black text-gray-800">~{possibleClients}<span className="text-sm text-gray-400 font-medium ml-1">Kişi</span></p>
+                                        <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1">TOPLAM RANDEVU</p>
+                                        <p className="text-2xl font-black text-gray-800">{todayApps.length}<span className="text-sm text-gray-400 font-medium ml-1">Adet</span></p>
                                     </div>
                                 </>
                             );
