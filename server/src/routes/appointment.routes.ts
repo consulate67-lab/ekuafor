@@ -107,7 +107,7 @@ router.post('/', async (req: Request, res: Response) => {
 
         const validatedData = appointmentSchema.parse(req.body);
 
-        // 2. Auth Logic for status
+        // 2. Auth Logic: Try to get companyId from token if not in body, and check status permissions
         if (req.headers.authorization) {
             try {
                 const token = req.headers.authorization.split(' ')[1];
@@ -116,8 +116,13 @@ router.post('/', async (req: Request, res: Response) => {
                     process.env.JWT_SECRET || 'your-secret-key'
                 ) as any;
 
+                // Fallback: Use companyId from token if not provided in body
+                if (!companyId && decoded.companyId) {
+                    companyId = decoded.companyId;
+                }
+
                 // If token is valid and belongs to this company (or super admin), trust the status
-                if (decoded.companyId === companyId || decoded.role === 'super_admin') {
+                if (companyId && (decoded.companyId === companyId || decoded.role === 'super_admin')) {
                     status = req.body.status || 'approved'; // Admin defaults to approved usually
                 }
             } catch (e) {
@@ -128,7 +133,7 @@ router.post('/', async (req: Request, res: Response) => {
 
         const appointment = await appointmentService.createAppointment({
             ...validatedData,
-            company_id: companyId,
+            company_id: companyId as number,
             status: status as any
         });
         res.status(201).json({ success: true, data: appointment });
