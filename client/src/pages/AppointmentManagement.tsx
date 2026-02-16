@@ -71,9 +71,11 @@ export default function AppointmentManagement() {
             await api.patch(`/appointments/${id}/status`, { status });
             fetchData();
         } catch (err: any) {
-            const msg = err.response?.data?.error || err.message || 'Durum güncellenirken hata oluştu';
-            setError(msg);
-            alert(msg); // Add alert to ensure user sees it immediately
+            console.error('Update Error Full:', err);
+            const serverError = err.response?.data?.error;
+            const message = serverError ? `Sunucu Hatası: ${serverError}` : (err.message || 'Bilinmeyen hata');
+            setError(message);
+            alert(message);
         }
     };
 
@@ -85,13 +87,22 @@ export default function AppointmentManagement() {
             const customerName = (newAppointment as any).customer_name;
             const finalNotes = customerName ? `Müşteri: ${customerName} | ${newAppointment.notes}` : newAppointment.notes;
 
-            await api.post('/appointments', {
+            const res = await api.post('/appointments', {
                 ...newAppointment,
                 company_id: company?.id, // Fix: send company_id
                 notes: finalNotes,
                 status: 'approved'
             });
             setShowAddForm(false);
+
+            // Check what status was actually saved
+            const savedStatus = res.data?.data?.status;
+            if (savedStatus === 'approved') {
+                alert('Randevu başarıyla ONAYLI olarak oluşturuldu.');
+            } else {
+                alert(`Randevu oluşturuldu ancak durumu: ${savedStatus}. Yönetici onayı gerekebilir.`);
+            }
+
             fetchData();
         } catch (err: any) {
             console.error('Appointment Error:', err);
