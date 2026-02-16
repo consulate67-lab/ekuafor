@@ -19,70 +19,81 @@ const appointmentSchema = z.object({
 
 // Randevuları listele (Firma bazlı, isteğe bağlı durum filtresiyle)
 // Randevuları listele (Firma bazlı, isteğe bağlı durum filtresiyle)
-router.get('/', async (req: Request, res: Response) => {
-    try {
-        // 1. Public Access (Booking Page - Availability Check)
-        if (req.query.company_id) {
+// 1. PUBLIC HANDLER: Check if it's a public booking request (via query params)
+const publicAppointmentHandler = async (req: Request, res: Response, next: any) => {
+    // If company_id is present AND there is NO auth header (or we want to allow public even if logged in but searching public),
+    // usually public booking check is:
+    if (req.query.company_id) {
+        try {
             const companyId = parseInt(req.query.company_id as string);
-            // Public listing might need to be sanitized (hide names/phones) but for MVP we return full
+            // Public listing might need to be sanitized but for MVP we return full
+            console.log(`[GET /appointments] Public Access: Company=${companyId}`);
             const appointments = await appointmentService.getAppointmentsByCompany(companyId, req.query.status as string);
             return res.json({ success: true, data: appointments });
+        } catch (error) {
+            console.error('[GET /appointments] Public Error:', error);
+            return next(error);
+        }
+    }
+    next();
+};
+
+// 2. PRIVATE HANDLER: Dashboard access (authenticated via authMiddleware)
+const privateAppointmentHandler = async (req: Request, res: Response, next: any) => {
+    try {
+        const companyId = req.user?.companyId;
+        const userId = req.user?.userId;
+
+        console.log(`[GET /appointments] Private Request: User=${userId}, Company=${companyId}`);
+
+        if (!companyId || !userId) {
+            console.log('[GET /appointments] Missing Info');
+            return res.status(403).json({ success: false, error: 'Firma/Kullanıcı bilgisi eksik' });
         }
 
-        // 2. Private Access (Dashboard) - Manually check auth
-        authMiddleware(req, res, async () => {
-            const companyId = req.user?.companyId;
-            const userId = req.user?.userId;
+        // Check role within the company
+        const roleResult = await pool.query(
+            'SELECT role FROM company_users WHERE company_id=$1 AND user_id=$2',
+            [companyId, userId]
+        );
+        const companyRole = roleResult.rows[0]?.role;
+        console.log(`[GET /appointments] Company Role Found: ${companyRole}`);
 
-            console.log(`[GET /appointments] Request: User=${userId}, Company=${companyId}`);
+        // Super Admin Bypass
+        if (req.user?.role === 'super_admin') {
+            // Allowed
+        } else if (!companyRole) {
+            console.log('[GET /appointments] No Role - Access Denied');
+            return res.status(403).json({ success: false, error: 'Bu firmada yetkiniz bulunmuyor' });
+        }
 
-            if (!companyId || !userId) {
-                console.log('[GET /appointments] Missing Info');
-                return res.status(403).json({ success: false, error: 'Firma/Kullanıcı bilgisi eksik' });
-            }
+        // Filter for staff: Only show their own appointments
+        let staffId: number | undefined;
+        if (companyRole === 'staff') {
+            staffId = userId;
+            console.log(`[GET /appointments] Filtering as Staff: ID=${staffId} (Own + Unassigned)`);
+        } else {
+            console.log(`[GET /appointments] Filtering as Manager/Admin: Showing ALL`);
+        }
 
-            // Check role within the company (more reliable than token role)
-            const roleResult = await pool.query(
-                'SELECT role FROM company_users WHERE company_id=$1 AND user_id=$2',
-                [companyId, userId]
-            );
-            const companyRole = roleResult.rows[0]?.role;
-            console.log(`[GET /appointments] Company Role Found: ${companyRole}`);
-
-            // Super Admin Bypass
-            if (req.user?.role === 'super_admin') {
-                // Allowed
-            } else if (!companyRole) {
-                // Not a member of this company
-                console.log('[GET /appointments] No Role - Access Denied');
-                return res.status(403).json({ success: false, error: 'Bu firmada yetkiniz bulunmuyor' });
-            }
-
-            // Filter for staff: Only show their own appointments
-            let staffId: number | undefined;
-            if (companyRole === 'staff') {
-                staffId = userId;
-                console.log(`[GET /appointments] Filtering as Staff: ID=${staffId} (Own + Unassigned)`);
-            } else {
-                console.log(`[GET /appointments] Filtering as Manager/Admin: Showing ALL`);
-            }
-
-            const appointments = await appointmentService.getAppointmentsByCompany(
-                companyId,
-                req.query.status as string,
-                staffId
-            );
-            console.log(`[GET /appointments] Found ${appointments.length} records.`);
-            res.json({ success: true, data: appointments });
-        });
+        const appointments = await appointmentService.getAppointmentsByCompany(
+            companyId,
+            req.query.status as string,
+            staffId
+        );
+        console.log(`[GET /appointments] Found ${appointments.length} records.`);
+        res.json({ success: true, data: appointments });
     } catch (error) {
         console.error('Randevu Listeleme Hatası:', error);
-        res.status(500).json({ success: false, error: 'Randevular yüklenirken hata oluştu' });
+        next(error);
     }
-});
+};
+
+router.get('/', publicAppointmentHandler, authMiddleware, privateAppointmentHandler);
 
 // Tarih aralığına göre randevuları getir (Takvim için)
-router.get('/calendar', authMiddleware, async (req: Request, res: Response) => {
+// Calendar is STRICTLY private
+router.get('/calendar', authMiddleware, async (req: Request, res: Response, next: any) => {
     try {
         const companyId = req.user?.companyId;
         const userId = req.user?.userId;
@@ -123,7 +134,7 @@ router.get('/calendar', authMiddleware, async (req: Request, res: Response) => {
         res.json({ success: true, data: appointments });
     } catch (error) {
         console.error('Calendar Error:', error);
-        res.status(500).json({ success: false, error: 'Takvim verileri yüklenirken hata oluştu' });
+        next(error);
     }
 });
 
