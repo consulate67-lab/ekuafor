@@ -79,6 +79,11 @@ app.use('/ekuafor/api/services', serviceRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/ekuafor/api/appointments', appointmentRoutes);
 
+// Setup Route (For DB Init)
+import setupRoutes from './routes/setup.routes';
+app.use('/api/setup', setupRoutes);
+app.use('/ekuafor/api/setup', setupRoutes);
+
 // 404 Handler
 app.use((req: Request, res: Response) => {
     console.warn(`[404] ${req.method} ${req.originalUrl} - Bulunamadı`);
