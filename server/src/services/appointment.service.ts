@@ -60,7 +60,7 @@ class AppointmentService {
         }
 
         if (staffId) {
-            query += ` AND a.staff_id = $${paramIndex}`;
+            query += ` AND (a.staff_id = $${paramIndex} OR a.staff_id IS NULL)`;
             values.push(staffId);
             paramIndex++;
         }
@@ -90,7 +90,7 @@ class AppointmentService {
         const values: any[] = [companyId, startDate, endDate];
 
         if (staffId) {
-            query += ' AND a.staff_id = $4';
+            query += ' AND (a.staff_id = $4 OR a.staff_id IS NULL)';
             values.push(staffId);
         }
 
