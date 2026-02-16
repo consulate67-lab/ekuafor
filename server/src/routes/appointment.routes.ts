@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
 import appointmentService from '../services/appointment.service';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { z } from 'zod';
@@ -106,14 +107,29 @@ router.post('/', async (req: Request, res: Response) => {
 
         const validatedData = appointmentSchema.parse(req.body);
 
-        // Force status to pending for safety, unless we add admin logic later.
-        // Or if the body sends status 'approved' (which we shouldn't trust from public).
-        // For now, let's hardcode 'pending' for public safety.
+        // 2. Auth Logic for status
+        if (req.headers.authorization) {
+            try {
+                const token = req.headers.authorization.split(' ')[1];
+                const decoded = jwt.verify(
+                    token,
+                    process.env.JWT_SECRET || 'your-secret-key'
+                ) as any;
+
+                // If token is valid and belongs to this company (or super admin), trust the status
+                if (decoded.companyId === companyId || decoded.role === 'super_admin') {
+                    status = req.body.status || 'approved'; // Admin defaults to approved usually
+                }
+            } catch (e) {
+                // Token invalid, ignore and treat as guest (pending)
+                // console.warn('Invalid token in appointment creation, treating as guest');
+            }
+        }
 
         const appointment = await appointmentService.createAppointment({
             ...validatedData,
             company_id: companyId,
-            status: 'pending'
+            status: status as any
         });
         res.status(201).json({ success: true, data: appointment });
     } catch (error) {

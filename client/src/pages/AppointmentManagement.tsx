@@ -225,6 +225,10 @@ export default function AppointmentManagement() {
                             {['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pa'].map(d => (
                                 <div key={d} className="text-center text-[10px] font-bold text-gray-400 py-1">{d}</div>
                             ))}
+                            {/* Empty cells for previous month */}
+                            {Array.from({ length: (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7 }).map((_, i) => (
+                                <div key={`empty-${i}`} />
+                            ))}
                             {days.map(day => {
                                 const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                                 const isSelected = selectedDate === dateStr;
