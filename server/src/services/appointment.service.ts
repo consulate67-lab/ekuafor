@@ -42,7 +42,7 @@ class AppointmentService {
         return result.rows[0];
     }
 
-    async getAppointmentsByCompany(companyId: number, status?: string): Promise<Appointment[]> {
+    async getAppointmentsByCompany(companyId: number, status?: string, staffId?: number): Promise<Appointment[]> {
         let query = `
       SELECT a.*, s.name as service_name, u.first_name || ' ' || u.last_name as customer_name
       FROM appointments a
@@ -51,10 +51,18 @@ class AppointmentService {
       WHERE a.company_id = $1
     `;
         const values: any[] = [companyId];
+        let paramIndex = 2;
 
         if (status) {
-            query += ' AND a.status = $2';
+            query += ` AND a.status = $${paramIndex}`;
             values.push(status);
+            paramIndex++;
+        }
+
+        if (staffId) {
+            query += ` AND a.staff_id = $${paramIndex}`;
+            values.push(staffId);
+            paramIndex++;
         }
 
         query += ' ORDER BY a.appointment_date DESC, a.start_time DESC';
@@ -71,16 +79,23 @@ class AppointmentService {
         return result.rows[0] || null;
     }
 
-    async getAppointmentsByDateRange(companyId: number, startDate: string, endDate: string): Promise<Appointment[]> {
-        const query = `
+    async getAppointmentsByDateRange(companyId: number, startDate: string, endDate: string, staffId?: number): Promise<Appointment[]> {
+        let query = `
       SELECT a.*, s.name as service_name, u.first_name || ' ' || u.last_name as customer_name
       FROM appointments a
       LEFT JOIN services s ON a.service_id = s.id
       LEFT JOIN users u ON a.customer_id = u.id
       WHERE a.company_id = $1 AND a.appointment_date BETWEEN $2 AND $3
-      ORDER BY a.appointment_date, a.start_time
     `;
-        const result = await pool.query(query, [companyId, startDate, endDate]);
+        const values: any[] = [companyId, startDate, endDate];
+
+        if (staffId) {
+            query += ' AND a.staff_id = $4';
+            values.push(staffId);
+        }
+
+        query += ' ORDER BY a.appointment_date, a.start_time';
+        const result = await pool.query(query, values);
         return result.rows;
     }
 }

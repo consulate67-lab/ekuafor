@@ -31,10 +31,24 @@ router.get('/', async (req: Request, res: Response) => {
         // 2. Private Access (Dashboard) - Manually check auth
         authMiddleware(req, res, async () => {
             const companyId = req.user?.companyId;
+            const userRole = req.user?.role;
+            const userId = req.user?.userId;
+
             if (!companyId) {
                 return res.status(403).json({ success: false, error: 'Firma ID bulunamadı' });
             }
-            const appointments = await appointmentService.getAppointmentsByCompany(companyId, req.query.status as string);
+
+            // Filter for staff: If not admin/owner, show only their own appointments
+            let staffId: number | undefined;
+            if (userRole !== 'super_admin' && userRole !== 'company_admin') {
+                staffId = userId;
+            }
+
+            const appointments = await appointmentService.getAppointmentsByCompany(
+                companyId,
+                req.query.status as string,
+                staffId
+            );
             res.json({ success: true, data: appointments });
         });
     } catch (error) {
@@ -46,14 +60,25 @@ router.get('/', async (req: Request, res: Response) => {
 router.get('/calendar', authMiddleware, async (req: Request, res: Response) => {
     try {
         const companyId = req.user?.companyId;
+        const userRole = req.user?.role;
+        const userId = req.user?.userId;
         const { start, end } = req.query;
+
         if (!companyId) {
             return res.status(403).json({ success: false, error: 'Firma ID bulunamadı' });
         }
+
+        // Filter for staff
+        let staffId: number | undefined;
+        if (userRole !== 'super_admin' && userRole !== 'company_admin') {
+            staffId = userId;
+        }
+
         const appointments = await appointmentService.getAppointmentsByDateRange(
             companyId,
             start as string,
-            end as string
+            end as string,
+            staffId
         );
         res.json({ success: true, data: appointments });
     } catch (error) {
