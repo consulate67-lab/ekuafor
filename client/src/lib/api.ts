@@ -31,7 +31,11 @@ const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
+    timeout: 30000, // 30 seconds timeout for Railway cold starts
 });
+
+// Configure retry delay
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Request interceptor - token ekle ve MOCK YÖNLENDİRME
 api.interceptors.request.use(
@@ -103,15 +107,39 @@ api.interceptors.request.use(
     }
 );
 
-// Response interceptor - hata yönetimi
+// Response interceptor - hata yönetimi ve RETRY (Yeniden Deneme)
 api.interceptors.response.use(
     (response) => response,
-    (error) => {
-        if (error.response?.status === 401) {
-            localStorage.removeItem('token');
-            const basename = import.meta.env.BASE_URL || '/';
-            window.location.href = `${basename}login`.replace(/\/+/g, '/');
+    async (error) => {
+        const config = error.config;
+
+        // Retry logic for Network Errors or 503 (Service Unavailable/Starting)
+        // Skip if it's already a retry or if it's a specific auth error
+        if (!config || config.__isRetryRequest || error.response?.status === 401) {
+            if (error.response?.status === 401) {
+                localStorage.removeItem('token');
+                const basename = import.meta.env.BASE_URL || '/';
+                window.location.href = `${basename}login`.replace(/\/+/g, '/');
+            }
+            return Promise.reject(error);
         }
+
+        // Initialize retry count
+        config.__retryCount = config.__retryCount || 0;
+
+        // Check if we should retry (Max 3 retries)
+        if (config.__retryCount < 3 && (!error.response || error.response.status >= 500)) {
+            config.__retryCount += 1;
+            config.__isRetryRequest = true; // Mark as retry to avoid infinite loop logic if needed, though count handles it
+
+            // Exponential backoff: 1s, 2s, 4s
+            const delay = 1000 * Math.pow(2, config.__retryCount - 1);
+            console.log(`Retrying request... Attempt ${config.__retryCount} after ${delay}ms`);
+
+            await wait(delay);
+            return api(config);
+        }
+
         return Promise.reject(error);
     }
 );

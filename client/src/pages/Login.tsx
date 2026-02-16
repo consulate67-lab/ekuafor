@@ -40,7 +40,7 @@ export default function Login() {
             navigate('/');
         } catch (err: any) {
             if (!err.response) {
-                setError(`Sunucuya bağlanılamadı. Hedef Adres: ${api.defaults.baseURL}. Lütfen VITE_API_URL Secret ayarını kontrol edin.`);
+                setError(`Sunucu şu an başlatılıyor veya ulaşılamıyor. Lütfen 10-15 saniye bekleyip tekrar deneyin. (${api.defaults.baseURL})`);
             } else {
                 const apiError = err.response?.data?.error;
                 const details = err.response?.data?.details;
