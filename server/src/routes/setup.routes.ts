@@ -207,6 +207,20 @@ END$$;
 INSERT INTO users (email, password, role, first_name, last_name) 
 VALUES ('admin@saloon.com', '$2a$10$YourHashedPasswordHere', 'super_admin', 'Super', 'Admin')
 ON CONFLICT (email) DO NOTHING;
+
+-- DATA MIGRATION: Populate company_users from users table (if missing)
+-- This fixes the issue where old databases have users/companies but no company_users relation
+INSERT INTO company_users (company_id, user_id, role)
+SELECT u.company_id, u.id, 
+    CASE 
+        WHEN u.role = 'company_admin' THEN 'owner'
+        ELSE 'staff'
+    END
+FROM users u
+WHERE u.company_id IS NOT NULL 
+AND NOT EXISTS (
+    SELECT 1 FROM company_users cu WHERE cu.user_id = u.id AND cu.company_id = u.company_id
+);
         `;
 
         await pool.query(sql);
