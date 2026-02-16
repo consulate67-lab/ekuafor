@@ -70,8 +70,10 @@ export default function AppointmentManagement() {
         try {
             await api.patch(`/appointments/${id}/status`, { status });
             fetchData();
-        } catch (err) {
-            setError('Durum güncellenirken hata oluştu');
+        } catch (err: any) {
+            const msg = err.response?.data?.error || err.message || 'Durum güncellenirken hata oluştu';
+            setError(msg);
+            alert(msg); // Add alert to ensure user sees it immediately
         }
     };
 

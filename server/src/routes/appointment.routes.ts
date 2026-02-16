@@ -122,12 +122,12 @@ router.post('/', async (req: Request, res: Response) => {
                 }
 
                 // If token is valid and belongs to this company (or super admin), trust the status
-                if (companyId && (decoded.companyId === companyId || decoded.role === 'super_admin')) {
-                    status = req.body.status || 'approved'; // Admin defaults to approved usually
+                // Use == for loose comparison (string vs number)
+                if (companyId && (decoded.companyId == companyId || decoded.role === 'super_admin')) {
+                    status = req.body.status || 'approved';
                 }
             } catch (e) {
-                // Token invalid, ignore and treat as guest (pending)
-                // console.warn('Invalid token in appointment creation, treating as guest');
+                // Token invalid
             }
         }
 
@@ -141,7 +141,10 @@ router.post('/', async (req: Request, res: Response) => {
         if (error instanceof z.ZodError) {
             return res.status(400).json({ success: false, error: 'Validasyon hatası', details: error.errors });
         }
-        res.status(500).json({ success: false, error: 'Randevu oluşturulurken hata oluştu' });
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Randevu oluşturulurken hata oluştu'
+        });
     }
 });
 
@@ -156,7 +159,11 @@ router.patch('/:id/status', authMiddleware, async (req: Request, res: Response) 
         }
         res.json({ success: true, data: appointment });
     } catch (error) {
-        res.status(500).json({ success: false, error: 'Randevu durumu güncellenirken hata oluştu' });
+        console.error('Update Status Error:', error);
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Randevu durumu güncellenirken hata oluştu'
+        });
     }
 });
 
