@@ -43,6 +43,7 @@ class AppointmentService {
     }
 
     async getAppointmentsByCompany(companyId: number, status?: string, staffId?: number): Promise<Appointment[]> {
+        console.log(`[Service] getAppointmentsByCompany: ID=${companyId}, Status=${status}, Staff=${staffId}`);
         let query = `
       SELECT a.*, s.name as service_name, u.first_name || ' ' || u.last_name as customer_name
       FROM appointments a
@@ -67,19 +68,31 @@ class AppointmentService {
 
         query += ' ORDER BY a.appointment_date DESC, a.start_time DESC';
 
-        const result = await pool.query(query, values);
-        return result.rows;
+        try {
+            const result = await pool.query(query, values);
+            console.log(`[Service] Found ${result.rowCount} rows`);
+            return result.rows;
+        } catch (err) {
+            console.error('[Service] Query Error:', err);
+            throw err;
+        }
     }
 
     async updateAppointmentStatus(id: number, status: string): Promise<Appointment | null> {
-        const result = await pool.query(
-            'UPDATE appointments SET status = $1 WHERE id = $2 RETURNING *',
-            [status, id]
-        );
-        return result.rows[0] || null;
+        try {
+            const result = await pool.query(
+                'UPDATE appointments SET status = $1 WHERE id = $2 RETURNING *',
+                [status, id]
+            );
+            return result.rows[0] || null;
+        } catch (err) {
+            console.error('[Service] Update Status Error:', err);
+            throw err;
+        }
     }
 
     async getAppointmentsByDateRange(companyId: number, startDate: string, endDate: string, staffId?: number): Promise<Appointment[]> {
+        console.log(`[Service] getByDateRange: ID=${companyId}, Valid=${startDate}-${endDate}, Staff=${staffId}`);
         let query = `
       SELECT a.*, s.name as service_name, u.first_name || ' ' || u.last_name as customer_name
       FROM appointments a
@@ -97,8 +110,14 @@ class AppointmentService {
         }
 
         query += ' ORDER BY a.appointment_date, a.start_time';
-        const result = await pool.query(query, values);
-        return result.rows;
+        try {
+            const result = await pool.query(query, values);
+            console.log(`[Service] Range Found ${result.rowCount} rows`);
+            return result.rows;
+        } catch (err) {
+            console.error('[Service] Range Query Error:', err);
+            throw err;
+        }
     }
 }
 
