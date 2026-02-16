@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import appointmentService from '../services/appointment.service';
 import { authMiddleware } from '../middleware/auth.middleware';
+import pool from '../config/database';
 import { z } from 'zod';
 
 const router = Router();
@@ -31,16 +32,30 @@ router.get('/', async (req: Request, res: Response) => {
         // 2. Private Access (Dashboard) - Manually check auth
         authMiddleware(req, res, async () => {
             const companyId = req.user?.companyId;
-            const userRole = req.user?.role;
             const userId = req.user?.userId;
 
-            if (!companyId) {
-                return res.status(403).json({ success: false, error: 'Firma ID bulunamadı' });
+            if (!companyId || !userId) {
+                return res.status(403).json({ success: false, error: 'Firma/Kullanıcı bilgisi eksik' });
             }
 
-            // Filter for staff: If not admin/owner, show only their own appointments
+            // Check role within the company (more reliable than token role)
+            const roleResult = await pool.query(
+                'SELECT role FROM company_users WHERE company_id=$1 AND user_id=$2',
+                [companyId, userId]
+            );
+            const companyRole = roleResult.rows[0]?.role; // 'owner' | 'manager' | 'staff'
+
+            // Super Admin Bypass
+            if (req.user?.role === 'super_admin') {
+                // Allowed
+            } else if (!companyRole) {
+                // Not a member of this company
+                return res.status(403).json({ success: false, error: 'Bu firmada yetkiniz bulunmuyor' });
+            }
+
+            // Filter for staff: Only show their own appointments
             let staffId: number | undefined;
-            if (userRole !== 'super_admin' && userRole !== 'company_admin') {
+            if (companyRole === 'staff') {
                 staffId = userId;
             }
 
@@ -52,6 +67,7 @@ router.get('/', async (req: Request, res: Response) => {
             res.json({ success: true, data: appointments });
         });
     } catch (error) {
+        console.error('Randevu Listeleme Hatası:', error);
         res.status(500).json({ success: false, error: 'Randevular yüklenirken hata oluştu' });
     }
 });
@@ -64,13 +80,25 @@ router.get('/calendar', authMiddleware, async (req: Request, res: Response) => {
         const userId = req.user?.userId;
         const { start, end } = req.query;
 
-        if (!companyId) {
-            return res.status(403).json({ success: false, error: 'Firma ID bulunamadı' });
+        if (!companyId || !userId) {
+            return res.status(403).json({ success: false, error: 'Firma/Kullanıcı bilgisi eksik' });
         }
 
-        // Filter for staff
+        // Check company role
+        const roleResult = await pool.query(
+            'SELECT role FROM company_users WHERE company_id=$1 AND user_id=$2',
+            [companyId, userId]
+        );
+        const companyRole = roleResult.rows[0]?.role;
+
+        if (req.user?.role === 'super_admin') {
+            // Allowed
+        } else if (!companyRole) {
+            return res.status(403).json({ success: false, error: 'Bu firmada yetkiniz bulunmuyor' });
+        }
+
         let staffId: number | undefined;
-        if (userRole !== 'super_admin' && userRole !== 'company_admin') {
+        if (companyRole === 'staff') {
             staffId = userId;
         }
 
