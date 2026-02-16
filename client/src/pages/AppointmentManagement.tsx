@@ -136,8 +136,6 @@ export default function AppointmentManagement() {
                     <div className="hidden xl:flex gap-6 mx-auto">
                         {(() => {
                             const todayStr = new Date().toISOString().split('T')[0];
-                            const now = new Date();
-                            const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
                             const [startH, startM] = (company.work_start_time || '09:00').split(':').map(Number);
                             const [endH, endM] = (company.work_end_time || '20:00').split(':').map(Number);
@@ -146,25 +144,28 @@ export default function AppointmentManagement() {
                             const endTotalMinutes = endH * 60 + endM;
 
                             // Calculate today's approved appointments duration
-                            const todayApps = appointments.filter(a => a.status === 'approved' && a.appointment_date === todayStr);
+                            const todayApps = appointments.filter(a =>
+                                a.status === 'approved' &&
+                                (a.appointment_date.toString().split('T')[0] === todayStr)
+                            );
+
                             const totalBusyMinutes = todayApps.reduce((acc, app) => {
                                 const [sH, sM] = app.start_time.split(':').map(Number);
                                 const [eH, eM] = (app.end_time || app.start_time).split(':').map(Number);
-                                // Simple fix if end_time missing, assume 30m? Actually mock server guarantees end_time now.
                                 let duration = (eH * 60 + eM) - (sH * 60 + sM);
-                                if (duration < 0) duration += 24 * 60; // Over midnight edge case (unlikely for day view)
+                                if (duration < 0) duration += 24 * 60;
                                 return acc + duration;
                             }, 0);
 
-                            // Remaining Time Logic
-                            // If now is before start, we count from start. If after end, 0.
-                            const effectiveStart = Math.max(currentMinutes, startTotalMinutes);
-                            const remainingMinutes = Math.max(0, endTotalMinutes - effectiveStart);
+                            // Total Capacity Logic (Capacity - Usage)
+                            const totalWorkMinutes = endTotalMinutes - startTotalMinutes;
+                            // Ensure non-negative if calculations go weird
+                            const remainingMinutes = Math.max(0, totalWorkMinutes - totalBusyMinutes);
 
                             return (
                                 <>
                                     <div className="bg-white/50 backdrop-blur-sm px-5 py-3 rounded-2xl border border-pink-100 shadow-sm flex flex-col items-center min-w-[100px]">
-                                        <p className="text-[10px] font-bold text-pink-500 uppercase tracking-widest mb-1">HARCANAN</p>
+                                        <p className="text-[10px] font-bold text-pink-500 uppercase tracking-widest mb-1">TOPLAM RANDEVU ZAMANI</p>
                                         <p className="text-2xl font-black text-gray-800">{(totalBusyMinutes / 60).toFixed(1)}<span className="text-sm text-gray-400 font-medium ml-1">sa</span></p>
                                     </div>
                                     <div className="bg-white/50 backdrop-blur-sm px-5 py-3 rounded-2xl border border-blue-100 shadow-sm flex flex-col items-center min-w-[100px]">
@@ -632,7 +633,7 @@ export default function AppointmentManagement() {
                     Sistemi Sıfırla
                 </button>
                 <div className="flex items-center gap-2 grayscale opacity-30">
-                    <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments v1.5</span>
+                    <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments v1.11</span>
                 </div>
             </div>
         </div>
