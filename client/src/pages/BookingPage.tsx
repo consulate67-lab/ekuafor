@@ -37,27 +37,46 @@ export default function BookingPage() {
     useEffect(() => {
         const fetchCompanyData = async () => {
             try {
-                // Fetch basic data
-                const [compRes, allServicesRes, allUsersRes, allAppsRes] = await Promise.all([
-                    api.get(`/companies/${id}`),
-                    api.get('/services', { params: { company_id: id } }),
-                    api.get(`/companies/${id}/employees`),
-                    api.get('/appointments', { params: { company_id: id } })
-                ]);
+                // Fetch basic data sequentially to identify failures
+                // 1. Company
+                try {
+                    const compRes = await api.get(`/companies/${id}`);
+                    setCompany(compRes.data.data);
+                } catch (e) {
+                    console.error('Failed to load company', e);
+                    throw new Error('Firma bilgileri yüklenemedi. ID hatalı olabilir.');
+                }
 
-                setCompany(compRes.data.data);
+                // 2. Services
+                try {
+                    const servicesRes = await api.get('/services', { params: { company_id: id } });
+                    setServices(servicesRes.data?.data || []);
+                } catch (e) {
+                    console.error('Failed to load services', e);
+                    // Don't block page load, just show empty
+                }
 
-                // Mock Server now filters by params, but we double check or just set
-                const loadedServices = allServicesRes.data?.data || [];
-                setServices(loadedServices);
+                // 3. Employees (Staff)
+                try {
+                    const usersRes = await api.get(`/companies/${id}/employees`);
+                    setStaff(usersRes.data?.data || []);
+                } catch (e) {
+                    console.error('Failed to load employees', e);
+                    // Don't block page load
+                }
 
-                const loadedStaff = allUsersRes.data?.data || [];
-                setStaff(loadedStaff);
+                // 4. Appointments
+                try {
+                    const appsRes = await api.get('/appointments', { params: { company_id: id } });
+                    setAppointments(appsRes.data?.data || []);
+                } catch (e) {
+                    console.error('Failed to load appointments', e);
+                    // Don't block
+                }
 
-                setAppointments(allAppsRes.data?.data || []);
-
-            } catch (err) {
-                console.error('Failed to load booking data', err);
+            } catch (err: any) {
+                console.error('Critical failure in booking data', err);
+                // Only critical error (company missing) triggers the error view
             } finally {
                 setLoading(false);
             }
@@ -171,7 +190,7 @@ export default function BookingPage() {
                     Sistemi Sıfırla (Veri Sorunu Varsa)
                 </button>
             </div>
-            <p className="text-[10px] text-gray-300 mt-10 uppercase tracking-widest">ID: {id} | v1.2</p>
+            <p className="text-[10px] text-gray-300 mt-10 uppercase tracking-widest">ID: {id} | v1.3</p>
         </div>
     );
 
