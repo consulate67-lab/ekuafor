@@ -41,7 +41,23 @@ app.get('/', (req, res) => {
 const healthHandler = async (req: Request, res: Response) => {
     try {
         const result = await pool.query('SELECT NOW()');
-        res.json({ success: true, db: 'Connected', time: result.rows[0].now });
+
+        // Extract DB Host for debugging (Masking credentials)
+        let dbHost = 'Unknown';
+        try {
+            if (process.env.DATABASE_URL) {
+                const url = new URL(process.env.DATABASE_URL);
+                dbHost = url.hostname;
+            }
+        } catch (e) { dbHost = 'Parse Error'; }
+
+        res.json({
+            success: true,
+            db: 'Connected',
+            time: result.rows[0].now,
+            connected_host: dbHost, // Shows which DB server we are talking to
+            env: process.env.NODE_ENV
+        });
     } catch (error: any) {
         console.error('Health Check Error:', error);
         res.status(500).json({
