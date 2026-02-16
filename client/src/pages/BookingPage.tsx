@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import { Appointment, Service, Company, User } from '../types';
@@ -33,6 +33,20 @@ export default function BookingPage() {
         customerName: '',
         customerPhone: ''
     });
+
+    const dateInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (step === 3 && dateInputRef.current) {
+            setTimeout(() => {
+                try {
+                    dateInputRef.current?.showPicker();
+                } catch (e) {
+                    console.log('showPicker not supported', e);
+                }
+            }, 300);
+        }
+    }, [step]);
 
     useEffect(() => {
         const fetchCompanyData = async () => {
@@ -190,7 +204,7 @@ export default function BookingPage() {
                     Sistemi Sıfırla (Veri Sorunu Varsa)
                 </button>
             </div>
-            <p className="text-[10px] text-gray-300 mt-10 uppercase tracking-widest">ID: {id} | v1.6</p>
+            <p className="text-[10px] text-gray-300 mt-10 uppercase tracking-widest">ID: {id} | v1.7</p>
         </div>
     );
 
@@ -289,6 +303,7 @@ export default function BookingPage() {
                         <button onClick={handleBack} className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 hover:text-gray-600">← Geri</button>
                         <h2 className="text-2xl font-black text-gray-900 mb-6">Tarih Seçimi</h2>
                         <input
+                            ref={dateInputRef} // Add ref
                             type="date"
                             min={new Date().toISOString().split('T')[0]}
                             onChange={(e) => {
@@ -297,6 +312,9 @@ export default function BookingPage() {
                             }}
                             className="w-full p-4 bg-white rounded-2xl border-2 border-gray-100 font-bold text-gray-900 focus:outline-none focus:border-pink-500 transition-colors text-lg"
                         />
+                        <p className="text-xs text-gray-400 mt-2 text-center" onClick={() => dateInputRef.current?.showPicker()}>
+                            Takvimi açmak için tıklayın
+                        </p>
                     </div>
                 )}
 
