@@ -234,9 +234,9 @@ export default function BookingPage() {
                         <div className="space-y-3">
                             {staff.map(u => (
                                 <button
-                                    key={u.id}
+                                    key={u.id || (u as any).user_id}
                                     onClick={() => {
-                                        setSelection({ ...selection, staffId: u.id });
+                                        setSelection({ ...selection, staffId: u.id || (u as any).user_id });
                                         handleNext();
                                     }}
                                     className="w-full bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-200 transition-all flex items-center gap-4 text-left"

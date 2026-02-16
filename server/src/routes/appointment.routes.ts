@@ -67,13 +67,16 @@ const privateAppointmentHandler = async (req: Request, res: Response, next: any)
             return res.status(403).json({ success: false, error: 'Bu firmada yetkiniz bulunmuyor' });
         }
 
-        // Filter for staff: Only show their own appointments
-        let staffId: number | undefined;
-        if (companyRole === 'staff') {
-            staffId = userId;
-            console.log(`[GET /appointments] Filtering as Staff: ID=${staffId} (Own + Unassigned)`);
+        // Default behavior: Everyone (Staff, Manager, Owner) sees their own appointments
+        // unless they are a Super Admin or explicitly want to see all.
+        // This fixes Rıza seeing Mehmet's appointments.
+        let staffId: number | undefined = userId;
+
+        if (req.user?.role === 'super_admin' || req.query.all === 'true') {
+            staffId = undefined; // Super admins or 'all' request see everything
+            console.log(`[GET /appointments] Showing ALL (SuperAdmin or all=true)`);
         } else {
-            console.log(`[GET /appointments] Filtering as Manager/Admin: Showing ALL`);
+            console.log(`[GET /appointments] Filtering for User: ID=${staffId}`);
         }
 
         const appointments = await appointmentService.getAppointmentsByCompany(
