@@ -207,6 +207,9 @@ router.post('/', async (req: Request, res: Response) => {
             } catch (e) {
                 console.log('[POST /appointments] Token verify failed or ignored:', e);
             }
+        } else if (req.body.status) {
+            // For Board Login/Public trusted booking
+            status = req.body.status;
         }
 
         const appointment = await appointmentService.createAppointment({

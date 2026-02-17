@@ -59,7 +59,7 @@ function App() {
     return (
         <div className="relative min-h-screen">
             <div className="fixed top-0 right-0 z-[9999] bg-pink-600 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg opacity-80 hover:opacity-100 pointer-events-none select-none shadow-md">
-                v1.59
+                v1.60
             </div>
             <Router basename="/ekuafor">
                 <Routes>

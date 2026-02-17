@@ -342,7 +342,16 @@ export default function SalonBoard() {
                                                     key={hour}
                                                     className={`p-4 border-r border-slate-50 align-top cursor-cell hover:bg-slate-50/80 transition-all relative ${isCurrent ? 'bg-indigo-50/10' : ''} ${isPast ? 'bg-slate-50/20' : ''}`}
                                                     onClick={() => {
+                                                        const pId = person.user_id || person.id;
                                                         setSelectedCell({ person, hour });
+                                                        setFastForm({
+                                                            customerName: '',
+                                                            serviceId: services[0]?.id?.toString() || '',
+                                                            notes: '',
+                                                            staffId: pId.toString(),
+                                                            appointmentDate: selectedDate,
+                                                            startTime: hour
+                                                        });
                                                         setIsModalOpen(true);
                                                     }}
                                                 >
