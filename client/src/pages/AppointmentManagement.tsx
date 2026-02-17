@@ -27,6 +27,16 @@ export default function AppointmentManagement() {
 
     const [isListening, setIsListening] = useState(false);
 
+    // Tarih formatlama yardımcısı (Timezone sorunlarını önlemek için)
+    const formatDateKey = (dateStr: string | Date | undefined) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     const fetchData = async () => {
         try {
             // 1. Get User & Company
@@ -295,7 +305,7 @@ export default function AppointmentManagement() {
                             // Calculate today's approved appointments duration
                             const todayApps = appointments.filter(a =>
                                 a.status === 'approved' &&
-                                (a.appointment_date.toString().split('T')[0] === todayStr)
+                                (formatDateKey(a.appointment_date) === todayStr)
                             );
 
                             const totalBusyMinutes = todayApps.reduce((acc, app) => {
@@ -420,7 +430,7 @@ export default function AppointmentManagement() {
                                 const isSelected = selectedDate === dateStr;
                                 const hasApproved = appointments.some(a =>
                                     a.status === 'approved' &&
-                                    (a.appointment_date.toString().split('T')[0] === dateStr)
+                                    (formatDateKey(a.appointment_date) === dateStr)
                                 );
                                 const isToday = new Date().toISOString().split('T')[0] === dateStr;
 
@@ -478,7 +488,7 @@ export default function AppointmentManagement() {
 
                                         const dayAppointments = appointments.filter(a =>
                                             a.status === 'approved' &&
-                                            (a.appointment_date.toString().split('T')[0] === dateStr)
+                                            (formatDateKey(a.appointment_date) === dateStr)
                                         );
 
                                         return (
@@ -550,7 +560,7 @@ export default function AppointmentManagement() {
                                 </thead>
                                 <tbody>
                                     {appointments
-                                        .filter(a => a.appointment_date.toString().split('T')[0] === selectedDate && a.status === 'approved')
+                                        .filter(a => formatDateKey(a.appointment_date) === selectedDate && a.status === 'approved')
                                         .sort((a, b) => a.start_time.localeCompare(b.start_time))
                                         .map(app => (
                                             <tr key={app.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors cursor-pointer group" onClick={() => setSelectedAppointment(app)}>
@@ -586,7 +596,7 @@ export default function AppointmentManagement() {
                                                 </td>
                                             </tr>
                                         ))}
-                                    {appointments.filter(a => a.appointment_date.toString().split('T')[0] === selectedDate && a.status === 'approved').length === 0 && (
+                                    {appointments.filter(a => formatDateKey(a.appointment_date) === selectedDate && a.status === 'approved').length === 0 && (
                                         <tr>
                                             <td colSpan={5} className="px-6 py-12 text-center text-gray-400 font-bold italic">Seçili gün için kayıtlı randevu bulunamadı.</td>
                                         </tr>
