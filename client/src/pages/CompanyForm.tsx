@@ -76,6 +76,14 @@ export default function CompanyForm() {
     const [selectedDistrict, setSelectedDistrict] = useState<number | null>(null);
     const [selectedNeighborhood, setSelectedNeighborhood] = useState<number | null>(null);
 
+    // SMS Settings
+    const [smsSettings, setSmsSettings] = useState({
+        provider: 'local_gateway',
+        api_url: '',
+        api_key: '',
+        is_active: false,
+    });
+
     // Map position
     const [mapPosition, setMapPosition] = useState<LatLng | null>(
         new LatLng(39.9334, 32.8597) // Ankara default
@@ -162,6 +170,16 @@ export default function CompanyForm() {
                 setMapPosition(newPos);
                 setMapCenter(newPos);
             }
+
+            // Fetch SMS settings too
+            try {
+                const smsRes = await api.get(`/sms/settings/${id}`);
+                if (smsRes.data.settings) {
+                    setSmsSettings(smsRes.data.settings);
+                }
+            } catch (smsErr) {
+                console.warn('SMS ayarları bulunamadı veya yüklenemedi');
+            }
         } catch (err: any) {
             setError(err.response?.data?.error || 'Firma yüklenirken hata oluştu');
         }
@@ -191,8 +209,19 @@ export default function CompanyForm() {
 
             if (isEdit) {
                 await api.put(`/companies/${id}`, data);
+                // Save SMS settings
+                await api.post('/sms/settings', {
+                    ...smsSettings,
+                    company_id: id
+                });
             } else {
-                await api.post('/companies', data);
+                const res = await api.post('/companies', data);
+                // For new company, use the new ID
+                const newId = res.data.data.id;
+                await api.post('/sms/settings', {
+                    ...smsSettings,
+                    company_id: newId
+                });
             }
 
             navigate('/companies');
@@ -552,6 +581,67 @@ export default function CompanyForm() {
                                     Ödeme sistemi aktif
                                 </label>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* SMS Ayarları */}
+                    <div className="card border-l-4 border-violet-500">
+                        <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                            <span className="w-8 h-8 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                </svg>
+                            </span>
+                            SMS Sunucu Entegrasyonu
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="md:col-span-2 flex items-center gap-3 p-4 bg-violet-50 rounded-xl">
+                                <input
+                                    type="checkbox"
+                                    id="sms_active"
+                                    checked={smsSettings.is_active}
+                                    onChange={(e) => setSmsSettings(prev => ({ ...prev, is_active: e.target.checked }))}
+                                    className="w-5 h-5 text-violet-600 border-gray-300 rounded focus:ring-violet-500"
+                                />
+                                <label htmlFor="sms_active" className="text-sm font-bold text-violet-900 select-none cursor-pointer">
+                                    Bu Firma İçin Otomatik SMS Bildirimlerini Aktif Et
+                                </label>
+                            </div>
+
+                            {smsSettings.is_active && (
+                                <>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Sağlayıcı</label>
+                                        <select
+                                            className="input-field"
+                                            value={smsSettings.provider}
+                                            onChange={e => setSmsSettings(prev => ({ ...prev, provider: e.target.value as any }))}
+                                        >
+                                            <option value="local_gateway">Yerel Gateway (Vodafone SIM/Android)</option>
+                                            <option value="vodafone_official">Vodafone Resmi API</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Gateway URL</label>
+                                        <input
+                                            type="url"
+                                            placeholder="http://192.168...:8080/send-sms"
+                                            className="input-field"
+                                            value={smsSettings.api_url}
+                                            onChange={e => setSmsSettings(prev => ({ ...prev, api_url: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">API/Gateway Şifresi (Opsiyonel)</label>
+                                        <input
+                                            type="password"
+                                            className="input-field"
+                                            value={smsSettings.api_key}
+                                            onChange={e => setSmsSettings(prev => ({ ...prev, api_key: e.target.value }))}
+                                        />
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
 

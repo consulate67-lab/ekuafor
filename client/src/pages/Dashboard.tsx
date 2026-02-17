@@ -163,22 +163,6 @@ export default function Dashboard() {
                             </div>
                         </Link>
                     )}
-                    {/* SMS Ayarları (SADECE ADMIN VEYA SAHİP) */}
-                    {(user?.role === 'super_admin' || user?.role === 'company_admin') && (
-                        <Link to="/sms" className="card group hover:scale-[1.02] transition-all duration-300 border-violet-100">
-                            <div className="flex items-center gap-5">
-                                <div className="bg-violet-50 p-4 rounded-2xl group-hover:bg-violet-600 group-hover:text-white transition-colors duration-300">
-                                    <svg className="w-8 h-8 text-violet-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-bold text-gray-900 mb-1">SMS Sunucu</h3>
-                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Vodafone hattınız ile SMS sistemini bağlayın.</p>
-                                </div>
-                            </div>
-                        </Link>
-                    )}
 
                     {/* WhatsApp Paylaşım (Personel ve Yönetici) */}
                     {(user?.role === 'staff' || user?.role === 'company_admin') && (
