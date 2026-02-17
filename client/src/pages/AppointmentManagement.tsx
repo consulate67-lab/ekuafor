@@ -9,12 +9,11 @@ export default function AppointmentManagement() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [formError, setFormError] = useState('');
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [showAddForm, setShowAddForm] = useState(false);
     const [newAppointment, setNewAppointment] = useState({
         service_id: 0,
         staff_id: 0,
-        appointment_date: new Date().toISOString().split('T')[0],
+        appointment_date: '', // fetchData içinde dolacak veya Manuel form açılınca getLocalDateString() olacak
         start_time: '09:00',
         end_time: '10:00',
         notes: '',
