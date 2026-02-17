@@ -9,6 +9,7 @@ export default function CustomerHome() {
     const [loading, setLoading] = useState(true);
     const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
     const [favorites, setFavorites] = useState<number[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         const savedFavs = localStorage.getItem('saloon_favorites');
@@ -63,14 +64,8 @@ export default function CustomerHome() {
     };
 
     const filterByLocation = (userLat: number, userLng: number) => {
-        // Simple mock filtering based on "if company has lat/lng"
-        // In real app, calculate distance. Here we just sort/filter if data exists.
-        // For MVP, since mock data likely doesn't have real coordinates, we'll just simulate sorting or rely on existing data.
-
-        // Let's assume we sort by distance if company has format coordinates.
-        // Haversine formula
         const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-            const R = 6371; // km
+            const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
@@ -81,14 +76,35 @@ export default function CustomerHome() {
         };
 
         const sorted = [...companies].map(c => {
-            // Mock coords if missing for demo, or just use 0,0
-            const cLat = c.latitude || 41.0082; // Istanbul default
+            const cLat = c.latitude || 41.0082;
             const cLng = c.longitude || 28.9784;
             const distance = calculateDistance(userLat, userLng, cLat, cLng);
             return { ...c, distance };
         }).sort((a, b) => a.distance - b.distance);
 
         setFilteredCompanies(sorted);
+    };
+
+    const handleSearch = (query: string) => {
+        setSearchQuery(query);
+        const lowerQuery = query.toLowerCase();
+        const filtered = companies.filter(c =>
+            c.name.toLowerCase().includes(lowerQuery) ||
+            (c.province_name && c.province_name.toLowerCase().includes(lowerQuery)) ||
+            (c.district_name && c.district_name.toLowerCase().includes(lowerQuery))
+        );
+        setFilteredCompanies(filtered);
+    };
+
+    const openMaps = (e: React.MouseEvent, c: Company) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const addressParts = [c.name, c.address_line, c.district_name, c.province_name].filter(Boolean);
+        const query = encodeURIComponent(addressParts.join(' '));
+        const url = (c.latitude && c.longitude)
+            ? `https://www.google.com/maps/dir/?api=1&destination=${c.latitude},${c.longitude}`
+            : `https://www.google.com/maps/search/?api=1&query=${query}`;
+        window.open(url, '_blank');
     };
 
     const favoriteCompanies = companies.filter(c => favorites.includes(c.id!));
@@ -102,23 +118,38 @@ export default function CustomerHome() {
                 </div>
             </header>
 
-            {/* Hero / Location */}
-            <div className="bg-gradient-to-br from-pink-600 to-violet-600 text-white py-12 px-4 rounded-b-[2.5rem] shadow-xl shadow-pink-200">
+            {/* Hero & Search */}
+            <div className="bg-gradient-to-br from-pink-600 to-violet-600 text-white pt-12 pb-16 px-4 rounded-b-[2.5rem] shadow-xl shadow-pink-200 relative mb-8">
                 <div className="max-w-md mx-auto text-center">
-                    <h2 className="text-2xl font-black mb-2">Size En Yakın Salonu Bulun</h2>
-                    <p className="text-white/80 text-sm font-medium mb-6">Konumunuza göre en iyi kuaförleri keşfedin.</p>
+                    <h2 className="text-2xl font-black mb-2 leading-tight">Keşfet, Rezerv Et,<br />Keyfini Çıkar</h2>
+                    <p className="text-white/80 text-sm font-medium mb-8">Hayallerindeki bakıma bir adım uzaktasın.</p>
 
-                    <button
-                        onClick={handleGetLocation}
-                        className="bg-white text-pink-600 px-6 py-3 rounded-full font-bold shadow-lg active:scale-95 transition-transform flex items-center gap-2 mx-auto"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        {location ? 'Konum Güncellendi' : 'Konumumu Kullan'}
-                    </button>
+                    <div className="relative group max-w-sm mx-auto">
+                        <div className="absolute inset-y-0 left-0 pl-1 index-30 flex items-center pointer-events-none">
+                            <svg className="w-5 h-5 text-gray-400 ml-4 group-focus-within:text-pink-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Salon veya şehir ara..."
+                            value={searchQuery}
+                            onChange={(e) => handleSearch(e.target.value)}
+                            className="w-full bg-white text-gray-900 pl-12 pr-4 py-4 rounded-2xl shadow-2xl shadow-black/10 focus:ring-4 focus:ring-white/20 outline-none font-bold text-sm transition-all"
+                        />
+                    </div>
                 </div>
+
+                {/* Floating Location Button */}
+                <button
+                    onClick={handleGetLocation}
+                    className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-white text-pink-600 px-6 py-3 rounded-full font-bold shadow-xl active:scale-95 transition-transform flex items-center gap-2 border border-pink-50 whitespace-nowrap"
+                >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    </svg>
+                    <span className="text-xs uppercase tracking-tighter">{location ? 'Bana Yakınlar' : 'Çevremdekiler'}</span>
+                </button>
             </div>
 
             {/* Favorites List */}
@@ -176,10 +207,19 @@ export default function CustomerHome() {
                                 🏢
                             </div>
                             <div className="flex-1 min-w-0 pr-8">
-                                <h4 className="font-bold text-gray-900 truncate">{c.name}</h4>
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <h4 className="font-bold text-gray-900 truncate">{c.name}</h4>
+                                    <button
+                                        onClick={(e) => openMaps(e, c)}
+                                        className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                                        title="Haritada Gör"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                    </button>
+                                </div>
                                 <p className="text-xs text-gray-500 truncate">{c.district_name || 'Merkez'}, {c.province_name || 'İstanbul'}</p>
                                 {c.distance !== undefined && (
-                                    <p className="text-[10px] font-bold text-pink-500 mt-1">{(c.distance).toFixed(1)} km</p>
+                                    <p className="text-[10px] font-black text-pink-500 mt-1 uppercase tracking-tighter shadow-sm bg-pink-50/50 inline-block px-1.5 py-0.5 rounded">{(c.distance).toFixed(1)} km mesafede</p>
                                 )}
                             </div>
                         </Link>
