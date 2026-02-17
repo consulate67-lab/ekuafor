@@ -19,18 +19,36 @@ export default function CustomerHome() {
             setFavorites(JSON.parse(savedFavs));
         }
 
-        const fetchCompanies = async () => {
+        const fetchData = async () => {
             try {
                 const res = await api.get('/companies');
-                setCompanies(res.data.data);
-                setFilteredCompanies([]); // Don't show by default to keep clean
+                const allCompanies = res.data.data;
+                setCompanies(allCompanies);
+
+                // Proactively try to get location
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            const { latitude, longitude } = position.coords;
+                            const newLoc = { lat: latitude, lng: longitude };
+                            setLocation(newLoc);
+                            applyFilters(searchQuery, newLoc, distanceLimit, allCompanies);
+                        },
+                        () => {
+                            // If location fails, show all
+                            setFilteredCompanies(allCompanies);
+                        }
+                    );
+                } else {
+                    setFilteredCompanies(allCompanies);
+                }
             } catch (err) {
                 console.error('Failed to fetch companies', err);
             } finally {
                 setLoading(false);
             }
         };
-        fetchCompanies();
+        fetchData();
     }, []);
 
     const toggleFavorite = (e: React.MouseEvent, id: number) => {
@@ -47,7 +65,7 @@ export default function CustomerHome() {
         localStorage.setItem('saloon_favorites', JSON.stringify(newFavs));
     };
 
-    const applyFilters = (query: string, loc: { lat: number, lng: number } | null, dist: number) => {
+    const applyFilters = (query: string, loc: { lat: number, lng: number } | null, dist: number, dataOverride?: Company[]) => {
         const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
             const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -59,9 +77,10 @@ export default function CustomerHome() {
             return R * c;
         };
 
+        const targetData = dataOverride || companies;
         const lowerQuery = query.toLowerCase();
 
-        const result = companies.map(c => {
+        const result = targetData.map(c => {
             let distance = undefined;
             if (loc) {
                 distance = calculateDistance(loc.lat, loc.lng, c.latitude || 41.0082, c.longitude || 28.9784);
@@ -144,19 +163,29 @@ export default function CustomerHome() {
                     <h2 className="text-2xl font-black mb-2 leading-tight">Keşfet, Rezerv Et,<br />Keyfini Çıkar</h2>
                     <p className="text-white/80 text-sm font-medium mb-8">Hayallerindeki bakıma bir adım uzaktasın.</p>
 
-                    <div className="relative group max-w-sm mx-auto">
-                        <div className="absolute inset-y-0 left-0 pl-1 index-30 flex items-center pointer-events-none">
-                            <svg className="w-5 h-5 text-gray-400 ml-4 group-focus-within:text-pink-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
+                    <div className="flex items-center gap-2 max-w-sm mx-auto">
+                        <div className="relative group flex-1">
+                            <div className="absolute inset-y-0 left-0 pl-1 index-30 flex items-center pointer-events-none">
+                                <svg className="w-5 h-5 text-gray-400 ml-4 group-focus-within:text-pink-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="Salon veya şehir ara..."
+                                value={searchQuery}
+                                onChange={(e) => handleSearch(e.target.value)}
+                                className="w-full bg-white text-gray-900 pl-12 pr-4 py-4 rounded-2xl shadow-2xl shadow-black/10 focus:ring-4 focus:ring-white/20 outline-none font-bold text-sm transition-all"
+                            />
                         </div>
-                        <input
-                            type="text"
-                            placeholder="Salon veya şehir ara..."
-                            value={searchQuery}
-                            onChange={(e) => handleSearch(e.target.value)}
-                            className="w-full bg-white text-gray-900 pl-12 pr-4 py-4 rounded-2xl shadow-2xl shadow-black/10 focus:ring-4 focus:ring-white/20 outline-none font-bold text-sm transition-all"
-                        />
+                        <button
+                            onClick={() => setShowSlider(!showSlider)}
+                            className={`p-4 rounded-2xl shadow-2xl transition-all ${showSlider ? 'bg-pink-600 text-white' : 'bg-white text-gray-400'}`}
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                            </svg>
+                        </button>
                     </div>
                 </div>
 
@@ -227,8 +256,8 @@ export default function CustomerHome() {
 
             {/* Main List */}
             <div className="max-w-md mx-auto px-4 py-8 space-y-4">
-                <h3 className="font-black text-gray-900 uppercase tracking-widest text-xs mb-4">
-                    {searchQuery || location ? (location ? 'Yakındaki Salonlar' : 'Arama Sonuçları') : ''}
+                <h3 className="font-black text-gray-900 uppercase tracking-widest text-[10px] mb-4">
+                    {location ? `${distanceLimit} km İçindeki Salonlar` : 'Tüm Salonlar'}
                 </h3>
 
                 {loading ? (
@@ -272,21 +301,11 @@ export default function CustomerHome() {
                     ))
                 )}
 
-                {!loading && filteredCompanies.length === 0 && (searchQuery || location) && (
+                {!loading && filteredCompanies.length === 0 && (
                     <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-gray-100 p-8">
                         <div className="text-4xl mb-4 opacity-20">🔍</div>
                         <p className="text-gray-400 font-bold mb-1">Eşleşen salon bulunamadı.</p>
                         <p className="text-gray-300 text-xs text-medium">Farklı bir kelime deneyebilir veya mesafeyi artırabilirsiniz.</p>
-                    </div>
-                )}
-
-                {!loading && filteredCompanies.length === 0 && !searchQuery && !location && (
-                    <div className="text-center py-20">
-                        <div className="w-20 h-20 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <svg className="w-10 h-10 text-pink-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                        </div>
-                        <h4 className="text-xl font-bold text-gray-900 mb-2">Başlamaya Ne Dersin?</h4>
-                        <p className="text-gray-400 text-sm font-medium px-10">Dilediğin salonu yukarıdan ara veya çevrendekileri keşfetmek için butona bas.</p>
                     </div>
                 )}
             </div>
