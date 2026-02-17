@@ -54,36 +54,45 @@ class AppointmentService {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `;
+        console.log('[AppointmentService] Creating appointment:', JSON.stringify(appointment, null, 2));
+
         const values = [
             appointment.company_id,
-            appointment.customer_id,
+            appointment.customer_id || null,
             appointment.service_id,
-            appointment.staff_id,
+            appointment.staff_id || null,
             appointment.appointment_date,
             appointment.start_time,
             appointment.end_time,
             appointment.status || 'pending',
-            appointment.notes,
-            appointment.price
+            appointment.notes || null,
+            appointment.price || null
         ];
-        const result = await pool.query(query, values);
-        const newAppointment = result.rows[0];
 
-        // SMS Notification
         try {
-            if (newAppointment.customer_id) {
-                const customerRes = await pool.query('SELECT phone, first_name FROM users WHERE id = $1', [newAppointment.customer_id]);
-                const customer = customerRes.rows[0];
-                if (customer && customer.phone) {
-                    const message = `Merhaba ${customer.first_name}, randevunuz alınmıştır. Tarih: ${newAppointment.appointment_date} Saat: ${newAppointment.start_time}. Bizi tercih ettiğiniz için teşekkür ederiz!`;
-                    await smsService.sendSms(newAppointment.company_id, customer.phone, message);
-                }
-            }
-        } catch (smsError) {
-            console.error('SMS notification failed during appointment creation:', smsError);
-        }
+            const result = await pool.query(query, values);
+            const newAppointment = result.rows[0];
+            console.log('[AppointmentService] Success! New ID:', newAppointment.id);
 
-        return newAppointment;
+            // SMS Notification
+            try {
+                if (newAppointment.customer_id) {
+                    const customerRes = await pool.query('SELECT phone, first_name FROM users WHERE id = $1', [newAppointment.customer_id]);
+                    const customer = customerRes.rows[0];
+                    if (customer && customer.phone) {
+                        const message = `Merhaba ${customer.first_name}, randevunuz alınmıştır. Tarih: ${newAppointment.appointment_date} Saat: ${newAppointment.start_time}. Bizi tercih ettiğiniz için teşekkür ederiz!`;
+                        await smsService.sendSms(newAppointment.company_id, customer.phone, message);
+                    }
+                }
+            } catch (smsError) {
+                console.error('SMS notification failed during appointment creation:', smsError);
+            }
+
+            return newAppointment;
+        } catch (dbError) {
+            console.error('[AppointmentService] Database Insert Error:', dbError);
+            throw dbError;
+        }
     }
 
     async getAppointmentsByCompany(companyId: number, status?: string, staffId?: number): Promise<Appointment[]> {

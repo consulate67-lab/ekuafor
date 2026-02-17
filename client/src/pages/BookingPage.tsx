@@ -170,9 +170,10 @@ export default function BookingPage() {
 
             alert('Randevu talebiniz alındı! Onaylandığında size bildirim yapılacaktır.');
             navigate('/');
-        } catch (err) {
+        } catch (err: any) {
             console.error('Booking failed', err);
-            alert('Randevu oluşturulurken bir hata oluştu.');
+            const serverMsg = err.response?.data?.error || err.message;
+            alert('Randevu oluşturulurken bir hata oluştu: ' + serverMsg);
         }
     };
 
