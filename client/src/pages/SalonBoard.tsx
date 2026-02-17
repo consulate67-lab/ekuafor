@@ -22,6 +22,19 @@ export default function SalonBoard() {
         notes: ''
     });
 
+    // Helper to generate consistent color for staff
+    const getStaffColor = (name: string) => {
+        const colors = [
+            '#4f46e5', '#db2777', '#059669', '#d97706', '#7c3aed',
+            '#2563eb', '#dc2626', '#0891b2', '#16a34a', '#be185d'
+        ];
+        let hash = 0;
+        for (let i = 0; i < name.length; i++) {
+            hash = name.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return colors[Math.abs(hash) % colors.length];
+    };
+
     const hours = Array.from({ length: 14 }, (_, i) => `${i + 8}:00`); // 08:00 to 21:00
 
     const fetchData = useCallback(async (compId: number) => {
@@ -215,11 +228,11 @@ export default function SalonBoard() {
                 <div className="bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.04)] border border-slate-100 overflow-hidden inline-block min-w-full">
                     <table className="w-full border-separate border-spacing-0">
                         <thead>
-                            <tr>
-                                <th className="sticky left-0 z-40 bg-white/95 backdrop-blur-md p-8 text-left border-b border-r border-slate-100 min-w-[280px] shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
+                            <tr className="bg-black">
+                                <th className="sticky left-0 z-40 bg-black p-8 text-left border-b border-white/10 min-w-[280px] shadow-[4px_0_24px_rgba(0,0,0,0.2)]">
                                     <div className="flex flex-col">
                                         <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.25em] mb-1">Organizasyon</span>
-                                        <span className="text-xl font-black text-slate-800 tracking-tight">Uzmanlar</span>
+                                        <span className="text-xl font-black text-white tracking-tight">Uzmanlar</span>
                                     </div>
                                 </th>
                                 {hours.map(hour => {
@@ -231,18 +244,18 @@ export default function SalonBoard() {
                                         <th
                                             key={hour}
                                             id={`hour-col-${hNum}`}
-                                            className={`p-8 text-center border-b border-slate-100 min-w-[180px] transition-all relative ${isCurrent ? 'bg-indigo-50/40' : ''}`}
+                                            className={`p-8 text-center border-b border-white/10 min-w-[180px] transition-all relative ${isCurrent ? 'bg-white/5' : ''}`}
                                         >
                                             <div className={`flex flex-col items-center gap-1 transition-all ${isCurrent ? 'scale-110' : ''}`}>
-                                                <span className={`text-lg font-black tracking-tight ${isCurrent ? 'text-indigo-600' : isPast ? 'text-slate-300' : 'text-slate-700'}`}>
+                                                <span className={`text-lg font-black tracking-tight ${isCurrent ? 'text-indigo-400' : isPast ? 'text-slate-600' : 'text-slate-200'}`}>
                                                     {hour}
                                                 </span>
                                                 {isCurrent && (
-                                                    <span className="px-3 py-1 bg-indigo-500 text-[9px] text-white font-black uppercase tracking-widest rounded-full shadow-lg shadow-indigo-200">
+                                                    <span className="px-3 py-1 bg-indigo-500 text-[9px] text-white font-black uppercase tracking-widest rounded-full shadow-lg">
                                                         ŞİMDİ
                                                     </span>
                                                 )}
-                                                {!isCurrent && isPast && <span className="text-[9px] font-black text-slate-200 uppercase tracking-widest">Geçti</span>}
+                                                {!isCurrent && isPast && <span className="text-[9px] font-black text-slate-700 uppercase tracking-widest">Geçti</span>}
                                             </div>
                                             {isCurrent && <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-indigo-500 rounded-t-full"></div>}
                                         </th>
@@ -253,19 +266,23 @@ export default function SalonBoard() {
                         <tbody className="divide-y divide-slate-100">
                             {staff.map(person => {
                                 const pId = person.user_id || person.id;
+                                const staffColor = getStaffColor(`${person.first_name} ${person.last_name}`);
                                 return (
                                     <tr key={pId} className="group transition-colors">
-                                        <td className="sticky left-0 z-30 bg-white/95 backdrop-blur-md p-8 border-r border-slate-100 font-bold text-slate-900 shadow-[4px_0_24px_rgba(0,0,0,0.02)] group-hover:bg-slate-50 transition-colors">
+                                        <td className="sticky left-0 z-30 bg-white p-8 border-r border-slate-100 font-bold text-slate-900 shadow-[10px_0_30px_-15px_rgba(0,0,0,0.1)] group-hover:bg-slate-50 transition-colors">
                                             <div className="flex items-center gap-5">
                                                 <div className="relative">
-                                                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600 flex items-center justify-center font-black text-lg uppercase shadow-inner">
+                                                    <div
+                                                        className="w-14 h-14 rounded-2xl text-white flex items-center justify-center font-black text-lg uppercase shadow-lg shadow-inner"
+                                                        style={{ backgroundColor: staffColor }}
+                                                    >
                                                         {person.first_name?.[0] || 'U'}{person.last_name?.[0] || 'Z'}
                                                     </div>
                                                     <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full"></div>
                                                 </div>
                                                 <div>
-                                                    <p className="text-lg font-black text-slate-800 leading-none mb-1.5 tracking-tight group-hover:text-indigo-600 transition-colors">{person.first_name} {person.last_name}</p>
-                                                    <span className="inline-flex px-2 py-0.5 bg-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest rounded-md">Uzman Kadro</span>
+                                                    <p className="text-lg font-black text-slate-800 leading-none mb-1.5 tracking-tight group-hover:opacity-80 transition-opacity">{person.first_name} {person.last_name}</p>
+                                                    <span className="inline-flex px-2 py-0.5 bg-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest rounded-md">Uzman</span>
                                                 </div>
                                             </div>
                                         </td>
@@ -298,11 +315,12 @@ export default function SalonBoard() {
                                                             <div
                                                                 key={app.id}
                                                                 onClick={(e) => e.stopPropagation()}
-                                                                className={`p-5 rounded-3xl border-l-[6px] shadow-xl shadow-slate-200/40 transition-all hover:scale-[1.03] hover:shadow-2xl active:scale-95 cursor-pointer ${isPast ? 'grayscale-[0.4] opacity-70' : ''} ${app.status === 'approved' ? 'bg-white border-indigo-500 text-slate-900 group-hover:bg-indigo-50/30' :
-                                                                        app.status === 'pending' ? 'bg-amber-50 border-amber-500 text-amber-900 animate-pulse' :
-                                                                            app.status === 'completed' ? 'bg-emerald-50 border-emerald-500 text-emerald-900 opacity-60' :
-                                                                                'bg-slate-50 border-slate-300 text-slate-500'
+                                                                className={`p-5 rounded-3xl border-l-[6px] shadow-xl shadow-slate-200/40 transition-all hover:scale-[1.03] hover:shadow-2xl active:scale-95 cursor-pointer ${isPast ? 'grayscale-[0.4] opacity-70' : ''} ${app.status === 'approved' ? 'bg-white text-slate-900 group-hover:bg-slate-50' :
+                                                                    app.status === 'pending' ? 'bg-amber-50 border-amber-500 text-amber-900 animate-pulse' :
+                                                                        app.status === 'completed' ? 'bg-emerald-50 border-emerald-500 text-emerald-900 opacity-60' :
+                                                                            'bg-slate-50 border-slate-300 text-slate-500'
                                                                     }`}
+                                                                style={app.status === 'approved' ? { borderLeftColor: staffColor } : {}}
                                                             >
                                                                 <div className="flex justify-between items-start mb-2">
                                                                     <div className="flex items-center gap-2">
@@ -310,8 +328,8 @@ export default function SalonBoard() {
                                                                         {isCurrent && <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping"></span>}
                                                                     </div>
                                                                     <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${app.status === 'approved' ? 'bg-indigo-100 text-indigo-600' :
-                                                                            app.status === 'pending' ? 'bg-amber-100 text-amber-600' :
-                                                                                'bg-slate-100 text-slate-400'
+                                                                        app.status === 'pending' ? 'bg-amber-100 text-amber-600' :
+                                                                            'bg-slate-100 text-slate-400'
                                                                         }`}>
                                                                         {app.status === 'approved' ? 'ONAYLI' : app.status === 'pending' ? 'YENİ' : 'GEÇMİŞ'}
                                                                     </span>
