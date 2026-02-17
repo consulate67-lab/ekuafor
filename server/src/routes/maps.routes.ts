@@ -16,14 +16,26 @@ router.get('/search', authMiddleware, async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, error: 'Arama terimi (q) gereklidir' });
         }
 
-        // Parallel search on both services
+        // Robust parallel search: If one fails, others can still return results
         const [googleResults, yandexResults] = await Promise.all([
-            googleMapsService.searchBusinesses(query, lat, lng),
-            yandexMapsService.searchBusinesses(query, lat, lng)
+            googleMapsService.searchBusinesses(query, lat, lng).catch(err => {
+                console.error('Google search error (swallowed):', err.message);
+                return [];
+            }),
+            yandexMapsService.searchBusinesses(query, lat, lng).catch(err => {
+                console.error('Yandex search error (swallowed):', err.message);
+                return [];
+            })
         ]);
 
         // Merge and remove duplicates (simple name-based check)
         const combined = [...googleResults, ...yandexResults];
+
+        if (combined.length === 0) {
+            // If everything is truly empty, maybe return a hint
+            return res.json({ success: true, data: [], info: 'Sonuç bulunamadı' });
+        }
+
         const unique = combined.filter((v, i, a) => a.findIndex(t => t.name === v.name) === i);
 
         res.json({ success: true, data: unique });
