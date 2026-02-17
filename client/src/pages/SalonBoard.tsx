@@ -153,7 +153,7 @@ export default function SalonBoard() {
 
         try {
             setLoading(true);
-            await api.patch(`/appointments/${id}`, { status: 'cancelled' });
+            await api.patch(`/appointments/${id}/status`, { status: 'cancelled' });
             setIsDetailModalOpen(false);
             if (company?.id) fetchData(company.id);
         } catch (err: any) {

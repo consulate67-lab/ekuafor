@@ -229,7 +229,8 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 // Randevu durumu güncelle (Onayla/İptal)
-router.patch('/:id/status', authMiddleware, async (req: Request, res: Response) => {
+// Tablet Paneli için authMiddleware kaldırıldı (Board Key ile giriş yapıldığı için)
+router.patch('/:id/status', async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
         const { status } = req.body;
@@ -244,6 +245,21 @@ router.patch('/:id/status', authMiddleware, async (req: Request, res: Response) 
             success: false,
             error: error instanceof Error ? error.message : 'Randevu durumu güncellenirken hata oluştu'
         });
+    }
+});
+
+// Geriye dönük uyumluluk için PATCH /:id desteği
+router.patch('/:id', async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id);
+        const { status } = req.body;
+        if (status) {
+            const appointment = await appointmentService.updateAppointmentStatus(id, status);
+            return res.json({ success: true, data: appointment });
+        }
+        res.status(400).json({ success: false, error: 'Status gereklidir' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: 'Güncelleme hatası' });
     }
 });
 
