@@ -10,6 +10,8 @@ export default function CustomerHome() {
     const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
     const [favorites, setFavorites] = useState<number[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [distanceLimit, setDistanceLimit] = useState(50);
+    const [showSlider, setShowSlider] = useState(false);
 
     useEffect(() => {
         const savedFavs = localStorage.getItem('saloon_favorites');
@@ -21,7 +23,7 @@ export default function CustomerHome() {
             try {
                 const res = await api.get('/companies');
                 setCompanies(res.data.data);
-                setFilteredCompanies(res.data.data); // Default: show all
+                setFilteredCompanies([]); // Don't show by default to keep clean
             } catch (err) {
                 console.error('Failed to fetch companies', err);
             } finally {
@@ -45,25 +47,7 @@ export default function CustomerHome() {
         localStorage.setItem('saloon_favorites', JSON.stringify(newFavs));
     };
 
-    const handleGetLocation = () => {
-        if (!navigator.geolocation) {
-            alert('Tarayıcınız konum özelliğini desteklemiyor.');
-            return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                setLocation({ lat: latitude, lng: longitude });
-                filterByLocation(latitude, longitude);
-            },
-            () => {
-                alert('Konum izni verilmedi. Tüm firmalar listeleniyor.');
-            }
-        );
-    };
-
-    const filterByLocation = (userLat: number, userLng: number) => {
+    const applyFilters = (query: string, loc: { lat: number, lng: number } | null, dist: number) => {
         const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
             const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -75,25 +59,61 @@ export default function CustomerHome() {
             return R * c;
         };
 
-        const sorted = [...companies].map(c => {
-            const cLat = c.latitude || 41.0082;
-            const cLng = c.longitude || 28.9784;
-            const distance = calculateDistance(userLat, userLng, cLat, cLng);
-            return { ...c, distance };
-        }).sort((a, b) => a.distance - b.distance);
+        const lowerQuery = query.toLowerCase();
 
-        setFilteredCompanies(sorted);
+        const result = companies.map(c => {
+            let distance = undefined;
+            if (loc) {
+                distance = calculateDistance(loc.lat, loc.lng, c.latitude || 41.0082, c.longitude || 28.9784);
+            }
+            return { ...c, distance };
+        }).filter(c => {
+            const matchesSearch = !lowerQuery ||
+                c.name.toLowerCase().includes(lowerQuery) ||
+                (c.province_name && c.province_name.toLowerCase().includes(lowerQuery)) ||
+                (c.district_name && c.district_name.toLowerCase().includes(lowerQuery));
+
+            const matchesDistance = !loc || (c.distance !== undefined && c.distance <= dist);
+
+            return matchesSearch && matchesDistance;
+        });
+
+        // Sort by distance if location exists
+        if (loc) {
+            result.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+        }
+
+        setFilteredCompanies(result);
+    };
+
+    const handleGetLocation = () => {
+        if (!navigator.geolocation) {
+            alert('Tarayıcınız konum özelliğini desteklemiyor.');
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                const newLoc = { lat: latitude, lng: longitude };
+                setLocation(newLoc);
+                setShowSlider(true);
+                applyFilters(searchQuery, newLoc, distanceLimit);
+            },
+            () => {
+                alert('Konum izni verilmedi.');
+            }
+        );
     };
 
     const handleSearch = (query: string) => {
         setSearchQuery(query);
-        const lowerQuery = query.toLowerCase();
-        const filtered = companies.filter(c =>
-            c.name.toLowerCase().includes(lowerQuery) ||
-            (c.province_name && c.province_name.toLowerCase().includes(lowerQuery)) ||
-            (c.district_name && c.district_name.toLowerCase().includes(lowerQuery))
-        );
-        setFilteredCompanies(filtered);
+        applyFilters(query, location, distanceLimit);
+    };
+
+    const handleDistanceChange = (val: number) => {
+        setDistanceLimit(val);
+        applyFilters(searchQuery, location, val);
     };
 
     const openMaps = (e: React.MouseEvent, c: Company) => {
@@ -152,6 +172,32 @@ export default function CustomerHome() {
                 </button>
             </div>
 
+            {/* Distance Slider (Visible after location enabled) */}
+            {showSlider && location && (
+                <div className="max-w-md mx-auto px-6 mt-12 animate-in slide-in-from-top-4 duration-300">
+                    <div className="bg-white p-5 rounded-3xl shadow-lg border border-pink-50">
+                        <div className="flex justify-between items-center mb-4">
+                            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Mesafe Filtresi</span>
+                            <span className="text-sm font-black text-pink-600 bg-pink-50 px-3 py-1 rounded-full">{distanceLimit === 50 ? 'Tümü (50 km)' : `${distanceLimit} km`}</span>
+                        </div>
+                        <input
+                            type="range"
+                            min="1"
+                            max="50"
+                            step="1"
+                            value={distanceLimit}
+                            onChange={(e) => handleDistanceChange(parseInt(e.target.value))}
+                            className="w-full h-2 bg-pink-100 rounded-lg appearance-none cursor-pointer accent-pink-600"
+                        />
+                        <div className="flex justify-between mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
+                            <span>1 km</span>
+                            <span>25 km</span>
+                            <span>50 km</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Favorites List */}
             {favorites.length > 0 && (
                 <div className="max-w-md mx-auto px-4 py-8 pb-0 space-y-4">
@@ -182,7 +228,7 @@ export default function CustomerHome() {
             {/* Main List */}
             <div className="max-w-md mx-auto px-4 py-8 space-y-4">
                 <h3 className="font-black text-gray-900 uppercase tracking-widest text-xs mb-4">
-                    {location ? 'Yakındaki Salonlar' : 'Tüm Salonlar'}
+                    {searchQuery || location ? (location ? 'Yakındaki Salonlar' : 'Arama Sonuçları') : ''}
                 </h3>
 
                 {loading ? (
@@ -226,9 +272,21 @@ export default function CustomerHome() {
                     ))
                 )}
 
-                {!loading && filteredCompanies.length === 0 && (
-                    <div className="text-center py-10 text-gray-400 font-bold">
-                        Salon bulunamadı.
+                {!loading && filteredCompanies.length === 0 && (searchQuery || location) && (
+                    <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-gray-100 p-8">
+                        <div className="text-4xl mb-4 opacity-20">🔍</div>
+                        <p className="text-gray-400 font-bold mb-1">Eşleşen salon bulunamadı.</p>
+                        <p className="text-gray-300 text-xs text-medium">Farklı bir kelime deneyebilir veya mesafeyi artırabilirsiniz.</p>
+                    </div>
+                )}
+
+                {!loading && filteredCompanies.length === 0 && !searchQuery && !location && (
+                    <div className="text-center py-20">
+                        <div className="w-20 h-20 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <svg className="w-10 h-10 text-pink-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        </div>
+                        <h4 className="text-xl font-bold text-gray-900 mb-2">Başlamaya Ne Dersin?</h4>
+                        <p className="text-gray-400 text-sm font-medium px-10">Dilediğin salonu yukarıdan ara veya çevrendekileri keşfetmek için butona bas.</p>
                     </div>
                 )}
             </div>
