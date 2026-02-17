@@ -213,18 +213,6 @@ export default function SalonBoard() {
                             {company?.name || 'Yükleniyor...'}
                         </h1>
                         <div className="flex items-center gap-4">
-                            <div className="relative group">
-                                <input
-                                    type="date"
-                                    value={selectedDate}
-                                    onChange={(e) => {
-                                        setSelectedDate(e.target.value);
-                                        if (company?.id) fetchData(company.id, e.target.value);
-                                    }}
-                                    className="bg-slate-100 px-4 py-1 rounded-xl text-xs font-black text-slate-600 uppercase border-2 border-transparent focus:border-indigo-500 outline-none transition-all cursor-pointer"
-                                />
-                            </div>
-                            <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
                             <span className="text-xs font-black text-indigo-500 uppercase tracking-widest animate-pulse">
                                 {new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
                             </span>
@@ -345,7 +333,8 @@ export default function SalonBoard() {
 
                                             const personApps = appointments.filter(a =>
                                                 Number(a.staff_id) === Number(pId) &&
-                                                parseInt(a.start_time.split(':')[0]) === hNum
+                                                parseInt(a.start_time.split(':')[0]) === hNum &&
+                                                a.status !== 'cancelled'
                                             );
 
                                             return (
