@@ -4,10 +4,23 @@
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="vite.svg" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="pink-600" />
+  <meta name="apple-mobile-web-app-title" content="Saloon" />
+  <meta name="theme-color" content="#db2777" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Saloon - Güzellik Merkezi Randevu Sistemi</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script type="text/javascript">
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/ekuafor/sw.js')
+          .then(reg => console.log('SW registered', reg))
+          .catch(err => console.log('SW error', err));
+      });
+    }
+
     (function (l) {
       if (l.search[1] === '/') {
         var decoded = l.search.slice(1).split('&').map(function (s) {
