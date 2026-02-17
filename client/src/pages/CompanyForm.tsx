@@ -210,19 +210,27 @@ export default function CompanyForm() {
 
             if (isEdit) {
                 await api.put(`/companies/${id}`, data);
-                // Save SMS settings
-                await api.post('/sms/settings', {
-                    ...smsSettings,
-                    company_id: id
-                });
+                // Save SMS settings (Don't let it block the main flow)
+                try {
+                    await api.post('/sms/settings', {
+                        ...smsSettings,
+                        company_id: Number(id)
+                    });
+                } catch (smsErr) {
+                    console.error('SMS settings could not be saved:', smsErr);
+                }
             } else {
                 const res = await api.post('/companies', data);
                 // For new company, use the new ID
                 const newId = res.data.data.id;
-                await api.post('/sms/settings', {
-                    ...smsSettings,
-                    company_id: newId
-                });
+                try {
+                    await api.post('/sms/settings', {
+                        ...smsSettings,
+                        company_id: newId
+                    });
+                } catch (smsErr) {
+                    console.error('SMS settings could not be saved for new company:', smsErr);
+                }
             }
 
             navigate('/companies');
