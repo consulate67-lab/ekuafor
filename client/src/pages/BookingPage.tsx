@@ -51,14 +51,22 @@ export default function BookingPage() {
     useEffect(() => {
         const fetchCompanyData = async () => {
             try {
-                // Fetch basic data sequentially to identify failures
-                // 1. Company
-                try {
-                    const compRes = await api.get(`/companies/${id}`);
-                    setCompany(compRes.data.data);
-                } catch (e) {
-                    console.error('Failed to load company', e);
-                    throw new Error('Firma bilgileri yüklenemedi. ID hatalı olabilir.');
+                // ... fetch company details
+                const compRes = await api.get(`/companies/${id}`);
+                const companyData = compRes.data.data;
+                setCompany(companyData);
+
+                // QR Auto-Favorite Logic
+                if (searchParams.get('ref') === 'qr' && id) {
+                    const companyId = Number(id);
+                    const savedFavs = localStorage.getItem('saloon_favorites');
+                    let favorites: number[] = savedFavs ? JSON.parse(savedFavs) : [];
+
+                    if (!favorites.includes(companyId)) {
+                        favorites.push(companyId);
+                        localStorage.setItem('saloon_favorites', JSON.stringify(favorites));
+                        console.log(`[BookingPage] Company ${companyId} added to favorites via QR`);
+                    }
                 }
 
                 // 2. Services
@@ -67,7 +75,6 @@ export default function BookingPage() {
                     setServices(servicesRes.data?.data || []);
                 } catch (e) {
                     console.error('Failed to load services', e);
-                    // Don't block page load, just show empty
                 }
 
                 // 3. Employees (Staff)
@@ -76,7 +83,6 @@ export default function BookingPage() {
                     setStaff(usersRes.data?.data || []);
                 } catch (e) {
                     console.error('Failed to load employees', e);
-                    // Don't block page load
                 }
 
                 // 4. Appointments
@@ -85,18 +91,16 @@ export default function BookingPage() {
                     setAppointments(appsRes.data?.data || []);
                 } catch (e) {
                     console.error('Failed to load appointments', e);
-                    // Don't block
                 }
 
             } catch (err: any) {
                 console.error('Critical failure in booking data', err);
-                // Only critical error (company missing) triggers the error view
             } finally {
                 setLoading(false);
             }
         };
         fetchCompanyData();
-    }, [id]);
+    }, [id, searchParams]);
 
     const handleNext = () => setStep(prev => prev + 1);
     const handleBack = () => setStep(prev => prev - 1);
@@ -418,7 +422,7 @@ export default function BookingPage() {
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
                         <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse"></div>
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">ID: {id} | Staff: {staff.length} | Svc: {services.length} | v1.5</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">ID: {id} | Staff: {staff.length} | Svc: {services.length} | v1.43</span>
                     </div>
                 </div>
             </div>

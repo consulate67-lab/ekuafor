@@ -72,14 +72,14 @@ export default function CompanyDetail() {
 
                         <div className="bg-white p-4 rounded-2xl border-2 border-dashed border-pink-100 mb-6">
                             <img
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}/ekuafor/book/${company.id}`)}`}
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}/ekuafor/book/${company.id}?ref=qr`)}`}
                                 alt="Firma QR Kodu"
                                 className="w-40 h-40"
                             />
                         </div>
 
                         <a
-                            href={`https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(`${window.location.origin}/ekuafor/book/${company.id}`)}`}
+                            href={`https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(`${window.location.origin}/ekuafor/book/${company.id}?ref=qr`)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn-primary w-full py-2 text-xs font-bold text-center"
