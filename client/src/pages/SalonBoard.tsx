@@ -12,7 +12,7 @@ export default function SalonBoard() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [currentHour, setCurrentHour] = useState(new Date().getHours());
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedDate] = useState(new Date().toISOString().split('T')[0]);
 
     // Modal States
     const [isModalOpen, setIsModalOpen] = useState(false);
