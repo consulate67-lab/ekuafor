@@ -97,7 +97,7 @@ export default function SalonBoard() {
             const container = document.getElementById('matrix-container');
             const currentHourCol = document.getElementById(`hour-col-${currentHour}`);
             if (container && currentHourCol) {
-                const scrollPos = currentHourCol.offsetLeft - 260; // Offset for sticky column
+                const scrollPos = currentHourCol.offsetLeft - 300; // Offset for sticky column
                 container.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
             }
         }
@@ -143,7 +143,7 @@ export default function SalonBoard() {
                     <div className="w-24 h-24 bg-gradient-to-tr from-amber-400 to-orange-500 text-white rounded-[2rem] flex items-center justify-center mx-auto mb-8 text-4xl shadow-2xl shadow-orange-500/20 rotate-3">
                         📟
                     </div>
-                    <h1 className="text-4xl font-black text-white mb-3 tracking-tight">Salon Board</h1>
+                    <h1 className="text-4xl font-black text-white mb-3 tracking-tight">Salon Paneli</h1>
                     <p className="text-slate-400 mb-10 font-medium">Cihazınızı yetkilendirmek için anahtarı girin.</p>
 
                     <form onSubmit={handleLogin} className="space-y-6">
@@ -178,7 +178,7 @@ export default function SalonBoard() {
                     <div className="relative">
                         <div className="bg-slate-900 text-white px-5 py-2.5 rounded-2xl flex items-center gap-3 shadow-xl shadow-slate-900/10">
                             <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.8)]"></span>
-                            <span className="text-[11px] font-black uppercase tracking-widest leading-none mt-0.5">Live Matrix</span>
+                            <span className="text-[11px] font-black uppercase tracking-widest leading-none mt-0.5">Canlı Matris</span>
                         </div>
                     </div>
                     <div>
@@ -229,7 +229,7 @@ export default function SalonBoard() {
                     <table className="w-full border-separate border-spacing-0">
                         <thead>
                             <tr className="bg-black">
-                                <th className="sticky left-0 z-40 bg-black p-8 text-left border-b border-white/10 min-w-[280px] shadow-[4px_0_24px_rgba(0,0,0,0.2)]">
+                                <th className="sticky left-0 z-40 bg-black p-8 text-left border-b border-white/10 min-w-[300px] shadow-[4px_0_24px_rgba(0,0,0,0.2)]">
                                     <div className="flex flex-col">
                                         <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.25em] mb-1">Organizasyon</span>
                                         <span className="text-xl font-black text-white tracking-tight">Uzmanlar</span>
@@ -316,9 +316,9 @@ export default function SalonBoard() {
                                                                 key={app.id}
                                                                 onClick={(e) => e.stopPropagation()}
                                                                 className={`p-5 rounded-3xl border-l-[6px] shadow-xl shadow-slate-200/40 transition-all hover:scale-[1.03] hover:shadow-2xl active:scale-95 cursor-pointer ${isPast ? 'grayscale-[0.4] opacity-70' : ''} ${app.status === 'approved' ? 'bg-white text-slate-900 group-hover:bg-slate-50' :
-                                                                    app.status === 'pending' ? 'bg-amber-50 border-amber-500 text-amber-900 animate-pulse' :
-                                                                        app.status === 'completed' ? 'bg-emerald-50 border-emerald-500 text-emerald-900 opacity-60' :
-                                                                            'bg-slate-50 border-slate-300 text-slate-500'
+                                                                        app.status === 'pending' ? 'bg-amber-50 border-amber-500 text-amber-900 animate-pulse' :
+                                                                            app.status === 'completed' ? 'bg-emerald-50 border-emerald-500 text-emerald-900 opacity-60' :
+                                                                                'bg-slate-50 border-slate-300 text-slate-500'
                                                                     }`}
                                                                 style={app.status === 'approved' ? { borderLeftColor: staffColor } : {}}
                                                             >
@@ -328,8 +328,8 @@ export default function SalonBoard() {
                                                                         {isCurrent && <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping"></span>}
                                                                     </div>
                                                                     <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${app.status === 'approved' ? 'bg-indigo-100 text-indigo-600' :
-                                                                        app.status === 'pending' ? 'bg-amber-100 text-amber-600' :
-                                                                            'bg-slate-100 text-slate-400'
+                                                                            app.status === 'pending' ? 'bg-amber-100 text-amber-600' :
+                                                                                'bg-slate-100 text-slate-400'
                                                                         }`}>
                                                                         {app.status === 'approved' ? 'ONAYLI' : app.status === 'pending' ? 'YENİ' : 'GEÇMİŞ'}
                                                                     </span>
@@ -373,7 +373,7 @@ export default function SalonBoard() {
                         </svg>
                         <div className="absolute inset-0 bg-emerald-400/20 blur-lg animate-pulse rounded-full"></div>
                     </div>
-                    <span className="text-[11px] font-black uppercase tracking-[0.2em] animate-pulse">Live Sync</span>
+                    <span className="text-[11px] font-black uppercase tracking-[0.2em] animate-pulse">Canlı Senk</span>
                 </div>
             </div>
 
