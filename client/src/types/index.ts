@@ -112,4 +112,5 @@ export interface Appointment {
     price?: number;
     customer_name?: string;
     service_name?: string;
+    staff_name?: string;
 }

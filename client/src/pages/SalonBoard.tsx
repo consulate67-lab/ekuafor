@@ -142,7 +142,7 @@ export default function SalonBoard() {
             setIsModalOpen(false);
             setFastForm({ customerName: '', serviceId: '', notes: '', staffId: '', appointmentDate: '', startTime: '' });
             setSelectedCell(null);
-            fetchData(company.id!);
+            if (company.id) fetchData(company.id);
         } catch (err: any) {
             alert(err.response?.data?.error || 'Randevu eklenemedi');
         } finally {
@@ -206,7 +206,7 @@ export default function SalonBoard() {
                                     value={selectedDate}
                                     onChange={(e) => {
                                         setSelectedDate(e.target.value);
-                                        if (company) fetchData(company.id, e.target.value);
+                                        if (company?.id) fetchData(company.id, e.target.value);
                                     }}
                                     className="bg-slate-100 px-4 py-1 rounded-xl text-xs font-black text-slate-600 uppercase border-2 border-transparent focus:border-indigo-500 outline-none transition-all cursor-pointer"
                                 />
@@ -529,8 +529,8 @@ export default function SalonBoard() {
                             <div className="flex justify-between items-start mb-8">
                                 <div>
                                     <div className={`inline-flex px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-4 ${selectedAppointment.status === 'approved' ? 'bg-indigo-50 text-indigo-600' :
-                                            selectedAppointment.status === 'pending' ? 'bg-amber-50 text-amber-600' :
-                                                'bg-slate-100 text-slate-500'
+                                        selectedAppointment.status === 'pending' ? 'bg-amber-50 text-amber-600' :
+                                            'bg-slate-100 text-slate-500'
                                         }`}>
                                         {selectedAppointment.status === 'approved' ? 'ONAYLI RANDEVU' : 'BEKLEYEN RANDEVU'}
                                     </div>
