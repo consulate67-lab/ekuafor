@@ -225,11 +225,11 @@ export default function SalonBoard() {
 
             {/* Matrix Container */}
             <div id="matrix-container" className="flex-1 overflow-auto p-6 lg:p-10 scroll-smooth bg-slate-50/50">
-                <div className="bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.04)] border border-slate-100 overflow-hidden inline-block min-w-full">
+                <div className="bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.04)] border border-slate-100 inline-block min-w-full">
                     <table className="w-full border-separate border-spacing-0">
                         <thead>
                             <tr className="bg-black">
-                                <th className="sticky left-0 z-40 bg-black p-8 text-left border-b border-white/10 min-w-[300px] shadow-[4px_0_24px_rgba(0,0,0,0.2)]">
+                                <th className="sticky left-0 z-[60] bg-black p-8 text-left border-b border-white/10 min-w-[300px] shadow-[10px_0_30px_-15px_rgba(0,0,0,0.3)] rounded-tl-[3rem]">
                                     <div className="flex flex-col">
                                         <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.25em] mb-1">Organizasyon</span>
                                         <span className="text-xl font-black text-white tracking-tight">Uzmanlar</span>
@@ -269,7 +269,7 @@ export default function SalonBoard() {
                                 const staffColor = getStaffColor(`${person.first_name} ${person.last_name}`);
                                 return (
                                     <tr key={pId} className="group transition-colors">
-                                        <td className="sticky left-0 z-30 bg-white p-8 border-r border-slate-100 font-bold text-slate-900 shadow-[10px_0_30px_-15px_rgba(0,0,0,0.1)] group-hover:bg-slate-50 transition-colors">
+                                        <td className="sticky left-0 z-[50] bg-white p-8 border-r border-slate-100 font-bold text-slate-900 shadow-[10px_0_30px_-15px_rgba(0,0,0,0.1)] group-hover:bg-slate-50 transition-colors">
                                             <div className="flex items-center gap-5">
                                                 <div className="relative">
                                                     <div
@@ -316,9 +316,9 @@ export default function SalonBoard() {
                                                                 key={app.id}
                                                                 onClick={(e) => e.stopPropagation()}
                                                                 className={`p-5 rounded-3xl border-l-[6px] shadow-xl shadow-slate-200/40 transition-all hover:scale-[1.03] hover:shadow-2xl active:scale-95 cursor-pointer ${isPast ? 'grayscale-[0.4] opacity-70' : ''} ${app.status === 'approved' ? 'bg-white text-slate-900 group-hover:bg-slate-50' :
-                                                                        app.status === 'pending' ? 'bg-amber-50 border-amber-500 text-amber-900 animate-pulse' :
-                                                                            app.status === 'completed' ? 'bg-emerald-50 border-emerald-500 text-emerald-900 opacity-60' :
-                                                                                'bg-slate-50 border-slate-300 text-slate-500'
+                                                                    app.status === 'pending' ? 'bg-amber-50 border-amber-500 text-amber-900 animate-pulse' :
+                                                                        app.status === 'completed' ? 'bg-emerald-50 border-emerald-500 text-emerald-900 opacity-60' :
+                                                                            'bg-slate-50 border-slate-300 text-slate-500'
                                                                     }`}
                                                                 style={app.status === 'approved' ? { borderLeftColor: staffColor } : {}}
                                                             >
@@ -328,8 +328,8 @@ export default function SalonBoard() {
                                                                         {isCurrent && <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping"></span>}
                                                                     </div>
                                                                     <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${app.status === 'approved' ? 'bg-indigo-100 text-indigo-600' :
-                                                                            app.status === 'pending' ? 'bg-amber-100 text-amber-600' :
-                                                                                'bg-slate-100 text-slate-400'
+                                                                        app.status === 'pending' ? 'bg-amber-100 text-amber-600' :
+                                                                            'bg-slate-100 text-slate-400'
                                                                         }`}>
                                                                         {app.status === 'approved' ? 'ONAYLI' : app.status === 'pending' ? 'YENİ' : 'GEÇMİŞ'}
                                                                     </span>
