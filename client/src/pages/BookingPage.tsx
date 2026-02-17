@@ -208,7 +208,7 @@ export default function BookingPage() {
         </div>
     );
 
-    const selectedStaffUser = staff.find(u => u.id === selection.staffId);
+    const selectedStaffUser = staff.find(u => (u.id === selection.staffId) || ((u as any).user_id === selection.staffId));
     const selectedService = services.find(s => s.id === selection.serviceId);
 
     return (
