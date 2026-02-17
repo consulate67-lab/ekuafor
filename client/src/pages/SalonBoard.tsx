@@ -12,14 +12,20 @@ export default function SalonBoard() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [currentHour, setCurrentHour] = useState(new Date().getHours());
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
     // Modal States
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
     const [selectedCell, setSelectedCell] = useState<{ person: any, hour: string } | null>(null);
     const [fastForm, setFastForm] = useState({
         customerName: '',
         serviceId: '',
-        notes: ''
+        notes: '',
+        staffId: '',
+        appointmentDate: '',
+        startTime: ''
     });
 
     // Helper to generate consistent color for staff
@@ -37,12 +43,12 @@ export default function SalonBoard() {
 
     const hours = Array.from({ length: 14 }, (_, i) => `${i + 8}:00`); // 08:00 to 21:00
 
-    const fetchData = useCallback(async (compId: number) => {
+    const fetchData = useCallback(async (compId: number, date?: string) => {
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const dateToFetch = date || selectedDate;
 
             const [appsRes, staffRes, servRes] = await Promise.all([
-                api.get('/appointments', { params: { company_id: compId, start_date: today, end_date: today } }),
+                api.get('/appointments', { params: { company_id: compId, start_date: dateToFetch, end_date: dateToFetch } }),
                 api.get(`/companies/${compId}/employees`),
                 api.get('/services', { params: { company_id: compId } })
             ]);
@@ -51,9 +57,9 @@ export default function SalonBoard() {
             setStaff(staffRes.data.data || []);
             setServices(servRes.data.data || []);
         } catch (err) {
-            console.error('Data sync failed', err);
+            console.error('Veri senkronizasyonu başarısız', err);
         }
-    }, []);
+    }, [selectedDate]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -105,20 +111,27 @@ export default function SalonBoard() {
 
     const handleFastSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedCell || !company) return;
+        if (!company) return;
 
         try {
             setLoading(true);
-            const today = new Date().toISOString().split('T')[0];
-            const startTime = selectedCell.hour;
+            const date = fastForm.appointmentDate || selectedDate;
+            const startTime = fastForm.startTime || selectedCell?.hour || '08:00';
+            const staffId = fastForm.staffId || selectedCell?.person.user_id || selectedCell?.person.id;
+
+            if (!staffId) {
+                alert('Lütfen bir personel seçin');
+                return;
+            }
+
             const endTimeHour = parseInt(startTime.split(':')[0]) + 1;
             const endTime = `${endTimeHour}:00`;
 
             await api.post('/appointments', {
                 company_id: company.id,
-                staff_id: selectedCell.person.user_id || selectedCell.person.id,
+                staff_id: parseInt(staffId.toString()),
                 service_id: fastForm.serviceId ? parseInt(fastForm.serviceId) : (services[0]?.id || 1),
-                appointment_date: today,
+                appointment_date: date,
                 start_time: startTime,
                 end_time: endTime,
                 customer_name: fastForm.customerName || 'Misafir Müşteri',
@@ -127,7 +140,8 @@ export default function SalonBoard() {
             });
 
             setIsModalOpen(false);
-            setFastForm({ customerName: '', serviceId: '', notes: '' });
+            setFastForm({ customerName: '', serviceId: '', notes: '', staffId: '', appointmentDate: '', startTime: '' });
+            setSelectedCell(null);
             fetchData(company.id!);
         } catch (err: any) {
             alert(err.response?.data?.error || 'Randevu eklenemedi');
@@ -185,10 +199,18 @@ export default function SalonBoard() {
                         <h1 className="text-3xl font-black text-slate-900 leading-none mb-1.5 uppercase tracking-tighter decoration-indigo-500 underline-offset-4 decoration-4">
                             {company?.name || 'Yükleniyor...'}
                         </h1>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                                {new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                            </span>
+                        <div className="flex items-center gap-4">
+                            <div className="relative group">
+                                <input
+                                    type="date"
+                                    value={selectedDate}
+                                    onChange={(e) => {
+                                        setSelectedDate(e.target.value);
+                                        if (company) fetchData(company.id, e.target.value);
+                                    }}
+                                    className="bg-slate-100 px-4 py-1 rounded-xl text-xs font-black text-slate-600 uppercase border-2 border-transparent focus:border-indigo-500 outline-none transition-all cursor-pointer"
+                                />
+                            </div>
                             <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
                             <span className="text-xs font-black text-indigo-500 uppercase tracking-widest animate-pulse">
                                 {new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
@@ -198,6 +220,23 @@ export default function SalonBoard() {
                 </div>
 
                 <div className="flex items-center gap-6">
+                    <button
+                        onClick={() => {
+                            setFastForm({
+                                customerName: '',
+                                serviceId: '',
+                                notes: '',
+                                staffId: staff[0]?.user_id || staff[0]?.id || '',
+                                appointmentDate: selectedDate,
+                                startTime: '09:00'
+                            });
+                            setIsModalOpen(true);
+                        }}
+                        className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all flex items-center gap-3"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
+                        Yeni Randevu
+                    </button>
                     {pendingCount > 0 && (
                         <div className="bg-amber-50 border border-amber-100 text-amber-900 px-6 py-3 rounded-[1.5rem] flex items-center gap-4 animate-bounce shadow-lg shadow-amber-200/20">
                             <div className="flex -space-x-2">
@@ -255,9 +294,9 @@ export default function SalonBoard() {
                                                         ŞİMDİ
                                                     </span>
                                                 )}
-                                                {!isCurrent && isPast && <span className="text-[9px] font-black text-slate-700 uppercase tracking-widest">Geçti</span>}
+                                                {!isCurrent && isPast && selectedDate === new Date().toISOString().split('T')[0] && <span className="text-[9px] font-black text-slate-700 uppercase tracking-widest">Geçti</span>}
                                             </div>
-                                            {isCurrent && <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-indigo-500 rounded-t-full"></div>}
+                                            {isCurrent && selectedDate === new Date().toISOString().split('T')[0] && <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-indigo-500 rounded-t-full"></div>}
                                         </th>
                                     );
                                 })}
@@ -314,8 +353,12 @@ export default function SalonBoard() {
                                                         {personApps.map(app => (
                                                             <div
                                                                 key={app.id}
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                className={`p-5 rounded-3xl border-l-[6px] shadow-xl shadow-slate-200/40 transition-all hover:scale-[1.03] hover:shadow-2xl active:scale-95 cursor-pointer ${isPast ? 'grayscale-[0.4] opacity-70' : ''} ${app.status === 'approved' ? 'bg-white text-slate-900 group-hover:bg-slate-50' :
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedAppointment(app);
+                                                                    setIsDetailModalOpen(true);
+                                                                }}
+                                                                className={`p-5 rounded-3xl border-l-[6px] shadow-xl shadow-slate-200/40 transition-all hover:scale-[1.03] hover:shadow-2xl active:scale-95 cursor-pointer ${isPast && selectedDate === new Date().toISOString().split('T')[0] ? 'grayscale-[0.4] opacity-70' : ''} ${app.status === 'approved' ? 'bg-white text-slate-900 group-hover:bg-slate-50' :
                                                                     app.status === 'pending' ? 'bg-amber-50 border-amber-500 text-amber-900 animate-pulse' :
                                                                         app.status === 'completed' ? 'bg-emerald-50 border-emerald-500 text-emerald-900 opacity-60' :
                                                                             'bg-slate-50 border-slate-300 text-slate-500'
@@ -377,71 +420,92 @@ export default function SalonBoard() {
                 </div>
             </div>
 
-            {/* Fast Appointment Modal - Ultra Premium */}
+            {/* New/Fast Appointment Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
                     <div className="bg-white w-full max-w-2xl rounded-[4rem] overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] border border-slate-100 animate-scale-up">
                         <div className="relative p-12 bg-gradient-to-br from-slate-50 to-white">
                             <div className="flex justify-between items-start mb-10">
                                 <div>
-                                    <div className="inline-flex px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest mb-4">Hızlı Rezarvasyon</div>
-                                    <h2 className="text-4xl font-black text-slate-900 leading-none tracking-tighter">Yeni Randevu</h2>
-                                    <div className="flex items-center gap-3 mt-4">
-                                        <div className="flex items-center gap-2 px-3 py-1 bg-slate-900 text-white rounded-xl text-xs font-bold">
-                                            <span className="w-2 h-2 bg-indigo-400 rounded-full"></span>
-                                            {selectedCell?.hour}
-                                        </div>
-                                        <div className="px-3 py-1 bg-slate-100 text-slate-500 rounded-xl text-xs font-bold uppercase tracking-widest">
-                                            {selectedCell?.person.first_name}
-                                        </div>
-                                    </div>
+                                    <div className="inline-flex px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest mb-4">Rezarvasyon Formu</div>
+                                    <h2 className="text-4xl font-black text-slate-900 leading-none tracking-tighter">
+                                        {selectedCell ? 'Hızlı Randevu' : 'Yeni Randevu'}
+                                    </h2>
                                 </div>
-                                <button onClick={() => setIsModalOpen(false)} className="w-16 h-16 bg-white border border-slate-100 rounded-3xl flex items-center justify-center text-slate-400 hover:text-slate-900 hover:rotate-90 transition-all shadow-sm">
+                                <button onClick={() => { setIsModalOpen(false); setSelectedCell(null); }} className="w-16 h-16 bg-white border border-slate-100 rounded-3xl flex items-center justify-center text-slate-400 hover:text-slate-900 hover:rotate-90 transition-all shadow-sm">
                                     <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
 
-                            <form onSubmit={handleFastSubmit} className="space-y-8">
+                            <form onSubmit={handleFastSubmit} className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-3">
-                                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Müşteri Detayı</label>
+                                    <div className="space-y-2">
+                                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Müşteri İsmi</label>
                                         <input
                                             type="text"
                                             value={fastForm.customerName}
                                             onChange={e => setFastForm(prev => ({ ...prev, customerName: e.target.value }))}
                                             placeholder="İsim veya Misafir"
-                                            className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 focus:shadow-[0_0_0_8px_rgba(99,102,241,0.1)] transition-all font-black text-xl text-slate-900 outline-none"
+                                            className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-black text-xl text-slate-900 outline-none"
                                         />
                                     </div>
 
-                                    <div className="space-y-3">
-                                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Hizmet Seçimi</label>
-                                        <div className="relative">
-                                            <select
-                                                value={fastForm.serviceId}
-                                                onChange={e => setFastForm(prev => ({ ...prev, serviceId: e.target.value }))}
-                                                className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 focus:shadow-[0_0_0_8px_rgba(99,102,241,0.1)] transition-all font-black text-xl text-slate-900 outline-none appearance-none"
-                                            >
-                                                <option value="">İşlem Belirtilmedi</option>
-                                                {services.map(s => (
-                                                    <option key={s.id} value={s.id}>{s.name}</option>
-                                                ))}
-                                            </select>
-                                            <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
-                                            </div>
-                                        </div>
+                                    <div className="space-y-2">
+                                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Hizmet</label>
+                                        <select
+                                            value={fastForm.serviceId}
+                                            onChange={e => setFastForm(prev => ({ ...prev, serviceId: e.target.value }))}
+                                            className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-black text-xl text-slate-900 outline-none appearance-none cursor-pointer"
+                                        >
+                                            <option value="">Hizmet Seçin</option>
+                                            {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Uzman</label>
+                                        <select
+                                            disabled={!!selectedCell}
+                                            value={fastForm.staffId || selectedCell?.person.user_id || selectedCell?.person.id}
+                                            onChange={e => setFastForm(prev => ({ ...prev, staffId: e.target.value }))}
+                                            className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-black text-xl text-slate-900 outline-none appearance-none cursor-pointer disabled:bg-slate-50"
+                                        >
+                                            {staff.map(s => <option key={s.user_id || s.id} value={s.user_id || s.id}>{s.first_name} {s.last_name}</option>)}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Tarih</label>
+                                        <input
+                                            type="date"
+                                            disabled={!!selectedCell}
+                                            value={fastForm.appointmentDate || selectedDate}
+                                            onChange={e => setFastForm(prev => ({ ...prev, appointmentDate: e.target.value }))}
+                                            className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-black text-xl text-slate-900 outline-none disabled:bg-slate-50"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Başlangıç Saati</label>
+                                        <select
+                                            disabled={!!selectedCell}
+                                            value={fastForm.startTime || selectedCell?.hour}
+                                            onChange={e => setFastForm(prev => ({ ...prev, startTime: e.target.value }))}
+                                            className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-black text-xl text-slate-900 outline-none cursor-pointer disabled:bg-slate-50"
+                                        >
+                                            {hours.map(h => <option key={h} value={h}>{h}</option>)}
+                                        </select>
                                     </div>
                                 </div>
 
-                                <div className="space-y-3">
-                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Özel Not</label>
+                                <div className="space-y-2">
+                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Notlar</label>
                                     <textarea
                                         value={fastForm.notes}
                                         onChange={e => setFastForm(prev => ({ ...prev, notes: e.target.value }))}
-                                        placeholder="Eklemek istediğiniz bir bilgi var mı?"
+                                        placeholder="Kısa notlar..."
                                         rows={2}
-                                        className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-bold text-slate-600 outline-none resize-none"
+                                        className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-medium text-slate-600 outline-none resize-none"
                                     />
                                 </div>
 
@@ -449,9 +513,68 @@ export default function SalonBoard() {
                                     disabled={loading}
                                     className="w-full bg-slate-900 text-white py-8 rounded-[2.5rem] font-black uppercase tracking-[0.3em] shadow-[0_24px_48px_-12px_rgba(15,23,42,0.4)] hover:bg-slate-800 hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 text-xl"
                                 >
-                                    {loading ? 'Sistem İşliyor...' : 'Randevuyu Onayla'}
+                                    {loading ? 'Kaydediliyor...' : 'Randevuyu Onayla'}
                                 </button>
                             </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Appointment Detail Modal */}
+            {isDetailModalOpen && selectedAppointment && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+                    <div className="bg-white w-full max-w-lg rounded-[4rem] overflow-hidden shadow-2xl animate-scale-up">
+                        <div className="p-12">
+                            <div className="flex justify-between items-start mb-8">
+                                <div>
+                                    <div className={`inline-flex px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-4 ${selectedAppointment.status === 'approved' ? 'bg-indigo-50 text-indigo-600' :
+                                            selectedAppointment.status === 'pending' ? 'bg-amber-50 text-amber-600' :
+                                                'bg-slate-100 text-slate-500'
+                                        }`}>
+                                        {selectedAppointment.status === 'approved' ? 'ONAYLI RANDEVU' : 'BEKLEYEN RANDEVU'}
+                                    </div>
+                                    <h2 className="text-4xl font-black text-slate-900 tracking-tighter">{selectedAppointment.customer_name || 'Misafir'}</h2>
+                                </div>
+                                <button onClick={() => setIsDetailModalOpen(false)} className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 hover:text-slate-900 transition-all">
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+
+                            <div className="space-y-6">
+                                <div className="flex items-center gap-6 p-6 bg-slate-50 rounded-[2.5rem]">
+                                    <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center text-2xl shadow-sm">✂️</div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Hizmet</p>
+                                        <p className="text-xl font-black text-slate-800 uppercase tracking-tight">{selectedAppointment.service_name}</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-6 bg-slate-50 rounded-[2.5rem]">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Saat</p>
+                                        <p className="text-xl font-black text-slate-800">{selectedAppointment.start_time}</p>
+                                    </div>
+                                    <div className="p-6 bg-slate-50 rounded-[2.5rem]">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Uzman</p>
+                                        <p className="text-lg font-black text-slate-800 truncate">{selectedAppointment.staff_name || 'Belirsiz'}</p>
+                                    </div>
+                                </div>
+
+                                {selectedAppointment.notes && (
+                                    <div className="p-8 bg-indigo-50/50 border border-indigo-100/50 rounded-[2.5rem]">
+                                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">Müşteri Notu</p>
+                                        <p className="text-slate-700 font-bold leading-relaxed">{selectedAppointment.notes}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <button
+                                onClick={() => setIsDetailModalOpen(false)}
+                                className="w-full mt-10 bg-slate-900 text-white py-6 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all"
+                            >
+                                Kapat
+                            </button>
                         </div>
                     </div>
                 </div>
