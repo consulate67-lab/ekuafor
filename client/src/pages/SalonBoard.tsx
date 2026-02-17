@@ -143,8 +143,21 @@ export default function SalonBoard() {
             setFastForm({ customerName: '', serviceId: '', notes: '', staffId: '', appointmentDate: '', startTime: '' });
             setSelectedCell(null);
             if (company.id) fetchData(company.id);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCancelAppointment = async (id: number) => {
+        if (!confirm('Bu randevuyu iptal etmek istediğinize emin misiniz?')) return;
+
+        try {
+            setLoading(true);
+            await api.patch(`/appointments/${id}`, { status: 'cancelled' });
+            setIsDetailModalOpen(false);
+            if (company?.id) fetchData(company.id);
         } catch (err: any) {
-            alert(err.response?.data?.error || 'Randevu eklenemedi');
+            alert(err.response?.data?.error || 'Randevu iptal edilemedi');
         } finally {
             setLoading(false);
         }
@@ -569,12 +582,21 @@ export default function SalonBoard() {
                                 )}
                             </div>
 
-                            <button
-                                onClick={() => setIsDetailModalOpen(false)}
-                                className="w-full mt-10 bg-slate-900 text-white py-6 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all"
-                            >
-                                Kapat
-                            </button>
+                            <div className="flex gap-4 mt-8">
+                                <button
+                                    onClick={() => handleCancelAppointment(selectedAppointment.id!)}
+                                    disabled={loading}
+                                    className="flex-1 bg-red-50 text-red-600 py-6 rounded-[2rem] font-black uppercase tracking-widest hover:bg-red-100 transition-all disabled:opacity-50"
+                                >
+                                    İptal Et
+                                </button>
+                                <button
+                                    onClick={() => setIsDetailModalOpen(false)}
+                                    className="flex-1 bg-slate-900 text-white py-6 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all"
+                                >
+                                    Kapat
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
