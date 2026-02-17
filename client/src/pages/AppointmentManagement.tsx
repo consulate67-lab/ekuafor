@@ -28,14 +28,29 @@ export default function AppointmentManagement() {
     const [isListening, setIsListening] = useState(false);
 
     // Tarih formatlama yardımcısı (Timezone sorunlarını önlemek için)
-    const formatDateKey = (dateStr: string | Date | undefined) => {
+    const formatDateKey = (dateStr: any) => {
         if (!dateStr) return '';
-        const d = new Date(dateStr);
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return '';
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        } catch (e) {
+            return '';
+        }
+    };
+
+    const getLocalDateString = () => {
+        const d = new Date();
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
     };
+
+    const [selectedDate, setSelectedDate] = useState(getLocalDateString());
 
     const fetchData = async () => {
         try {
@@ -232,7 +247,7 @@ export default function AppointmentManagement() {
             setNewAppointment({
                 service_id: 0,
                 staff_id: 0,
-                appointment_date: new Date().toISOString().split('T')[0],
+                appointment_date: getLocalDateString(),
                 start_time: '09:00',
                 end_time: '10:00',
                 notes: '',
@@ -375,6 +390,10 @@ export default function AppointmentManagement() {
                         </div>
                         <h3 className="text-xl font-bold text-gray-900 uppercase tracking-tight">Onay Bekleyenler</h3>
                     </div>
+
+                    {appointments.length > 0 && (
+                        <p className="text-[10px] text-gray-400 mb-2 px-1">Veri tabanında toplam {appointments.length} randevu bulundu.</p>
+                    )}
 
                     <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                         {pendingAppointments.map(app => {
@@ -598,7 +617,13 @@ export default function AppointmentManagement() {
                                         ))}
                                     {appointments.filter(a => formatDateKey(a.appointment_date) === selectedDate && a.status === 'approved').length === 0 && (
                                         <tr>
-                                            <td colSpan={5} className="px-6 py-12 text-center text-gray-400 font-bold italic">Seçili gün için kayıtlı randevu bulunamadı.</td>
+                                            <td colSpan={5} className="px-6 py-12 text-center text-gray-400 font-bold italic">
+                                                {selectedDate} tarihinde onaylı randevu bulunamadı.
+                                                <br />
+                                                <span className="text-[10px] uppercase font-normal text-gray-300">
+                                                    (Toplam veri: {appointments.length} | Onay bekleyen: {pendingAppointments.length})
+                                                </span>
+                                            </td>
                                         </tr>
                                     )}
                                 </tbody>

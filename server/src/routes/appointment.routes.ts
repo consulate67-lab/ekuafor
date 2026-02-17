@@ -84,8 +84,15 @@ const privateAppointmentHandler = async (req: Request, res: Response, next: any)
             console.log(`[GET /appointments] Filtering for Staff User: ID=${staffId}`);
         }
 
+        // Super Admin can override companyId via query param
+        let targetCompanyId = companyId;
+        if (req.user?.role === 'super_admin' && req.query.company_id) {
+            targetCompanyId = parseInt(req.query.company_id as string);
+            console.log(`[GET /appointments] Super Admin Overriding Company ID to: ${targetCompanyId}`);
+        }
+
         const appointments = await appointmentService.getAppointmentsByCompany(
-            companyId,
+            targetCompanyId,
             req.query.status as string,
             staffId
         );
