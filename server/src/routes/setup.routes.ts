@@ -221,6 +221,38 @@ WHERE u.company_id IS NOT NULL
 AND NOT EXISTS (
     SELECT 1 FROM company_users cu WHERE cu.user_id = u.id AND cu.company_id = u.company_id
 );
+
+-- SMS Ayarları
+CREATE TABLE IF NOT EXISTS sms_settings (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER UNIQUE REFERENCES companies(id) ON DELETE CASCADE,
+    provider VARCHAR(50) DEFAULT 'local_gateway',
+    api_url TEXT,
+    api_key TEXT,
+    is_active BOOLEAN DEFAULT true,
+    sender_id VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- SMS Günlükleri
+CREATE TABLE IF NOT EXISTS sms_logs (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+    phone_number VARCHAR(20) NOT NULL,
+    message TEXT NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending',
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- SMS Triggers
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_sms_settings_updated_at') THEN
+        CREATE TRIGGER update_sms_settings_updated_at BEFORE UPDATE ON sms_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+END$$;
         `;
 
         await pool.query(sql);
@@ -230,7 +262,7 @@ AND NOT EXISTS (
             message: 'Database schema initialized successfully!',
             tables: [
                 'users', 'companies', 'company_users', 'services',
-                'working_hours', 'appointments', 'payments'
+                'working_hours', 'appointments', 'payments', 'sms_settings', 'sms_logs'
             ]
         });
 
