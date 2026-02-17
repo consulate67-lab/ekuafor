@@ -1,10 +1,11 @@
 import { Router, Request, Response } from 'express';
 import googleMapsService from '../services/google-maps.service';
+import yandexMapsService from '../services/yandex-maps.service';
 import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// Google Maps üzerinde işletme ara
+// Google ve Yandex üzerinden işletme ara
 router.get('/search', authMiddleware, async (req: Request, res: Response) => {
     try {
         const query = req.query.q as string;
@@ -15,8 +16,17 @@ router.get('/search', authMiddleware, async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, error: 'Arama terimi (q) gereklidir' });
         }
 
-        const results = await googleMapsService.searchBusinesses(query, lat, lng);
-        res.json({ success: true, data: results });
+        // Parallel search on both services
+        const [googleResults, yandexResults] = await Promise.all([
+            googleMapsService.searchBusinesses(query, lat, lng),
+            yandexMapsService.searchBusinesses(query, lat, lng)
+        ]);
+
+        // Merge and remove duplicates (simple name-based check)
+        const combined = [...googleResults, ...yandexResults];
+        const unique = combined.filter((v, i, a) => a.findIndex(t => t.name === v.name) === i);
+
+        res.json({ success: true, data: unique });
     } catch (error: any) {
         res.status(500).json({ success: false, error: error.message });
     }
