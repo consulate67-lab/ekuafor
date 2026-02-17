@@ -21,6 +21,7 @@ export default function AppointmentManagement() {
         price: 0
     });
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+    const [voiceTranscript, setVoiceTranscript] = useState('');
 
     const [company, setCompany] = useState<Company | null>(null);
 
@@ -89,72 +90,103 @@ export default function AppointmentManagement() {
         recognition.onresult = async (event: any) => {
             const transcript = event.results[0][0].transcript.toLowerCase();
             console.log('Sesli Komut:', transcript);
+            setVoiceTranscript(transcript);
 
-            try {
-                // Parse logic (Simple NLP)
-                let date = new Date().toISOString().split('T')[0];
-                if (transcript.includes('yarın')) {
-                    const tomorrow = new Date();
-                    tomorrow.setDate(tomorrow.getDate() + 1);
-                    date = tomorrow.toISOString().split('T')[0];
-                }
-
-                // Time Parsing
-                let time = '09:00';
-                const timeMatch = transcript.match(/(\d{1,2})[:\s](\d{2})/); // 17:00 or 17 00
-                const hourOnlyMatch = transcript.match(/saat\s?(\d{1,2})/); // saat 5
-
-                if (timeMatch) {
-                    time = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
-                } else if (hourOnlyMatch) {
-                    let h = parseInt(hourOnlyMatch[1]);
-                    if (transcript.includes('akşam') && h < 12) h += 12;
-                    time = `${String(h).padStart(2, '0')}:00`;
-                }
-
-                // Service Matching
-                const matchedService = services.find(s => transcript.includes(s.name.toLowerCase()));
-                if (!matchedService) {
-                    alert(`Hizmet anlaşılamadı. Şu hizmetlerden birini söyleyin: ${services.map(s => s.name).join(', ')}`);
-                    return;
-                }
-
-                // Customer Name (Experimental)
-                // Try to get text after "için" or before "için" or simply last words
-                let customerPart = transcript.split('randevu')[0].split('için').pop()?.trim() || 'Sesli Müşteri';
-                customerPart = customerPart.replace(matchedService.name.toLowerCase(), '').trim();
-
-                // Validation
-                const duration = matchedService.duration_minutes || 30;
-                const [h, m] = time.split(':').map(Number);
-                const totalMin = h * 60 + m + duration;
-                const endH = Math.floor(totalMin / 60);
-                const endM = totalMin % 60;
-                const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-
-                if (window.confirm(`${date} tarihinde saat ${time} için ${matchedService.name} (Müşteri: ${customerPart}) randevusu oluşturulsun mu?`)) {
-                    const finalNotes = `Sesli Komut: ${transcript} | Müşteri: ${customerPart}`;
-                    await api.post('/appointments', {
-                        company_id: company?.id,
-                        service_id: matchedService.id,
-                        appointment_date: date,
-                        start_time: time,
-                        end_time: endTime,
-                        notes: finalNotes,
-                        price: matchedService.price,
-                        status: 'approved'
-                    });
-                    fetchData();
-                    alert('Randevu başarıyla eklendi.');
-                }
-
-            } catch (err) {
-                console.error('Voice parse error', err);
-                alert('Komut anlaşılamadı. Lütfen örneğe uygun söyleyin: "Bugün akşam 5 için Saç Kesim Ahmet Yılmaza randevu oluştur"');
-            }
+            // Directly call processing
+            await processVoiceTranscript(transcript);
         };
 
         recognition.start();
+    };
+
+    const processVoiceTranscript = async (transcript: string) => {
+        try {
+            // Parse logic (Simple NLP)
+            let date = new Date().toISOString().split('T')[0];
+            if (transcript.includes('yarın')) {
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                date = tomorrow.toISOString().split('T')[0];
+            }
+
+            // Time Parsing
+            let time = '09:00';
+            const timeMatch = transcript.match(/(\d{1,2})[:\s](\d{2})/); // 17:00 or 17 00
+            const hourOnlyMatch = transcript.match(/saat\s?(\d{1,2})/); // saat 5
+
+            if (timeMatch) {
+                time = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+            } else if (hourOnlyMatch) {
+                let h = parseInt(hourOnlyMatch[1]);
+                if (transcript.includes('akşam') && h < 12) h += 12;
+                time = `${String(h).padStart(2, '0')}:00`;
+            }
+
+            // Service Matching
+            const matchedService = services.find(s => transcript.includes(s.name.toLowerCase()));
+            if (!matchedService) {
+                alert(`Hizmet anlaşılamadı. Şu hizmetlerden birini söyleyin: ${services.map(s => s.name).join(', ')}`);
+                return;
+            }
+
+            // Customer Name (Experimental)
+            let customerPart = transcript.split('randevu')[0].split('için').pop()?.trim() || 'Sesli Müşteri';
+            customerPart = customerPart.replace(matchedService.name.toLowerCase(), '').trim();
+
+            // Validation
+            const duration = matchedService.duration_minutes || 30;
+            const [h, m] = time.split(':').map(Number);
+            const totalMin = h * 60 + m + duration;
+            const endH = Math.floor(totalMin / 60);
+            const endM = totalMin % 60;
+            const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+            if (window.confirm(`${date} tarihinde saat ${time} için ${matchedService.name} (Müşteri: ${customerPart}) randevusu oluşturulsun mu?`)) {
+                const finalNotes = `Sesli Komut: ${transcript} | Müşteri: ${customerPart}`;
+                await api.post('/appointments', {
+                    company_id: company?.id,
+                    service_id: matchedService.id,
+                    appointment_date: date,
+                    start_time: time,
+                    end_time: endTime,
+                    notes: finalNotes,
+                    price: matchedService.price,
+                    status: 'approved'
+                });
+                fetchData();
+                alert('Randevu başarıyla eklendi.');
+                setVoiceTranscript(''); // Clear after success
+            }
+
+        } catch (err) {
+            console.error('Voice parse error', err);
+            alert('Komut anlaşılamadı. Lütfen örneğe uygun söyleyin: "Bugün akşam 5 için Saç Kesim Ahmet Yılmaza randevu oluştur"');
+        }
+    };
+
+    const handleWhatsAppNotify = (app: Appointment) => {
+        const notes = app.notes || '';
+        // Extract phone from "Tel: 0555..." or similar
+        const phoneMatch = notes.match(/Tel:\s*([\d\s+-]+)/);
+        const nameMatch = notes.match(/Müşteri:\s*([^|]+)/);
+
+        let phone = phoneMatch ? phoneMatch[1].replace(/\s+/g, '') : '';
+        const customerName = nameMatch ? nameMatch[1].trim() : (app.customer_name || 'Değerli Müşterimiz');
+
+        if (!phone) {
+            alert('Müşteri telefon numarası bulunamadı (Notlarda "Tel: ..." formatında olmalı).');
+            return;
+        }
+
+        // Basic Turkish formatting: 05xx -> 905xx
+        if (phone.startsWith('0')) phone = '90' + phone.substring(1);
+        if (phone.length === 10) phone = '90' + phone;
+
+        const date = new Date(app.appointment_date).toLocaleDateString('tr-TR');
+        const message = `Merhaba ${customerName}, ${company?.name || 'Saloon'} bünyesindeki randevunuz ${date} günü saat ${app.start_time} - ${app.end_time} için onaylanmıştır. İyi günler dileriz.`;
+
+        const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+        window.open(waUrl, '_blank');
     };
 
     const handleStatusUpdate = async (id: number, status: string) => {
@@ -236,6 +268,17 @@ export default function AppointmentManagement() {
                     </Link>
                     <h2 className="text-3xl font-bold text-gray-900 mb-2">Randevu Yönetimi</h2>
                     <p className="text-gray-500 font-medium">Bekleyen onaylar ve günlük randevu planınızı takip edin.</p>
+                </div>
+
+                {/* Hidden Voice Input Area (Background processing) */}
+                <div className="sr-only opacity-0 absolute pointer-events-none">
+                    <input
+                        type="text"
+                        readOnly
+                        value={voiceTranscript}
+                        id="voice-hidden-input"
+                        aria-hidden="true"
+                    />
                 </div>
 
                 {company && (
@@ -324,29 +367,34 @@ export default function AppointmentManagement() {
                     </div>
 
                     <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                        {pendingAppointments.map(app => (
-                            <div key={app.id} className="card p-5 border-l-4 border-amber-400 hover:shadow-lg transition-all duration-300">
-                                <div className="flex justify-between items-start mb-3">
-                                    <h4 className="font-bold text-gray-900">{app.customer_name || 'Misafir Müşteri'}</h4>
-                                    <span className="text-[10px] font-black bg-amber-50 text-amber-600 px-2 py-1 rounded uppercase">{app.start_time}</span>
+                        {pendingAppointments.map(app => {
+                            const nameMatch = app.notes?.match(/Müşteri:\s*([^|]+)/);
+                            const displayName = nameMatch ? nameMatch[1].trim() : (app.customer_name || 'Misafir Müşteri');
+
+                            return (
+                                <div key={app.id} className="card p-5 border-l-4 border-amber-400 hover:shadow-lg transition-all duration-300">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <h4 className="font-bold text-gray-900">{displayName}</h4>
+                                        <span className="text-[10px] font-black bg-amber-50 text-amber-600 px-2 py-1 rounded uppercase">{app.start_time}</span>
+                                    </div>
+                                    <p className="text-sm font-bold text-pink-600 mb-4">{app.service_name}</p>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleStatusUpdate(app.id!, 'approved')}
+                                            className="flex-1 btn-primary py-2 text-xs font-bold"
+                                        >
+                                            Onayla
+                                        </button>
+                                        <button
+                                            onClick={() => handleStatusUpdate(app.id!, 'cancelled')}
+                                            className="flex-1 btn-secondary py-2 text-xs font-bold border-gray-100 text-red-500"
+                                        >
+                                            Reddet
+                                        </button>
+                                    </div>
                                 </div>
-                                <p className="text-sm font-bold text-pink-600 mb-4">{app.service_name}</p>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => handleStatusUpdate(app.id!, 'approved')}
-                                        className="flex-1 btn-primary py-2 text-xs font-bold"
-                                    >
-                                        Onayla
-                                    </button>
-                                    <button
-                                        onClick={() => handleStatusUpdate(app.id!, 'cancelled')}
-                                        className="flex-1 btn-secondary py-2 text-xs font-bold border-gray-100 text-red-500"
-                                    >
-                                        Reddet
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                         {pendingAppointments.length === 0 && (
                             <div className="py-12 text-center bg-gray-50 rounded-3xl border-2 border-dashed border-gray-100">
                                 <p className="text-gray-400 font-bold">Bekleyen randevu yok.</p>
@@ -511,10 +559,18 @@ export default function AppointmentManagement() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-bold text-xs uppercase">
-                                                            {(app.customer_name?.[0] || 'M')}
-                                                        </div>
-                                                        <span className="text-sm font-bold text-gray-900">{app.customer_name || 'Misafir Müşteri'}</span>
+                                                        {(() => {
+                                                            const nameMatch = app.notes?.match(/Müşteri:\s*([^|]+)/);
+                                                            const displayName = nameMatch ? nameMatch[1].trim() : (app.customer_name || 'Misafir Müşteri');
+                                                            return (
+                                                                <>
+                                                                    <div className="w-8 h-8 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-bold text-xs uppercase">
+                                                                        {displayName[0]}
+                                                                    </div>
+                                                                    <span className="text-sm font-bold text-gray-900">{displayName}</span>
+                                                                </>
+                                                            );
+                                                        })()}
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">
@@ -717,15 +773,21 @@ export default function AppointmentManagement() {
                                 </div>
                             </div>
 
-                            <div className="bg-white border-2 border-pink-50 rounded-xl p-4 flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-bold text-lg">
-                                    {(selectedAppointment.customer_name?.[0] || 'M').toUpperCase()}
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-bold text-pink-400 uppercase tracking-wider mb-0.5">Müşteri</p>
-                                    <h4 className="font-bold text-gray-900 text-lg leading-none">{selectedAppointment.customer_name || 'Misafir Müşteri'}</h4>
-                                </div>
-                            </div>
+                            {(() => {
+                                const nameMatch = selectedAppointment.notes?.match(/Müşteri:\s*([^|]+)/);
+                                const displayName = nameMatch ? nameMatch[1].trim() : (selectedAppointment.customer_name || 'Misafir Müşteri');
+                                return (
+                                    <div className="bg-white border-2 border-pink-50 rounded-xl p-4 flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-bold text-lg">
+                                            {displayName[0].toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-pink-400 uppercase tracking-wider mb-0.5">Müşteri</p>
+                                            <h4 className="font-bold text-gray-900 text-lg leading-none">{displayName}</h4>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             <div className="space-y-3">
                                 <div>
@@ -748,22 +810,33 @@ export default function AppointmentManagement() {
                                 )}
                             </div>
 
-                            <div className="flex gap-3 pt-4 border-t border-gray-100">
-                                <button
-                                    onClick={() => {
-                                        handleStatusUpdate(selectedAppointment.id!, 'cancelled');
-                                        setSelectedAppointment(null);
-                                    }}
-                                    className="flex-1 btn-secondary border-red-100 text-red-600 hover:bg-red-50 hover:border-red-200 py-3 text-sm font-bold"
-                                >
-                                    Randevuyu İptal Et
-                                </button>
-                                <button
-                                    onClick={() => setSelectedAppointment(null)}
-                                    className="flex-1 btn-primary py-3 text-sm font-bold"
-                                >
-                                    Kapat
-                                </button>
+                            <div className="flex flex-col gap-3 pt-4 border-t border-gray-100">
+                                {selectedAppointment.status === 'approved' && (
+                                    <button
+                                        onClick={() => handleWhatsAppNotify(selectedAppointment)}
+                                        className="w-full bg-emerald-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all"
+                                    >
+                                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.246 2.248 3.484 5.232 3.483 8.413-.003 6.557-5.338 11.892-11.893 11.892-1.997-.001-3.951-.5-5.688-1.448l-6.308 1.654zm6.757-4.051c1.535.912 3.017 1.393 4.673 1.394 5.217 0 9.458-4.244 9.461-9.462.001-2.527-.981-4.903-2.768-6.69s-4.162-2.771-6.691-2.771c-5.218 0-9.461 4.243-9.464 9.463 0 1.761.48 3.484 1.389 5.006l-1.011 3.692 3.791-.994zm11.034-7.405c-.173-.087-1.019-.504-1.177-.561s-.272-.087-.384.087-.432.561-.533.676-.198.115-.371.029c-.173-.087-.731-.269-1.392-.859-.513-.457-.86-.1.021-1.21-.087 1.088-.419 1.139-.533 1.226-.115.087-.228.132-.34.029-.115-.104-.509-.616-1.026-1.114-.403-.388-.707-.15-.815-.15s-.208.016-.316.143-.416.488-.416 1.189-.511 1.383-.615 1.52c-.104.137-1.006 1.535-2.438 2.771-1.432 1.236-2.646 1.233-3.125 1.189-.479-.044-1.541-.611-2.112-1.28-.571-.669-.533-1.604-.416-2.131z" /></svg>
+                                        WhatsApp ile Bildir
+                                    </button>
+                                )}
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => {
+                                            handleStatusUpdate(selectedAppointment.id!, 'cancelled');
+                                            setSelectedAppointment(null);
+                                        }}
+                                        className="flex-1 btn-secondary border-red-100 text-red-600 hover:bg-red-50 hover:border-red-200 py-3 text-sm font-bold"
+                                    >
+                                        Randevuyu İptal Et
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectedAppointment(null)}
+                                        className="flex-1 btn-primary py-3 text-sm font-bold"
+                                    >
+                                        Kapat
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -784,7 +857,7 @@ export default function AppointmentManagement() {
                     Sistemi Sıfırla
                 </button>
                 <div className="flex items-center gap-2 grayscale opacity-30">
-                    <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments v1.11</span>
+                    <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments v1.35</span>
                 </div>
             </div>
         </div>

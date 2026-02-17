@@ -164,7 +164,7 @@ export default function BookingPage() {
                 start_time: selection.time,
                 end_time: endTime,
                 customer_name: selection.customerName,
-                notes: `Tel: ${selection.customerPhone}`,
+                notes: `Müşteri: ${selection.customerName} | Tel: ${selection.customerPhone}`,
                 status: 'pending'
             });
 
@@ -306,13 +306,20 @@ export default function BookingPage() {
                             ref={dateInputRef} // Add ref
                             type="date"
                             min={new Date().toISOString().split('T')[0]}
+                            value={selection.date || ''}
                             onChange={(e) => {
                                 setSelection({ ...selection, date: e.target.value });
-                                handleNext();
                             }}
-                            className="w-full p-4 bg-white rounded-2xl border-2 border-gray-100 font-bold text-gray-900 focus:outline-none focus:border-pink-500 transition-colors text-lg"
+                            className="w-full p-4 bg-white rounded-2xl border-2 border-gray-100 font-bold text-gray-900 focus:outline-none focus:border-pink-500 transition-colors text-lg mb-4"
                         />
-                        <p className="text-xs text-gray-400 mt-2 text-center" onClick={() => dateInputRef.current?.showPicker()}>
+                        <button
+                            disabled={!selection.date}
+                            onClick={handleNext}
+                            className={`w-full py-4 rounded-xl font-black uppercase tracking-widest transition-all ${selection.date ? 'bg-pink-600 text-white shadow-lg' : 'bg-gray-100 text-gray-400'}`}
+                        >
+                            Devam Et
+                        </button>
+                        <p className="text-xs text-gray-400 mt-4 text-center" onClick={() => dateInputRef.current?.showPicker()}>
                             Takvimi açmak için tıklayın
                         </p>
                     </div>
@@ -410,7 +417,7 @@ export default function BookingPage() {
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
                         <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse"></div>
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">ID: {id} | Staff: {staff.length} | Svc: {services.length} | v1.4</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">ID: {id} | Staff: {staff.length} | Svc: {services.length} | v1.5</span>
                     </div>
                 </div>
             </div>

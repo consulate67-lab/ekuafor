@@ -24,7 +24,7 @@ console.log('-------------------------');
 import { mockAdapter } from './mock-server';
 
 // Mock Sunucuyu Devreye Al (Her zaman veya sadece canlıda)
-const USE_MOCK_SERVER = false; // RAILWAY AKTİF (Gerçek Veri)
+const USE_MOCK_SERVER = false; // GERÇEK VERİTABANI AKTİF
 
 const api = axios.create({
     baseURL: baseUrl,
@@ -51,7 +51,7 @@ api.interceptors.request.use(
             console.log('⚡ Mock Server İsteği:', config.url);
 
             // Sadece desteklenen rotaları mockla, diğerleri (örn dış api) geçsin
-            const mockedRoutes = ['/auth', '/services', '/users', '/companies', '/appointments'];
+            const mockedRoutes = ['/auth', '/services', '/users', '/companies', '/appointments', '/sms'];
             if (mockedRoutes.some(r => config.url?.includes(r))) {
                 config.adapter = async (cfg) => {
                     try {

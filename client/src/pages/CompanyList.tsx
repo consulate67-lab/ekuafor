@@ -7,7 +7,6 @@ export default function CompanyList() {
     const [companies, setCompanies] = useState<Company[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [selectedQR, setSelectedQR] = useState<number | null>(null);
 
     useEffect(() => {
         fetchCompanies();
@@ -185,15 +184,6 @@ export default function CompanyList() {
                                     </div>
 
                                     <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
-                                        {/* QR Button */}
-                                        <button
-                                            onClick={() => setSelectedQR(company.id!)}
-                                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-violet-50 text-violet-600 hover:bg-violet-600 hover:text-white transition-all duration-300"
-                                            title="Karekod"
-                                        >
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 12v1m0 0v3m0-3h3m-3 0h-3m3 3v-3m-9 3v-3m0 3h3m-3 0h-3m3 3v-3m0 3v-3m-3 3h3m3 0h3" /></svg>
-                                        </button>
-
                                         {!company.is_verified && (
                                             <button
                                                 onClick={() => handleVerify(company.id!)}
@@ -232,39 +222,6 @@ export default function CompanyList() {
                     </div>
                 )}
             </main>
-
-            {/* QR Modal */}
-            {selectedQR && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="card w-full max-w-sm shadow-2xl scale-in-center animate-in zoom-in-95 duration-300 bg-white p-8 text-center relative">
-                        <button onClick={() => setSelectedQR(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-
-                        <h3 className="text-2xl font-black text-gray-900 mb-2">Firma Karekodu</h3>
-                        <p className="text-sm text-gray-500 font-medium mb-6">Müşterileriniz bu kodu okutarak randevu alabilir.</p>
-
-                        <div className="bg-white p-4 rounded-xl border-2 border-dashed border-gray-200 inline-block mb-6">
-                            <img
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`${window.location.origin}/ekuafor/book/${selectedQR}`)}`}
-                                alt="QR Code"
-                                className="w-48 h-48"
-                            />
-                        </div>
-
-                        <div className="flex gap-3">
-                            <a
-                                href={`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(`${window.location.origin}/ekuafor/book/${selectedQR}`)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex-1 btn-primary py-3 text-sm font-bold"
-                            >
-                                İndir / Yazdır
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

@@ -11,7 +11,6 @@ export default function Dashboard() {
         todayIncome: 0,
         customerCount: 0
     });
-    const [showQR, setShowQR] = useState(false);
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -164,27 +163,21 @@ export default function Dashboard() {
                             </div>
                         </Link>
                     )}
-
-
-                    {/* QR Kod (Sadece Firma Sahibi) */}
-                    {(user?.role === 'company_admin' || user?.role === 'super_admin') && (
-                        <button
-                            onClick={() => setShowQR(true)}
-                            className="card group hover:scale-[1.02] transition-all duration-300 border-gray-800 text-left w-full"
-                        >
+                    {/* SMS Ayarları (SADECE ADMIN VEYA SAHİP) */}
+                    {(user?.role === 'super_admin' || user?.role === 'company_admin') && (
+                        <Link to="/sms" className="card group hover:scale-[1.02] transition-all duration-300 border-violet-100">
                             <div className="flex items-center gap-5">
-                                <div className="bg-gray-900 p-4 rounded-2xl group-hover:bg-black group-hover:text-white transition-colors duration-300">
-                                    <svg className="w-8 h-8 text-white group-hover:text-pink-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v1m6 11h2m-6 0h-2v4h2v-4zm-6 0H6.4M6.4 16H8v4H6.4v-4zm-2.4-5h14M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 10h.01M14 10h.01M10 14h.01M14 14h.01" />
+                                <div className="bg-violet-50 p-4 rounded-2xl group-hover:bg-violet-600 group-hover:text-white transition-colors duration-300">
+                                    <svg className="w-8 h-8 text-violet-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                     </svg>
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-bold text-gray-900 mb-1">Firma Karekodu</h3>
-                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Müşterileriniz için hızlı randevu QR kodu.</p>
+                                    <h3 className="text-xl font-bold text-gray-900 mb-1">SMS Sunucu</h3>
+                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Vodafone hattınız ile SMS sistemini bağlayın.</p>
                                 </div>
                             </div>
-                        </button>
+                        </Link>
                     )}
 
                     {/* WhatsApp Paylaşım (Personel ve Yönetici) */}
@@ -255,43 +248,11 @@ export default function Dashboard() {
                         Sistemi Sıfırla
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Dashboard v1.5 | {user?.role}</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Dashboard v1.35 | {user?.role}</span>
                     </div>
                 </div>
             </main>
 
-            {/* QR Modal */}
-            {showQR && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="card w-full max-w-sm shadow-2xl scale-in-center animate-in zoom-in-95 duration-300 bg-white p-8 text-center relative">
-                        <button onClick={() => setShowQR(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-
-                        <h3 className="text-2xl font-black text-gray-900 mb-2">Firma Karekodu</h3>
-                        <p className="text-sm text-gray-500 font-medium mb-6">Müşterileriniz bu kodu okutarak randevu alabilir.</p>
-
-                        <div className="bg-white p-4 rounded-xl border-2 border-dashed border-gray-200 inline-block mb-6">
-                            <img
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`${window.location.origin}/ekuafor/book/${user?.company_id}`)}`}
-                                alt="QR Code"
-                                className="w-48 h-48"
-                            />
-                        </div>
-
-                        <div className="flex gap-3">
-                            <a
-                                href={`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(`${window.location.origin}/ekuafor/book/${user?.company_id}`)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex-1 btn-primary py-3 text-sm font-bold"
-                            >
-                                İndir / Yazdır
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

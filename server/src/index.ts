@@ -9,6 +9,7 @@ import companyRoutes from './routes/company.routes';
 import addressRoutes from './routes/address.routes';
 import serviceRoutes from './routes/service.routes';
 import appointmentRoutes from './routes/appointment.routes';
+import smsRoutes from './routes/sms.routes';
 
 dotenv.config();
 
@@ -103,6 +104,9 @@ app.use('/ekuafor/api/services', serviceRoutes);
 
 app.use('/api/appointments', appointmentRoutes);
 app.use('/ekuafor/api/appointments', appointmentRoutes);
+
+app.use('/api/sms', smsRoutes);
+app.use('/ekuafor/api/sms', smsRoutes);
 
 // Setup Route (For DB Init)
 import setupRoutes from './routes/setup.routes';

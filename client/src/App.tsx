@@ -12,6 +12,7 @@ import ServiceManagement from './pages/ServiceManagement';
 import AppointmentManagement from './pages/AppointmentManagement';
 import CustomerHome from './pages/CustomerHome';
 import BookingPage from './pages/BookingPage';
+import SmsSettings from './pages/SmsSettings';
 
 function App() {
     const { isAuthenticated, initialized, setUser, setInitialized } = useAuthStore();
@@ -57,7 +58,7 @@ function App() {
     return (
         <div className="relative min-h-screen">
             <div className="fixed top-0 right-0 z-[9999] bg-pink-600 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg opacity-80 hover:opacity-100 pointer-events-none select-none shadow-md">
-                v1.33
+                v1.35
             </div>
             <Router basename="/ekuafor">
                 <Routes>
@@ -77,6 +78,7 @@ function App() {
                             <Route path="/companies/:id/edit" element={<CompanyForm />} />
                             <Route path="/services" element={<ServiceManagement />} />
                             <Route path="/appointments" element={<AppointmentManagement />} />
+                            <Route path="/sms" element={<SmsSettings />} />
                             <Route path="*" element={<Navigate to="/dashboard" replace />} />
                         </>
                     ) : (

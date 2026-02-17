@@ -64,6 +64,29 @@ export default function CompanyDetail() {
                             <p><span className="font-medium">IBAN:</span> {company.iban}</p>
                         </div>
                     </div>
+
+                    {/* QR Kod Bölümü */}
+                    <div className="card flex flex-col items-center justify-center p-8">
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">Firma Karekodu</h3>
+                        <p className="text-xs text-gray-500 mb-6 text-center">Bu kodu müşterilerinizle paylaşarak hızlı randevu almalarını sağlayabilirsiniz.</p>
+
+                        <div className="bg-white p-4 rounded-2xl border-2 border-dashed border-pink-100 mb-6">
+                            <img
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}/ekuafor/book/${company.id}`)}`}
+                                alt="Firma QR Kodu"
+                                className="w-40 h-40"
+                            />
+                        </div>
+
+                        <a
+                            href={`https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(`${window.location.origin}/ekuafor/book/${company.id}`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-primary w-full py-2 text-xs font-bold text-center"
+                        >
+                            QR Kodu İndir
+                        </a>
+                    </div>
                 </div>
 
                 {/* Sağ Kolon: Mesai Bilgileri (Çalışan Yönetimi yerine) */}

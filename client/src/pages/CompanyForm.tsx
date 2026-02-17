@@ -19,6 +19,16 @@ const DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
+function MapController({ center }: { center: LatLng }) {
+    const map = useMapEvents({});
+    useEffect(() => {
+        if (center) {
+            map.setView(center, map.getZoom());
+        }
+    }, [center, map]);
+    return null;
+}
+
 function LocationMarker({ position, setPosition }: {
     position: LatLng | null;
     setPosition: (pos: LatLng) => void;
@@ -70,11 +80,26 @@ export default function CompanyForm() {
     const [mapPosition, setMapPosition] = useState<LatLng | null>(
         new LatLng(39.9334, 32.8597) // Ankara default
     );
+    const [mapCenter, setMapCenter] = useState<LatLng>(new LatLng(39.9334, 32.8597));
 
     useEffect(() => {
         fetchProvinces();
         if (isEdit) {
             fetchCompany();
+        } else {
+            // Geolocation for new company
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const newPos = new LatLng(position.coords.latitude, position.coords.longitude);
+                        setMapPosition(newPos);
+                        setMapCenter(newPos);
+                    },
+                    (error) => {
+                        console.warn('Konum alınamadı:', error.message);
+                    }
+                );
+            }
         }
     }, []);
 
@@ -133,7 +158,9 @@ export default function CompanyForm() {
             if (company.neighborhood_id) setSelectedNeighborhood(company.neighborhood_id);
 
             if (company.latitude && company.longitude) {
-                setMapPosition(new LatLng(company.latitude, company.longitude));
+                const newPos = new LatLng(company.latitude, company.longitude);
+                setMapPosition(newPos);
+                setMapCenter(newPos);
             }
         } catch (err: any) {
             setError(err.response?.data?.error || 'Firma yüklenirken hata oluştu');
@@ -417,14 +444,15 @@ export default function CompanyForm() {
                         </p>
                         <div className="h-96 rounded-lg overflow-hidden border border-gray-300">
                             <MapContainer
-                                center={mapPosition || new LatLng(39.9334, 32.8597)}
-                                zoom={13}
+                                center={mapCenter}
+                                zoom={15}
                                 style={{ height: '100%', width: '100%' }}
                             >
                                 <TileLayer
                                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                 />
+                                <MapController center={mapCenter} />
                                 <LocationMarker position={mapPosition} setPosition={setMapPosition} />
                             </MapContainer>
                         </div>
