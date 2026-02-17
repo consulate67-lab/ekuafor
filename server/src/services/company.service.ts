@@ -35,8 +35,8 @@ export interface Company {
     // Durum
     is_active?: boolean;
     is_verified?: boolean;
-
     created_by?: number;
+    board_key?: string;
 }
 
 class CompanyService {
@@ -55,8 +55,8 @@ class CompanyService {
           latitude, longitude,
           bank_name, bank_branch, iban, account_holder_name,
           commission_rate, payment_enabled,
-          is_active, is_verified, created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+          is_active, is_verified, created_by, board_key
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
         RETURNING *
       `;
 
@@ -84,7 +84,8 @@ class CompanyService {
                 company.payment_enabled || false,
                 company.is_active !== false,
                 company.is_verified || false,
-                createdBy
+                createdBy,
+                company.board_key || null
             ];
 
             const result = await client.query(query, values);

@@ -253,6 +253,9 @@ BEGIN
         CREATE TRIGGER update_sms_settings_updated_at BEFORE UPDATE ON sms_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     END IF;
 END$$;
+
+-- MIGRATION: Board Key defined in companies
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS board_key VARCHAR(100);
         `;
 
         await pool.query(sql);

@@ -43,6 +43,7 @@ const companySchema = z.object({
 
     commission_rate: z.coerce.number().min(0).max(100).optional(),
     payment_enabled: z.boolean().optional(),
+    board_key: z.string().optional(),
 });
 
 /**
@@ -225,6 +226,36 @@ router.post('/:id/verify', authMiddleware, roleCheck(['super_admin']), async (re
         res.status(500).json({
             success: false,
             error: error instanceof Error ? error.message : 'Firma onaylanırken hata oluştu'
+        });
+    }
+});
+
+/**
+ * POST /api/companies/board-login
+ * Tablet Dashboard girişi için board_key doğrula
+ */
+router.post('/board-login', async (req: Request, res: Response) => {
+    try {
+        const { board_key } = req.body;
+        if (!board_key) {
+            return res.status(400).json({ success: false, error: 'Board Key gereklidir' });
+        }
+
+        const result = await companyService.getAllCompanies(); // Simple lookup for now
+        const company = result.find(c => (c as any).board_key === board_key);
+
+        if (!company) {
+            return res.status(401).json({ success: false, error: 'Geçersiz Board Key' });
+        }
+
+        res.json({
+            success: true,
+            data: company
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Giriş yapılırken hata oluştu'
         });
     }
 });

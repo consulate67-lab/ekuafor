@@ -13,6 +13,7 @@ import AppointmentManagement from './pages/AppointmentManagement';
 import CustomerHome from './pages/CustomerHome';
 import BookingPage from './pages/BookingPage';
 import SmsSettings from './pages/SmsSettings';
+import SalonBoard from './pages/SalonBoard';
 
 function App() {
     const { isAuthenticated, initialized, setUser, setInitialized } = useAuthStore();
@@ -58,7 +59,7 @@ function App() {
     return (
         <div className="relative min-h-screen">
             <div className="fixed top-0 right-0 z-[9999] bg-pink-600 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg opacity-80 hover:opacity-100 pointer-events-none select-none shadow-md">
-                v1.46
+                v1.49
             </div>
             <Router basename="/ekuafor">
                 <Routes>
@@ -67,6 +68,7 @@ function App() {
                     <Route path="/book/:id" element={<BookingPage />} />
                     <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
                     <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />} />
+                    <Route path="/board" element={<SalonBoard />} />
 
                     {/* Protected Routes */}
                     {isAuthenticated ? (

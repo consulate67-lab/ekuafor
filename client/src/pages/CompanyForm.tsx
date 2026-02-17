@@ -65,6 +65,7 @@ export default function CompanyForm() {
         account_holder_name: '',
         commission_rate: 0,
         payment_enabled: false,
+        board_key: '',
     });
 
     // Address data
@@ -642,6 +643,46 @@ export default function CompanyForm() {
                                     </div>
                                 </>
                             )}
+                        </div>
+                    </div>
+
+                    {/* Tablet Dashboard Ayarları */}
+                    <div className="card border-l-4 border-amber-500">
+                        <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                            <span className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                            </span>
+                            Tablet Dashboard (Salon Board)
+                        </h2>
+                        <div className="bg-amber-50 p-4 rounded-xl mb-6">
+                            <p className="text-sm text-amber-800 leading-relaxed font-medium">
+                                İş yerindeki tabletin sürekli açık kalması ve tüm çalışanların randevularını matrix formatında görebilmesi için bir erişim anahtarı belirleyin. Bu anahtar cihaza özeldir ve şifre yerine geçer.
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="md:col-span-2">
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Dashboard Erişim Anahtarı (Board Key)</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        name="board_key"
+                                        value={formData.board_key || ''}
+                                        onChange={handleChange}
+                                        className="input-field font-mono text-lg"
+                                        placeholder="Örn: SALON-TABLET-123"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData(prev => ({ ...prev, board_key: `BOARD-${Math.random().toString(36).substr(2, 9).toUpperCase()}` }))}
+                                        className="bg-amber-100 text-amber-700 font-bold px-4 rounded-xl hover:bg-amber-200 transition-colors"
+                                    >
+                                        Oluştur
+                                    </button>
+                                </div>
+                                <p className="text-[10px] text-gray-400 mt-2 italic">* Bu anahtarı iş yerindeki tablette bir kez girmeniz yeterli olacaktır.</p>
+                            </div>
                         </div>
                     </div>
 

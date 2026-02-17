@@ -48,6 +48,7 @@ export interface Company {
     // Durum
     is_active?: boolean;
     is_verified?: boolean;
+    board_key?: string;
 
     created_at?: string;
     updated_at?: string;
