@@ -11,6 +11,7 @@ export default function SalonBoard() {
     const [services, setServices] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [currentHour, setCurrentHour] = useState(new Date().getHours());
 
     // Modal States
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -27,7 +28,6 @@ export default function SalonBoard() {
         try {
             const today = new Date().toISOString().split('T')[0];
 
-            // Parallel fetch for speed
             const [appsRes, staffRes, servRes] = await Promise.all([
                 api.get('/appointments', { params: { company_id: compId, start_date: today, end_date: today } }),
                 api.get(`/companies/${compId}/employees`),
@@ -70,11 +70,25 @@ export default function SalonBoard() {
             api.get(`/companies/${compId}`).then(res => setCompany(res.data.data));
             fetchData(compId);
 
-            // Refresher every 30 seconds
-            const interval = setInterval(() => fetchData(compId), 30000);
+            const interval = setInterval(() => {
+                fetchData(compId);
+                setCurrentHour(new Date().getHours());
+            }, 30000);
             return () => clearInterval(interval);
         }
     }, [boardKey, fetchData]);
+
+    // Auto-scroll to current hour
+    useEffect(() => {
+        if (staff.length > 0) {
+            const container = document.getElementById('matrix-container');
+            const currentHourCol = document.getElementById(`hour-col-${currentHour}`);
+            if (container && currentHourCol) {
+                const scrollPos = currentHourCol.offsetLeft - 260; // Offset for sticky column
+                container.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
+            }
+        }
+    }, [staff, currentHour]);
 
     const handleFastSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -84,20 +98,19 @@ export default function SalonBoard() {
             setLoading(true);
             const today = new Date().toISOString().split('T')[0];
             const startTime = selectedCell.hour;
-            // Default 1 hour duration if no service selected
             const endTimeHour = parseInt(startTime.split(':')[0]) + 1;
             const endTime = `${endTimeHour}:00`;
 
             await api.post('/appointments', {
                 company_id: company.id,
                 staff_id: selectedCell.person.user_id || selectedCell.person.id,
-                service_id: fastForm.serviceId ? parseInt(fastForm.serviceId) : (services[0]?.id || 1), // Fallback to first service or ID 1
+                service_id: fastForm.serviceId ? parseInt(fastForm.serviceId) : (services[0]?.id || 1),
                 appointment_date: today,
                 start_time: startTime,
                 end_time: endTime,
                 customer_name: fastForm.customerName || 'Misafir Müşteri',
                 notes: fastForm.notes,
-                status: 'approved' // Tablet direct entries are auto-approved
+                status: 'approved'
             });
 
             setIsModalOpen(false);
@@ -112,27 +125,27 @@ export default function SalonBoard() {
 
     if (!boardKey) {
         return (
-            <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
-                <div className="max-w-md w-full bg-white rounded-[2.5rem] p-10 shadow-2xl text-center">
-                    <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-3xl flex items-center justify-center mx-auto mb-6 text-3xl">
+            <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-6 bg-mesh-gradient">
+                <div className="max-w-md w-full bg-white/10 backdrop-blur-2xl rounded-[3rem] p-12 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] border border-white/10 text-center animate-fade-in">
+                    <div className="w-24 h-24 bg-gradient-to-tr from-amber-400 to-orange-500 text-white rounded-[2rem] flex items-center justify-center mx-auto mb-8 text-4xl shadow-2xl shadow-orange-500/20 rotate-3">
                         📟
                     </div>
-                    <h1 className="text-3xl font-black text-gray-900 mb-2">Salon Board</h1>
-                    <p className="text-gray-500 mb-8 font-medium">Lütfen tablet erişim anahtarını giriniz.</p>
+                    <h1 className="text-4xl font-black text-white mb-3 tracking-tight">Salon Board</h1>
+                    <p className="text-slate-400 mb-10 font-medium">Cihazınızı yetkilendirmek için anahtarı girin.</p>
 
-                    <form onSubmit={handleLogin} className="space-y-4">
+                    <form onSubmit={handleLogin} className="space-y-6">
                         <input
                             type="text"
                             value={inputKey}
                             onChange={e => setInputKey(e.target.value.toUpperCase())}
-                            placeholder="ERİŞİM ANAHTARI"
-                            className="w-full p-5 bg-gray-50 rounded-2xl border-2 border-gray-100 font-black text-center text-xl tracking-[0.3em] focus:border-amber-500 transition-colors uppercase"
+                            placeholder="•••• •••• ••••"
+                            className="w-full p-6 bg-white/5 rounded-2xl border-2 border-white/10 font-mono text-center text-2xl tracking-[0.4em] text-amber-400 focus:border-amber-500 focus:bg-white/10 transition-all outline-none"
                             required
                         />
-                        {error && <p className="text-red-500 text-sm font-bold">{error}</p>}
+                        {error && <p className="text-red-400 text-sm font-bold bg-red-400/10 py-3 rounded-xl">{error}</p>}
                         <button
                             disabled={loading}
-                            className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-50"
+                            className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 py-6 rounded-2xl font-black uppercase tracking-widest shadow-[0_20px_40px_-10px_rgba(245,158,11,0.3)] active:scale-95 transition-all disabled:opacity-50"
                         >
                             {loading ? 'Bağlanıyor...' : 'Sistemi Başlat'}
                         </button>
@@ -145,27 +158,42 @@ export default function SalonBoard() {
     const pendingCount = appointments.filter(a => a.status === 'pending').length;
 
     return (
-        <div className="min-h-screen bg-slate-100 flex flex-col font-sans overflow-hidden">
-            {/* Board Header */}
-            <header className="bg-white px-8 py-5 shadow-sm flex justify-between items-center z-20">
-                <div className="flex items-center gap-6">
-                    <div className="bg-slate-900 text-white px-4 py-2 rounded-xl flex items-center gap-3">
-                        <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
-                        <span className="text-xs font-black uppercase tracking-widest leading-none mt-0.5">Live Board</span>
+        <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans overflow-hidden selection:bg-indigo-100">
+            {/* Ultra Modern Header */}
+            <header className="bg-white/70 backdrop-blur-xl px-10 py-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] border-b border-slate-100 flex justify-between items-center z-50">
+                <div className="flex items-center gap-8">
+                    <div className="relative">
+                        <div className="bg-slate-900 text-white px-5 py-2.5 rounded-2xl flex items-center gap-3 shadow-xl shadow-slate-900/10">
+                            <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.8)]"></span>
+                            <span className="text-[11px] font-black uppercase tracking-widest leading-none mt-0.5">Live Matrix</span>
+                        </div>
                     </div>
                     <div>
-                        <h1 className="text-2xl font-black text-gray-900 leading-none mb-1 uppercase tracking-tight">{company?.name || 'Yükleniyor...'}</h1>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{new Date().toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                        <h1 className="text-3xl font-black text-slate-900 leading-none mb-1.5 uppercase tracking-tighter decoration-indigo-500 underline-offset-4 decoration-4">
+                            {company?.name || 'Yükleniyor...'}
+                        </h1>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                                {new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                            </span>
+                            <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                            <span className="text-xs font-black text-indigo-500 uppercase tracking-widest animate-pulse">
+                                {new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        </div>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-6">
                     {pendingCount > 0 && (
-                        <div className="bg-amber-100 text-amber-700 px-6 py-3 rounded-full flex items-center gap-3 animate-bounce">
-                            <span className="w-8 h-8 bg-amber-600 text-white rounded-full flex items-center justify-center font-black text-sm">{pendingCount}</span>
-                            <span className="text-xs font-black uppercase tracking-widest">Bekleyen İstek Var</span>
+                        <div className="bg-amber-50 border border-amber-100 text-amber-900 px-6 py-3 rounded-[1.5rem] flex items-center gap-4 animate-bounce shadow-lg shadow-amber-200/20">
+                            <div className="flex -space-x-2">
+                                <span className="w-10 h-10 bg-amber-500 text-white rounded-full flex items-center justify-center font-black text-sm ring-4 ring-white shadow-lg">{pendingCount}</span>
+                            </div>
+                            <span className="text-xs font-black uppercase tracking-widest">Bekleyen İstek</span>
                         </div>
                     )}
+
                     <button
                         onClick={() => {
                             if (confirm('Sistemden çıkış yapılsın mı?')) {
@@ -173,83 +201,123 @@ export default function SalonBoard() {
                                 window.location.reload();
                             }
                         }}
-                        className="w-12 h-12 rounded-2xl bg-gray-50 text-gray-400 hover:text-red-500 transition-colors flex items-center justify-center"
+                        className="group w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all flex items-center justify-center shadow-sm"
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                        <svg className="w-7 h-7 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
                     </button>
                 </div>
             </header>
 
-            {/* Matrix View */}
-            <div className="flex-1 overflow-auto p-4 lg:p-8">
-                <div className="bg-white rounded-[2rem] shadow-xl border border-gray-100 overflow-hidden inline-block min-w-full">
-                    <table className="w-full border-collapse">
+            {/* Matrix Container */}
+            <div id="matrix-container" className="flex-1 overflow-auto p-6 lg:p-10 scroll-smooth bg-slate-50/50">
+                <div className="bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.04)] border border-slate-100 overflow-hidden inline-block min-w-full">
+                    <table className="w-full border-separate border-spacing-0">
                         <thead>
-                            <tr className="bg-gray-50">
-                                <th className="sticky left-0 z-10 bg-gray-50 p-6 text-left border-b border-r border-gray-100 min-w-[200px]">
-                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Uzman / Saat</span>
+                            <tr>
+                                <th className="sticky left-0 z-40 bg-white/95 backdrop-blur-md p-8 text-left border-b border-r border-slate-100 min-w-[280px] shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
+                                    <div className="flex flex-col">
+                                        <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.25em] mb-1">Organizasyon</span>
+                                        <span className="text-xl font-black text-slate-800 tracking-tight">Uzmanlar</span>
+                                    </div>
                                 </th>
-                                {hours.map(hour => (
-                                    <th key={hour} className="p-6 text-center border-b border-gray-100 min-w-[150px]">
-                                        <span className="text-sm font-black text-gray-700">{hour}</span>
-                                    </th>
-                                ))}
+                                {hours.map(hour => {
+                                    const hNum = parseInt(hour.split(':')[0]);
+                                    const isCurrent = hNum === currentHour;
+                                    const isPast = hNum < currentHour;
+
+                                    return (
+                                        <th
+                                            key={hour}
+                                            id={`hour-col-${hNum}`}
+                                            className={`p-8 text-center border-b border-slate-100 min-w-[180px] transition-all relative ${isCurrent ? 'bg-indigo-50/40' : ''}`}
+                                        >
+                                            <div className={`flex flex-col items-center gap-1 transition-all ${isCurrent ? 'scale-110' : ''}`}>
+                                                <span className={`text-lg font-black tracking-tight ${isCurrent ? 'text-indigo-600' : isPast ? 'text-slate-300' : 'text-slate-700'}`}>
+                                                    {hour}
+                                                </span>
+                                                {isCurrent && (
+                                                    <span className="px-3 py-1 bg-indigo-500 text-[9px] text-white font-black uppercase tracking-widest rounded-full shadow-lg shadow-indigo-200">
+                                                        ŞİMDİ
+                                                    </span>
+                                                )}
+                                                {!isCurrent && isPast && <span className="text-[9px] font-black text-slate-200 uppercase tracking-widest">Geçti</span>}
+                                            </div>
+                                            {isCurrent && <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-indigo-500 rounded-t-full"></div>}
+                                        </th>
+                                    );
+                                })}
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-slate-100">
                             {staff.map(person => {
                                 const pId = person.user_id || person.id;
                                 return (
-                                    <tr key={pId} className="group transition-colors hover:bg-slate-50/50">
-                                        <td className="sticky left-0 z-10 bg-white group-hover:bg-slate-50 p-6 border-b border-r border-gray-100 font-bold text-gray-900 shadow-[2px_0_10px_rgba(0,0,0,0.02)]">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center font-black text-sm uppercase">
-                                                    {person.first_name?.[0] || 'U'}{person.last_name?.[0] || 'Z'}
+                                    <tr key={pId} className="group transition-colors">
+                                        <td className="sticky left-0 z-30 bg-white/95 backdrop-blur-md p-8 border-r border-slate-100 font-bold text-slate-900 shadow-[4px_0_24px_rgba(0,0,0,0.02)] group-hover:bg-slate-50 transition-colors">
+                                            <div className="flex items-center gap-5">
+                                                <div className="relative">
+                                                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600 flex items-center justify-center font-black text-lg uppercase shadow-inner">
+                                                        {person.first_name?.[0] || 'U'}{person.last_name?.[0] || 'Z'}
+                                                    </div>
+                                                    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full"></div>
                                                 </div>
                                                 <div>
-                                                    <p className="leading-none mb-1">{person.first_name} {person.last_name}</p>
-                                                    <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Personel</span>
+                                                    <p className="text-lg font-black text-slate-800 leading-none mb-1.5 tracking-tight group-hover:text-indigo-600 transition-colors">{person.first_name} {person.last_name}</p>
+                                                    <span className="inline-flex px-2 py-0.5 bg-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest rounded-md">Uzman Kadro</span>
                                                 </div>
                                             </div>
                                         </td>
                                         {hours.map(hour => {
-                                            const hourNum = parseInt(hour.split(':')[0]);
+                                            const hNum = parseInt(hour.split(':')[0]);
+                                            const isCurrent = hNum === currentHour;
+                                            const isPast = hNum < currentHour;
+
                                             const personApps = appointments.filter(a =>
                                                 Number(a.staff_id) === Number(pId) &&
-                                                parseInt(a.start_time.split(':')[0]) === hourNum
+                                                parseInt(a.start_time.split(':')[0]) === hNum
                                             );
 
                                             return (
                                                 <td
                                                     key={hour}
-                                                    className="p-3 border-b border-gray-100 align-top cursor-cell hover:bg-amber-50/30 transition-colors relative"
+                                                    className={`p-4 border-r border-slate-50 align-top cursor-cell hover:bg-slate-50/80 transition-all relative ${isCurrent ? 'bg-indigo-50/10' : ''} ${isPast ? 'bg-slate-50/20' : ''}`}
                                                     onClick={() => {
                                                         setSelectedCell({ person, hour });
                                                         setIsModalOpen(true);
                                                     }}
                                                 >
-                                                    <div className="space-y-1">
+                                                    <div className={`space-y-2 min-h-[100px] transition-all ${isPast && personApps.length === 0 ? 'opacity-20' : ''}`}>
                                                         {personApps.length === 0 && (
-                                                            <div className="opacity-0 group-hover:opacity-100 flex items-center justify-center py-4 border-2 border-dashed border-gray-100 rounded-2xl text-[10px] text-gray-400 font-bold uppercase tracking-widest transition-opacity">
-                                                                + Ekle
+                                                            <div className="opacity-0 group-hover:opacity-100 flex items-center justify-center h-20 border-3 border-dashed border-slate-200 rounded-3xl text-[11px] text-slate-400 font-black uppercase tracking-widest transition-all bg-white shadow-sm">
+                                                                + Müsait
                                                             </div>
                                                         )}
                                                         {personApps.map(app => (
                                                             <div
                                                                 key={app.id}
                                                                 onClick={(e) => e.stopPropagation()}
-                                                                className={`p-3 rounded-2xl border-l-4 shadow-sm transition-all hover:scale-[1.02] ${app.status === 'approved' ? 'bg-indigo-50 border-indigo-500 text-indigo-900' :
-                                                                    app.status === 'pending' ? 'bg-amber-50 border-amber-500 text-amber-900 animate-pulse' :
-                                                                        app.status === 'completed' ? 'bg-green-50 border-green-500 text-green-900 opacity-60' :
-                                                                            'bg-gray-50 border-gray-300 text-gray-500'
+                                                                className={`p-5 rounded-3xl border-l-[6px] shadow-xl shadow-slate-200/40 transition-all hover:scale-[1.03] hover:shadow-2xl active:scale-95 cursor-pointer ${isPast ? 'grayscale-[0.4] opacity-70' : ''} ${app.status === 'approved' ? 'bg-white border-indigo-500 text-slate-900 group-hover:bg-indigo-50/30' :
+                                                                        app.status === 'pending' ? 'bg-amber-50 border-amber-500 text-amber-900 animate-pulse' :
+                                                                            app.status === 'completed' ? 'bg-emerald-50 border-emerald-500 text-emerald-900 opacity-60' :
+                                                                                'bg-slate-50 border-slate-300 text-slate-500'
                                                                     }`}
                                                             >
-                                                                <div className="flex justify-between items-start mb-1">
-                                                                    <span className="text-[10px] font-black uppercase tracking-tighter">{app.start_time}</span>
-                                                                    {app.status === 'pending' && <span className="w-2 h-2 bg-amber-500 rounded-full"></span>}
+                                                                <div className="flex justify-between items-start mb-2">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{app.start_time}</span>
+                                                                        {isCurrent && <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping"></span>}
+                                                                    </div>
+                                                                    <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${app.status === 'approved' ? 'bg-indigo-100 text-indigo-600' :
+                                                                            app.status === 'pending' ? 'bg-amber-100 text-amber-600' :
+                                                                                'bg-slate-100 text-slate-400'
+                                                                        }`}>
+                                                                        {app.status === 'approved' ? 'ONAYLI' : app.status === 'pending' ? 'YENİ' : 'GEÇMİŞ'}
+                                                                    </span>
                                                                 </div>
-                                                                <p className="text-xs font-bold truncate leading-tight mb-1">{app.customer_name || 'Müşteri'}</p>
-                                                                <p className="text-[9px] font-medium opacity-70 truncate uppercase">{app.service_name}</p>
+                                                                <p className="text-base font-black truncate leading-tight mb-1 tracking-tight">{app.customer_name || 'Misafir'}</p>
+                                                                <p className="text-[10px] font-bold text-slate-400 truncate uppercase tracking-widest">{app.service_name}</p>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -264,86 +332,109 @@ export default function SalonBoard() {
                 </div>
             </div>
 
-            {/* Float Summary / Legend */}
-            <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-md border border-white px-8 py-4 rounded-3xl shadow-2xl flex gap-8 z-30">
-                <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-amber-500 rounded-full"></div>
-                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Beklemede</span>
+            {/* Float Premium Legend */}
+            <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-2xl px-10 py-5 rounded-[2.5rem] shadow-[0_24px_48px_-12px_rgba(0,0,0,0.3)] flex items-center gap-10 z-[100] border border-white/10">
+                <div className="flex items-center gap-3">
+                    <div className="w-4 h-4 bg-amber-500 rounded-xl shadow-lg shadow-amber-500/20"></div>
+                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">Yeni Talep</span>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-indigo-500 rounded-full"></div>
-                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Onaylı</span>
+                <div className="flex items-center gap-3">
+                    <div className="w-4 h-4 bg-indigo-500 rounded-xl shadow-lg shadow-indigo-500/20"></div>
+                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">Onaylandı</span>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Tamamlandı</span>
+                <div className="flex items-center gap-3">
+                    <div className="w-4 h-4 bg-emerald-500 rounded-xl shadow-lg shadow-emerald-500/20"></div>
+                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">Tamamlandı</span>
                 </div>
-                <div className="w-px h-4 bg-gray-200 self-center"></div>
-                <div className="flex items-center gap-2 text-gray-400">
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    <span className="text-[10px] font-black uppercase tracking-widest">Canlı Senkronizasyon</span>
+                <div className="w-px h-6 bg-slate-800"></div>
+                <div className="flex items-center gap-3 text-emerald-400 group">
+                    <div className="relative">
+                        <svg className="w-5 h-5 animate-spin group-hover:animate-none group-hover:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-100" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <div className="absolute inset-0 bg-emerald-400/20 blur-lg animate-pulse rounded-full"></div>
+                    </div>
+                    <span className="text-[11px] font-black uppercase tracking-[0.2em] animate-pulse">Live Sync</span>
                 </div>
             </div>
-            {/* Fast Appointment Modal */}
+
+            {/* Fast Appointment Modal - Ultra Premium */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
-                    <div className="bg-white w-full max-w-xl rounded-[3rem] p-10 shadow-2xl animate-scale-up">
-                        <div className="flex justify-between items-start mb-8">
-                            <div>
-                                <h2 className="text-3xl font-black text-gray-900 leading-tight">Hızlı Randevu</h2>
-                                <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mt-1">
-                                    {selectedCell?.person.first_name} • {selectedCell?.hour}
-                                </p>
-                            </div>
-                            <button onClick={() => setIsModalOpen(false)} className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleFastSubmit} className="space-y-6">
-                            <div>
-                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-2">Müşteri (Opsiyonel)</label>
-                                <input
-                                    type="text"
-                                    value={fastForm.customerName}
-                                    onChange={e => setFastForm(prev => ({ ...prev, customerName: e.target.value }))}
-                                    placeholder="Müşteri Adı / Misafir"
-                                    className="w-full p-5 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all font-bold text-gray-900"
-                                />
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+                    <div className="bg-white w-full max-w-2xl rounded-[4rem] overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] border border-slate-100 animate-scale-up">
+                        <div className="relative p-12 bg-gradient-to-br from-slate-50 to-white">
+                            <div className="flex justify-between items-start mb-10">
+                                <div>
+                                    <div className="inline-flex px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest mb-4">Hızlı Rezarvasyon</div>
+                                    <h2 className="text-4xl font-black text-slate-900 leading-none tracking-tighter">Yeni Randevu</h2>
+                                    <div className="flex items-center gap-3 mt-4">
+                                        <div className="flex items-center gap-2 px-3 py-1 bg-slate-900 text-white rounded-xl text-xs font-bold">
+                                            <span className="w-2 h-2 bg-indigo-400 rounded-full"></span>
+                                            {selectedCell?.hour}
+                                        </div>
+                                        <div className="px-3 py-1 bg-slate-100 text-slate-500 rounded-xl text-xs font-bold uppercase tracking-widest">
+                                            {selectedCell?.person.first_name}
+                                        </div>
+                                    </div>
+                                </div>
+                                <button onClick={() => setIsModalOpen(false)} className="w-16 h-16 bg-white border border-slate-100 rounded-3xl flex items-center justify-center text-slate-400 hover:text-slate-900 hover:rotate-90 transition-all shadow-sm">
+                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
                             </div>
 
-                            <div>
-                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-2">İşlem Tipi (Opsiyonel)</label>
-                                <select
-                                    value={fastForm.serviceId}
-                                    onChange={e => setFastForm(prev => ({ ...prev, serviceId: e.target.value }))}
-                                    className="w-full p-5 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all font-bold text-gray-900 appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyBmaWxsPSJub25lIiBzdHJva2U9InJnYigxNTYsIDE2MywgMTc1KSIgc3Ryb2tlLXdpZHRoPSIyIiB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTE5IDlsLTcgNy03LTciPjwvcGF0aD48L3N2Zz4=')] bg-[length:24px] bg-[right_20px_center] bg-no-repeat"
+                            <form onSubmit={handleFastSubmit} className="space-y-8">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-3">
+                                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Müşteri Detayı</label>
+                                        <input
+                                            type="text"
+                                            value={fastForm.customerName}
+                                            onChange={e => setFastForm(prev => ({ ...prev, customerName: e.target.value }))}
+                                            placeholder="İsim veya Misafir"
+                                            className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 focus:shadow-[0_0_0_8px_rgba(99,102,241,0.1)] transition-all font-black text-xl text-slate-900 outline-none"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Hizmet Seçimi</label>
+                                        <div className="relative">
+                                            <select
+                                                value={fastForm.serviceId}
+                                                onChange={e => setFastForm(prev => ({ ...prev, serviceId: e.target.value }))}
+                                                className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 focus:shadow-[0_0_0_8px_rgba(99,102,241,0.1)] transition-all font-black text-xl text-slate-900 outline-none appearance-none"
+                                            >
+                                                <option value="">İşlem Belirtilmedi</option>
+                                                {services.map(s => (
+                                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                                ))}
+                                            </select>
+                                            <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Özel Not</label>
+                                    <textarea
+                                        value={fastForm.notes}
+                                        onChange={e => setFastForm(prev => ({ ...prev, notes: e.target.value }))}
+                                        placeholder="Eklemek istediğiniz bir bilgi var mı?"
+                                        rows={2}
+                                        className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-bold text-slate-600 outline-none resize-none"
+                                    />
+                                </div>
+
+                                <button
+                                    disabled={loading}
+                                    className="w-full bg-slate-900 text-white py-8 rounded-[2.5rem] font-black uppercase tracking-[0.3em] shadow-[0_24px_48px_-12px_rgba(15,23,42,0.4)] hover:bg-slate-800 hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 text-xl"
                                 >
-                                    <option value="">İşlem Seçilmeyebilir</option>
-                                    {services.map(s => (
-                                        <option key={s.id} value={s.id}>{s.name} - ₺{s.price}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-2">Not (Opsiyonel)</label>
-                                <textarea
-                                    value={fastForm.notes}
-                                    onChange={e => setFastForm(prev => ({ ...prev, notes: e.target.value }))}
-                                    placeholder="Kısa not..."
-                                    rows={2}
-                                    className="w-full p-5 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all font-bold text-gray-900 resize-none"
-                                />
-                            </div>
-
-                            <button
-                                disabled={loading}
-                                className="w-full bg-slate-900 text-white py-6 rounded-3xl font-black uppercase tracking-[0.2em] shadow-2xl hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-50"
-                            >
-                                {loading ? 'Kaydediliyor...' : 'Randevuyu Oluştur'}
-                            </button>
-                        </form>
+                                    {loading ? 'Sistem İşliyor...' : 'Randevuyu Onayla'}
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             )}
