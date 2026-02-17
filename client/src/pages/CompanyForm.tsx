@@ -85,11 +85,57 @@ export default function CompanyForm() {
         is_active: false,
     });
 
-    // Map position
+    // Map results
+    const [mapSearchQuery, setMapSearchQuery] = useState('');
+    const [mapResults, setMapResults] = useState<any[]>([]);
+    const [isSearchingMaps, setIsSearchingMaps] = useState(false);
+
     const [mapPosition, setMapPosition] = useState<LatLng | null>(
         new LatLng(39.9334, 32.8597) // Ankara default
     );
     const [mapCenter, setMapCenter] = useState<LatLng>(new LatLng(39.9334, 32.8597));
+
+    const handleMapSearch = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!mapSearchQuery.trim()) return;
+        setIsSearchingMaps(true);
+        try {
+            const response = await api.get(`/maps/search?q=${encodeURIComponent(mapSearchQuery)}`);
+            setMapResults(response.data.data);
+        } catch (err) {
+            console.error('Harita arama hatası:', err);
+        } finally {
+            setIsSearchingMaps(false);
+        }
+    };
+
+    const handleSelectPlace = async (place: any) => {
+        try {
+            setLoading(true);
+            const response = await api.get(`/maps/details/${place.place_id}`);
+            const details = response.data.data;
+
+            setFormData(prev => ({
+                ...prev,
+                name: details.name || place.name,
+                address_line: details.address || place.address,
+                phone: details.phone || prev.phone,
+            }));
+
+            if (details.latitude && details.longitude) {
+                const newPos = new LatLng(details.latitude, details.longitude);
+                setMapPosition(newPos);
+                setMapCenter(newPos);
+            }
+
+            setMapResults([]);
+            setMapSearchQuery('');
+        } catch (err) {
+            console.error('Detay alma hatası:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         fetchProvinces();
@@ -281,6 +327,55 @@ export default function CompanyForm() {
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* Google Maps Search Section */}
+                    {!isEdit && (
+                        <div className="card border-l-4 border-emerald-500 bg-emerald-50/30">
+                            <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                <span className="text-xl">📍</span> Google Maps'ten Hızlı Getir
+                            </h2>
+                            <p className="text-sm text-gray-600 mb-4">
+                                İşletmeyi Google Maps üzerinde arayarak bilgilerini (isim, adres, telefon, konum) otomatik doldurabilirsiniz.
+                            </p>
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={mapSearchQuery}
+                                    onChange={(e) => setMapSearchQuery(e.target.value)}
+                                    placeholder="Örn: Karizma Kuaför Ankara"
+                                    className="input-field flex-1"
+                                    onKeyDown={(e) => e.key === 'Enter' && handleMapSearch(e)}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleMapSearch}
+                                    disabled={isSearchingMaps}
+                                    className="bg-emerald-600 text-white px-6 rounded-xl font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                                >
+                                    {isSearchingMaps ? 'Aranıyor...' : 'Ara'}
+                                </button>
+                            </div>
+
+                            {mapResults.length > 0 && (
+                                <div className="mt-4 space-y-2 max-h-60 overflow-y-auto bg-white rounded-xl border border-emerald-100 shadow-inner p-2 cursor-default">
+                                    {mapResults.map((place) => (
+                                        <div
+                                            key={place.place_id}
+                                            onClick={() => handleSelectPlace(place)}
+                                            className="p-3 hover:bg-emerald-50 rounded-lg border border-transparent hover:border-emerald-200 transition-all cursor-pointer group"
+                                        >
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <h4 className="font-bold text-gray-900 group-hover:text-emerald-700">{place.name}</h4>
+                                                    <p className="text-xs text-gray-500">{place.address}</p>
+                                                </div>
+                                                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-bold uppercase tracking-tighter">Seç</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                     {/* Temel Bilgiler */}
                     <div className="card">
                         <h2 className="text-xl font-semibold text-gray-900 mb-4">Temel Bilgiler</h2>
