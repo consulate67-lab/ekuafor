@@ -29,16 +29,9 @@ export default function AppointmentManagement() {
     // Tarih formatlama yardımcısı (Timezone sorunlarını önlemek için)
     const formatDateKey = (dateStr: any) => {
         if (!dateStr) return '';
-        try {
-            const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return '';
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        } catch (e) {
-            return '';
-        }
+        // Date nesnesi veya ISO dizesi gelirse YYYY-MM-DD kısmını al
+        const str = typeof dateStr === 'string' ? dateStr : dateStr.toISOString();
+        return str.split('T')[0];
     };
 
     const getLocalDateString = () => {
@@ -68,15 +61,22 @@ export default function AppointmentManagement() {
 
             // 2. Get Appointments & Services separately
             try {
-                const appResponse = await api.get('/appointments');
-                setAppointments(appResponse.data?.data || []);
+                // EXPLICIT company_id for Super Admins/Updated Users
+                const appResponse = await api.get('/appointments', {
+                    params: { company_id: companyId }
+                });
+                const fetchedApps = appResponse.data?.data || [];
+                console.log(`[AppointmentManagement] Fetched ${fetchedApps.length} appointments for company ${companyId}`);
+                setAppointments(fetchedApps);
             } catch (err) {
                 console.warn('Appointments fetch failed', err);
                 setAppointments([]);
             }
 
             try {
-                const svcResponse = await api.get('/services');
+                const svcResponse = await api.get('/services', {
+                    params: { company_id: companyId }
+                });
                 setServices(svcResponse.data?.data || []);
             } catch (err) {
                 console.warn('Services fetch failed', err);
