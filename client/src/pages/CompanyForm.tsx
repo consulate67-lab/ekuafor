@@ -377,6 +377,12 @@ export default function CompanyForm() {
                                 </button>
                             </div>
 
+                            {mapSearchQuery.length >= 3 && mapResults.length === 0 && !isSearchingMaps && (
+                                <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-100 text-amber-700 text-sm font-medium">
+                                    🔍 Aradığınız kriterlere uygun işletme bulunamadı. Lütfen daha genel bir isim veya Google Maps üzerindeki tam ismini deneyin.
+                                </div>
+                            )}
+
                             {mapResults.length > 0 && (
                                 <div className="mt-4 space-y-2 max-h-60 overflow-y-auto bg-white rounded-xl border border-emerald-100 shadow-inner p-2 cursor-default">
                                     {mapResults.map((place) => (

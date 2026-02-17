@@ -80,8 +80,8 @@ class GoogleMapsService {
     }
 
     private getMockData(query: string): MapsBusiness[] {
-        // Fallback for demonstration when no API key is provided
-        const mocks = [
+        // Genişletilmiş örnek veriler (API Key yoksa çalışır)
+        const mocks: MapsBusiness[] = [
             {
                 name: "Gold Güzellik Merkezi",
                 address: "Atatürk Blv. No:123, Çankaya/Ankara",
@@ -97,9 +97,39 @@ class GoogleMapsService {
                 latitude: 39.9167,
                 longitude: 32.8250,
                 place_id: "mock_2"
+            },
+            {
+                name: "Nurten Bayan Kuaförü",
+                address: "Kızılay Karanfil Sokak No:12, Ankara",
+                phone: "0312 417 00 33",
+                latitude: 39.9195,
+                longitude: 32.8530,
+                place_id: "mock_3"
+            },
+            {
+                name: "Elegance Salon",
+                address: "Nişantaşı Vali Konağı Cad. No:88, İstanbul",
+                phone: "0212 233 00 44",
+                latitude: 41.0515,
+                longitude: 28.9910,
+                place_id: "mock_4"
+            },
+            {
+                name: "Pırlanta Güzellik Salonu",
+                address: "Alsancak Gül Sokak No:5, İzmir",
+                phone: "0232 421 00 55",
+                latitude: 38.4350,
+                longitude: 27.1420,
+                place_id: "mock_5"
             }
         ];
-        return mocks.filter(m => m.name.toLowerCase().includes(query.toLowerCase()) || query.length < 3);
+
+        const q = query.toLowerCase();
+        return mocks.filter(m =>
+            m.name.toLowerCase().includes(q) ||
+            m.address.toLowerCase().includes(q) ||
+            q.length < 3
+        );
     }
 }
 
