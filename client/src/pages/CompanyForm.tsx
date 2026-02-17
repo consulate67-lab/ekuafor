@@ -85,13 +85,14 @@ export default function CompanyForm() {
         is_active: false,
     });
 
-    // Map results
+    // Arama ve Konum Durumları
     const [mapSearchQuery, setMapSearchQuery] = useState('');
     const [mapResults, setMapResults] = useState<any[]>([]);
     const [isSearchingMaps, setIsSearchingMaps] = useState(false);
+    const [userCoords, setUserCoords] = useState<{ lat: number, lng: number } | null>(null);
 
     const [mapPosition, setMapPosition] = useState<LatLng | null>(
-        new LatLng(39.9334, 32.8597) // Ankara default
+        new LatLng(39.9334, 32.8597)
     );
     const [mapCenter, setMapCenter] = useState<LatLng>(new LatLng(39.9334, 32.8597));
 
@@ -104,10 +105,13 @@ export default function CompanyForm() {
 
         setIsSearchingMaps(true);
         try {
-            // Include current map position or geolocation for better results
+            // Priority: 1. User's live coords, 2. Map position, 3. None
             let url = `/maps/search?q=${encodeURIComponent(query)}`;
-            if (mapPosition) {
-                url += `&lat=${mapPosition.lat}&lng=${mapPosition.lng}`;
+            const biasLat = userCoords?.lat || mapPosition?.lat;
+            const biasLng = userCoords?.lng || mapPosition?.lng;
+
+            if (biasLat && biasLng) {
+                url += `&lat=${biasLat}&lng=${biasLng}`;
             }
             const response = await api.get(url);
             setMapResults(response.data.data);
@@ -171,10 +175,12 @@ export default function CompanyForm() {
                         const newPos = new LatLng(position.coords.latitude, position.coords.longitude);
                         setMapPosition(newPos);
                         setMapCenter(newPos);
+                        setUserCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
                     },
                     (error) => {
-                        console.warn('Konum alınamadı:', error.message);
-                    }
+                        console.warn('Konum alınamadı (Varsayılan Ankara kullanılacak):', error.message);
+                    },
+                    { enableHighAccuracy: true }
                 );
             }
         }
