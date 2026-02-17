@@ -95,12 +95,21 @@ export default function CompanyForm() {
     );
     const [mapCenter, setMapCenter] = useState<LatLng>(new LatLng(39.9334, 32.8597));
 
-    const handleMapSearch = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!mapSearchQuery.trim()) return;
+    const handleMapSearch = async (queryOverride?: string) => {
+        const query = queryOverride || mapSearchQuery;
+        if (!query.trim() || query.length < 3) {
+            setMapResults([]);
+            return;
+        }
+
         setIsSearchingMaps(true);
         try {
-            const response = await api.get(`/maps/search?q=${encodeURIComponent(mapSearchQuery)}`);
+            // Include current map position or geolocation for better results
+            let url = `/maps/search?q=${encodeURIComponent(query)}`;
+            if (mapPosition) {
+                url += `&lat=${mapPosition.lat}&lng=${mapPosition.lng}`;
+            }
+            const response = await api.get(url);
             setMapResults(response.data.data);
         } catch (err) {
             console.error('Harita arama hatası:', err);
@@ -108,6 +117,19 @@ export default function CompanyForm() {
             setIsSearchingMaps(false);
         }
     };
+
+    // Debounced search for typing
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (mapSearchQuery.length >= 3) {
+                handleMapSearch();
+            } else {
+                setMapResults([]);
+            }
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [mapSearchQuery]);
 
     const handleSelectPlace = async (place: any) => {
         try {
@@ -343,11 +365,11 @@ export default function CompanyForm() {
                                     onChange={(e) => setMapSearchQuery(e.target.value)}
                                     placeholder="Örn: Karizma Kuaför Ankara"
                                     className="input-field flex-1"
-                                    onKeyDown={(e) => e.key === 'Enter' && handleMapSearch(e)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleMapSearch()}
                                 />
                                 <button
                                     type="button"
-                                    onClick={handleMapSearch}
+                                    onClick={() => handleMapSearch()}
                                     disabled={isSearchingMaps}
                                     className="bg-emerald-600 text-white px-6 rounded-xl font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50"
                                 >

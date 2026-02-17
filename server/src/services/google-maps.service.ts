@@ -18,7 +18,7 @@ class GoogleMapsService {
         this.apiKey = process.env.GOOGLE_MAPS_API_KEY;
     }
 
-    async searchBusinesses(query: string): Promise<MapsBusiness[]> {
+    async searchBusinesses(query: string, lat?: number, lng?: number): Promise<MapsBusiness[]> {
         if (!this.apiKey) {
             console.warn('[GoogleMapsService] API Key is missing. Returning mock data.');
             return this.getMockData(query);
@@ -26,7 +26,12 @@ class GoogleMapsService {
 
         try {
             // 1. Search for places
-            const searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${this.apiKey}&language=tr`;
+            let searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${this.apiKey}&language=tr`;
+
+            if (lat && lng) {
+                // Add location bias (radius in meters)
+                searchUrl += `&location=${lat},${lng}&radius=50000`;
+            }
             const searchResponse = await axios.get(searchUrl);
 
             if (searchResponse.data.status !== 'OK' && searchResponse.data.status !== 'ZERO_RESULTS') {
