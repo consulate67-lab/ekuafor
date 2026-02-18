@@ -141,20 +141,8 @@ export default function BookingPage() {
         const [startH, startM] = (company.work_start_time || '09:00').split(':').map(Number);
         const [endH, endM] = (company.work_end_time || '20:00').split(':').map(Number);
 
-        let startTime = startH * 60 + startM;
-        const endTime = endH * 60 + endM;
-
-        // TODAY CHECK: If today is selected, start from current time + 30 mins
-        const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
-        if (selection.date === today) {
-            const now = new Date();
-            const currentMin = now.getHours() * 60 + now.getMinutes() + 30; // 30 min buffer
-            if (currentMin > startTime) {
-                startTime = Math.ceil(currentMin / 30) * 30; // Round to next 30 min slot
-            }
-        }
-
-        const slots: string[] = [];
+        let workBegin = startH * 60 + startM;
+        const workEnd = endH * 60 + endM;
 
         // Find existing appointments for selected staff and date
         const staffApps = appointments.filter(a =>
@@ -164,24 +152,41 @@ export default function BookingPage() {
             a.appointment_date === selection.date
         );
 
-        // Simple collision detection
-        for (let time = startTime; time <= endTime - duration; time += 30) {
+        const now = new Date();
+        const todayStr = now.toLocaleDateString('en-CA'); // YYYY-MM-DD
+        const currentMin = now.getHours() * 60 + now.getMinutes();
+
+        const slots: { time: string; isAvailable: boolean }[] = [];
+
+        // Generate 30-min slots within working hours
+        for (let time = workBegin; time <= workEnd - duration; time += 30) {
             const slotEnd = time + duration;
+            const h = Math.floor(time / 60);
+            const m = time % 60;
+            const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
-            const isBusy = staffApps.some(app => {
-                const [asH, asM] = app.start_time.split(':').map(Number);
-                const [aeH, aeM] = app.end_time.split(':').map(Number);
-                const appStart = asH * 60 + asM;
-                const appEnd = aeH * 60 + aeM;
+            let isAvailable = true;
 
-                return (time < appEnd && slotEnd > appStart); // Overlap condition
-            });
-
-            if (!isBusy) {
-                const h = Math.floor(time / 60);
-                const m = time % 60;
-                slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+            // 1. Past Time Check (If today)
+            if (selection.date === todayStr && time < currentMin + 15) {
+                isAvailable = false;
             }
+
+            // 2. Collision Check with staff appointments
+            if (isAvailable) {
+                const isBusy = staffApps.some(app => {
+                    const [asH, asM] = app.start_time.split(':').map(Number);
+                    const [aeH, aeM] = app.end_time.split(':').map(Number);
+                    const appStart = asH * 60 + asM;
+                    const appEnd = aeH * 60 + aeM;
+
+                    // Standard overlap logic: slot starts before app ends AND slot ends after app starts
+                    return (time < appEnd && slotEnd > appStart);
+                });
+                if (isBusy) isAvailable = false;
+            }
+
+            slots.push({ time: timeStr, isAvailable });
         }
         return slots;
     };
@@ -373,20 +378,24 @@ export default function BookingPage() {
                         <button onClick={handleBack} className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 hover:text-gray-600">← Geri</button>
                         <h2 className="text-2xl font-black text-gray-900 mb-6">Saat Seçimi</h2>
                         <div className="grid grid-cols-3 gap-3">
-                            {generateTimeSlots().length > 0 ? generateTimeSlots().map(t => (
+                            {generateTimeSlots().length > 0 ? generateTimeSlots().map(slot => (
                                 <button
-                                    key={t}
+                                    key={slot.time}
+                                    disabled={!slot.isAvailable}
                                     onClick={() => {
-                                        setSelection({ ...selection, time: t });
+                                        setSelection({ ...selection, time: slot.time });
                                         handleNext();
                                     }}
-                                    className="py-3 bg-white rounded-xl border border-gray-100 font-bold text-gray-700 hover:bg-[#1e1b4b] hover:text-white hover:border-[#1e1b4b] transition-all shadow-sm"
+                                    className={`py-3 rounded-xl border font-bold transition-all shadow-sm ${slot.isAvailable
+                                        ? 'bg-white border-gray-100 text-[#1e1b4b] hover:bg-[#1e1b4b] hover:text-white hover:border-[#1e1b4b]'
+                                        : 'bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed opacity-60'
+                                        }`}
                                 >
-                                    {t}
+                                    {slot.time}
                                 </button>
                             )) : (
                                 <div className="col-span-3 text-center py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                                    <p className="text-gray-400 font-bold">Uygun saat bulunamadı.</p>
+                                    <p className="text-gray-400 font-bold">Bu tarih için çalışma saatleri dışında kalıyor.</p>
                                 </div>
                             )}
                         </div>
