@@ -108,7 +108,7 @@ export default function BookingPage() {
 
                 // 4. Appointments
                 try {
-                    const today = new Date().toISOString().split('T')[0];
+                    const today = new Date().toLocaleDateString('en-CA');
                     const appsRes = await api.get('/appointments', {
                         params: {
                             company_id: id,
@@ -138,7 +138,7 @@ export default function BookingPage() {
         const service = services.find(s => s.id === selection.serviceId);
         const duration = service?.duration_minutes || 30;
 
-        const [startH, startM] = (company.work_start_time || '09:00').split(':').map(Number);
+        const [startH, startM] = (company.work_start_time || '08:00').split(':').map(Number);
         const [endH, endM] = (company.work_end_time || '20:00').split(':').map(Number);
 
         let workBegin = startH * 60 + startM;
@@ -468,7 +468,7 @@ export default function BookingPage() {
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
                         <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse"></div>
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">ID: {id} | Staff: {staff.length} | Svc: {services.length} | v1.43</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">ID: {id} | Staff: {staff.length} | Svc: {services.length} | v1.7.0</span>
                     </div>
                 </div>
             </div>
