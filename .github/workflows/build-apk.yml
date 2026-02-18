@@ -28,7 +28,8 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          npm install --workspace=client
+          cd client
+          npm install
 
       - name: Build Web Project
         run: |
@@ -42,7 +43,7 @@ jobs:
         run: |
           cd client
           # Ensure dist exists
-          mkdir -p dist
+          if [ ! -d "dist" ]; then mkdir dist; fi
           npx cap sync android
 
       - name: Build Android APK
