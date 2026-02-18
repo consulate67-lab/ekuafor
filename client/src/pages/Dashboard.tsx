@@ -23,10 +23,11 @@ export default function Dashboard() {
                 }
             } else if (user?.role === 'company_admin' || user?.role === 'staff') {
                 try {
+                    const todayStr = new Date().toISOString().split('T')[0];
                     // Safe fetch for appointments
                     let appointments: any[] = [];
                     try {
-                        const appointmentsRes = await api.get('/appointments');
+                        const appointmentsRes = await api.get('/appointments', { params: { start_date: todayStr } });
                         appointments = appointmentsRes.data?.data || [];
                     } catch (e) {
                         console.warn('Appointments fetch failed', e);
@@ -40,8 +41,6 @@ export default function Dashboard() {
                     } catch (e) {
                         console.warn('Services fetch failed', e);
                     }
-
-                    const todayStr = new Date().toISOString().split('T')[0];
 
                     // Active Appointments (Today's pending or approved)
                     const activeApps = appointments.filter(a =>
@@ -232,7 +231,7 @@ export default function Dashboard() {
                         Sistemi Sıfırla
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Dashboard v1.35 | {user?.role}</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Dashboard v1.36 | {user?.role}</span>
                     </div>
                 </div>
             </main>

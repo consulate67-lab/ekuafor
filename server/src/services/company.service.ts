@@ -149,6 +149,9 @@ class CompanyService {
         is_active?: boolean;
         is_verified?: boolean;
         search?: string;
+        lat?: number;
+        lng?: number;
+        radius?: number; // in km
     }): Promise<Company[]> {
         let query = 'SELECT * FROM companies WHERE 1=1';
         const values: any[] = [];
@@ -167,9 +170,24 @@ class CompanyService {
         }
 
         if (filters?.search) {
-            query += ` AND (name ILIKE $${paramIndex} OR email ILIKE $${paramIndex})`;
+            query += ` AND (name ILIKE $${paramIndex} OR email ILIKE $${paramIndex} OR province_name ILIKE $${paramIndex} OR district_name ILIKE $${paramIndex})`;
             values.push(`%${filters.search}%`);
             paramIndex++;
+        }
+
+        // Spatial filtering (Haversine formula)
+        if (filters?.lat && filters?.lng && filters?.radius) {
+            // Earth radius: 6371 km
+            // Use bounding box first for optimization if possible, but for simple use just Haversine
+            query += ` AND (
+                6371 * acos(
+                    cos(radians($${paramIndex})) * cos(radians(latitude)) * 
+                    cos(radians(longitude) - radians($${paramIndex + 1})) + 
+                    sin(radians($${paramIndex})) * sin(radians(latitude))
+                )
+            ) <= $${paramIndex + 2}`;
+            values.push(filters.lat, filters.lng, filters.radius);
+            paramIndex += 3;
         }
 
         query += ' ORDER BY created_at DESC';

@@ -89,7 +89,10 @@ router.get('/', async (req: Request, res: Response) => {
         const filters = {
             is_active: req.query.is_active === 'true' ? true : req.query.is_active === 'false' ? false : undefined,
             is_verified: req.query.is_verified === 'true' ? true : req.query.is_verified === 'false' ? false : undefined,
-            search: req.query.search as string | undefined
+            search: req.query.search as string | undefined,
+            lat: req.query.lat ? parseFloat(req.query.lat as string) : undefined,
+            lng: req.query.lng ? parseFloat(req.query.lng as string) : undefined,
+            radius: req.query.radius ? parseFloat(req.query.radius as string) : undefined
         };
 
         const companies = await companyService.getAllCompanies(filters);

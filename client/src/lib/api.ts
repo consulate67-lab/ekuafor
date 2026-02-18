@@ -2,13 +2,19 @@ import axios from 'axios';
 
 let baseUrl = import.meta.env.VITE_API_URL;
 
-// Akıllı Otomatik Bağlantı: Canlıda mıyız?
-if (!baseUrl && window.location.hostname.includes('github.io')) {
-    baseUrl = 'https://web-production-db847.up.railway.app/api';
-}
+// Akıllı Otomatik Bağlantı: Neredeyiz?
+const isGitHubPages = window.location.hostname.includes('github.io');
+const isMobile = window.location.protocol === 'capacitor:' || window.location.hostname === 'localhost' && !isGitHubPages;
 
-// Varsayılan (Yerel) Değer
-baseUrl = baseUrl || 'http://localhost:3000/api';
+if (!baseUrl) {
+    if (isGitHubPages || isMobile) {
+        // Canlıda veya Mobilde üretim sunucusunu kullan
+        baseUrl = 'https://web-production-db847.up.railway.app/api';
+    } else {
+        // Sadece yerel geliştirmede localhost
+        baseUrl = 'http://localhost:3000/api';
+    }
+}
 
 // Debug logging
 console.log('--- Saloon API Connection ---');

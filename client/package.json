@@ -9,11 +9,19 @@
         "build": "tsc && vite build",
         "preview": "vite preview",
         "predeploy": "npm run build",
-        "deploy": "gh-pages -d dist"
+        "deploy": "gh-pages -d dist",
+        "mobile:sync": "cross-env VITE_BASE=/ npm run build && npx cap sync",
+        "mobile:open:android": "npx cap open android",
+        "mobile:open:ios": "npx cap open ios"
     },
     "dependencies": {
+        "@capacitor/android": "^8.1.0",
+        "@capacitor/cli": "^8.1.0",
+        "@capacitor/core": "^8.1.0",
+        "@capacitor/ios": "^8.1.0",
         "@hookform/resolvers": "^3.3.4",
         "axios": "^1.6.5",
+        "cross-env": "^10.1.0",
         "leaflet": "^1.9.4",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",

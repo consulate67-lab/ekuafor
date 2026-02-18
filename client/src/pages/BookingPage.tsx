@@ -87,7 +87,13 @@ export default function BookingPage() {
 
                 // 4. Appointments
                 try {
-                    const appsRes = await api.get('/appointments', { params: { company_id: id } });
+                    const today = new Date().toISOString().split('T')[0];
+                    const appsRes = await api.get('/appointments', {
+                        params: {
+                            company_id: id,
+                            start_date: today
+                        }
+                    });
                     setAppointments(appsRes.data?.data || []);
                 } catch (e) {
                     console.error('Failed to load appointments', e);

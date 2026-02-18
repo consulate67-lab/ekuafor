@@ -13,42 +13,78 @@ export default function CustomerHome() {
     const [distanceLimit, setDistanceLimit] = useState(50);
     const [showSlider, setShowSlider] = useState(false);
 
+    const fetchData = async (query?: string, loc?: { lat: number, lng: number } | null, dist?: number) => {
+        try {
+            const params: any = { is_active: true, is_verified: true };
+            if (query) params.search = query;
+            if (loc && (showSlider || dist)) {
+                params.lat = loc.lat;
+                params.lng = loc.lng;
+                params.radius = dist || distanceLimit;
+            }
+
+            const res = await api.get('/companies', { params });
+            const allCompanies = res.data.data;
+            setCompanies(allCompanies);
+
+            // Client-side distance calculation for DISPLAY only
+            const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+                const R = 6371;
+                const dLat = (lat2 - lat1) * Math.PI / 180;
+                const dLon = (lon2 - lon1) * Math.PI / 180;
+                const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                return R * c;
+            };
+
+            const resultWithDistance = allCompanies.map((c: Company) => {
+                let distance = undefined;
+                if (loc) {
+                    distance = calculateDistance(loc.lat, loc.lng, c.latitude || 41.0082, c.longitude || 28.9784);
+                }
+                return { ...c, distance };
+            });
+
+            if (loc) {
+                resultWithDistance.sort((a: any, b: any) => (a.distance || 0) - (b.distance || 0));
+            }
+
+            setFilteredCompanies(resultWithDistance);
+        } catch (err) {
+            console.error('Failed to fetch companies', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
         const savedFavs = localStorage.getItem('saloon_favorites');
         if (savedFavs) {
             setFavorites(JSON.parse(savedFavs));
         }
 
-        const fetchData = async () => {
-            try {
-                const res = await api.get('/companies');
-                const allCompanies = res.data.data;
-                setCompanies(allCompanies);
+        const initialFetch = async () => {
+            // First display all
+            await fetchData();
 
-                // Proactively try to get location
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                            const { latitude, longitude } = position.coords;
-                            const newLoc = { lat: latitude, lng: longitude };
-                            setLocation(newLoc);
-                            applyFilters(searchQuery, newLoc, distanceLimit, allCompanies);
-                        },
-                        () => {
-                            // If location fails, show all
-                            setFilteredCompanies(allCompanies);
-                        }
-                    );
-                } else {
-                    setFilteredCompanies(allCompanies);
-                }
-            } catch (err) {
-                console.error('Failed to fetch companies', err);
-            } finally {
-                setLoading(false);
+            // Then try location
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        const newLoc = { lat: latitude, lng: longitude };
+                        setLocation(newLoc);
+                        // Update with distance sorting
+                        fetchData(searchQuery, newLoc, distanceLimit);
+                    },
+                    (err) => console.log('Geolocation fail', err),
+                    { timeout: 10000 }
+                );
             }
         };
-        fetchData();
+        initialFetch();
     }, []);
 
     const toggleFavorite = (e: React.MouseEvent, id: number) => {
@@ -65,46 +101,6 @@ export default function CustomerHome() {
         localStorage.setItem('saloon_favorites', JSON.stringify(newFavs));
     };
 
-    const applyFilters = (query: string, loc: { lat: number, lng: number } | null, dist: number, dataOverride?: Company[]) => {
-        const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-            const R = 6371;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c;
-        };
-
-        const targetData = dataOverride || companies;
-        const lowerQuery = query.toLowerCase();
-
-        const result = targetData.map(c => {
-            let distance = undefined;
-            if (loc) {
-                distance = calculateDistance(loc.lat, loc.lng, c.latitude || 41.0082, c.longitude || 28.9784);
-            }
-            return { ...c, distance };
-        }).filter(c => {
-            const matchesSearch = !lowerQuery ||
-                c.name.toLowerCase().includes(lowerQuery) ||
-                (c.province_name && c.province_name.toLowerCase().includes(lowerQuery)) ||
-                (c.district_name && c.district_name.toLowerCase().includes(lowerQuery));
-
-            const matchesDistance = !loc || (c.distance !== undefined && c.distance <= dist);
-
-            return matchesSearch && matchesDistance;
-        });
-
-        // Sort by distance if location exists
-        if (loc) {
-            result.sort((a, b) => (a.distance || 0) - (b.distance || 0));
-        }
-
-        setFilteredCompanies(result);
-    };
-
     const handleGetLocation = () => {
         if (!navigator.geolocation) {
             alert('Tarayıcınız konum özelliğini desteklemiyor.');
@@ -117,7 +113,7 @@ export default function CustomerHome() {
                 const newLoc = { lat: latitude, lng: longitude };
                 setLocation(newLoc);
                 setShowSlider(true);
-                applyFilters(searchQuery, newLoc, distanceLimit);
+                fetchData(searchQuery, newLoc, distanceLimit);
             },
             () => {
                 alert('Konum izni verilmedi.');
@@ -127,12 +123,12 @@ export default function CustomerHome() {
 
     const handleSearch = (query: string) => {
         setSearchQuery(query);
-        applyFilters(query, location, distanceLimit);
+        fetchData(query, location, distanceLimit);
     };
 
     const handleDistanceChange = (val: number) => {
         setDistanceLimit(val);
-        applyFilters(searchQuery, location, val);
+        fetchData(searchQuery, location, val);
     };
 
     const openMaps = (e: React.MouseEvent, c: Company) => {

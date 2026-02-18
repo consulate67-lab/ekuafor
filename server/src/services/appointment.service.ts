@@ -95,8 +95,8 @@ class AppointmentService {
         }
     }
 
-    async getAppointmentsByCompany(companyId: number, status?: string, staffId?: number): Promise<Appointment[]> {
-        console.log(`[Service] getAppointmentsByCompany: ID=${companyId}, Status=${status}, Staff=${staffId}`);
+    async getAppointmentsByCompany(companyId: number, status?: string, staffId?: number, startDate?: string, endDate?: string): Promise<Appointment[]> {
+        console.log(`[Service] getAppointmentsByCompany: ID=${companyId}, Status=${status}, Staff=${staffId}, StartDate=${startDate}, EndDate=${endDate}`);
         let query = `
       SELECT a.*, s.name as service_name, u.first_name || ' ' || u.last_name as customer_name
       FROM appointments a
@@ -116,6 +116,16 @@ class AppointmentService {
         if (staffId) {
             query += ` AND (a.staff_id = $${paramIndex} OR a.staff_id IS NULL)`;
             values.push(staffId);
+            paramIndex++;
+        }
+
+        if (startDate && endDate) {
+            query += ` AND a.appointment_date BETWEEN $${paramIndex} AND $${paramIndex + 1}`;
+            values.push(startDate, endDate);
+            paramIndex += 2;
+        } else if (startDate) {
+            query += ` AND a.appointment_date >= $${paramIndex}`;
+            values.push(startDate);
             paramIndex++;
         }
 

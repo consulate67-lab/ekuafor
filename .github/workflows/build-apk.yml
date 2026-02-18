@@ -1,0 +1,59 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch: # Manuel tetikleme için
+  push:
+    branches: [ main ]
+    paths:
+      - 'client/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'zulu'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install Dependencies
+        run: |
+          cd client
+          npm install
+
+      - name: Build Web Project
+        run: |
+          cd client
+          export VITE_BASE=/
+          npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+
+      - name: Capacitor Sync
+        run: |
+          cd client
+          npx cap sync android
+
+      - name: Build Android APK
+        run: |
+          cd client/android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: saloon-app-debug
+          path: client/android/app/build/outputs/apk/debug/app-debug.apk

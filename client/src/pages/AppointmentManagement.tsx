@@ -61,9 +61,16 @@ export default function AppointmentManagement() {
 
             // 2. Get Appointments & Services separately
             try {
+                // Optimize: Get from beginning of current month to show dots in mini-calendar
+                const now = new Date();
+                const firstDayOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+
                 // EXPLICIT company_id for Super Admins/Updated Users
                 const appResponse = await api.get('/appointments', {
-                    params: { company_id: companyId }
+                    params: {
+                        company_id: companyId,
+                        start_date: firstDayOfMonth
+                    }
                 });
                 const fetchedApps = appResponse.data?.data || [];
                 console.log(`[AppointmentManagement] Fetched ${fetchedApps.length} appointments for company ${companyId}`);
