@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import { Company } from '../types';
+import { Geolocation } from '@capacitor/geolocation';
 
 export default function CustomerHome() {
     const [companies, setCompanies] = useState<Company[]>([]);
@@ -69,19 +70,15 @@ export default function CustomerHome() {
             // First display all
             await fetchData();
 
-            // Then try location
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const { latitude, longitude } = position.coords;
-                        const newLoc = { lat: latitude, lng: longitude };
-                        setLocation(newLoc);
-                        // Update with distance sorting
-                        fetchData(searchQuery, newLoc, distanceLimit);
-                    },
-                    (err) => console.log('Geolocation fail', err),
-                    { timeout: 10000 }
-                );
+            // Then try location using Capacitor for better mobile support
+            try {
+                const position = await Geolocation.getCurrentPosition();
+                const { latitude, longitude } = position.coords;
+                const newLoc = { lat: latitude, lng: longitude };
+                setLocation(newLoc);
+                fetchData(searchQuery, newLoc, distanceLimit);
+            } catch (err) {
+                console.log('Geolocation fail', err);
             }
         };
         initialFetch();
@@ -101,24 +98,28 @@ export default function CustomerHome() {
         localStorage.setItem('saloon_favorites', JSON.stringify(newFavs));
     };
 
-    const handleGetLocation = () => {
-        if (!navigator.geolocation) {
-            alert('Tarayıcınız konum özelliğini desteklemiyor.');
-            return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                const newLoc = { lat: latitude, lng: longitude };
-                setLocation(newLoc);
-                setShowSlider(true);
-                fetchData(searchQuery, newLoc, distanceLimit);
-            },
-            () => {
-                alert('Konum izni verilmedi.');
+    const handleGetLocation = async () => {
+        try {
+            // Mobile devices need explicit permission check/request
+            const permission = await Geolocation.checkPermissions();
+            if (permission.location !== 'granted') {
+                const request = await Geolocation.requestPermissions();
+                if (request.location !== 'granted') {
+                    alert('Konum izni verilmedi.');
+                    return;
+                }
             }
-        );
+
+            const position = await Geolocation.getCurrentPosition();
+            const { latitude, longitude } = position.coords;
+            const newLoc = { lat: latitude, lng: longitude };
+            setLocation(newLoc);
+            setShowSlider(true);
+            fetchData(searchQuery, newLoc, distanceLimit);
+        } catch (err) {
+            console.error('Position error', err);
+            alert('Konum bilgisi alınamadı.');
+        }
     };
 
     const handleSearch = (query: string) => {
