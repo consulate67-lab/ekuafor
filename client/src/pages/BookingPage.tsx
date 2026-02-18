@@ -144,22 +144,14 @@ export default function BookingPage() {
         let workBegin = startH * 60 + startM;
         const workEnd = endH * 60 + endM;
 
-        // Find existing appointments for selected staff and date
-        const staffApps = appointments.filter(a =>
-            (a.staff_id === selection.staffId || !a.staff_id) &&
-            a.company_id === Number(id) &&
-            a.status !== 'cancelled' &&
-            a.appointment_date === selection.date
-        );
-
         const now = new Date();
-        const todayStr = now.toLocaleDateString('en-CA'); // YYYY-MM-DD
+        const todayStr = now.toLocaleDateString('en-CA');
         const currentMin = now.getHours() * 60 + now.getMinutes();
 
         const slots: { time: string; isAvailable: boolean }[] = [];
 
-        // Generate 30-min slots within working hours
-        for (let time = workBegin; time <= workEnd - duration; time += 30) {
+        // Corrected loop to include the very last possible slot ending at workEnd
+        for (let time = workBegin; time <= (workEnd - duration); time += 30) {
             const slotEnd = time + duration;
             const h = Math.floor(time / 60);
             const m = time % 60;
@@ -167,13 +159,21 @@ export default function BookingPage() {
 
             let isAvailable = true;
 
-            // 1. Past Time Check (If today)
-            if (selection.date === todayStr && time < currentMin + 15) {
+            // 1. Past Time Check (If today) - Strict 5 min buffer
+            if (selection.date === todayStr && time < currentMin + 5) {
                 isAvailable = false;
             }
 
             // 2. Collision Check with staff appointments
             if (isAvailable) {
+                // Find existing appointments for selected staff and date
+                const staffApps = appointments.filter(a =>
+                    (a.staff_id === selection.staffId || !a.staff_id) &&
+                    a.company_id === Number(id) &&
+                    a.status !== 'cancelled' &&
+                    a.appointment_date === selection.date
+                );
+
                 const isBusy = staffApps.some(app => {
                     const [asH, asM] = app.start_time.split(':').map(Number);
                     const [aeH, aeM] = app.end_time.split(':').map(Number);
@@ -388,7 +388,7 @@ export default function BookingPage() {
                                     }}
                                     className={`py-3 rounded-xl border font-bold transition-all shadow-sm ${slot.isAvailable
                                         ? 'bg-white border-gray-100 text-[#1e1b4b] hover:bg-[#1e1b4b] hover:text-white hover:border-[#1e1b4b]'
-                                        : 'bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed opacity-60'
+                                        : 'bg-transparent border-dashed border-gray-200 text-gray-300 cursor-not-allowed opacity-30 select-none'
                                         }`}
                                 >
                                     {slot.time}
