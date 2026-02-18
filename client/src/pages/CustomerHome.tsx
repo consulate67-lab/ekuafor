@@ -16,7 +16,7 @@ export default function CustomerHome() {
 
     const fetchData = async (query?: string, loc?: { lat: number, lng: number } | null, dist?: number) => {
         try {
-            const params: any = { is_active: true, is_verified: true };
+            const params: any = { is_active: true }; // Onay şartını şimdilik kaldırdık
             if (query) params.search = query;
             if (loc && (showSlider || dist)) {
                 params.lat = loc.lat;
