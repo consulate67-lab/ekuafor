@@ -41,7 +41,27 @@ export default function SalonBoard() {
         return colors[Math.abs(hash) % colors.length];
     };
 
-    const hours = Array.from({ length: 14 }, (_, i) => `${i + 8}:00`); // 08:00 to 21:00
+    const generateHours = () => {
+        if (!company) return Array.from({ length: 14 }, (_, i) => `${i + 8}:00`);
+
+        const [startH, startM] = (company.work_start_time || '08:00').split(':').map(Number);
+        const [endH, endM] = (company.work_end_time || '21:00').split(':').map(Number);
+        const interval = company.slot_interval || 60;
+
+        const hours = [];
+        let currentMin = startH * 60 + startM;
+        const endMin = endH * 60 + endM;
+
+        while (currentMin < endMin) {
+            const h = Math.floor(currentMin / 60);
+            const m = currentMin % 60;
+            hours.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+            currentMin += interval;
+        }
+        return hours;
+    };
+
+    const hours = generateHours();
 
     const fetchData = useCallback(async (compId: number, date?: string) => {
         try {
@@ -124,13 +144,20 @@ export default function SalonBoard() {
                 return;
             }
 
-            const endTimeHour = parseInt(startTime.split(':')[0]) + 1;
-            const endTime = `${endTimeHour}:00`;
+            const sId = fastForm.serviceId || (services[0]?.id || 1).toString();
+            const service = services.find(s => s.id === parseInt(sId));
+            const duration = service?.duration_minutes || company.slot_interval || 30;
+
+            const [sh, sm] = startTime.split(':').map(Number);
+            const endTotal = sh * 60 + sm + duration;
+            const eh = Math.floor(endTotal / 60);
+            const em = endTotal % 60;
+            const endTime = `${eh.toString().padStart(2, '0')}:${em.toString().padStart(2, '0')}`;
 
             await api.post('/appointments', {
                 company_id: company.id,
                 staff_id: parseInt(staffId.toString()),
-                service_id: fastForm.serviceId ? parseInt(fastForm.serviceId) : (services[0]?.id || 1),
+                service_id: parseInt(sId),
                 appointment_date: date,
                 start_time: startTime,
                 end_time: endTime,
@@ -333,12 +360,22 @@ export default function SalonBoard() {
                                         </td>
                                         {hours.map(hour => {
                                             const hNum = parseInt(hour.split(':')[0]);
-                                            const isCurrent = hNum === currentHour;
-                                            const isPast = hNum < currentHour;
+                                            const mNum = parseInt(hour.split(':')[1]);
+
+                                            // isCurrent logic needs update for minutes but for highlighting "NOW" simply using hour is approx okay.
+                                            // Or better:
+                                            const now = new Date();
+                                            const currentTotal = now.getHours() * 60 + now.getMinutes();
+                                            const [hh, mm] = hour.split(':').map(Number);
+                                            const slotTotal = hh * 60 + mm;
+                                            const nextSlotTotal = slotTotal + (company?.slot_interval || 60);
+
+                                            const isCurrent = currentTotal >= slotTotal && currentTotal < nextSlotTotal;
+                                            const isPast = currentTotal >= nextSlotTotal;
 
                                             const personApps = appointments.filter(a =>
                                                 Number(a.staff_id) === Number(pId) &&
-                                                parseInt(a.start_time.split(':')[0]) === hNum &&
+                                                a.start_time.startsWith(hour) && // Exact match "HH:MM"
                                                 a.status !== 'cancelled'
                                             );
 
