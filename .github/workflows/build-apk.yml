@@ -30,6 +30,8 @@ jobs:
         run: |
           cd client
           npm install
+          # Vite/Rollup için Linux ortamına özel eksik modülü zorla yükle
+          npm install @rollup/rollup-linux-x64-gnu
 
       - name: Build Web Project
         run: |
