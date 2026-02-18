@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -29,6 +29,9 @@ jobs:
       - name: Install Dependencies
         run: |
           cd client
+          # Windows kilit dosyası Linux'ta Rollup hatasına neden oluyor.
+          # Temiz bir başlangıç için siliyoruz.
+          rm -f package-lock.json
           npm install
 
       - name: Build Web Project
@@ -47,6 +50,7 @@ jobs:
       - name: Build Android APK
         run: |
           cd client/android
+          chmod +x gradlew
           ./gradlew assembleDebug
 
       - name: Upload APK
