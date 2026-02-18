@@ -345,7 +345,7 @@ export default function SalonBoard() {
                                             return (
                                                 <td
                                                     key={hour}
-                                                    className={`p-4 border-r border-slate-50 align-top cursor-cell hover:bg-slate-50/80 transition-all relative ${isCurrent ? 'bg-indigo-50/10' : ''} ${isPast ? 'bg-slate-50/20' : ''}`}
+                                                    className={`p-4 border-r border-slate-50 align-top transition-all relative ${isCurrent ? 'bg-indigo-50/10' : ''} ${isPast ? 'bg-slate-50/20' : 'cursor-cell hover:bg-slate-50/80'} ${(isPast && selectedDate === new Date().toISOString().split('T')[0] && personApps.length === 0) ? 'pointer-events-none' : ''}`}
                                                     onClick={() => {
                                                         const isToday = selectedDate === new Date().toISOString().split('T')[0];
                                                         if (isToday && isPast) return; // Geçmiş saatlere eklemeyi engelle
