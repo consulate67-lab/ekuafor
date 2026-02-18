@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import { Appointment, Service, Company, User } from '../types';
+import { App } from '@capacitor/app';
 
 export default function BookingPage() {
     const { id } = useParams<{ id: string }>();
@@ -17,6 +18,26 @@ export default function BookingPage() {
     // If staff param exists, start at step 2
     const initialStaffId = searchParams.get('staff') ? Number(searchParams.get('staff')) : null;
     const [step, setStep] = useState(initialStaffId ? 2 : 1);
+
+    // Android Hardware Back Button Support
+    useEffect(() => {
+        const backHandler = App.addListener('backButton', () => {
+            if (step > 1) {
+                // If we started with a staff param at step 2, don't go back to step 1
+                if (step === 2 && initialStaffId) {
+                    navigate(-1);
+                } else {
+                    setStep(prev => prev - 1);
+                }
+            } else {
+                navigate(-1);
+            }
+        });
+
+        return () => {
+            backHandler.then(h => h.remove());
+        };
+    }, [step, navigate, initialStaffId]);
 
     const [selection, setSelection] = useState<{
         staffId: number | null;
@@ -120,14 +141,24 @@ export default function BookingPage() {
         const [startH, startM] = (company.work_start_time || '09:00').split(':').map(Number);
         const [endH, endM] = (company.work_end_time || '20:00').split(':').map(Number);
 
-        const startTime = startH * 60 + startM;
+        let startTime = startH * 60 + startM;
         const endTime = endH * 60 + endM;
+
+        // TODAY CHECK: If today is selected, start from current time + 30 mins
+        const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+        if (selection.date === today) {
+            const now = new Date();
+            const currentMin = now.getHours() * 60 + now.getMinutes() + 30; // 30 min buffer
+            if (currentMin > startTime) {
+                startTime = Math.ceil(currentMin / 30) * 30; // Round to next 30 min slot
+            }
+        }
 
         const slots: string[] = [];
 
         // Find existing appointments for selected staff and date
         const staffApps = appointments.filter(a =>
-            (a.staff_id === selection.staffId || !a.staff_id) && // Assuming appointments are linked to staff or company
+            (a.staff_id === selection.staffId || !a.staff_id) &&
             a.company_id === Number(id) &&
             a.status !== 'cancelled' &&
             a.appointment_date === selection.date
@@ -201,7 +232,7 @@ export default function BookingPage() {
             <div className="flex flex-col gap-2 w-full max-w-xs">
                 <button
                     onClick={() => window.location.reload()}
-                    className="w-full bg-pink-600 text-white py-3 rounded-xl font-bold shadow-lg active:scale-95 transition-transform"
+                    className="w-full bg-[#1e1b4b] text-white py-3 rounded-xl font-bold shadow-lg active:scale-95 transition-transform"
                 >
                     Sayfayı Yenile
                 </button>
@@ -234,7 +265,7 @@ export default function BookingPage() {
                 {/* Progress Bar */}
                 <div className="flex gap-2 mb-8">
                     {[1, 2, 3, 4, 5].map(s => (
-                        <div key={s} className={`h-1 flex-1 rounded-full transition-colors duration-300 ${s <= step ? 'bg-pink-600' : 'bg-gray-200'}`}></div>
+                        <div key={s} className={`h-1 flex-1 rounded-full transition-colors duration-300 ${s <= step ? 'bg-[#b45309]' : 'bg-gray-200'}`}></div>
                     ))}
                 </div>
 
@@ -252,7 +283,7 @@ export default function BookingPage() {
                                     }}
                                     className="w-full bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-200 transition-all flex items-center gap-4 text-left"
                                 >
-                                    <div className="w-12 h-12 bg-pink-50 text-pink-600 rounded-full flex items-center justify-center font-bold text-lg">
+                                    <div className="w-12 h-12 bg-indigo-50 text-[#1e1b4b] rounded-full flex items-center justify-center font-bold text-lg">
                                         {u.first_name[0]}
                                     </div>
                                     <div>
@@ -301,7 +332,7 @@ export default function BookingPage() {
                                         <h3 className="font-bold text-gray-900">{s.name}</h3>
                                         <p className="text-xs text-gray-500">{s.duration_minutes} dakika</p>
                                     </div>
-                                    <div className="font-black text-pink-600">₺{s.price}</div>
+                                    <div className="font-black text-[#b45309]">₺{s.price}</div>
                                 </button>
                             ))}
                         </div>
@@ -326,7 +357,7 @@ export default function BookingPage() {
                         <button
                             disabled={!selection.date}
                             onClick={handleNext}
-                            className={`w-full py-4 rounded-xl font-black uppercase tracking-widest transition-all ${selection.date ? 'bg-pink-600 text-white shadow-lg' : 'bg-gray-100 text-gray-400'}`}
+                            className={`w-full py-4 rounded-xl font-black uppercase tracking-widest transition-all ${selection.date ? 'bg-[#1e1b4b] text-white shadow-lg' : 'bg-gray-100 text-gray-400'}`}
                         >
                             Devam Et
                         </button>
@@ -349,7 +380,7 @@ export default function BookingPage() {
                                         setSelection({ ...selection, time: t });
                                         handleNext();
                                     }}
-                                    className="py-3 bg-white rounded-xl border border-gray-100 font-bold text-gray-700 hover:bg-pink-600 hover:text-white hover:border-pink-600 transition-all shadow-sm"
+                                    className="py-3 bg-white rounded-xl border border-gray-100 font-bold text-gray-700 hover:bg-[#1e1b4b] hover:text-white hover:border-[#1e1b4b] transition-all shadow-sm"
                                 >
                                     {t}
                                 </button>
@@ -406,7 +437,7 @@ export default function BookingPage() {
                                     placeholder="Örn: 0555 555 55 55"
                                 />
                             </div>
-                            <button className="w-full btn-primary py-4 text-sm font-black uppercase tracking-widest shadow-xl shadow-pink-500/30 mt-4">
+                            <button className="w-full btn-primary py-4 text-sm font-black uppercase tracking-widest shadow-xl shadow-indigo-500/30 mt-4 rounded-xl">
                                 Randevuyu Onayla
                             </button>
                         </form>
