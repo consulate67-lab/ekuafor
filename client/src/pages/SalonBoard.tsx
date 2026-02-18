@@ -347,6 +347,9 @@ export default function SalonBoard() {
                                                     key={hour}
                                                     className={`p-4 border-r border-slate-50 align-top cursor-cell hover:bg-slate-50/80 transition-all relative ${isCurrent ? 'bg-indigo-50/10' : ''} ${isPast ? 'bg-slate-50/20' : ''}`}
                                                     onClick={() => {
+                                                        const isToday = selectedDate === new Date().toISOString().split('T')[0];
+                                                        if (isToday && isPast) return; // Geçmiş saatlere eklemeyi engelle
+
                                                         const pId = person.user_id || person.id;
                                                         setSelectedCell({ person, hour });
                                                         setFastForm({
@@ -361,7 +364,7 @@ export default function SalonBoard() {
                                                     }}
                                                 >
                                                     <div className={`space-y-2 min-h-[100px] transition-all ${isPast && personApps.length === 0 ? 'opacity-20' : ''}`}>
-                                                        {personApps.length === 0 && (
+                                                        {personApps.length === 0 && !(isPast && selectedDate === new Date().toISOString().split('T')[0]) && (
                                                             <div className="opacity-0 group-hover:opacity-100 flex items-center justify-center h-20 border-3 border-dashed border-slate-200 rounded-3xl text-[11px] text-slate-400 font-black uppercase tracking-widest transition-all bg-white shadow-sm">
                                                                 + Müsait
                                                             </div>
