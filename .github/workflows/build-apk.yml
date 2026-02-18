@@ -26,10 +26,9 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: |
-            cd client
-            npm ci || npm install # Try ci first, fallback to install
+          npm install --workspace=client
 
       - name: Build Web Project
         run: |
@@ -42,13 +41,15 @@ jobs:
       - name: Capacitor Sync
         run: |
           cd client
+          # Ensure dist exists
+          mkdir -p dist
           npx cap sync android
 
       - name: Build Android APK
         run: |
           cd client/android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
