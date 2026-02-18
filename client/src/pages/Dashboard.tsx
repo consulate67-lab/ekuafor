@@ -84,20 +84,19 @@ export default function Dashboard() {
             {/* Header */}
             <header className="bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-gray-100">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                    <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-pink-600 to-violet-600 flex items-center justify-center shadow-lg shadow-pink-500/20">
-                                <span className="text-white font-serif text-xl">S</span>
+                    <div className="relative flex justify-center items-center">
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-pink-600 to-violet-600 flex items-center justify-center shadow-lg shadow-pink-500/20">
+                                <span className="text-white font-serif text-lg">S</span>
                             </div>
-                            <h1 className="text-xl font-bold heading-serif hidden md:block">Saloon Yönetim Paneli</h1>
+                            <h1 className="text-lg font-black heading-serif text-gray-900 tracking-tight">Saloon Yönetim</h1>
                         </div>
-                        <div className="flex items-center gap-6">
-                            <div className="text-right hidden sm:block">
-                                <p className="text-sm font-bold text-gray-900 leading-none">{user?.first_name} {user?.last_name}</p>
-                                <p className="text-[10px] font-semibold text-pink-600 uppercase tracking-wider mt-1">{user?.role?.replace('_', ' ')}</p>
-                            </div>
-                            <button onClick={logout} className="btn-secondary py-2 px-4 text-xs font-bold border-gray-100">
-                                Çıkış Yap
+
+                        <div className="absolute right-0 flex items-center gap-3">
+                            <button onClick={logout} className="p-2 text-gray-400 hover:text-pink-600 transition-colors">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                </svg>
                             </button>
                         </div>
                     </div>
@@ -230,9 +229,6 @@ export default function Dashboard() {
                     >
                         Sistemi Sıfırla
                     </button>
-                    <div className="flex items-center gap-2 grayscale opacity-30">
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Dashboard v1.36 | {user?.role}</span>
-                    </div>
                 </div>
             </main>
 

@@ -58,8 +58,9 @@ function App() {
 
     return (
         <div className="relative min-h-screen">
-            <div className="fixed top-0 right-0 z-[9999] bg-pink-600 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg opacity-80 hover:opacity-100 pointer-events-none select-none shadow-md">
-                v1.69
+            <div className="fixed top-0 left-1/2 -translate-x-1/2 z-[9999] bg-pink-600/90 backdrop-blur-sm text-white text-[9px] font-black px-3 py-1 rounded-b-xl shadow-lg shadow-pink-500/20 pointer-events-none select-none tracking-widest uppercase flex items-center gap-1 border-x border-b border-white/20">
+                <span className="opacity-70">VER</span>
+                <span>1.69</span>
             </div>
             <Router basename={import.meta.env.BASE_URL}>
                 <Routes>

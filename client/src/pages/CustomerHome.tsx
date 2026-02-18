@@ -149,8 +149,8 @@ export default function CustomerHome() {
         <div className="min-h-screen bg-slate-50">
             {/* Header */}
             <header className="bg-white sticky top-0 z-30 shadow-sm">
-                <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
-                    <h1 className="text-xl font-bold text-gray-900 heading-serif">Saloon</h1>
+                <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-center">
+                    <h1 className="text-2xl font-black text-gray-900 heading-serif tracking-tight">Saloon</h1>
                 </div>
             </header>
 
