@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
@@ -30,8 +30,6 @@ jobs:
         run: |
           cd client
           npm install
-          # Vite/Rollup için Linux ortamına özel eksik modülü zorla yükle
-          npm install @rollup/rollup-linux-x64-gnu
 
       - name: Build Web Project
         run: |
@@ -44,15 +42,12 @@ jobs:
       - name: Capacitor Sync
         run: |
           cd client
-          # Ensure dist exists
-          if [ ! -d "dist" ]; then mkdir dist; fi
           npx cap sync android
 
       - name: Build Android APK
         run: |
           cd client/android
-          chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
