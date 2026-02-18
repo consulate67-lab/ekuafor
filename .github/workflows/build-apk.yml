@@ -28,11 +28,10 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          # Dengeleyici: Tüm kilit dosyalarını temizle (Windows kaynaklı çakışmayı önlemek için)
-          rm -f package-lock.json
-          rm -f client/package-lock.json
           cd client
-          npm install
+          # Ultra-clean: Her şeyi sil ve sıfırdan kur
+          rm -rf node_modules package-lock.json
+          npm install --include=optional
 
       - name: Build Web Project
         run: |
