@@ -25,21 +25,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: 'npm'
-          cache-dependency-path: client/package-lock.json
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
-          cd client
-          npm install
+            cd client
+            npm ci || npm install # Try ci first, fallback to install
 
       - name: Build Web Project
         run: |
           cd client
-          export VITE_BASE=/
           npm run build
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_BASE: /
 
       - name: Capacitor Sync
         run: |
