@@ -44,6 +44,9 @@ const companySchema = z.object({
     commission_rate: z.coerce.number().min(0).max(100).optional(),
     payment_enabled: z.boolean().optional(),
     board_key: z.string().optional(),
+    work_start_time: z.string().optional(),
+    work_end_time: z.string().optional(),
+    slot_interval: z.coerce.number().min(5).max(480).optional(),
 });
 
 /**

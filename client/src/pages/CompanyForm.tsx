@@ -508,6 +508,27 @@ export default function CompanyForm() {
                                     className="input-field"
                                 />
                             </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Randevu Aralığı (dk)
+                                </label>
+                                <select
+                                    name="slot_interval"
+                                    value={formData.slot_interval || 30}
+                                    onChange={(e) => setFormData(p => ({ ...p, slot_interval: Number(e.target.value) }))}
+                                    className="input-field"
+                                >
+                                    <option value={15}>15 dk</option>
+                                    <option value={20}>20 dk</option>
+                                    <option value={30}>30 dk</option>
+                                    <option value={40}>40 dk</option>
+                                    <option value={45}>45 dk</option>
+                                    <option value={60}>60 dk</option>
+                                    <option value={75}>75 dk</option>
+                                    <option value={90}>90 dk</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 

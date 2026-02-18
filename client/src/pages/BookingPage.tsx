@@ -150,8 +150,10 @@ export default function BookingPage() {
 
         const slots: { time: string; isAvailable: boolean }[] = [];
 
-        // Generate 30-min slots within working hours
-        for (let time = workBegin; time <= (workEnd - duration); time += 30) {
+        const slotInterval = company.slot_interval || 30;
+
+        // Generate slots based on company interval
+        for (let time = workBegin; time <= (workEnd - duration); time += slotInterval) {
             const slotEnd = time + duration;
             const h = Math.floor(time / 60);
             const m = time % 60;

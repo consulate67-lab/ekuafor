@@ -37,6 +37,9 @@ export interface Company {
     is_verified?: boolean;
     created_by?: number;
     board_key?: string;
+    work_start_time?: string;
+    work_end_time?: string;
+    slot_interval?: number;
 }
 
 class CompanyService {
@@ -55,8 +58,9 @@ class CompanyService {
           latitude, longitude,
           bank_name, bank_branch, iban, account_holder_name,
           commission_rate, payment_enabled,
-          is_active, is_verified, created_by, board_key
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+          is_active, is_verified, created_by, board_key, 
+          work_start_time, work_end_time, slot_interval
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
         RETURNING *
       `;
 
@@ -85,7 +89,10 @@ class CompanyService {
                 company.is_active !== false,
                 company.is_verified || false,
                 createdBy,
-                company.board_key || null
+                company.board_key || null,
+                company.work_start_time || '09:00',
+                company.work_end_time || '20:00',
+                company.slot_interval || 30
             ];
 
             const result = await client.query(query, values);

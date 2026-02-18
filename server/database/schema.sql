@@ -57,7 +57,13 @@ CREATE TABLE IF NOT EXISTS companies (
     
     -- Vergi Bilgileri
     tax_number VARCHAR(20),
+    tax_number VARCHAR(20),
     tax_office VARCHAR(100),
+
+    -- Çalışma Saatleri (Genel)
+    work_start_time VARCHAR(10) DEFAULT '08:00',
+    work_end_time VARCHAR(10) DEFAULT '20:00',
+    slot_interval INTEGER DEFAULT 30, -- Dakika cinsinden randevu aralığı
     
     -- Ödeme Ayarları
     commission_rate DECIMAL(5, 2) DEFAULT 0.00,

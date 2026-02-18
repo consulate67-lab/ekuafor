@@ -44,6 +44,7 @@ export interface Company {
     // Çalışma Saatleri
     work_start_time?: string;
     work_end_time?: string;
+    slot_interval?: number;
 
     // Durum
     is_active?: boolean;
