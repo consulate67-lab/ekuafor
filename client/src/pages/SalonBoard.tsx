@@ -148,16 +148,21 @@ export default function SalonBoard() {
         }
     };
 
-    const handleCancelAppointment = async (id: number) => {
-        if (!confirm('Bu randevuyu iptal etmek istediğinize emin misiniz?')) return;
+    const handleUpdateStatus = async (id: number, newStatus: string) => {
+        let msg = '';
+        if (newStatus === 'cancelled') msg = 'Bu randevuyu iptal etmek istediğinize emin misiniz?';
+        if (newStatus === 'approved') msg = 'Bu randevuyu onaylamak istiyor musunuz?';
+        if (newStatus === 'completed') msg = 'Bu randevuyu tamamlandı olarak işaretlemek istiyor musunuz?';
+
+        if (msg && !confirm(msg)) return;
 
         try {
             setLoading(true);
-            await api.patch(`/appointments/${id}/status`, { status: 'cancelled' });
+            await api.patch(`/appointments/${id}/status`, { status: newStatus });
             setIsDetailModalOpen(false);
             if (company?.id) fetchData(company.id);
         } catch (err: any) {
-            alert(err.response?.data?.error || 'Randevu iptal edilemedi');
+            alert(err.response?.data?.error || 'İşlem başarısız oldu');
         } finally {
             setLoading(false);
         }
@@ -580,20 +585,46 @@ export default function SalonBoard() {
                                 )}
                             </div>
 
-                            <div className="flex gap-4 mt-8">
-                                <button
-                                    onClick={() => handleCancelAppointment(selectedAppointment.id!)}
-                                    disabled={loading}
-                                    className="flex-1 bg-red-50 text-red-600 py-6 rounded-[2rem] font-black uppercase tracking-widest hover:bg-red-100 transition-all disabled:opacity-50"
-                                >
-                                    İptal Et
-                                </button>
-                                <button
-                                    onClick={() => setIsDetailModalOpen(false)}
-                                    className="flex-1 bg-slate-900 text-white py-6 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all"
-                                >
-                                    Kapat
-                                </button>
+                            <div className="flex flex-col gap-3 mt-8">
+                                <div className="flex gap-4">
+                                    {selectedAppointment.status === 'pending' && (
+                                        <button
+                                            onClick={() => handleUpdateStatus(selectedAppointment.id!, 'approved')}
+                                            disabled={loading}
+                                            className="flex-1 bg-emerald-500 text-white py-6 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-emerald-200 hover:bg-emerald-600 transition-all disabled:opacity-50"
+                                        >
+                                            Onayla
+                                        </button>
+                                    )}
+
+                                    {selectedAppointment.status === 'approved' && (
+                                        <button
+                                            onClick={() => handleUpdateStatus(selectedAppointment.id!, 'completed')}
+                                            disabled={loading}
+                                            className="flex-1 bg-indigo-600 text-white py-6 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all disabled:opacity-50"
+                                        >
+                                            Tamamla
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="flex gap-4">
+                                    {selectedAppointment.status !== 'cancelled' && selectedAppointment.status !== 'completed' && (
+                                        <button
+                                            onClick={() => handleUpdateStatus(selectedAppointment.id!, 'cancelled')}
+                                            disabled={loading}
+                                            className="flex-1 bg-red-50 text-red-600 py-6 rounded-[2rem] font-black uppercase tracking-widest hover:bg-red-100 transition-all disabled:opacity-50"
+                                        >
+                                            İptal Et
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setIsDetailModalOpen(false)}
+                                        className="flex-1 bg-slate-900 text-white py-6 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all"
+                                    >
+                                        Kapat
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
