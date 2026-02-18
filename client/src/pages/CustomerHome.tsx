@@ -50,11 +50,19 @@ export default function CustomerHome() {
                 return { ...c, distance };
             });
 
+            let finalResult = resultWithDistance;
+            // Eğer konum varsa ve mesafe filtresi aktifse eliyoruz
             if (loc) {
-                resultWithDistance.sort((a: any, b: any) => (a.distance || 0) - (b.distance || 0));
+                const threshold = dist || distanceLimit;
+                finalResult = resultWithDistance.filter((c: any) =>
+                    c.distance === undefined || c.distance <= threshold
+                );
+
+                // Yakından uzağa sıralıyoruz
+                finalResult.sort((a: any, b: any) => (a.distance || 0) - (b.distance || 0));
             }
 
-            setFilteredCompanies(resultWithDistance);
+            setFilteredCompanies(finalResult);
         } catch (err) {
             console.error('Failed to fetch companies', err);
         } finally {
