@@ -46,7 +46,7 @@ export default function SalonBoard() {
 
         const [startH, startM] = (company.work_start_time || '08:00').split(':').map(Number);
         const [endH, endM] = (company.work_end_time || '21:00').split(':').map(Number);
-        const interval = company.slot_interval || 60;
+        const interval = company.slot_interval || 30;
 
         const hours = [];
         let currentMin = startH * 60 + startM;
@@ -106,7 +106,15 @@ export default function SalonBoard() {
         const storedId = localStorage.getItem('salon_board_company_id');
         if (boardKey && storedId) {
             const compId = parseInt(storedId);
-            api.get(`/companies/${compId}`).then(res => setCompany(res.data.data));
+            api.get(`/companies/${compId}`).then(res => {
+                const cd = res.data.data;
+                console.log('[SalonBoard v1.7.3] Company:', JSON.stringify({
+                    work_start_time: cd?.work_start_time,
+                    work_end_time: cd?.work_end_time,
+                    slot_interval: cd?.slot_interval
+                }));
+                setCompany(cd);
+            });
             fetchData(compId);
 
             const interval = setInterval(() => {
@@ -359,8 +367,6 @@ export default function SalonBoard() {
                                             </div>
                                         </td>
                                         {hours.map(hour => {
-                                            const hNum = parseInt(hour.split(':')[0]);
-                                            const mNum = parseInt(hour.split(':')[1]);
 
                                             // isCurrent logic needs update for minutes but for highlighting "NOW" simply using hour is approx okay.
                                             // Or better:
@@ -440,7 +446,8 @@ export default function SalonBoard() {
                                                     </div>
                                                 </td>
                                             );
-                                        })}
+                                        })
+                                        }
                                     </tr>
                                 );
                             })}

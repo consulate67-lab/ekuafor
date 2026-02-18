@@ -75,6 +75,11 @@ export default function BookingPage() {
                 // ... fetch company details
                 const compRes = await api.get(`/companies/${id}`);
                 const companyData = compRes.data.data;
+                console.log('[BookingPage v1.7.3] Company data:', JSON.stringify({
+                    work_start_time: companyData.work_start_time,
+                    work_end_time: companyData.work_end_time,
+                    slot_interval: companyData.slot_interval
+                }));
                 setCompany(companyData);
 
                 // QR Auto-Favorite Logic
@@ -152,8 +157,8 @@ export default function BookingPage() {
 
         const slotInterval = company.slot_interval || 30;
 
-        // Generate slots based on company interval
-        for (let time = workBegin; time <= (workEnd - duration); time += slotInterval) {
+        // Generate slots up to end of working hours
+        for (let time = workBegin; time < workEnd; time += slotInterval) {
             const slotEnd = time + duration;
             const h = Math.floor(time / 60);
             const m = time % 60;
@@ -470,7 +475,7 @@ export default function BookingPage() {
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
                         <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse"></div>
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">ID: {id} | Staff: {staff.length} | Svc: {services.length} | v1.7.2</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">ID: {id} | Staff: {staff.length} | Svc: {services.length} | v1.7.3</span>
                     </div>
                 </div>
             </div>
