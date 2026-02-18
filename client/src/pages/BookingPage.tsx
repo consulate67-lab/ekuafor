@@ -111,13 +111,18 @@ export default function BookingPage() {
                     console.error('Failed to load employees', e);
                 }
 
-                // 4. Appointments
+                // 4. Appointments - fetch wider range so all selectable dates have data
                 try {
                     const today = new Date().toLocaleDateString('en-CA');
+                    // Fetch 60 days ahead to cover all bookable dates
+                    const futureDate = new Date();
+                    futureDate.setDate(futureDate.getDate() + 60);
+                    const endDate = futureDate.toLocaleDateString('en-CA');
                     const appsRes = await api.get('/appointments', {
                         params: {
                             company_id: id,
-                            start_date: today
+                            start_date: today,
+                            end_date: endDate
                         }
                     });
                     setAppointments(appsRes.data?.data || []);
@@ -157,12 +162,18 @@ export default function BookingPage() {
         const slotInterval = company.slot_interval || 30;
 
         // Get all appointments for this staff on this date
-        const staffApps = appointments.filter(a =>
-            (a.staff_id === selection.staffId || !a.staff_id) &&
-            a.company_id === Number(id) &&
-            a.status !== 'cancelled' &&
-            a.appointment_date === selection.date
-        );
+        // Normalize: appointment_date from DB may be ISO "2026-02-19T00:00:00.000Z"
+        const selectedDate = selection.date; // "2026-02-19"
+        const staffApps = appointments.filter(a => {
+            const appDate = (a.appointment_date || '').substring(0, 10); // "2026-02-19"
+            const staffMatch = (Number(a.staff_id) === Number(selection.staffId)) || !a.staff_id;
+            const companyMatch = Number(a.company_id) === Number(id);
+            const notCancelled = a.status !== 'cancelled';
+            const dateMatch = appDate === selectedDate;
+            return staffMatch && companyMatch && notCancelled && dateMatch;
+        });
+
+        console.log(`[v1.7.3] generateTimeSlots: date=${selectedDate}, staffId=${selection.staffId}, found ${staffApps.length} appointments`, staffApps.map(a => ({ start: a.start_time, end: a.end_time, date: a.appointment_date, staff: a.staff_id, status: a.status })));
 
         const slots: { time: string; isAvailable: boolean }[] = [];
 
