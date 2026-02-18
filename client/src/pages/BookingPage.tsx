@@ -138,7 +138,7 @@ export default function BookingPage() {
         const service = services.find(s => s.id === selection.serviceId);
         const duration = service?.duration_minutes || 30;
 
-        const [startH, startM] = (company.work_start_time || '08:00').split(':').map(Number);
+        const [startH, startM] = (company.work_start_time || '09:00').split(':').map(Number);
         const [endH, endM] = (company.work_end_time || '20:00').split(':').map(Number);
 
         let workBegin = startH * 60 + startM;
@@ -150,7 +150,7 @@ export default function BookingPage() {
 
         const slots: { time: string; isAvailable: boolean }[] = [];
 
-        // Corrected loop to include the very last possible slot ending at workEnd
+        // Generate 30-min slots within working hours
         for (let time = workBegin; time <= (workEnd - duration); time += 30) {
             const slotEnd = time + duration;
             const h = Math.floor(time / 60);
@@ -159,14 +159,13 @@ export default function BookingPage() {
 
             let isAvailable = true;
 
-            // 1. Past Time Check (If today) - Strict 5 min buffer
+            // 1. Past Time Check (If today) - 5 min buffer
             if (selection.date === todayStr && time < currentMin + 5) {
                 isAvailable = false;
             }
 
-            // 2. Collision Check with staff appointments
+            // 2. STRICT Collision Check (Block all affected slots)
             if (isAvailable) {
-                // Find existing appointments for selected staff and date
                 const staffApps = appointments.filter(a =>
                     (a.staff_id === selection.staffId || !a.staff_id) &&
                     a.company_id === Number(id) &&
@@ -180,7 +179,8 @@ export default function BookingPage() {
                     const appStart = asH * 60 + asM;
                     const appEnd = aeH * 60 + aeM;
 
-                    // Standard overlap logic: slot starts before app ends AND slot ends after app starts
+                    // Overlap logic: Any part of the slot (time to slotEnd) falls inside an existing appointment
+                    // OR the appointment falls inside the slot.
                     return (time < appEnd && slotEnd > appStart);
                 });
                 if (isBusy) isAvailable = false;
@@ -468,7 +468,7 @@ export default function BookingPage() {
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
                         <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse"></div>
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">ID: {id} | Staff: {staff.length} | Svc: {services.length} | v1.7.0</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">ID: {id} | Staff: {staff.length} | Svc: {services.length} | v1.7.1</span>
                     </div>
                 </div>
             </div>
