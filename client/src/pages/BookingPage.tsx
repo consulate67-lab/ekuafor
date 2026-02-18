@@ -146,54 +146,51 @@ export default function BookingPage() {
         const [startH, startM] = (company.work_start_time || '09:00').split(':').map(Number);
         const [endH, endM] = (company.work_end_time || '20:00').split(':').map(Number);
 
-        let workBegin = startH * 60 + startM;
+        const workBegin = startH * 60 + startM;
         const workEnd = endH * 60 + endM;
 
         const now = new Date();
         const todayStr = now.toLocaleDateString('en-CA');
+        const isToday = selection.date === todayStr;
         const currentMin = now.getHours() * 60 + now.getMinutes();
-
-        const slots: { time: string; isAvailable: boolean }[] = [];
 
         const slotInterval = company.slot_interval || 30;
 
-        // Generate slots up to end of working hours
+        // Get all appointments for this staff on this date
+        const staffApps = appointments.filter(a =>
+            (a.staff_id === selection.staffId || !a.staff_id) &&
+            a.company_id === Number(id) &&
+            a.status !== 'cancelled' &&
+            a.appointment_date === selection.date
+        );
+
+        const slots: { time: string; isAvailable: boolean }[] = [];
+
         for (let time = workBegin; time < workEnd; time += slotInterval) {
+            // 1. BUGÜN ise geçmiş saatleri hiç gösterme (5dk buffer)
+            if (isToday && time < currentMin + 5) {
+                continue; // Geçmiş slot - listeye ekleme
+            }
+
             const slotEnd = time + duration;
             const h = Math.floor(time / 60);
             const m = time % 60;
             const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
-            let isAvailable = true;
+            // 2. Çakışma kontrolü - mevcut randevularla kesişen slotlar DOLU (şeffaf)
+            // Periyot gridine uyumlu: randevu 13:30-14:15 ise, 13:30 ve 14:00 slotları bloke
+            // (çünkü 14:00 slotu randevunun bitiş saati 14:15'ten önce başlıyor)
+            const isBusy = staffApps.some(app => {
+                const [asH, asM] = app.start_time.split(':').map(Number);
+                const [aeH, aeM] = app.end_time.split(':').map(Number);
+                const appStart = asH * 60 + asM;
+                const appEnd = aeH * 60 + aeM;
 
-            // 1. Past Time Check (If today) - 5 min buffer
-            if (selection.date === todayStr && time < currentMin + 5) {
-                isAvailable = false;
-            }
+                // Bu slot aralığı (time -> slotEnd) mevcut randevuyla çakışıyor mu?
+                return (time < appEnd && slotEnd > appStart);
+            });
 
-            // 2. STRICT Collision Check (Block all affected slots)
-            if (isAvailable) {
-                const staffApps = appointments.filter(a =>
-                    (a.staff_id === selection.staffId || !a.staff_id) &&
-                    a.company_id === Number(id) &&
-                    a.status !== 'cancelled' &&
-                    a.appointment_date === selection.date
-                );
-
-                const isBusy = staffApps.some(app => {
-                    const [asH, asM] = app.start_time.split(':').map(Number);
-                    const [aeH, aeM] = app.end_time.split(':').map(Number);
-                    const appStart = asH * 60 + asM;
-                    const appEnd = aeH * 60 + aeM;
-
-                    // Overlap logic: Any part of the slot (time to slotEnd) falls inside an existing appointment
-                    // OR the appointment falls inside the slot.
-                    return (time < appEnd && slotEnd > appStart);
-                });
-                if (isBusy) isAvailable = false;
-            }
-
-            slots.push({ time: timeStr, isAvailable });
+            slots.push({ time: timeStr, isAvailable: !isBusy });
         }
         return slots;
     };
