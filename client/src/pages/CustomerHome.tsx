@@ -13,6 +13,7 @@ export default function CustomerHome() {
     const [searchQuery, setSearchQuery] = useState('');
     const [distanceLimit, setDistanceLimit] = useState(50);
     const [showSlider, setShowSlider] = useState(false);
+    const [locating, setLocating] = useState(false);
 
     const fetchData = async (query?: string, loc?: { lat: number, lng: number } | null, dist?: number) => {
         try {
@@ -82,13 +83,16 @@ export default function CustomerHome() {
 
             // Then try location using Capacitor for better mobile support
             try {
-                const position = await Geolocation.getCurrentPosition();
+                const position = await Geolocation.getCurrentPosition({
+                    enableHighAccuracy: true,
+                    timeout: 5000
+                });
                 const { latitude, longitude } = position.coords;
                 const newLoc = { lat: latitude, lng: longitude };
                 setLocation(newLoc);
                 fetchData(searchQuery, newLoc, distanceLimit);
             } catch (err) {
-                console.log('Geolocation fail', err);
+                console.log('Initial geolocation fail', err);
             }
         };
         initialFetch();
@@ -109,26 +113,34 @@ export default function CustomerHome() {
     };
 
     const handleGetLocation = async () => {
+        if (locating) return;
+        setLocating(true);
         try {
             // Mobile devices need explicit permission check/request
             const permission = await Geolocation.checkPermissions();
             if (permission.location !== 'granted') {
                 const request = await Geolocation.requestPermissions();
                 if (request.location !== 'granted') {
-                    alert('Konum izni verilmedi.');
+                    setLocating(false);
+                    alert('Konum izni verilmedi. Yakınınızdaki salonları görmek için lütfen izin verin.');
                     return;
                 }
             }
 
-            const position = await Geolocation.getCurrentPosition();
+            const position = await Geolocation.getCurrentPosition({
+                enableHighAccuracy: true,
+                timeout: 10000
+            });
             const { latitude, longitude } = position.coords;
             const newLoc = { lat: latitude, lng: longitude };
             setLocation(newLoc);
             setShowSlider(true);
-            fetchData(searchQuery, newLoc, distanceLimit);
+            await fetchData(searchQuery, newLoc, distanceLimit);
         } catch (err) {
             console.error('Position error', err);
-            alert('Konum bilgisi alınamadı.');
+            alert('Konum bilgisi şu an alınamadı. Lütfen GPS\'inizin açık olduğundan emin olup tekrar deneyin.');
+        } finally {
+            setLocating(false);
         }
     };
 
@@ -199,12 +211,19 @@ export default function CustomerHome() {
                 {/* Floating Location Button */}
                 <button
                     onClick={handleGetLocation}
-                    className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-white text-pink-600 px-6 py-3 rounded-full font-bold shadow-xl active:scale-95 transition-transform flex items-center gap-2 border border-pink-50 whitespace-nowrap"
+                    disabled={locating}
+                    className={`absolute -bottom-6 left-1/2 -translate-x-1/2 bg-white px-6 py-3 rounded-full font-bold shadow-xl active:scale-95 transition-all flex items-center gap-2 border border-pink-50 whitespace-nowrap ${locating ? 'text-gray-400' : 'text-pink-600'}`}
                 >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    </svg>
-                    <span className="text-xs uppercase tracking-tighter">{location ? 'Bana Yakınlar' : 'Çevremdekiler'}</span>
+                    {locating ? (
+                        <div className="w-4 h-4 border-2 border-pink-600 border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        </svg>
+                    )}
+                    <span className="text-xs uppercase tracking-tighter">
+                        {locating ? 'Konum Alınıyor...' : (location ? 'Bana Yakınlar' : 'Çevremdekiler')}
+                    </span>
                 </button>
             </div>
 
