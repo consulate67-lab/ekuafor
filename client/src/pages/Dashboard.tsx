@@ -86,14 +86,14 @@ export default function Dashboard() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <div className="relative flex justify-center items-center">
                         <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-pink-600 to-violet-600 flex items-center justify-center shadow-lg shadow-pink-500/20">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#1e1b4b] to-[#b45309] flex items-center justify-center shadow-lg shadow-indigo-500/20">
                                 <span className="text-white font-serif text-lg">S</span>
                             </div>
                             <h1 className="text-lg font-black heading-serif text-gray-900 tracking-tight">Saloon Yönetim</h1>
                         </div>
 
                         <div className="absolute right-0 flex items-center gap-3">
-                            <button onClick={logout} className="p-2 text-gray-400 hover:text-pink-600 transition-colors">
+                            <button onClick={logout} className="p-2 text-gray-400 hover:text-[#b45309] transition-colors">
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                                 </svg>

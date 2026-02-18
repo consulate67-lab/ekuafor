@@ -177,7 +177,7 @@ export default function CustomerHome() {
             </header>
 
             {/* Hero & Search */}
-            <div className="bg-gradient-to-br from-pink-600 to-violet-600 text-white pt-12 pb-16 px-4 rounded-b-[2.5rem] shadow-xl shadow-pink-200 relative mb-8">
+            <div className="bg-gradient-to-br from-[#1e1b4b] to-[#111827] text-white pt-12 pb-16 px-4 rounded-b-[2.5rem] shadow-xl shadow-indigo-200 relative mb-8">
                 <div className="max-w-md mx-auto text-center">
                     <h2 className="text-2xl font-black mb-2 leading-tight">Keşfet, Rezerv Et,<br />Keyfini Çıkar</h2>
                     <p className="text-white/80 text-sm font-medium mb-8">Hayallerindeki bakıma bir adım uzaktasın.</p>
@@ -185,7 +185,7 @@ export default function CustomerHome() {
                     <div className="flex items-center gap-2 max-w-sm mx-auto">
                         <div className="relative group flex-1">
                             <div className="absolute inset-y-0 left-0 pl-1 index-30 flex items-center pointer-events-none">
-                                <svg className="w-5 h-5 text-gray-400 ml-4 group-focus-within:text-pink-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5 text-gray-400 ml-4 group-focus-within:text-[#b45309] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                             </div>
@@ -199,7 +199,7 @@ export default function CustomerHome() {
                         </div>
                         <button
                             onClick={() => setShowSlider(!showSlider)}
-                            className={`p-4 rounded-2xl shadow-2xl transition-all ${showSlider ? 'bg-pink-600 text-white' : 'bg-white text-gray-400'}`}
+                            className={`p-4 rounded-2xl shadow-2xl transition-all ${showSlider ? 'bg-[#b45309] text-white' : 'bg-white text-gray-400'}`}
                         >
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
@@ -212,10 +212,10 @@ export default function CustomerHome() {
                 <button
                     onClick={handleGetLocation}
                     disabled={locating}
-                    className={`absolute -bottom-6 left-1/2 -translate-x-1/2 bg-white px-6 py-3 rounded-full font-bold shadow-xl active:scale-95 transition-all flex items-center gap-2 border border-pink-50 whitespace-nowrap ${locating ? 'text-gray-400' : 'text-pink-600'}`}
+                    className={`absolute -bottom-6 left-1/2 -translate-x-1/2 bg-white px-6 py-3 rounded-full font-bold shadow-xl active:scale-95 transition-all flex items-center gap-2 border border-slate-50 whitespace-nowrap ${locating ? 'text-gray-400' : 'text-[#b45309]'}`}
                 >
                     {locating ? (
-                        <div className="w-4 h-4 border-2 border-pink-600 border-t-transparent rounded-full animate-spin"></div>
+                        <div className="w-4 h-4 border-2 border-[#b45309] border-t-transparent rounded-full animate-spin"></div>
                     ) : (
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -230,10 +230,10 @@ export default function CustomerHome() {
             {/* Distance Slider (Visible after location enabled) */}
             {showSlider && location && (
                 <div className="max-w-md mx-auto px-6 mt-12 animate-in slide-in-from-top-4 duration-300">
-                    <div className="bg-white p-5 rounded-3xl shadow-lg border border-pink-50">
+                    <div className="bg-white p-5 rounded-3xl shadow-lg border border-slate-100">
                         <div className="flex justify-between items-center mb-4">
                             <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Mesafe Filtresi</span>
-                            <span className="text-sm font-black text-pink-600 bg-pink-50 px-3 py-1 rounded-full">{distanceLimit === 50 ? 'Tümü (50 km)' : `${distanceLimit} km`}</span>
+                            <span className="text-sm font-black text-[#1e1b4b] bg-indigo-50 px-3 py-1 rounded-full">{distanceLimit === 50 ? 'Tümü (50 km)' : `${distanceLimit} km`}</span>
                         </div>
                         <input
                             type="range"
@@ -242,7 +242,7 @@ export default function CustomerHome() {
                             step="1"
                             value={distanceLimit}
                             onChange={(e) => handleDistanceChange(parseInt(e.target.value))}
-                            className="w-full h-2 bg-pink-100 rounded-lg appearance-none cursor-pointer accent-pink-600"
+                            className="w-full h-2 bg-indigo-50 rounded-lg appearance-none cursor-pointer accent-[#b45309]"
                         />
                         <div className="flex justify-between mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
                             <span>1 km</span>
@@ -262,16 +262,16 @@ export default function CustomerHome() {
                             <Link
                                 to={`/book/${c.id}`}
                                 key={c.id}
-                                className="bg-white p-4 rounded-2xl shadow-sm border border-pink-100 flex items-center gap-4 hover:shadow-md transition-shadow active:scale-[0.98]"
+                                className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition-shadow active:scale-[0.98]"
                             >
-                                <div className="w-16 h-16 bg-pink-50 text-pink-600 rounded-xl flex-shrink-0 flex items-center justify-center text-2xl relative">
+                                <div className="w-16 h-16 bg-slate-50 text-[#b45309] rounded-xl flex-shrink-0 flex items-center justify-center text-2xl relative">
                                     ❤️
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <h4 className="font-bold text-gray-900 truncate">{c.name}</h4>
                                     <p className="text-xs text-gray-500 truncate">{c.district_name || 'Merkez'}, {c.province_name || 'İstanbul'}</p>
                                 </div>
-                                <div className="w-8 h-8 rounded-full bg-pink-50 text-pink-600 flex items-center justify-center">
+                                <div className="w-8 h-8 rounded-full bg-slate-50 text-[#1e1b4b] flex items-center justify-center">
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                                 </div>
                             </Link>
@@ -320,7 +320,7 @@ export default function CustomerHome() {
                                 </div>
                                 <p className="text-xs text-gray-500 truncate">{c.district_name || 'Merkez'}, {c.province_name || 'İstanbul'}</p>
                                 {c.distance !== undefined && (
-                                    <p className="text-[10px] font-black text-pink-500 mt-1 uppercase tracking-tighter shadow-sm bg-pink-50/50 inline-block px-1.5 py-0.5 rounded">{(c.distance).toFixed(1)} km mesafede</p>
+                                    <p className="text-[10px] font-black text-[#1e1b4b] mt-1 uppercase tracking-tighter shadow-sm bg-indigo-50 inline-block px-1.5 py-0.5 rounded">{(c.distance).toFixed(1)} km mesafede</p>
                                 )}
                             </div>
                         </Link>

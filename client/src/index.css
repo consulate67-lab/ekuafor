@@ -19,15 +19,15 @@ body {
 
 @layer components {
   .btn-primary {
-    @apply bg-gradient-to-r from-pink-600 to-violet-600 hover:from-pink-700 hover:to-violet-700 text-white font-medium py-2.5 px-6 rounded-xl transition-all duration-300 shadow-lg shadow-pink-500/20 active:scale-[0.98] disabled:opacity-50;
+    @apply bg-gradient-to-r from-[#1e1b4b] to-[#b45309] hover:from-[#111827] hover:to-[#92400e] text-white font-bold py-2.5 px-6 rounded-xl transition-all duration-300 shadow-lg shadow-indigo-500/20 active:scale-[0.98] disabled:opacity-50;
   }
 
   .btn-secondary {
-    @apply bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium py-2.5 px-6 rounded-xl transition-all duration-300;
+    @apply bg-white border border-gray-200 hover:bg-gray-50 text-[#1e1b4b] font-bold py-2.5 px-6 rounded-xl transition-all duration-300;
   }
 
   .input-field {
-    @apply w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 transition-all duration-200 placeholder:text-gray-400;
+    @apply w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-[#1e1b4b] transition-all duration-200 placeholder:text-gray-400;
   }
 
   .card {
@@ -39,7 +39,7 @@ body {
   }
 
   .heading-serif {
-    @apply font-serif text-indigo-950;
+    @apply font-serif text-[#1e1b4b];
   }
 }
 

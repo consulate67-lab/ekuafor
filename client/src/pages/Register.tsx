@@ -61,12 +61,12 @@ export default function Register() {
     return (
         <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-slate-50 py-12 px-4">
             {/* Background Orbs */}
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-pink-200/30 rounded-full blur-[120px] animate-pulse"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-violet-200/30 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-200/20 rounded-full blur-[120px] animate-pulse"></div>
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-orange-200/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
 
             <div className="max-w-md w-full relative z-10">
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-pink-600 to-violet-600 shadow-xl shadow-pink-500/30 mb-6 rotate-3 hover:rotate-0 transition-transform duration-500">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#1e1b4b] to-[#b45309] shadow-xl shadow-indigo-500/20 mb-6 rotate-3 hover:rotate-0 transition-transform duration-500">
                         <span className="text-white text-3xl font-serif">S</span>
                     </div>
                     <h1 className="text-3xl font-bold heading-serif mb-2 tracking-tight">Hesap Oluştur</h1>
@@ -197,7 +197,7 @@ export default function Register() {
                     <div className="mt-6 pt-4 border-t border-gray-100 text-center">
                         <p className="text-sm text-gray-500">
                             Zaten hesabınız var mı?{' '}
-                            <Link to="/login" className="font-bold text-pink-600 hover:text-pink-700 transition-colors">Giriş Yapın</Link>
+                            <Link to="/login" className="font-bold text-[#b45309] hover:text-[#92400e] transition-colors">Giriş Yapın</Link>
                         </p>
                     </div>
                 </div>
