@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import { Company } from '../types';
@@ -25,7 +25,7 @@ export default function CustomerHome() {
             }
 
             const res = await api.get('/companies', { params });
-            const allCompanies = res.data.data;
+            const allCompanies = res.data?.data || [];
             setCompanies(allCompanies);
 
             // Client-side distance calculation for DISPLAY only
@@ -43,7 +43,9 @@ export default function CustomerHome() {
             const resultWithDistance = allCompanies.map((c: Company) => {
                 let distance = undefined;
                 if (loc) {
-                    distance = calculateDistance(loc.lat, loc.lng, c.latitude || 41.0082, c.longitude || 28.9784);
+                    const lat2 = typeof c.latitude === 'string' ? parseFloat(c.latitude) : c.latitude;
+                    const lng2 = typeof c.longitude === 'string' ? parseFloat(c.longitude) : c.longitude;
+                    distance = calculateDistance(loc.lat, loc.lng, lat2 || 41.0082, lng2 || 28.9784);
                 }
                 return { ...c, distance };
             });
