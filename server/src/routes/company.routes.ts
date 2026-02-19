@@ -278,7 +278,7 @@ router.post('/admin-login', async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, error: 'Admin anahtarı gereklidir' });
         }
 
-        const result = await pool.query('SELECT * FROM companies WHERE admin_key = $1', [admin_key]);
+        const result = await pool.query('SELECT * FROM companies WHERE UPPER(admin_key) = UPPER($1)', [admin_key]);
         if (result.rows.length === 0) {
             return res.status(404).json({ success: false, error: 'Geçersiz admin anahtarı' });
         }
@@ -373,7 +373,7 @@ router.post('/staff-login', async (req: Request, res: Response) => {
             `SELECT u.id, u.first_name, u.last_name, u.board_code, u.gender, u.department_id, u.company_id, d.name as department_name
              FROM users u
              LEFT JOIN departments d ON u.department_id = d.id
-             WHERE u.board_code = $1`,
+             WHERE UPPER(u.board_code) = UPPER($1)`,
             [board_code]
         );
 
@@ -416,13 +416,13 @@ router.post('/check-code', async (req: Request, res: Response) => {
         }
 
         // Önce admin_key mi kontrol et
-        const adminResult = await pool.query('SELECT id, name FROM companies WHERE admin_key = $1', [code]);
+        const adminResult = await pool.query('SELECT id, name, admin_key FROM companies WHERE UPPER(admin_key) = UPPER($1)', [code]);
         if (adminResult.rows.length > 0) {
             return res.json({
                 success: true,
                 data: {
                     type: 'admin',
-                    redirect: `/company-panel?key=${code}`,
+                    redirect: `/company-panel?key=${adminResult.rows[0].admin_key}`,
                     company_name: adminResult.rows[0].name
                 }
             });
@@ -433,7 +433,7 @@ router.post('/check-code', async (req: Request, res: Response) => {
             `SELECT u.id, u.first_name, u.last_name, u.board_code, c.name as company_name
              FROM users u
              JOIN companies c ON u.company_id = c.id
-             WHERE u.board_code = $1`,
+             WHERE UPPER(u.board_code) = UPPER($1)`,
             [code]
         );
         if (staffResult.rows.length > 0) {
@@ -444,13 +444,13 @@ router.post('/check-code', async (req: Request, res: Response) => {
                     redirect: `/staff-panel`,
                     staff_name: `${staffResult.rows[0].first_name} ${staffResult.rows[0].last_name}`,
                     company_name: staffResult.rows[0].company_name,
-                    board_code: code
+                    board_code: staffResult.rows[0].board_code
                 }
             });
         }
 
         // SalonBoard board_key mi kontrol et
-        const boardResult = await pool.query('SELECT id, name FROM companies WHERE board_key = $1', [code]);
+        const boardResult = await pool.query('SELECT id, name, board_key FROM companies WHERE UPPER(board_key) = UPPER($1)', [code]);
         if (boardResult.rows.length > 0) {
             return res.json({
                 success: true,
@@ -458,7 +458,7 @@ router.post('/check-code', async (req: Request, res: Response) => {
                     type: 'board',
                     redirect: `/board`,
                     company_name: boardResult.rows[0].name,
-                    board_key: code
+                    board_key: boardResult.rows[0].board_key
                 }
             });
         }
