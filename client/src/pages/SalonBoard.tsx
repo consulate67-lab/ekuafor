@@ -149,6 +149,7 @@ export default function SalonBoard() {
 
             if (!staffId) {
                 alert('Lütfen bir personel seçin');
+                setLoading(false);
                 return;
             }
 
@@ -157,10 +158,33 @@ export default function SalonBoard() {
             const duration = service?.duration_minutes || company.slot_interval || 30;
 
             const [sh, sm] = startTime.split(':').map(Number);
-            const endTotal = sh * 60 + sm + duration;
-            const eh = Math.floor(endTotal / 60);
-            const em = endTotal % 60;
+            const newStart = sh * 60 + sm;
+            const newEnd = newStart + duration;
+            const eh = Math.floor(newEnd / 60);
+            const em = newEnd % 60;
             const endTime = `${eh.toString().padStart(2, '0')}:${em.toString().padStart(2, '0')}`;
+
+            // ÇAKIŞMA KONTROLÜ - mevcut randevularla karşılaştır
+            const existingApps = appointments.filter(a => {
+                const appDate = (a.appointment_date || '').substring(0, 10);
+                return Number(a.staff_id) === Number(staffId) &&
+                    a.status !== 'cancelled' &&
+                    appDate === date;
+            });
+
+            const conflict = existingApps.find(app => {
+                const [asH, asM] = app.start_time.split(':').map(Number);
+                const [aeH, aeM] = app.end_time.split(':').map(Number);
+                const appStart = asH * 60 + asM;
+                const appEnd = aeH * 60 + aeM;
+                return (newStart < appEnd && newEnd > appStart);
+            });
+
+            if (conflict) {
+                alert(`⚠️ Çakışma tespit edildi!\n\nSeçilen saat: ${startTime} - ${endTime} (${duration} dk)\nMevcut randevu: ${conflict.start_time} - ${conflict.end_time} (${conflict.customer_name || 'Misafir'})\n\nLütfen başka bir saat seçin.`);
+                setLoading(false);
+                return;
+            }
 
             await api.post('/appointments', {
                 company_id: company.id,
@@ -178,6 +202,9 @@ export default function SalonBoard() {
             setFastForm({ customerName: '', serviceId: '', notes: '', staffId: '', appointmentDate: '', startTime: '' });
             setSelectedCell(null);
             if (company.id) fetchData(company.id);
+        } catch (err: any) {
+            console.error('Randevu kayıt hatası:', err);
+            alert(err.response?.data?.error || 'Randevu kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.');
         } finally {
             setLoading(false);
         }

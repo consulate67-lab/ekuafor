@@ -212,10 +212,34 @@ export default function BookingPage() {
             const service = services.find(s => s.id === selection.serviceId);
             const duration = service?.duration_minutes || 30;
             const [h, m] = (selection.time || '00:00').split(':').map(Number);
-            const totalMin = h * 60 + m + duration;
-            const endH = Math.floor(totalMin / 60);
-            const endM = totalMin % 60;
+            const newStart = h * 60 + m;
+            const newEnd = newStart + duration;
+            const endH = Math.floor(newEnd / 60);
+            const endM = newEnd % 60;
             const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+            // Çakışma kontrolü - son güvenlik katmanı
+            const staffApps = appointments.filter(a => {
+                const appDate = (a.appointment_date || '').substring(0, 10);
+                return (Number(a.staff_id) === Number(selection.staffId) || !a.staff_id) &&
+                    Number(a.company_id) === Number(id) &&
+                    a.status !== 'cancelled' &&
+                    appDate === selection.date;
+            });
+
+            const conflict = staffApps.find(app => {
+                const [asH, asM] = app.start_time.split(':').map(Number);
+                const [aeH, aeM] = app.end_time.split(':').map(Number);
+                const appStart = asH * 60 + asM;
+                const appEnd = aeH * 60 + aeM;
+                return (newStart < appEnd && newEnd > appStart);
+            });
+
+            if (conflict) {
+                alert(`⚠️ Bu saat aralığı dolu!\n\nSeçtiğiniz: ${selection.time} - ${endTime} (${duration} dk)\nMevcut randevu: ${conflict.start_time} - ${conflict.end_time}\n\nLütfen başka bir saat seçin.`);
+                setStep(4); // Saat seçim ekranına geri dön
+                return;
+            }
 
             await api.post('/appointments', {
                 company_id: Number(id),
