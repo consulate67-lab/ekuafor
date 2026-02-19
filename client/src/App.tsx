@@ -15,6 +15,7 @@ import BookingPage from './pages/BookingPage';
 import SmsSettings from './pages/SmsSettings';
 import SalonBoard from './pages/SalonBoard';
 import CompanyPanel from './pages/CompanyPanel';
+import MyAppointments from './pages/MyAppointments';
 
 
 function App() {
@@ -60,15 +61,12 @@ function App() {
 
     return (
         <div className="relative min-h-screen">
-            <div className="fixed top-0 left-1/2 -translate-x-1/2 z-[9999] bg-[#1e1b4b]/95 backdrop-blur-sm text-white text-[9px] font-black px-3 py-1 rounded-b-xl shadow-lg shadow-indigo-500/20 pointer-events-none select-none tracking-widest uppercase flex items-center gap-1 border-x border-b border-[#b45309]/30">
-                <span className="opacity-70 text-[#b45309]">VER</span>
-                <span>1.7.9</span>
-            </div>
             <Router basename={import.meta.env.BASE_URL}>
                 <Routes>
                     {/* Public Routes */}
                     <Route path="/" element={<CustomerHome />} />
                     <Route path="/book/:id" element={<BookingPage />} />
+                    <Route path="/my-appointments" element={<MyAppointments />} />
                     <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
                     <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />} />
                     <Route path="/board" element={<SalonBoard />} />

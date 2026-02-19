@@ -113,6 +113,8 @@ export interface Appointment {
     notes?: string;
     price?: number;
     customer_name?: string;
+    customer_phone?: string;
     service_name?: string;
     staff_name?: string;
+    company_name?: string;
 }

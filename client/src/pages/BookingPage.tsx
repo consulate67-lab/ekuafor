@@ -249,9 +249,13 @@ export default function BookingPage() {
                 start_time: selection.time,
                 end_time: endTime,
                 customer_name: selection.customerName,
+                customer_phone: selection.customerPhone,
                 notes: `Müşteri: ${selection.customerName} | Tel: ${selection.customerPhone}`,
                 status: 'pending'
             });
+
+            // Save phone locally to identify this customer in MyAppointments
+            localStorage.setItem('customer_phone', selection.customerPhone);
 
             alert('Randevu talebiniz alındı! Onaylandığında size bildirim yapılacaktır.');
             navigate('/');
@@ -325,17 +329,23 @@ export default function BookingPage() {
                                         setSelection({ ...selection, staffId: u.id || (u as any).user_id });
                                         handleNext();
                                     }}
-                                    className="w-full bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-200 transition-all flex items-center gap-4 text-left"
+                                    className="w-full bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-indigo-100 transition-all flex items-center gap-5 text-left group active:scale-[0.98]"
                                 >
-                                    <div className="w-12 h-12 bg-indigo-50 text-[#1e1b4b] rounded-full flex items-center justify-center font-bold text-lg">
+                                    <div className="w-16 h-16 bg-slate-50 text-[#1e1b4b] rounded-2xl flex items-center justify-center font-black text-xl group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner">
                                         {u.first_name[0]}
                                     </div>
-                                    <div>
-                                        <h3 className="font-bold text-gray-900">{u.first_name} {u.last_name}</h3>
-                                        <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">{u.role === 'company_admin' ? 'Yönetici' : 'Uzman'}</p>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-black text-slate-900 text-lg group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{u.first_name} {u.last_name}</h3>
+                                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-2">{u.role === 'company_admin' ? 'Baş Uzman' : 'Uzman'}</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {/* Dummy skills for now, in real case this would come from API */}
+                                            {['Saç Tasarım', 'Sakal Tıraşı', 'Cilt Bakımı'].map(skill => (
+                                                <span key={skill} className="px-2 py-0.5 bg-slate-50 text-slate-500 rounded-md text-[8px] font-bold border border-slate-100 uppercase">{skill}</span>
+                                            ))}
+                                        </div>
                                     </div>
-                                    <div className="ml-auto text-gray-300">
-                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                    <div className="w-8 h-8 rounded-full bg-slate-50 text-slate-300 flex items-center justify-center group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
                                     </div>
                                 </button>
                             ))}
@@ -388,25 +398,39 @@ export default function BookingPage() {
                     <div className="animate-in slide-in-from-right duration-300 fade-in">
                         <button onClick={handleBack} className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 hover:text-gray-600">← Geri</button>
                         <h2 className="text-2xl font-black text-gray-900 mb-6">Tarih Seçimi</h2>
-                        <input
-                            ref={dateInputRef} // Add ref
-                            type="date"
-                            min={new Date().toISOString().split('T')[0]}
-                            value={selection.date || ''}
-                            onChange={(e) => {
-                                setSelection({ ...selection, date: e.target.value });
-                            }}
-                            className="w-full p-4 bg-white rounded-2xl border-2 border-gray-100 font-bold text-gray-900 focus:outline-none focus:border-pink-500 transition-colors text-lg mb-4"
-                        />
-                        <button
-                            disabled={!selection.date}
-                            onClick={handleNext}
-                            className={`w-full py-4 rounded-xl font-black uppercase tracking-widest transition-all ${selection.date ? 'bg-[#1e1b4b] text-white shadow-lg' : 'bg-gray-100 text-gray-400'}`}
-                        >
-                            Devam Et
-                        </button>
-                        <p className="text-xs text-gray-400 mt-4 text-center" onClick={() => dateInputRef.current?.showPicker()}>
-                            Takvimi açmak için tıklayın
+                        <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 text-center mb-6">
+                            <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center text-3xl mx-auto mb-6 shadow-inner">
+                                📅
+                            </div>
+                            <h3 className="text-xl font-black text-slate-900 mb-2">Tarih Belirleyin</h3>
+                            <p className="text-slate-400 text-xs font-medium mb-8">Lütfen size uygun olan günü seçin.</p>
+
+                            <div className="relative mb-6">
+                                <input
+                                    ref={dateInputRef}
+                                    type="date"
+                                    min={new Date().toISOString().split('T')[0]}
+                                    value={selection.date || ''}
+                                    onChange={(e) => {
+                                        setSelection({ ...selection, date: e.target.value });
+                                    }}
+                                    className="w-full p-5 bg-slate-50 rounded-2xl border-2 border-slate-100 font-black text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors text-center text-lg tracking-widest uppercase cursor-pointer"
+                                />
+                                <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-400">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                </div>
+                            </div>
+
+                            <button
+                                disabled={!selection.date}
+                                onClick={handleNext}
+                                className={`w-full py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-xs transition-all ${selection.date ? 'bg-slate-900 text-white shadow-xl shadow-indigo-950/20 active:scale-95' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                            >
+                                Devam Et
+                            </button>
+                        </div>
+                        <p className="text-[10px] text-gray-400 text-center font-bold uppercase tracking-widest opacity-50">
+                            Takvimle etkileşime geçmek için kutucuğa dokunun
                         </p>
                     </div>
                 )}

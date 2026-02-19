@@ -219,23 +219,36 @@ export default function CustomerHome() {
 
     return (
         <div className="min-h-screen bg-slate-50">
-            {/* Header */}
-            <header className="bg-white sticky top-0 z-30 shadow-sm">
-                <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-center">
-                    <h1 className="text-2xl font-black text-gray-900 heading-serif tracking-tight">Saloon</h1>
+            {/* Header - Modern & Minimal */}
+            <header className="bg-white/80 backdrop-blur-md sticky top-0 z-40 border-b border-slate-100">
+                <div className="max-w-md mx-auto px-6 py-5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-slate-900 to-[#b45309] flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                            <span className="text-white font-serif text-lg">S</span>
+                        </div>
+                        <h1 className="text-xl font-black text-slate-900 tracking-tight">Saloon</h1>
+                    </div>
+                    <button
+                        onClick={openCodeModal}
+                        className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center active:scale-95 transition-all"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                        </svg>
+                    </button>
                 </div>
             </header>
 
             {/* Hero & Search */}
             <div className="bg-gradient-to-br from-[#1e1b4b] to-[#111827] text-white pt-12 pb-16 px-4 rounded-b-[2.5rem] shadow-xl shadow-indigo-200 relative mb-8">
-                <div className="max-w-md mx-auto text-center">
-                    <h2 className="text-2xl font-black mb-2 leading-tight">Keşfet, Rezerv Et,<br />Keyfini Çıkar</h2>
-                    <p className="text-white/80 text-sm font-medium mb-8">Hayallerindeki bakıma bir adım uzaktasın.</p>
+                <div className="max-w-md mx-auto text-center px-2">
+                    <h2 className="text-3xl font-black mb-4 leading-tight tracking-tight">Kusursuz Görünüm<br />Burada Başlar.</h2>
+                    <p className="text-white/60 text-sm font-medium mb-10 max-w-[280px] mx-auto">En iyi uzmanlar ve size en yakın salonlar tek bir tıkla yanınızda.</p>
 
-                    <div className="flex items-center gap-2 max-w-sm mx-auto">
+                    <div className="flex items-center gap-3">
                         <div className="relative group flex-1">
-                            <div className="absolute inset-y-0 left-0 pl-1 index-30 flex items-center pointer-events-none">
-                                <svg className="w-5 h-5 text-gray-400 ml-4 group-focus-within:text-[#b45309] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <svg className="w-4 h-4 text-white/30 group-focus-within:text-[#b45309] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                             </div>
@@ -244,97 +257,97 @@ export default function CustomerHome() {
                                 placeholder="Salon veya şehir ara..."
                                 value={searchQuery}
                                 onChange={(e) => handleSearch(e.target.value)}
-                                className="w-full bg-white text-gray-900 pl-12 pr-4 py-4 rounded-2xl shadow-2xl shadow-black/10 focus:ring-4 focus:ring-white/20 outline-none font-bold text-sm transition-all"
+                                className="w-full bg-white/10 backdrop-blur-xl text-white pl-11 pr-4 py-4 rounded-2xl border border-white/10 focus:ring-2 focus:ring-[#b45309]/50 focus:bg-white/20 outline-none font-bold text-sm transition-all placeholder:text-white/30"
                             />
                         </div>
-                        {/* QR / Kod Tarayıcı Butonu */}
-                        <button
-                            onClick={openCodeModal}
-                            className="p-4 rounded-2xl shadow-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white hover:from-amber-400 hover:to-orange-500 active:scale-90 transition-all relative"
-                            title="QR Kod Okut / Kod Gir"
-                        >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                            </svg>
-                            <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full animate-pulse shadow-lg shadow-emerald-500/50"></span>
-                        </button>
                         <button
                             onClick={() => setShowSlider(!showSlider)}
-                            className={`p-4 rounded-2xl shadow-2xl transition-all ${showSlider ? 'bg-[#b45309] text-white' : 'bg-white text-gray-400'}`}
+                            className={`p-4 rounded-2xl shadow-xl transition-all ${showSlider ? 'bg-[#b45309] text-white' : 'bg-white/10 text-white/40 border border-white/10'}`}
                         >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                             </svg>
                         </button>
                     </div>
                 </div>
 
-                {/* Floating Location Button */}
+                {/* Modern Distance Filter (Integrated) */}
+                {showSlider && location && (
+                    <div className="max-w-md mx-auto mt-10 animate-in slide-in-from-top-4 duration-500">
+                        <div className="bg-white/10 backdrop-blur-2xl p-6 rounded-[2rem] border border-white/10 shadow-2xl">
+                            <div className="flex justify-between items-center mb-5">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-5 bg-[#b45309] rounded-full"></div>
+                                    <span className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em]">Mesafe Filtresi</span>
+                                </div>
+                                <span className="text-xs font-black text-white bg-[#b45309] px-3 py-1 rounded-full shadow-lg shadow-orange-950/20">
+                                    {distanceLimit === 50 ? 'Tümü (50 km)' : `${distanceLimit} km`}
+                                </span>
+                            </div>
+                            <input
+                                type="range"
+                                min="1"
+                                max="50"
+                                step="1"
+                                value={distanceLimit}
+                                onChange={(e) => handleDistanceChange(parseInt(e.target.value))}
+                                className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#b45309]"
+                            />
+                            <div className="flex justify-between mt-3 text-[9px] font-bold text-white/20 uppercase tracking-widest">
+                                <span>1 km</span>
+                                <span>25 km</span>
+                                <span>50 km</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Banner / Call to Action */}
+            <div className="max-w-md mx-auto px-4 -mt-10 relative z-10 mb-8">
                 <button
                     onClick={handleGetLocation}
                     disabled={locating}
-                    className={`absolute -bottom-6 left-1/2 -translate-x-1/2 bg-white px-6 py-3 rounded-full font-bold shadow-xl active:scale-95 transition-all flex items-center gap-2 border border-slate-50 whitespace-nowrap ${locating ? 'text-gray-400' : 'text-[#b45309]'}`}
+                    className="w-full bg-white rounded-[2rem] p-6 shadow-2xl shadow-slate-200/50 flex items-center justify-between group active:scale-[0.98] transition-all border border-slate-50"
                 >
-                    {locating ? (
-                        <div className="w-4 h-4 border-2 border-[#b45309] border-t-transparent rounded-full animate-spin"></div>
-                    ) : (
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        </svg>
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-indigo-50 text-[#1e1b4b] rounded-2xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+                            {locating ? <div className="w-5 h-5 border-2 border-[#1e1b4b] border-t-transparent rounded-full animate-spin" /> : '📍'}
+                        </div>
+                        <div className="text-left font-bold">
+                            <p className="text-slate-900 text-sm">{locating ? 'Aranıyor...' : (location ? 'Konum Algılandı' : 'Yakınındakileri Bul')}</p>
+                            <p className="text-slate-400 text-[10px] uppercase tracking-widest">{locating ? 'Yakındaki salonlar yükleniyor' : (location ? 'Sana en yakın sonuçlar' : 'Çevrendeki en iyi uzmanları keşfet')}</p>
+                        </div>
+                    </div>
+                    {!locating && (
+                        <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-slate-300 group-hover:text-[#b45309] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                            </svg>
+                        </div>
                     )}
-                    <span className="text-xs uppercase tracking-tighter">
-                        {locating ? 'Konum Alınıyor...' : (location ? 'Bana Yakınlar' : 'Çevremdekiler')}
-                    </span>
                 </button>
             </div>
 
-            {/* Distance Slider (Visible after location enabled) */}
-            {showSlider && location && (
-                <div className="max-w-md mx-auto px-6 mt-12 animate-in slide-in-from-top-4 duration-300">
-                    <div className="bg-white p-5 rounded-3xl shadow-lg border border-slate-100">
-                        <div className="flex justify-between items-center mb-4">
-                            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Mesafe Filtresi</span>
-                            <span className="text-sm font-black text-[#1e1b4b] bg-indigo-50 px-3 py-1 rounded-full">{distanceLimit === 50 ? 'Tümü (50 km)' : `${distanceLimit} km`}</span>
-                        </div>
-                        <input
-                            type="range"
-                            min="1"
-                            max="50"
-                            step="1"
-                            value={distanceLimit}
-                            onChange={(e) => handleDistanceChange(parseInt(e.target.value))}
-                            className="w-full h-2 bg-indigo-50 rounded-lg appearance-none cursor-pointer accent-[#b45309]"
-                        />
-                        <div className="flex justify-between mt-2 text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
-                            <span>1 km</span>
-                            <span>25 km</span>
-                            <span>50 km</span>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Favorites List */}
+            {/* Horizontal Favorites - Modern Way */}
             {favorites.length > 0 && (
-                <div className="max-w-md mx-auto px-4 py-8 pb-0 space-y-4">
-                    <h3 className="font-black text-gray-900 uppercase tracking-widest text-xs mb-4">Favorilerim ({favorites.length})</h3>
-                    <div className="grid grid-cols-1 gap-4">
+                <div className="max-w-md mx-auto py-4">
+                    <div className="flex items-center justify-between px-6 mb-4">
+                        <h3 className="font-black text-slate-900 uppercase tracking-widest text-[10px]">Favorilerim</h3>
+                        <span className="bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full text-[9px] font-black">{favorites.length}</span>
+                    </div>
+                    <div className="flex gap-4 overflow-x-auto px-6 pb-4 hide-scrollbar">
                         {favoriteCompanies.map((c: any) => (
                             <Link
                                 to={`/book/${c.id}`}
                                 key={c.id}
-                                className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition-shadow active:scale-[0.98]"
+                                className="flex-shrink-0 w-32 bg-white rounded-3xl p-4 shadow-lg shadow-slate-200/30 border border-slate-50 text-center group active:scale-95 transition-all"
                             >
-                                <div className="w-16 h-16 bg-slate-50 text-[#b45309] rounded-xl flex-shrink-0 flex items-center justify-center text-2xl relative">
-                                    ❤️
+                                <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-3 group-hover:bg-indigo-50 transition-colors">
+                                    💈
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <h4 className="font-bold text-gray-900 truncate">{c.name}</h4>
-                                    <p className="text-xs text-gray-500 truncate">{c.district_name || 'Merkez'}, {c.province_name || 'İstanbul'}</p>
-                                </div>
-                                <div className="w-8 h-8 rounded-full bg-slate-50 text-[#1e1b4b] flex items-center justify-center">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                                </div>
+                                <h4 className="font-black text-slate-900 text-[11px] truncate">{c.name}</h4>
+                                <p className="text-slate-400 text-[9px] font-bold mt-0.5">{c.district_name || 'Merkez'}</p>
                             </Link>
                         ))}
                     </div>
@@ -389,12 +402,54 @@ export default function CustomerHome() {
                 )}
 
                 {!loading && filteredCompanies.length === 0 && (
-                    <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-gray-100 p-8">
-                        <div className="text-4xl mb-4 opacity-20">🔍</div>
-                        <p className="text-gray-400 font-bold mb-1">Eşleşen salon bulunamadı.</p>
-                        <p className="text-gray-300 text-xs text-medium">Farklı bir kelime deneyebilir veya mesafeyi artırabilirsiniz.</p>
+                    <div className="text-center py-24 bg-white rounded-[3rem] border-2 border-dashed border-slate-100 p-10">
+                        <div className="text-5xl mb-6 opacity-30">🔍</div>
+                        <p className="text-slate-400 font-bold mb-2">Eşleşen salon bulunamadı.</p>
+                        <p className="text-slate-300 text-[10px] font-bold uppercase tracking-widest">Arama kelimesini veya mesafeyi değiştirin</p>
                     </div>
                 )}
+            </div>
+
+            {/* Persistent Bottom Navigation - Premium Design */}
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-48px)] max-w-sm z-40">
+                <nav className="bg-slate-900/95 backdrop-blur-xl rounded-[2.5rem] p-2 flex items-center justify-between shadow-2xl shadow-indigo-900/40 border border-white/5">
+                    <button
+                        onClick={() => {
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                            setSearchQuery('');
+                            fetchData();
+                        }}
+                        className="flex-1 flex flex-col items-center gap-1 group"
+                    >
+                        <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white active:scale-90 transition-all group-hover:bg-white/20">
+                            🏠
+                        </div>
+                    </button>
+
+                    {/* Floating Center Favorites Button */}
+                    <button
+                        onClick={() => {
+                            if (favorites.length > 0) {
+                                window.scrollTo({ top: 300, behavior: 'smooth' });
+                            }
+                        }}
+                        className="flex-1 flex flex-col items-center gap-1 group -mt-10"
+                    >
+                        <div className="w-16 h-16 bg-gradient-to-br from-[#b45309] to-orange-400 rounded-full flex items-center justify-center text-2xl shadow-xl shadow-orange-950/40 border-4 border-slate-900 active:scale-95 transition-all text-white">
+                            ❤️
+                        </div>
+                    </button>
+
+                    <Link
+                        to="/my-appointments"
+                        className="flex-1 flex flex-col items-center gap-1 group"
+                    >
+                        <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white active:scale-90 transition-all group-hover:bg-white/20">
+                            📅
+                        </div>
+                        {/* Potential Status Badge / Notification Dot would go here */}
+                    </Link>
+                </nav>
             </div>
 
             {/* Code Entry Modal */}
