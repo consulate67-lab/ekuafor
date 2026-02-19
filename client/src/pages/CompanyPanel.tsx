@@ -48,6 +48,7 @@ export default function CompanyPanel() {
         department_id: ''
     });
     const [copiedField, setCopiedField] = useState('');
+    const [isCreating, setIsCreating] = useState(false);
 
     const handleLogin = async (keyToUse?: string) => {
         const key = keyToUse || inputKey.trim();
@@ -117,6 +118,7 @@ export default function CompanyPanel() {
 
     const handleCreateStaffBoard = async () => {
         if (!staffForm.first_name.trim() || !staffForm.last_name.trim() || !company) return;
+        setIsCreating(true);
         try {
             await api.post(`/companies/${company.id}/create-staff-board`, {
                 first_name: staffForm.first_name.trim(),
@@ -128,7 +130,10 @@ export default function CompanyPanel() {
             setShowStaffModal(false);
             fetchData(company.id);
         } catch (err: any) {
-            alert(err.response?.data?.error || 'Personel kodu oluşturulamadı');
+            const msg = err.response?.data?.error || err.message || 'Personel kodu oluşturulamadı';
+            alert(msg);
+        } finally {
+            setIsCreating(false);
         }
     };
 
@@ -733,9 +738,18 @@ export default function CompanyPanel() {
                             </button>
                             <button
                                 onClick={handleCreateStaffBoard}
-                                className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-base active:scale-95 transition-all"
+                                disabled={isCreating}
+                                className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-base active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
-                                Oluştur
+                                {isCreating ? (
+                                    <>
+                                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                        </svg>
+                                        Oluşturuluyor...
+                                    </>
+                                ) : 'Oluştur'}
                             </button>
                         </div>
                     </div>

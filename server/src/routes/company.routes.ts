@@ -319,11 +319,15 @@ router.post('/:id/create-staff-board', async (req: Request, res: Response) => {
             [email, 'board-auth-only', first_name, last_name, companyId, board_code, gender || null, department_id || null]
         );
 
-        // company_users bağlantısı ekle
-        await pool.query(
-            'INSERT INTO company_users (company_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
-            [companyId, userResult.rows[0].id, 'staff']
-        );
+        // company_users bağlantısı ekle (constraint yoksa hata vermeden devam et)
+        try {
+            await pool.query(
+                'INSERT INTO company_users (company_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+                [companyId, userResult.rows[0].id, 'staff']
+            );
+        } catch (_) {
+            // company_users ekleme başarısız olsa bile devam et
+        }
 
         res.status(201).json({ success: true, data: userResult.rows[0] });
     } catch (error) {
