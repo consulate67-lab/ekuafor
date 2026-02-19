@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
 import pool from '../config/database';
 import companyService from '../services/company.service';
 import employeeRoutes from './employee.routes';
@@ -435,21 +436,33 @@ router.post('/check-code', async (req: Request, res: Response) => {
 
         // Sonra board_code mu kontrol et
         const staffResult = await pool.query(
-            `SELECT u.id, u.first_name, u.last_name, u.board_code, c.name as company_name
+            `SELECT u.id, u.first_name, u.last_name, u.board_code, u.company_id, c.name as company_name
              FROM users u
              JOIN companies c ON u.company_id = c.id
              WHERE UPPER(u.board_code) = UPPER($1)`,
             [code]
         );
         if (staffResult.rows.length > 0) {
+            const sr = staffResult.rows[0];
+
+            // JWT token oluştur - personel dashboard'a erişsin
+            const token = jwt.sign(
+                { userId: sr.id, email: `${sr.board_code}@staff.local`, role: 'company_admin', companyId: sr.company_id },
+                process.env.JWT_SECRET || 'your-secret-key',
+                { expiresIn: '7d' }
+            );
+
             return res.json({
                 success: true,
                 data: {
                     type: 'staff',
-                    redirect: `/board`,
-                    staff_name: `${staffResult.rows[0].first_name} ${staffResult.rows[0].last_name}`,
-                    company_name: staffResult.rows[0].company_name,
-                    board_code: staffResult.rows[0].board_code
+                    redirect: `/dashboard`,
+                    staff_name: `${sr.first_name} ${sr.last_name}`,
+                    company_name: sr.company_name,
+                    board_code: sr.board_code,
+                    company_id: sr.company_id,
+                    user_id: sr.id,
+                    token: token
                 }
             });
         }

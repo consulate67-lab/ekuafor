@@ -190,8 +190,13 @@ export default function CustomerHome() {
                     if (data.type === 'admin') {
                         navigate(data.redirect);
                     } else if (data.type === 'staff') {
+                        // JWT token'ı kaydet - Dashboard'a erişim için
+                        if (data.token) {
+                            localStorage.setItem('token', data.token);
+                        }
                         localStorage.setItem('staff_board_code', data.board_code);
-                        navigate(data.redirect);
+                        // Sayfa yenilenmeli ki auth store güncellensin
+                        window.location.href = `${import.meta.env.BASE_URL}dashboard`;
                     } else if (data.type === 'board') {
                         localStorage.setItem('salon_board_key', data.board_key);
                         navigate(data.redirect);
