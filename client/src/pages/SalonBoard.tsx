@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { Company, Appointment } from '../types';
 
 export default function SalonBoard() {
+    const navigate = useNavigate();
     const [boardKey, setBoardKey] = useState<string | null>(localStorage.getItem('salon_board_key'));
     const [inputKey, setInputKey] = useState('');
     const [company, setCompany] = useState<Company | null>(null);
@@ -13,6 +15,10 @@ export default function SalonBoard() {
     const [error, setError] = useState('');
     const [currentHour, setCurrentHour] = useState(new Date().getHours());
     const [selectedDate] = useState(new Date().toISOString().split('T')[0]);
+
+    // Staff Mode: when a staff member logs in via board_code
+    const [staffMode, setStaffMode] = useState(false);
+    const [staffInfo, setStaffInfo] = useState<any>(null);
 
     // Modal States
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -102,17 +108,35 @@ export default function SalonBoard() {
         }
     };
 
+    // Staff Mode: auto-login if staff_board_code exists
+    useEffect(() => {
+        const staffCode = localStorage.getItem('staff_board_code');
+        if (staffCode && !boardKey) {
+            (async () => {
+                try {
+                    const res = await api.post('/companies/staff-login', { board_code: staffCode });
+                    if (res.data?.success) {
+                        const { user, company: comp } = res.data.data;
+                        setStaffMode(true);
+                        setStaffInfo(user);
+                        setCompany(comp);
+                        setBoardKey('staff-mode');
+                        localStorage.setItem('salon_board_company_id', comp.id.toString());
+                        fetchData(comp.id);
+                    }
+                } catch {
+                    localStorage.removeItem('staff_board_code');
+                }
+            })();
+        }
+    }, []);
+
     useEffect(() => {
         const storedId = localStorage.getItem('salon_board_company_id');
-        if (boardKey && storedId) {
+        if (boardKey && boardKey !== 'staff-mode' && storedId) {
             const compId = parseInt(storedId);
             api.get(`/companies/${compId}`).then(res => {
                 const cd = res.data.data;
-                console.log('[SalonBoard v1.7.3] Company:', JSON.stringify({
-                    work_start_time: cd?.work_start_time,
-                    work_end_time: cd?.work_end_time,
-                    slot_interval: cd?.slot_interval
-                }));
                 setCompany(cd);
             });
             fetchData(compId);
@@ -124,6 +148,21 @@ export default function SalonBoard() {
             return () => clearInterval(interval);
         }
     }, [boardKey, fetchData]);
+
+    // In staff mode, filter staff list to only show the logged-in staff member
+    const displayStaff = staffMode && staffInfo
+        ? staff.filter(s => s.user_id === staffInfo.id || s.id === staffInfo.id)
+        : staff;
+
+    const handleStaffLogout = () => {
+        localStorage.removeItem('staff_board_code');
+        localStorage.removeItem('salon_board_company_id');
+        setStaffMode(false);
+        setStaffInfo(null);
+        setBoardKey(null);
+        setCompany(null);
+        navigate('/');
+    };
 
     // Auto-scroll to current hour
     useEffect(() => {
@@ -295,6 +334,13 @@ export default function SalonBoard() {
                         {company?.name || 'Yükleniyor...'}
                     </h1>
                     <div className="flex items-center gap-3">
+                        {staffMode && staffInfo && (
+                            <div className="bg-emerald-50 text-emerald-700 px-4 py-1.5 rounded-full flex items-center gap-2 border border-emerald-100 shadow-sm">
+                                <span className="text-[11px] font-black uppercase tracking-widest leading-none">
+                                    👤 {staffInfo.first_name} {staffInfo.last_name}
+                                </span>
+                            </div>
+                        )}
                         <div className="bg-indigo-50 text-indigo-600 px-4 py-1.5 rounded-full flex items-center gap-2 border border-indigo-100 shadow-sm">
                             <span className="text-[11px] font-black uppercase tracking-widest leading-none">
                                 {new Date(selectedDate).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
@@ -348,8 +394,12 @@ export default function SalonBoard() {
                     <button
                         onClick={() => {
                             if (confirm('Sistemden çıkış yapılsın mı?')) {
-                                localStorage.removeItem('salon_board_key');
-                                window.location.reload();
+                                if (staffMode) {
+                                    handleStaffLogout();
+                                } else {
+                                    localStorage.removeItem('salon_board_key');
+                                    window.location.reload();
+                                }
                             }
                         }}
                         className="group w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all flex items-center justify-center shadow-sm"
@@ -402,7 +452,7 @@ export default function SalonBoard() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {staff.map(person => {
+                            {displayStaff.map(person => {
                                 const pId = person.user_id || person.id;
                                 const staffColor = getStaffColor(`${person.first_name} ${person.last_name}`);
                                 return (

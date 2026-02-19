@@ -442,7 +442,7 @@ router.post('/check-code', async (req: Request, res: Response) => {
                 success: true,
                 data: {
                     type: 'staff',
-                    redirect: `/staff-panel`,
+                    redirect: `/board`,
                     staff_name: `${staffResult.rows[0].first_name} ${staffResult.rows[0].last_name}`,
                     company_name: staffResult.rows[0].company_name,
                     board_code: staffResult.rows[0].board_code
