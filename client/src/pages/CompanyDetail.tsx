@@ -191,6 +191,59 @@ export default function CompanyDetail() {
                             Randevu sistemi bu saatlere göre çalışacaktır.
                         </p>
                     </div>
+
+                    {/* Firma Yönetim Paneli - YENİ */}
+                    <div className="card bg-slate-900 text-white border-none shadow-2xl shadow-slate-200 overflow-hidden relative">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
+                        <div className="relative z-10">
+                            <h2 className="text-lg font-black mb-6 flex items-center gap-2">
+                                <span className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center text-sm">📱</span>
+                                Firma Yönetim Paneli
+                            </h2>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                                <div className="space-y-4">
+                                    <p className="text-slate-400 text-sm leading-relaxed">
+                                        Firma yöneticisinin personelleri, departmanları ve randevuları mobil üzerinden yönetebileceği şifresiz giriş anahtarıdır.
+                                    </p>
+                                    <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">YÖNETİM ANAHTARI (ADMIN KEY)</p>
+                                        <p className="text-2xl font-black tracking-widest font-mono text-white">
+                                            {company.admin_key || 'ADM-NEW-RANDOM'}
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(company.admin_key || '');
+                                                alert('Anahtar kopyalandı!');
+                                            }}
+                                            className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                        >
+                                            Kopyala
+                                        </button>
+                                        <Link
+                                            to={`/company-panel?key=${company.admin_key}`}
+                                            className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                        >
+                                            Panele Git
+                                        </Link>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col items-center gap-4">
+                                    <div className="bg-white p-4 rounded-3xl shadow-xl">
+                                        <img
+                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/ekuafor/company-panel?key=${company.admin_key}`)}`}
+                                            alt="Admin Panel QR"
+                                            className="w-32 h-32"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] font-black text-slate-500 text-center uppercase tracking-widest">YÖNETİCİ GİRİŞ QR KODU</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </main>
         </div>

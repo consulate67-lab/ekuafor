@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import pool from '../config/database';
 import companyService from '../services/company.service';
 import employeeRoutes from './employee.routes';
 import { authMiddleware, roleCheck } from '../middleware/auth.middleware';
@@ -262,6 +263,98 @@ router.post('/board-login', async (req: Request, res: Response) => {
         res.status(500).json({
             success: false,
             error: error instanceof Error ? error.message : 'Giriş yapılırken hata oluştu'
+        });
+    }
+});
+
+/**
+ * POST /api/companies/admin-login
+ * Firma admin paneline admin_key ile giriş
+ */
+router.post('/admin-login', async (req: Request, res: Response) => {
+    try {
+        const { admin_key } = req.body;
+        if (!admin_key) {
+            return res.status(400).json({ success: false, error: 'Admin anahtarı gereklidir' });
+        }
+
+        const result = await pool.query('SELECT * FROM companies WHERE admin_key = $1', [admin_key]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Geçersiz admin anahtarı' });
+        }
+
+        res.json({ success: true, data: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Giriş yapılırken hata oluştu'
+        });
+    }
+});
+
+/**
+ * POST /api/companies/:id/create-staff-board
+ * Personel board kodu oluştur (yeni kullanıcı + board_code)
+ */
+router.post('/:id/create-staff-board', async (req: Request, res: Response) => {
+    try {
+        const companyId = parseInt(req.params.id);
+        const { first_name, last_name, gender, department_id } = req.body;
+
+        if (!first_name || !last_name) {
+            return res.status(400).json({ success: false, error: 'İsim ve soyisim gereklidir' });
+        }
+
+        // Benzersiz board_code oluştur
+        const prefix = first_name.substring(0, 3).toUpperCase();
+        const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+        const board_code = `${prefix}-${random}`;
+
+        // Kullanıcı oluştur (şifre olmadan, board_code ile erişim)
+        const email = `${board_code.toLowerCase()}@staff.local`;
+        const userResult = await pool.query(
+            `INSERT INTO users (email, password, role, first_name, last_name, phone, company_id, board_code, gender, department_id)
+             VALUES ($1, $2, 'company_admin', $3, $4, '', $5, $6, $7, $8)
+             RETURNING *`,
+            [email, 'board-auth-only', first_name, last_name, companyId, board_code, gender || null, department_id || null]
+        );
+
+        // company_users bağlantısı ekle
+        await pool.query(
+            'INSERT INTO company_users (company_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+            [companyId, userResult.rows[0].id, 'staff']
+        );
+
+        res.status(201).json({ success: true, data: userResult.rows[0] });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Personel oluşturulurken hata oluştu'
+        });
+    }
+});
+
+/**
+ * GET /api/companies/:id/staff-boards
+ * Firma personel board kodlarını listele
+ */
+router.get('/:id/staff-boards', async (req: Request, res: Response) => {
+    try {
+        const companyId = parseInt(req.params.id);
+        const result = await pool.query(
+            `SELECT u.id, u.first_name, u.last_name, u.board_code, u.gender, u.department_id, d.name as department_name
+             FROM users u
+             LEFT JOIN departments d ON u.department_id = d.id
+             WHERE u.company_id = $1 AND u.board_code IS NOT NULL
+             ORDER BY u.first_name`,
+            [companyId]
+        );
+
+        res.json({ success: true, data: result.rows });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Personel listesi yüklenirken hata oluştu'
         });
     }
 });

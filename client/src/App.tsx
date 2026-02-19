@@ -14,6 +14,7 @@ import CustomerHome from './pages/CustomerHome';
 import BookingPage from './pages/BookingPage';
 import SmsSettings from './pages/SmsSettings';
 import SalonBoard from './pages/SalonBoard';
+import CompanyPanel from './pages/CompanyPanel';
 
 function App() {
     const { isAuthenticated, initialized, setUser, setInitialized } = useAuthStore();
@@ -70,6 +71,7 @@ function App() {
                     <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
                     <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />} />
                     <Route path="/board" element={<SalonBoard />} />
+                    <Route path="/company-panel" element={<CompanyPanel />} />
 
                     {/* Protected Routes */}
                     {isAuthenticated ? (

@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS users (
     last_name VARCHAR(100) NOT NULL,
     phone VARCHAR(20),
     company_id INTEGER, -- Hangi firmaya ait olduğu
+    board_code VARCHAR(20) UNIQUE, -- Personel board giriş kodu
+    gender VARCHAR(10), -- cinsiyet
+    department_id INTEGER, -- departman (silinirse NULL olur)
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -78,7 +81,17 @@ CREATE TABLE IF NOT EXISTS companies (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     -- Admin İlişkisi
-    created_by INTEGER REFERENCES users(id)
+    created_by INTEGER REFERENCES users(id),
+    admin_key VARCHAR(20) UNIQUE, -- Firma yönetim paneli anahtarı
+    board_key VARCHAR(20) UNIQUE -- Salon board anahtarı
+);
+
+-- Departmanlar Tablosu
+CREATE TABLE IF NOT EXISTS departments (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Firma-Kullanıcı İlişkisi

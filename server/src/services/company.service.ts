@@ -40,6 +40,7 @@ export interface Company {
     work_start_time?: string;
     work_end_time?: string;
     slot_interval?: number;
+    admin_key?: string;
 }
 
 class CompanyService {
@@ -59,8 +60,8 @@ class CompanyService {
           bank_name, bank_branch, iban, account_holder_name,
           commission_rate, payment_enabled,
           is_active, is_verified, created_by, board_key, 
-          work_start_time, work_end_time, slot_interval
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
+          work_start_time, work_end_time, slot_interval, admin_key
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
         RETURNING *
       `;
 
@@ -92,7 +93,8 @@ class CompanyService {
                 company.board_key || null,
                 company.work_start_time || '09:00',
                 company.work_end_time || '20:00',
-                company.slot_interval || 30
+                company.slot_interval || 30,
+                company.admin_key || `ADM-${company.name.substring(0, 3).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
             ];
 
             const result = await client.query(query, values);
