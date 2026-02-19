@@ -264,26 +264,57 @@ export default function SalonBoard() {
 
     const pendingCount = appointments.filter(a => a.status === 'pending').length;
 
+    const getSpecialDay = (dateStr: string) => {
+        const d = new Date(dateStr);
+        const day = d.getDate();
+        const month = d.getMonth() + 1;
+
+        const fixedDays: Record<string, string> = {
+            '1-1': 'Yılbaşı',
+            '23-4': 'Ulusal Egemenlik ve Çocuk Bayramı',
+            '1-5': 'Emek ve Dayanışma Günü',
+            '19-5': 'Atatürk\'ü Anma, Gençlik ve Spor Bayramı',
+            '15-7': 'Demokrasi ve Milli Birlik Günü',
+            '30-8': 'Zafer Bayramı',
+            '28-10': 'Cumhuriyet Bayramı (Arife)',
+            '29-10': 'Cumhuriyet Bayramı',
+            '10-11': 'Atatürk\'ü Anma Günü'
+        };
+
+        return fixedDays[`${day}-${month}`] || null;
+    };
+
+    const specialDay = getSpecialDay(selectedDate);
+
     return (
         <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans overflow-hidden selection:bg-indigo-100">
             {/* Ultra Modern Header */}
             <header className="bg-white/70 backdrop-blur-xl px-10 py-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] border-b border-slate-100 flex justify-between items-center z-50">
-                <div className="flex items-center gap-8">
-                    <div className="relative">
-                        <div className="bg-slate-900 text-white px-5 py-2.5 rounded-2xl flex items-center gap-3 shadow-xl shadow-slate-900/10">
-                            <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.8)]"></span>
-                            <span className="text-[11px] font-black uppercase tracking-widest leading-none mt-0.5">Canlı Matris</span>
-                        </div>
-                    </div>
-                    <div>
-                        <h1 className="text-3xl font-black text-slate-900 leading-none mb-1.5 uppercase tracking-tighter decoration-indigo-500 underline-offset-4 decoration-4">
-                            {company?.name || 'Yükleniyor...'}
-                        </h1>
-                        <div className="flex items-center gap-4">
-                            <span className="text-xs font-black text-indigo-500 uppercase tracking-widest animate-pulse">
-                                {new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                <div className="flex flex-col">
+                    <h1 className="text-3xl font-black text-slate-900 leading-none mb-2 uppercase tracking-tighter decoration-indigo-500 underline-offset-4 decoration-4">
+                        {company?.name || 'Yükleniyor...'}
+                    </h1>
+                    <div className="flex items-center gap-3">
+                        <div className="bg-indigo-50 text-indigo-600 px-4 py-1.5 rounded-full flex items-center gap-2 border border-indigo-100 shadow-sm">
+                            <span className="text-[11px] font-black uppercase tracking-widest leading-none">
+                                {new Date(selectedDate).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                            </span>
+                            <span className="w-1 h-3 bg-indigo-200 rounded-full"></span>
+                            <span className="text-[11px] font-black uppercase tracking-widest leading-none text-indigo-400">
+                                {new Date(selectedDate).toLocaleDateString('tr-TR', { weekday: 'long' })}
                             </span>
                         </div>
+                        {specialDay && (
+                            <div className="bg-amber-50 text-amber-700 px-4 py-1.5 rounded-full flex items-center gap-2 border border-amber-100 animate-pulse transition-all">
+                                <span className="text-sm">✨</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest leading-none">
+                                    {specialDay}
+                                </span>
+                            </div>
+                        )}
+                        <span className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
+                            {new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
                     </div>
                 </div>
 
