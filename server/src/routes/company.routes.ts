@@ -342,10 +342,11 @@ router.get('/:id/staff-boards', async (req: Request, res: Response) => {
     try {
         const companyId = parseInt(req.params.id);
         const result = await pool.query(
-            `SELECT u.id, u.first_name, u.last_name, u.board_code, u.gender, u.department_id, d.name as department_name
+            `SELECT DISTINCT u.id, u.first_name, u.last_name, u.board_code, u.gender, u.department_id, d.name as department_name
              FROM users u
              LEFT JOIN departments d ON u.department_id = d.id
-             WHERE u.company_id = $1 AND u.board_code IS NOT NULL
+             LEFT JOIN company_users cu ON cu.user_id = u.id AND cu.company_id = $1
+             WHERE (u.company_id = $1 OR cu.company_id = $1) AND u.role != 'customer'
              ORDER BY u.first_name`,
             [companyId]
         );

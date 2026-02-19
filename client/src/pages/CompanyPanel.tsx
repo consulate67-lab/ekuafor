@@ -303,14 +303,16 @@ export default function CompanyPanel() {
                                     <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Personel</p>
                                 </div>
                                 <div className="bg-white rounded-2xl p-4 text-center shadow-lg shadow-slate-200/30 border border-slate-50">
-                                    <p className="text-3xl font-black text-purple-600">{departments.length}</p>
-                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Departman</p>
-                                </div>
-                                <div className="bg-white rounded-2xl p-4 text-center shadow-lg shadow-slate-200/30 border border-slate-50">
                                     <p className="text-3xl font-black text-emerald-600">
                                         {company.work_start_time?.substring(0, 5) || '09:00'}
                                     </p>
                                     <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Açılış</p>
+                                </div>
+                                <div className="bg-white rounded-2xl p-4 text-center shadow-lg shadow-slate-200/30 border border-slate-50">
+                                    <p className="text-3xl font-black text-purple-600">
+                                        {company.work_end_time?.substring(0, 5) || '20:00'}
+                                    </p>
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Kapanış</p>
                                 </div>
                             </div>
 
@@ -346,8 +348,8 @@ export default function CompanyPanel() {
                                     <p className="text-sm font-black text-slate-900 font-mono tracking-wider truncate">{company.board_key || '—'}</p>
                                 </div>
                                 <div className="bg-white rounded-2xl p-4 shadow-lg shadow-slate-200/20 border border-slate-50">
-                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Kapanış</p>
-                                    <p className="text-sm font-black text-slate-900">{company.work_end_time?.substring(0, 5) || '20:00'}</p>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Departman</p>
+                                    <p className="text-sm font-black text-slate-900">{departments.length} birim</p>
                                 </div>
                             </div>
                         </div>
