@@ -239,11 +239,11 @@ export default function CustomerHome() {
                 </div>
             </header>
 
-            {/* Hero & Search */}
-            <div className="bg-gradient-to-br from-[#1e1b4b] to-[#111827] text-white pt-12 pb-16 px-4 rounded-b-[2.5rem] shadow-xl shadow-indigo-200 relative mb-8">
+            {/* Hero Section - Streamlined */}
+            <div className="bg-gradient-to-br from-[#1e1b4b] to-[#111827] text-white pt-8 pb-12 px-4 rounded-b-[2.5rem] shadow-xl shadow-indigo-200 relative mb-6">
                 <div className="max-w-md mx-auto text-center px-2">
-                    <h2 className="text-3xl font-black mb-4 leading-tight tracking-tight">Kusursuz Görünüm<br />Burada Başlar.</h2>
-                    <p className="text-white/60 text-sm font-medium mb-10 max-w-[280px] mx-auto">En iyi uzmanlar ve size en yakın salonlar tek bir tıkla yanınızda.</p>
+                    <h2 className="text-2xl font-black mb-3 leading-tight tracking-tight">Kusursuz Görünüm<br />Burada Başlar.</h2>
+                    <p className="text-white/40 text-[11px] font-bold uppercase tracking-widest mb-8">En iyi uzmanlar tek bir tıkla yanınızda.</p>
 
                     <div className="flex items-center gap-3">
                         <div className="relative group flex-1">
@@ -303,20 +303,20 @@ export default function CustomerHome() {
                 )}
             </div>
 
-            {/* Banner / Call to Action */}
-            <div className="max-w-md mx-auto px-4 -mt-10 relative z-10 mb-8">
+            {/* Compact Location Card */}
+            <div className="max-w-md mx-auto px-4 -mt-8 relative z-10 mb-6">
                 <button
                     onClick={handleGetLocation}
                     disabled={locating}
-                    className="w-full bg-white rounded-[2rem] p-6 shadow-2xl shadow-slate-200/50 flex items-center justify-between group active:scale-[0.98] transition-all border border-slate-50"
+                    className="w-full bg-white rounded-3xl p-4 shadow-xl shadow-slate-200/50 flex items-center justify-between group active:scale-[0.98] transition-all border border-slate-50"
                 >
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-indigo-50 text-[#1e1b4b] rounded-2xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
-                            {locating ? <div className="w-5 h-5 border-2 border-[#1e1b4b] border-t-transparent rounded-full animate-spin" /> : '📍'}
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-indigo-50 text-[#1e1b4b] rounded-xl flex items-center justify-center text-lg group-hover:scale-110 transition-transform">
+                            {locating ? <div className="w-4 h-4 border-2 border-[#1e1b4b] border-t-transparent rounded-full animate-spin" /> : '📍'}
                         </div>
-                        <div className="text-left font-bold">
-                            <p className="text-slate-900 text-sm">{locating ? 'Aranıyor...' : (location ? 'Konum Algılandı' : 'Yakınındakileri Bul')}</p>
-                            <p className="text-slate-400 text-[10px] uppercase tracking-widest">{locating ? 'Yakındaki salonlar yükleniyor' : (location ? 'Sana en yakın sonuçlar' : 'Çevrendeki en iyi uzmanları keşfet')}</p>
+                        <div className="text-left">
+                            <p className="text-slate-900 text-[13px] font-black">{locating ? 'Aranıyor...' : (location ? 'Konum Algılandı' : 'Yakınındakileri Bul')}</p>
+                            <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest leading-none mt-1">{locating ? 'Salonlar yükleniyor' : (location ? 'En yakın sonuçlar' : 'Uzmanları keşfet')}</p>
                         </div>
                     </div>
                     {!locating && (
@@ -331,23 +331,23 @@ export default function CustomerHome() {
 
             {/* Horizontal Favorites - Modern Way */}
             {favorites.length > 0 && (
-                <div className="max-w-md mx-auto py-4">
-                    <div className="flex items-center justify-between px-6 mb-4">
+                <div className="max-w-md mx-auto py-2">
+                    <div className="flex items-center justify-between px-6 mb-3">
                         <h3 className="font-black text-slate-900 uppercase tracking-widest text-[10px]">Favorilerim</h3>
-                        <span className="bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full text-[9px] font-black">{favorites.length}</span>
+                        <span className="bg-orange-50 text-orange-600 px-2.5 py-1 rounded-full text-[9px] font-black">❤️ {favorites.length}</span>
                     </div>
-                    <div className="flex gap-4 overflow-x-auto px-6 pb-4 hide-scrollbar">
+                    <div className="flex gap-3 overflow-x-auto px-6 pb-4 hide-scrollbar">
                         {favoriteCompanies.map((c: any) => (
                             <Link
                                 to={`/book/${c.id}`}
                                 key={c.id}
-                                className="flex-shrink-0 w-32 bg-white rounded-3xl p-4 shadow-lg shadow-slate-200/30 border border-slate-50 text-center group active:scale-95 transition-all"
+                                className="flex-shrink-0 w-28 bg-white rounded-3xl p-3 shadow-lg shadow-slate-200/30 border border-slate-50 text-center group active:scale-95 transition-all"
                             >
-                                <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-3 group-hover:bg-indigo-50 transition-colors">
+                                <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-xl mx-auto mb-2 group-hover:bg-orange-50 transition-colors">
                                     💈
                                 </div>
-                                <h4 className="font-black text-slate-900 text-[11px] truncate">{c.name}</h4>
-                                <p className="text-slate-400 text-[9px] font-bold mt-0.5">{c.district_name || 'Merkez'}</p>
+                                <h4 className="font-black text-slate-900 text-[10px] truncate">{c.name}</h4>
+                                <p className="text-slate-400 text-[8px] font-bold mt-0.5">{c.district_name || 'Merkez'}</p>
                             </Link>
                         ))}
                     </div>
@@ -411,8 +411,8 @@ export default function CustomerHome() {
             </div>
 
             {/* Persistent Bottom Navigation - Premium Design */}
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[360px] z-40">
-                <nav className="bg-slate-900/95 backdrop-blur-2xl rounded-[2.5rem] px-2 py-3 flex items-center justify-around shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/10">
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[360px] z-[50]">
+                <nav className="bg-slate-900/95 backdrop-blur-2xl rounded-[2.5rem] px-2 py-3 flex items-center justify-around shadow-[0_20px_50px_rgba(0,0,0,0.4)] border border-white/10">
                     <button
                         onClick={() => {
                             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -431,15 +431,14 @@ export default function CustomerHome() {
                         <button
                             onClick={() => {
                                 if (favorites.length > 0) {
-                                    window.scrollTo({ top: 400, behavior: 'smooth' });
+                                    window.scrollTo({ top: 150, behavior: 'smooth' });
                                 }
                             }}
-                            className="w-18 h-18 bg-gradient-to-br from-[#b45309] to-orange-500 rounded-full flex items-center justify-center text-3xl shadow-[0_10px_25px_rgba(180,83,9,0.4)] border-4 border-slate-900 active:scale-95 transition-all text-white relative z-10"
-                            style={{ width: '72px', height: '72px' }}
+                            className="bg-gradient-to-br from-[#b45309] to-orange-500 rounded-full flex items-center justify-center text-3xl shadow-[0_10px_25px_rgba(180,83,9,0.5)] border-4 border-[#111827] active:scale-95 transition-all text-white relative z-10"
+                            style={{ width: '68px', height: '68px' }}
                         >
                             ❤️
                         </button>
-                        <div className="absolute -bottom-1 w-10 h-1 bg-white/20 rounded-full blur-sm"></div>
                     </div>
 
                     <Link
@@ -452,6 +451,9 @@ export default function CustomerHome() {
                     </Link>
                 </nav>
             </div>
+
+            {/* Content Bottom Spacer to avoid overlap */}
+            <div className="h-32"></div>
 
             {/* Code Entry Modal */}
             {showCodeModal && (

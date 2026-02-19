@@ -466,8 +466,8 @@ export default function BookingPage() {
                                                 key={d}
                                                 disabled={isPast}
                                                 onClick={() => setSelection({ ...selection, date: dDate.toISOString().split('T')[0] })}
-                                                className={`h-12 w-full flex items-center justify-center rounded-2xl text-sm font-bold transition-all ${isSelected
-                                                    ? 'bg-slate-900 text-white shadow-lg scale-110 z-10'
+                                                className={`h-12 w-full flex items-center justify-center rounded-2xl text-sm font-black transition-all ${isSelected
+                                                    ? 'bg-[#b45309] text-white shadow-xl shadow-orange-500/40 scale-110 z-10'
                                                     : isPast
                                                         ? 'text-slate-200 cursor-not-allowed'
                                                         : 'text-slate-600 hover:bg-slate-50'
@@ -506,9 +506,9 @@ export default function BookingPage() {
                                         setSelection({ ...selection, time: slot.time });
                                         handleNext();
                                     }}
-                                    className={`py-3 rounded-xl border font-bold transition-all shadow-sm ${slot.isAvailable
-                                        ? 'bg-white border-gray-100 text-[#1e1b4b] hover:bg-[#1e1b4b] hover:text-white hover:border-[#1e1b4b]'
-                                        : 'bg-transparent border-dashed border-gray-200 text-gray-300 cursor-not-allowed opacity-30 select-none'
+                                    className={`py-4 rounded-2xl font-black text-sm transition-all shadow-sm ${slot.isAvailable
+                                        ? 'bg-white border-2 border-slate-100 text-[#1e1b4b] hover:border-orange-500 hover:shadow-xl hover:shadow-orange-500/20 active:scale-95'
+                                        : 'bg-slate-50 border-2 border-transparent text-slate-200 cursor-not-allowed opacity-40 select-none'
                                         }`}
                                 >
                                     {slot.time}
