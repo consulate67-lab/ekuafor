@@ -425,61 +425,86 @@ export default function CompanyPanel() {
 
                     {/* ADMIN QR TAB */}
                     {activeTab === 'qr' && (
-                        <div className="space-y-6">
-                            <div className="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/40 text-center">
-                                <div className="inline-flex px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest mb-6 border border-indigo-100">
-                                    Firma Yönetim QR Kodu
+                        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-120px)]">
+                            <div className="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/40 w-full max-w-md">
+
+                                {/* Üst Badge */}
+                                <div className="flex justify-center mb-8">
+                                    <div className="inline-flex items-center gap-2 px-5 py-2 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-100">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                        </svg>
+                                        Firma Yönetim Kodu
+                                    </div>
                                 </div>
 
-                                <div className="bg-white border-4 border-slate-900 rounded-3xl p-5 inline-block mb-6">
+                                {/* QR Code - Centered */}
+                                <div className="flex justify-center mb-6">
+                                    <div className="bg-white border-4 border-slate-900 rounded-3xl p-5">
+                                        <img
+                                            src={qrApiUrl(`${window.location.origin}${import.meta.env.BASE_URL}company-panel?key=${company.admin_key}`, 250)}
+                                            alt="Admin Panel QR"
+                                            className="w-44 h-44 mx-auto block"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Barcode */}
+                                <div className="flex justify-center mb-6">
                                     <img
-                                        src={qrApiUrl(`${window.location.origin}${import.meta.env.BASE_URL}company-panel?key=${company.admin_key}`, 250)}
-                                        alt="Admin Panel QR"
-                                        className="w-48 h-48"
+                                        src={`https://barcodeapi.org/api/128/${encodeURIComponent(company.admin_key || 'N/A')}`}
+                                        alt="Barcode"
+                                        className="h-14 max-w-full"
+                                        style={{ imageRendering: 'pixelated' }}
                                     />
                                 </div>
 
-                                <div className="space-y-3">
-                                    <p className="text-2xl font-black text-slate-900 tracking-widest font-mono">
+                                {/* Admin Key Code */}
+                                <div className="text-center mb-2">
+                                    <p className="text-2xl font-black text-slate-900 tracking-[0.25em] font-mono">
                                         {company.admin_key || 'Anahtar yok'}
                                     </p>
-                                    <p className="text-xs text-slate-400">Bu kodu firmaya yönetici olarak giriş yapmak için kullanın</p>
+                                </div>
 
-                                    <div className="flex gap-3 justify-center mt-6">
-                                        <button
-                                            onClick={() => copyText(company.admin_key || '', 'admin-key')}
-                                            className={`px-5 py-3 rounded-2xl text-sm font-black active:scale-95 transition-all ${copiedField === 'admin-key'
-                                                ? 'bg-emerald-600 text-white'
-                                                : 'bg-slate-900 text-white hover:bg-slate-800'
-                                                }`}
-                                        >
-                                            {copiedField === 'admin-key' ? '✅ Kopyalandı!' : '📋 Kopyala'}
-                                        </button>
-                                        <button
-                                            onClick={() => window.print()}
-                                            className="px-5 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-black hover:bg-indigo-500 active:scale-95 transition-all"
-                                        >
-                                            🖨️ Yazdır
-                                        </button>
-                                    </div>
+                                <p className="text-center text-xs text-slate-400 mb-6">
+                                    Bu kodu firmaya yönetici olarak giriş yapmak için kullanın
+                                </p>
+
+                                {/* Action Buttons */}
+                                <div className="flex gap-3 justify-center">
+                                    <button
+                                        onClick={() => copyText(company.admin_key || '', 'admin-key')}
+                                        className={`flex-1 max-w-[160px] py-3.5 rounded-2xl text-sm font-black active:scale-95 transition-all ${copiedField === 'admin-key'
+                                            ? 'bg-emerald-600 text-white'
+                                            : 'bg-slate-900 text-white hover:bg-slate-800'
+                                            }`}
+                                    >
+                                        {copiedField === 'admin-key' ? '✅ Kopyalandı!' : '📋 Kopyala'}
+                                    </button>
+                                    <button
+                                        onClick={() => window.print()}
+                                        className="flex-1 max-w-[160px] py-3.5 bg-indigo-600 text-white rounded-2xl text-sm font-black hover:bg-indigo-500 active:scale-95 transition-all"
+                                    >
+                                        🖨️ Yazdır
+                                    </button>
                                 </div>
                             </div>
 
-                            {/* Board Key */}
-                            <div className="bg-white rounded-3xl p-6 shadow-lg shadow-slate-200/20 flex items-center justify-between">
+                            {/* Board Key Card */}
+                            <div className="bg-white rounded-2xl p-5 shadow-lg shadow-slate-200/20 w-full max-w-md mt-5 flex items-center justify-between">
                                 <div>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Salon Board Anahtarı</p>
-                                    <p className="text-lg font-black text-slate-900 tracking-widest font-mono">{company.board_key || '—'}</p>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Salon Board Anahtarı</p>
+                                    <p className="text-base font-black text-slate-900 tracking-widest font-mono">{company.board_key || '—'}</p>
                                 </div>
                                 {company.board_key && (
                                     <button
                                         onClick={() => copyText(company.board_key, 'board-key')}
-                                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${copiedField === 'board-key'
+                                        className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all ${copiedField === 'board-key'
                                             ? 'bg-emerald-100 text-emerald-700'
                                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                             }`}
                                     >
-                                        {copiedField === 'board-key' ? '✅' : '📋'}
+                                        {copiedField === 'board-key' ? '✅ Kopyalandı!' : '📋 Kopyala'}
                                     </button>
                                 )}
                             </div>
