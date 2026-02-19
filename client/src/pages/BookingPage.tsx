@@ -398,40 +398,97 @@ export default function BookingPage() {
                     <div className="animate-in slide-in-from-right duration-300 fade-in">
                         <button onClick={handleBack} className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 hover:text-gray-600">← Geri</button>
                         <h2 className="text-2xl font-black text-gray-900 mb-6">Tarih Seçimi</h2>
-                        <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 text-center mb-6">
-                            <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center text-3xl mx-auto mb-6 shadow-inner">
-                                📅
-                            </div>
-                            <h3 className="text-xl font-black text-slate-900 mb-2">Tarih Belirleyin</h3>
-                            <p className="text-slate-400 text-xs font-medium mb-8">Lütfen size uygun olan günü seçin.</p>
-
-                            <div className="relative mb-6">
-                                <input
-                                    ref={dateInputRef}
-                                    type="date"
-                                    min={new Date().toISOString().split('T')[0]}
-                                    value={selection.date || ''}
-                                    onChange={(e) => {
-                                        setSelection({ ...selection, date: e.target.value });
+                        <div className="bg-white rounded-[2.5rem] p-6 shadow-xl shadow-slate-200/40 border border-slate-100">
+                            {/* Calendar Header */}
+                            <div className="flex items-center justify-between mb-8 px-2">
+                                <button
+                                    onClick={() => {
+                                        const d = new Date(selection.date || new Date());
+                                        d.setMonth(d.getMonth() - 1);
+                                        // Don't go before current month
+                                        if (d.getMonth() >= new Date().getMonth() || d.getFullYear() > new Date().getFullYear()) {
+                                            setSelection({ ...selection, date: d.toISOString().split('T')[0] });
+                                        }
                                     }}
-                                    className="w-full p-5 bg-slate-50 rounded-2xl border-2 border-slate-100 font-black text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors text-center text-lg tracking-widest uppercase cursor-pointer"
-                                />
-                                <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-400">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                </div>
+                                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-50 text-slate-400 transition-colors"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+                                </button>
+                                <h3 className="text-lg font-black text-slate-900 capitalize tracking-tight">
+                                    {new Date(selection.date || new Date()).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
+                                </h3>
+                                <button
+                                    onClick={() => {
+                                        const d = new Date(selection.date || new Date());
+                                        d.setMonth(d.getMonth() + 1);
+                                        setSelection({ ...selection, date: d.toISOString().split('T')[0] });
+                                    }}
+                                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-50 text-slate-400 transition-colors"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+                                </button>
+                            </div>
+
+                            {/* Day Names */}
+                            <div className="grid grid-cols-7 mb-4">
+                                {['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pz'].map(day => (
+                                    <div key={day} className="text-center text-[10px] font-black text-slate-300 uppercase tracking-widest">{day}</div>
+                                ))}
+                            </div>
+
+                            {/* Calendar Grid */}
+                            <div className="grid grid-cols-7 gap-y-2">
+                                {(() => {
+                                    const date = new Date(selection.date || new Date());
+                                    const year = date.getFullYear();
+                                    const month = date.getMonth();
+                                    const firstDay = new Date(year, month, 1).getDay(); // 0 is Sunday
+                                    const daysCount = new Date(year, month + 1, 0).getDate();
+                                    const today = new Date();
+                                    today.setHours(0, 0, 0, 0);
+
+                                    // Adjust firstDay for Monday start (0=Pt, 6=Pz)
+                                    const offset = firstDay === 0 ? 6 : firstDay - 1;
+
+                                    const elements = [];
+                                    // Empty cells
+                                    for (let i = 0; i < offset; i++) {
+                                        elements.push(<div key={`empty-${i}`} className="h-12" />);
+                                    }
+                                    // Days
+                                    for (let d = 1; d <= daysCount; d++) {
+                                        const dDate = new Date(year, month, d);
+                                        const isSelected = selection.date === dDate.toISOString().split('T')[0];
+                                        const isPast = dDate < today;
+
+                                        elements.push(
+                                            <button
+                                                key={d}
+                                                disabled={isPast}
+                                                onClick={() => setSelection({ ...selection, date: dDate.toISOString().split('T')[0] })}
+                                                className={`h-12 w-full flex items-center justify-center rounded-2xl text-sm font-bold transition-all ${isSelected
+                                                    ? 'bg-slate-900 text-white shadow-lg scale-110 z-10'
+                                                    : isPast
+                                                        ? 'text-slate-200 cursor-not-allowed'
+                                                        : 'text-slate-600 hover:bg-slate-50'
+                                                    }`}
+                                            >
+                                                {d}
+                                            </button>
+                                        );
+                                    }
+                                    return elements;
+                                })()}
                             </div>
 
                             <button
                                 disabled={!selection.date}
                                 onClick={handleNext}
-                                className={`w-full py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-xs transition-all ${selection.date ? 'bg-slate-900 text-white shadow-xl shadow-indigo-950/20 active:scale-95' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                                className={`w-full py-4 mt-8 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] transition-all ${selection.date ? 'bg-slate-900 text-white shadow-xl shadow-indigo-950/20 active:scale-95' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
                             >
-                                Devam Et
+                                Randevu Saati Seç
                             </button>
                         </div>
-                        <p className="text-[10px] text-gray-400 text-center font-bold uppercase tracking-widest opacity-50">
-                            Takvimle etkileşime geçmek için kutucuğa dokunun
-                        </p>
                     </div>
                 )}
 
@@ -467,52 +524,88 @@ export default function BookingPage() {
 
                 {/* Step 5: Confirmation */}
                 {step === 5 && (
-                    <div className="animate-in slide-in-from-right duration-300 fade-in">
-                        <button onClick={handleBack} className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 hover:text-gray-600">← Geri</button>
-                        <h2 className="text-2xl font-black text-gray-900 mb-6">Bilgilerinizi Girin</h2>
-
-                        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm mb-6">
-                            <div className="flex justify-between items-center border-b border-gray-50 pb-4 mb-4">
-                                <span className="text-xs font-bold text-gray-400 uppercase">Personel</span>
-                                <span className="font-bold text-gray-900">{selectedStaffUser?.first_name} {selectedStaffUser?.last_name}</span>
-                            </div>
-                            <div className="flex justify-between items-center border-b border-gray-50 pb-4 mb-4">
-                                <span className="text-xs font-bold text-gray-400 uppercase">Hizmet</span>
-                                <span className="font-bold text-gray-900">{selectedService?.name}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-xs font-bold text-gray-400 uppercase">Tarih/Saat</span>
-                                <span className="font-bold text-gray-900">{selection.date} / {selection.time}</span>
-                            </div>
-                        </div>
-
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Adınız Soyadınız</label>
-                                <input
-                                    required
-                                    type="text"
-                                    value={selection.customerName}
-                                    onChange={e => setSelection({ ...selection, customerName: e.target.value })}
-                                    className="w-full p-4 bg-white rounded-xl border-2 border-gray-100 font-bold text-gray-900 focus:outline-none focus:border-pink-500 transition-colors"
-                                    placeholder="Örn: Ahmet Yılmaz"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Telefon Numaranız</label>
-                                <input
-                                    required
-                                    type="tel"
-                                    value={selection.customerPhone}
-                                    onChange={e => setSelection({ ...selection, customerPhone: e.target.value })}
-                                    className="w-full p-4 bg-white rounded-xl border-2 border-gray-100 font-bold text-gray-900 focus:outline-none focus:border-pink-500 transition-colors"
-                                    placeholder="Örn: 0555 555 55 55"
-                                />
-                            </div>
-                            <button className="w-full btn-primary py-4 text-sm font-black uppercase tracking-widest shadow-xl shadow-indigo-500/30 mt-4 rounded-xl">
-                                Randevuyu Onayla
+                    <div className="animate-in slide-in-from-right duration-300 fade-in text-center">
+                        <header className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md px-6 py-4 flex items-center justify-between z-50 border-b border-slate-50">
+                            <button onClick={handleBack} className="flex items-center gap-1 text-slate-400 font-bold text-sm">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+                                <span>Saat Seç</span>
                             </button>
-                        </form>
+                            <h2 className="font-black text-slate-900 tracking-tight">{company.name}</h2>
+                            <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
+                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg>
+                            </div>
+                        </header>
+
+                        <div className="pt-12 pb-10">
+                            <div className="w-20 h-20 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-emerald-200 ring-8 ring-emerald-50">
+                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" /></svg>
+                            </div>
+                            <h2 className="text-2xl font-black text-slate-900 mb-8 px-4 leading-tight">Randevunuzu neredeyse<br />onaylamak üzereyiz!</h2>
+
+                            <div className="bg-white rounded-[2.5rem] p-1 border border-slate-100 shadow-2xl shadow-slate-200/50 mb-8 mx-1 overflow-hidden">
+                                <div className="p-6 flex items-center gap-4 bg-slate-50/50">
+                                    <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-xl font-black text-slate-400">
+                                        {selectedStaffUser?.first_name[0]}
+                                    </div>
+                                    <div className="text-left flex-1">
+                                        <h3 className="font-black text-slate-900 text-lg uppercase tracking-tight">{selectedStaffUser?.first_name} {selectedStaffUser?.last_name}</h3>
+                                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">{selectedService?.name}</p>
+                                    </div>
+                                    <div className="w-6 h-6 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-emerald-200">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                    </div>
+                                </div>
+                                <div className="p-6 text-left border-t border-slate-100">
+                                    <p className="text-slate-500 font-bold mb-1 text-sm capitalize">
+                                        {new Date(selection.date!).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' })}
+                                    </p>
+                                    <p className="text-3xl font-black text-slate-900 tracking-tight">{selection.time}</p>
+                                </div>
+                            </div>
+
+                            <form onSubmit={handleSubmit} className="space-y-6 text-left px-2">
+                                <div className="space-y-4">
+                                    <div className="relative">
+                                        <input
+                                            required
+                                            type="text"
+                                            value={selection.customerName}
+                                            onChange={e => setSelection({ ...selection, customerName: e.target.value })}
+                                            className="w-full p-5 bg-white rounded-2xl border-2 border-slate-100 font-bold text-slate-900 focus:outline-none focus:border-indigo-500 shadow-sm transition-all text-sm"
+                                            placeholder="Adınız Soyadınız"
+                                        />
+                                    </div>
+                                    <div className="relative">
+                                        <input
+                                            required
+                                            type="tel"
+                                            value={selection.customerPhone}
+                                            onChange={e => setSelection({ ...selection, customerPhone: e.target.value })}
+                                            className="w-full p-5 bg-white rounded-2xl border-2 border-slate-100 font-bold text-slate-900 focus:outline-none focus:border-indigo-500 shadow-sm transition-all text-sm"
+                                            placeholder="Telefon Numaranız"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3 px-2">
+                                    <div className="flex items-start gap-4 group">
+                                        <div className="w-5 h-5 rounded-full border-2 border-orange-500 flex-shrink-0 mt-0.5 group-hover:bg-orange-50 transition-colors"></div>
+                                        <p className="text-[11px] text-slate-400 font-medium leading-relaxed">Numaranız randevu detaylarını paylaşmak için kullanılacaktır!</p>
+                                    </div>
+                                    <label className="flex items-center gap-4 cursor-pointer group">
+                                        <input type="checkbox" className="hidden peer" defaultChecked />
+                                        <div className="w-5 h-5 rounded-md border-2 border-slate-200 peer-checked:bg-orange-500 peer-checked:border-orange-500 transition-all flex items-center justify-center">
+                                            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" /></svg>
+                                        </div>
+                                        <span className="text-[11px] text-slate-400 font-medium uppercase tracking-tight">SMS ile bildirim almak istiyorum</span>
+                                    </label>
+                                </div>
+
+                                <button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-5 rounded-3xl font-black text-base uppercase tracking-widest shadow-2xl shadow-orange-200 active:scale-95 transition-all mt-6">
+                                    Randevuyu Onayla
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 )}
 

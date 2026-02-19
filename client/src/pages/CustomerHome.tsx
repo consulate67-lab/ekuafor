@@ -411,43 +411,44 @@ export default function CustomerHome() {
             </div>
 
             {/* Persistent Bottom Navigation - Premium Design */}
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-48px)] max-w-sm z-40">
-                <nav className="bg-slate-900/95 backdrop-blur-xl rounded-[2.5rem] p-2 flex items-center justify-between shadow-2xl shadow-indigo-900/40 border border-white/5">
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[360px] z-40">
+                <nav className="bg-slate-900/95 backdrop-blur-2xl rounded-[2.5rem] px-2 py-3 flex items-center justify-around shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/10">
                     <button
                         onClick={() => {
                             window.scrollTo({ top: 0, behavior: 'smooth' });
                             setSearchQuery('');
                             fetchData();
                         }}
-                        className="flex-1 flex flex-col items-center gap-1 group"
+                        className="flex flex-col items-center justify-center w-14 h-14 group"
                     >
-                        <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white active:scale-90 transition-all group-hover:bg-white/20">
+                        <div className="w-11 h-11 bg-white/5 rounded-2xl flex items-center justify-center text-xl active:scale-90 transition-all group-hover:bg-white/10 border border-white/5">
                             🏠
                         </div>
                     </button>
 
                     {/* Floating Center Favorites Button */}
-                    <button
-                        onClick={() => {
-                            if (favorites.length > 0) {
-                                window.scrollTo({ top: 300, behavior: 'smooth' });
-                            }
-                        }}
-                        className="flex-1 flex flex-col items-center gap-1 group -mt-10"
-                    >
-                        <div className="w-16 h-16 bg-gradient-to-br from-[#b45309] to-orange-400 rounded-full flex items-center justify-center text-2xl shadow-xl shadow-orange-950/40 border-4 border-slate-900 active:scale-95 transition-all text-white">
+                    <div className="relative -mt-12 flex flex-col items-center">
+                        <button
+                            onClick={() => {
+                                if (favorites.length > 0) {
+                                    window.scrollTo({ top: 400, behavior: 'smooth' });
+                                }
+                            }}
+                            className="w-18 h-18 bg-gradient-to-br from-[#b45309] to-orange-500 rounded-full flex items-center justify-center text-3xl shadow-[0_10px_25px_rgba(180,83,9,0.4)] border-4 border-slate-900 active:scale-95 transition-all text-white relative z-10"
+                            style={{ width: '72px', height: '72px' }}
+                        >
                             ❤️
-                        </div>
-                    </button>
+                        </button>
+                        <div className="absolute -bottom-1 w-10 h-1 bg-white/20 rounded-full blur-sm"></div>
+                    </div>
 
                     <Link
                         to="/my-appointments"
-                        className="flex-1 flex flex-col items-center gap-1 group"
+                        className="flex flex-col items-center justify-center w-14 h-14 group"
                     >
-                        <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white active:scale-90 transition-all group-hover:bg-white/20">
+                        <div className="w-11 h-11 bg-white/5 rounded-2xl flex items-center justify-center text-xl active:scale-90 transition-all group-hover:bg-white/10 border border-white/5">
                             📅
                         </div>
-                        {/* Potential Status Badge / Notification Dot would go here */}
                     </Link>
                 </nav>
             </div>
