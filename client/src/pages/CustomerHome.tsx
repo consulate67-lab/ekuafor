@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { Company } from '../types';
 import { Geolocation } from '@capacitor/geolocation';
 
 export default function CustomerHome() {
+    const navigate = useNavigate();
     const [companies, setCompanies] = useState<Company[]>([]);
     const [filteredCompanies, setFilteredCompanies] = useState<Company[]>([]);
     const [loading, setLoading] = useState(true);
@@ -14,6 +15,13 @@ export default function CustomerHome() {
     const [distanceLimit, setDistanceLimit] = useState(50);
     const [showSlider, setShowSlider] = useState(false);
     const [locating, setLocating] = useState(false);
+
+    // Code Scanner States
+    const [showCodeModal, setShowCodeModal] = useState(false);
+    const [codeInput, setCodeInput] = useState('');
+    const [codeChecking, setCodeChecking] = useState(false);
+    const [codeError, setCodeError] = useState('');
+    const [codeResult, setCodeResult] = useState<any>(null);
 
     const fetchData = async (query?: string, loc?: { lat: number, lng: number } | null, dist?: number) => {
         try {
@@ -167,6 +175,43 @@ export default function CustomerHome() {
 
     const favoriteCompanies = companies.filter(c => favorites.includes(c.id!));
 
+    const handleCheckCode = async () => {
+        if (!codeInput.trim()) return;
+        setCodeChecking(true);
+        setCodeError('');
+        setCodeResult(null);
+        try {
+            const res = await api.post('/companies/check-code', { code: codeInput.trim().toUpperCase() });
+            if (res.data?.success) {
+                setCodeResult(res.data.data);
+                // Yönlendirme için kısa gecikme (kullanıcı sonucu görsün)
+                setTimeout(() => {
+                    const data = res.data.data;
+                    if (data.type === 'admin') {
+                        navigate(data.redirect);
+                    } else if (data.type === 'staff') {
+                        localStorage.setItem('staff_board_code', data.board_code);
+                        navigate(data.redirect);
+                    } else if (data.type === 'board') {
+                        localStorage.setItem('salon_board_key', data.board_key);
+                        navigate(data.redirect);
+                    }
+                }, 1200);
+            }
+        } catch (err: any) {
+            setCodeError(err.response?.data?.error || 'Geçersiz kod');
+        } finally {
+            setCodeChecking(false);
+        }
+    };
+
+    const openCodeModal = () => {
+        setShowCodeModal(true);
+        setCodeInput('');
+        setCodeError('');
+        setCodeResult(null);
+    };
+
     return (
         <div className="min-h-screen bg-slate-50">
             {/* Header */}
@@ -197,6 +242,17 @@ export default function CustomerHome() {
                                 className="w-full bg-white text-gray-900 pl-12 pr-4 py-4 rounded-2xl shadow-2xl shadow-black/10 focus:ring-4 focus:ring-white/20 outline-none font-bold text-sm transition-all"
                             />
                         </div>
+                        {/* QR / Kod Tarayıcı Butonu */}
+                        <button
+                            onClick={openCodeModal}
+                            className="p-4 rounded-2xl shadow-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white hover:from-amber-400 hover:to-orange-500 active:scale-90 transition-all relative"
+                            title="QR Kod Okut / Kod Gir"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                            </svg>
+                            <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full animate-pulse shadow-lg shadow-emerald-500/50"></span>
+                        </button>
                         <button
                             onClick={() => setShowSlider(!showSlider)}
                             className={`p-4 rounded-2xl shadow-2xl transition-all ${showSlider ? 'bg-[#b45309] text-white' : 'bg-white text-gray-400'}`}
@@ -335,6 +391,81 @@ export default function CustomerHome() {
                     </div>
                 )}
             </div>
+
+            {/* Code Entry Modal */}
+            {showCodeModal && (
+                <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowCodeModal(false)}>
+                    <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl" onClick={e => e.stopPropagation()}
+                        style={{ animation: 'slideUp 0.3s ease-out' }}>
+                        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6" />
+
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-amber-200">
+                                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                </svg>
+                            </div>
+                            <h2 className="text-2xl font-black text-slate-900">Kod ile Giriş</h2>
+                            <p className="text-slate-400 text-sm mt-1">Yönetici veya çalışan kodunuzu girin</p>
+                        </div>
+
+                        <input
+                            type="text"
+                            value={codeInput}
+                            onChange={e => setCodeInput(e.target.value.toUpperCase())}
+                            onKeyDown={e => e.key === 'Enter' && handleCheckCode()}
+                            placeholder="ADM-XXX-XXXX veya XXX-XXXX"
+                            className="w-full p-5 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-amber-500 text-center text-xl font-black text-slate-900 tracking-[0.2em] outline-none mb-4 transition-all"
+                            autoFocus
+                        />
+
+                        {codeError && (
+                            <div className="bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-2xl text-sm font-bold text-center mb-4 animate-pulse">
+                                ❌ {codeError}
+                            </div>
+                        )}
+
+                        {codeResult && (
+                            <div className="bg-emerald-50 border border-emerald-100 text-emerald-700 px-4 py-4 rounded-2xl text-center mb-4">
+                                <div className="text-3xl mb-2">✅</div>
+                                <p className="font-black text-base">
+                                    {codeResult.type === 'admin' && `${codeResult.company_name} - Yönetici Paneli`}
+                                    {codeResult.type === 'staff' && `${codeResult.staff_name} - ${codeResult.company_name}`}
+                                    {codeResult.type === 'board' && `${codeResult.company_name} - Salon Board`}
+                                </p>
+                                <p className="text-emerald-500 text-xs font-bold mt-1 animate-pulse">Yönlendiriliyor...</p>
+                            </div>
+                        )}
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowCodeModal(false)}
+                                className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-base active:scale-95 transition-all"
+                            >
+                                İptal
+                            </button>
+                            <button
+                                onClick={handleCheckCode}
+                                disabled={codeChecking || !codeInput.trim()}
+                                className="flex-1 py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-2xl font-black text-base active:scale-95 transition-all shadow-lg shadow-amber-200 disabled:opacity-50"
+                            >
+                                {codeChecking ? 'Kontrol Ediliyor...' : 'Giriş Yap'}
+                            </button>
+                        </div>
+
+                        <p className="text-center text-[10px] text-slate-400 mt-4 font-bold uppercase tracking-widest">
+                            QR kodu okutun veya kodu elle yazın
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            <style>{`
+                @keyframes slideUp {
+                    from { transform: translateY(100%); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                }
+            `}</style>
         </div>
     );
 }

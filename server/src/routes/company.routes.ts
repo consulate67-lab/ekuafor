@@ -358,5 +358,118 @@ router.get('/:id/staff-boards', async (req: Request, res: Response) => {
         });
     }
 });
+/**
+ * POST /api/companies/staff-login
+ * Çalışan board_code ile giriş (cihaz bazlı)
+ */
+router.post('/staff-login', async (req: Request, res: Response) => {
+    try {
+        const { board_code } = req.body;
+        if (!board_code) {
+            return res.status(400).json({ success: false, error: 'Board kodu gereklidir' });
+        }
+
+        const userResult = await pool.query(
+            `SELECT u.id, u.first_name, u.last_name, u.board_code, u.gender, u.department_id, u.company_id, d.name as department_name
+             FROM users u
+             LEFT JOIN departments d ON u.department_id = d.id
+             WHERE u.board_code = $1`,
+            [board_code]
+        );
+
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Geçersiz board kodu' });
+        }
+
+        const user = userResult.rows[0];
+        const companyResult = await pool.query('SELECT * FROM companies WHERE id = $1', [user.company_id]);
+
+        if (companyResult.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Firma bulunamadı' });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                user: user,
+                company: companyResult.rows[0]
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Giriş yapılırken hata oluştu'
+        });
+    }
+});
+
+/**
+ * POST /api/companies/check-code
+ * Evrensel kod kontrol: admin_key mi board_code mu?
+ * QR tarayıcı veya elle giriş sonrası doğru ekrana yönlendirir.
+ */
+router.post('/check-code', async (req: Request, res: Response) => {
+    try {
+        const { code } = req.body;
+        if (!code) {
+            return res.status(400).json({ success: false, error: 'Kod gereklidir' });
+        }
+
+        // Önce admin_key mi kontrol et
+        const adminResult = await pool.query('SELECT id, name FROM companies WHERE admin_key = $1', [code]);
+        if (adminResult.rows.length > 0) {
+            return res.json({
+                success: true,
+                data: {
+                    type: 'admin',
+                    redirect: `/company-panel?key=${code}`,
+                    company_name: adminResult.rows[0].name
+                }
+            });
+        }
+
+        // Sonra board_code mu kontrol et
+        const staffResult = await pool.query(
+            `SELECT u.id, u.first_name, u.last_name, u.board_code, c.name as company_name
+             FROM users u
+             JOIN companies c ON u.company_id = c.id
+             WHERE u.board_code = $1`,
+            [code]
+        );
+        if (staffResult.rows.length > 0) {
+            return res.json({
+                success: true,
+                data: {
+                    type: 'staff',
+                    redirect: `/staff-panel`,
+                    staff_name: `${staffResult.rows[0].first_name} ${staffResult.rows[0].last_name}`,
+                    company_name: staffResult.rows[0].company_name,
+                    board_code: code
+                }
+            });
+        }
+
+        // SalonBoard board_key mi kontrol et
+        const boardResult = await pool.query('SELECT id, name FROM companies WHERE board_key = $1', [code]);
+        if (boardResult.rows.length > 0) {
+            return res.json({
+                success: true,
+                data: {
+                    type: 'board',
+                    redirect: `/board`,
+                    company_name: boardResult.rows[0].name,
+                    board_key: code
+                }
+            });
+        }
+
+        return res.status(404).json({ success: false, error: 'Geçersiz kod. Lütfen doğru kodu giriniz.' });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Kod kontrol edilirken hata oluştu'
+        });
+    }
+});
 
 export default router;
