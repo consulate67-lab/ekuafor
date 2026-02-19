@@ -17,10 +17,11 @@ interface StaffBoard {
     department_name: string;
 }
 
-type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff';
+type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services';
 
 const menuItems: { key: TabKey; icon: string; label: string }[] = [
     { key: 'home', icon: '🏠', label: 'Ana Sayfa' },
+    { key: 'services', icon: '✂️', label: 'Hizmetler' },
     { key: 'booking', icon: '📅', label: 'Müşteri QR' },
     { key: 'qr', icon: '🔑', label: 'Yönetim Kodu' },
     { key: 'dept', icon: '🏢', label: 'Departmanlar' },
@@ -49,6 +50,18 @@ export default function CompanyPanel() {
     });
     const [copiedField, setCopiedField] = useState('');
     const [isCreating, setIsCreating] = useState(false);
+
+    // Services states
+    const [companyServices, setCompanyServices] = useState<any[]>([]);
+    const [showServiceModal, setShowServiceModal] = useState(false);
+    const [serviceForm, setServiceForm] = useState({
+        id: null as number | null,
+        name: '',
+        description: '',
+        duration_minutes: 30,
+        price: 0
+    });
+    const [isSavingService, setIsSavingService] = useState(false);
 
     const handleLogin = async (keyToUse?: string) => {
         const key = keyToUse || inputKey.trim();
@@ -83,12 +96,14 @@ export default function CompanyPanel() {
 
     const fetchData = async (companyId: number) => {
         try {
-            const [deptRes, staffRes] = await Promise.all([
+            const [deptRes, staffRes, svcRes] = await Promise.all([
                 api.get('/departments', { params: { company_id: companyId } }),
-                api.get(`/companies/${companyId}/staff-boards`)
+                api.get(`/companies/${companyId}/staff-boards`),
+                api.get('/services', { params: { company_id: companyId } })
             ]);
             setDepartments(deptRes.data?.data || []);
             setStaffBoards(staffRes.data?.data || []);
+            setCompanyServices(svcRes.data?.data || []);
         } catch (e) {
             console.error('Data fetch error', e);
         }
@@ -134,6 +149,47 @@ export default function CompanyPanel() {
             alert(msg);
         } finally {
             setIsCreating(false);
+        }
+    };
+
+    const handleSaveService = async () => {
+        if (!serviceForm.name.trim() || !company) return;
+        setIsSavingService(true);
+        try {
+            if (serviceForm.id) {
+                // Güncelle
+                await api.put(`/services/${serviceForm.id}`, {
+                    name: serviceForm.name.trim(),
+                    description: serviceForm.description.trim(),
+                    duration_minutes: serviceForm.duration_minutes,
+                    price: serviceForm.price
+                });
+            } else {
+                // Yeni ekle
+                await api.post('/services', {
+                    name: serviceForm.name.trim(),
+                    description: serviceForm.description.trim(),
+                    duration_minutes: serviceForm.duration_minutes,
+                    price: serviceForm.price
+                });
+            }
+            setServiceForm({ id: null, name: '', description: '', duration_minutes: 30, price: 0 });
+            setShowServiceModal(false);
+            fetchData(company.id);
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Hizmet kaydedilemedi');
+        } finally {
+            setIsSavingService(false);
+        }
+    };
+
+    const handleDeleteService = async (id: number) => {
+        if (!confirm('Bu hizmeti silmek istediğinize emin misiniz?')) return;
+        try {
+            await api.delete(`/services/${id}`);
+            fetchData(company.id);
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Hizmet silinemedi');
         }
     };
 
@@ -628,6 +684,70 @@ export default function CompanyPanel() {
                             )}
                         </div>
                     )}
+                    {/* SERVICES TAB */}
+                    {activeTab === 'services' && (
+                        <div className="space-y-4">
+                            <button
+                                onClick={() => {
+                                    setServiceForm({ id: null, name: '', description: '', duration_minutes: 30, price: 0 });
+                                    setShowServiceModal(true);
+                                }}
+                                className="w-full py-5 bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-2xl font-black text-base tracking-wide shadow-xl shadow-pink-500/20 active:scale-95 transition-all"
+                            >
+                                + Yeni Hizmet Ekle
+                            </button>
+
+                            {companyServices.length === 0 ? (
+                                <div className="bg-white rounded-3xl p-10 text-center shadow-lg shadow-slate-200/20">
+                                    <span className="text-4xl mb-3 block">✂️</span>
+                                    <p className="text-slate-400 font-bold">Henüz hizmet tanımlanmadı</p>
+                                    <p className="text-slate-300 text-xs mt-1">Firmanız için hizmet listesi oluşturun</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {companyServices.map(svc => (
+                                        <div key={svc.id} className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/20 relative group">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <h3 className="font-black text-slate-900 text-lg">{svc.name}</h3>
+                                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+                                                        ⏱️ {svc.duration_minutes} dk • 💰 {svc.price} ₺
+                                                    </p>
+                                                </div>
+                                                <div className="flex bg-slate-50 rounded-xl p-1 gap-1">
+                                                    <button
+                                                        onClick={() => {
+                                                            setServiceForm({
+                                                                id: svc.id,
+                                                                name: svc.name,
+                                                                description: svc.description || '',
+                                                                duration_minutes: svc.duration_minutes,
+                                                                price: svc.price
+                                                            });
+                                                            setShowServiceModal(true);
+                                                        }}
+                                                        className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-400 hover:text-indigo-600 transition-all"
+                                                    >
+                                                        ✏️
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteService(svc.id)}
+                                                        className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-400 hover:text-red-600 transition-all"
+                                                    >
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            {svc.description && (
+                                                <p className="text-sm text-slate-500 mt-2 line-clamp-2">{svc.description}</p>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                 </div>
             </main>
 
@@ -751,6 +871,77 @@ export default function CompanyPanel() {
                                     </>
                                 ) : 'Oluştur'}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Service Modal */}
+            {showServiceModal && (
+                <div className="fixed inset-0 z-[200] flex items-end justify-center bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowServiceModal(false)}>
+                    <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}
+                        style={{ animation: 'slideUp 0.3s ease-out' }}>
+                        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
+                        <h2 className="text-2xl font-black text-slate-900 mb-6">{serviceForm.id ? 'Hizmeti Düzenle' : 'Yeni Hizmet'}</h2>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Hizmet Adı</label>
+                                <input
+                                    type="text"
+                                    value={serviceForm.name}
+                                    onChange={e => setServiceForm(p => ({ ...p, name: e.target.value }))}
+                                    placeholder="Örn: Saç Kesimi"
+                                    className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-pink-500 text-base font-bold text-slate-900 outline-none"
+                                />
+                            </div>
+
+                            <div className="flex gap-4">
+                                <div className="flex-1">
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Süre (Dk)</label>
+                                    <input
+                                        type="number"
+                                        value={serviceForm.duration_minutes}
+                                        onChange={e => setServiceForm(p => ({ ...p, duration_minutes: parseInt(e.target.value) || 0 }))}
+                                        className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-pink-500 text-base font-bold text-slate-900 outline-none"
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Ücret (₺)</label>
+                                    <input
+                                        type="number"
+                                        value={serviceForm.price}
+                                        onChange={e => setServiceForm(p => ({ ...p, price: parseFloat(e.target.value) || 0 }))}
+                                        className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-pink-500 text-base font-bold text-slate-900 outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Açıklama</label>
+                                <textarea
+                                    value={serviceForm.description}
+                                    onChange={e => setServiceForm(p => ({ ...p, description: e.target.value }))}
+                                    rows={3}
+                                    className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-pink-500 text-base font-bold text-slate-900 outline-none resize-none"
+                                />
+                            </div>
+
+                            <div className="flex gap-3 mt-6 pt-4">
+                                <button
+                                    onClick={() => setShowServiceModal(false)}
+                                    className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-base active:scale-95 transition-all"
+                                >
+                                    İptal
+                                </button>
+                                <button
+                                    onClick={handleSaveService}
+                                    disabled={isSavingService}
+                                    className="flex-1 py-4 bg-pink-600 text-white rounded-2xl font-black text-base active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+                                >
+                                    {isSavingService ? 'Kaydediliyor...' : (serviceForm.id ? 'Güncelle' : 'Kaydet')}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

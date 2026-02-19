@@ -10,6 +10,7 @@ export default function ServiceManagement() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showForm, setShowForm] = useState(false);
+    const [showTemplates, setShowTemplates] = useState(false);
     const [formData, setFormData] = useState<Partial<Service>>({
         name: '',
         description: '',
@@ -73,6 +74,45 @@ export default function ServiceManagement() {
         }
     };
 
+    const handleAddFromTemplate = async (template: any) => {
+        setLoading(true);
+        try {
+            await api.post('/services', {
+                name: template.name,
+                description: template.description || '',
+                duration_minutes: template.duration,
+                price: template.price
+            });
+            fetchServices();
+            // Modal açık kalsın, çoklu ekleme yapılabilsin
+        } catch (err: any) {
+            alert('Hizmet eklenirken hata: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const Templates = {
+        men: [
+            { name: 'Saç Kesimi', duration: 30, price: 200, description: 'Yıkama dahil saç kesimi' },
+            { name: 'Sakal Tıraşı', duration: 15, price: 100, description: 'Sakal düzeltme ve şekillendirme' },
+            { name: 'Saç & Sakal', duration: 45, price: 280, description: 'Komple bakım paketi' },
+            { name: 'Çocuk Tıraşı', duration: 20, price: 150, description: '12 yaş altı' },
+            { name: 'Saç Boyama', duration: 60, price: 500, description: 'Dip boya veya komple' },
+            { name: 'Fön', duration: 15, price: 80, description: 'Yıkama ve fön' }
+        ],
+        women: [
+            { name: 'Saç Kesimi', duration: 45, price: 300, description: 'Yıkama ve şekillendirme dahil' },
+            { name: 'Fön', duration: 30, price: 150, description: 'Düz veya dalgalı fön' },
+            { name: 'Dip Boya', duration: 90, price: 600, description: 'Dip boyama işlemi' },
+            { name: 'Komple Boya', duration: 120, price: 1000, description: 'Tüm saç boyama' },
+            { name: 'Ombre / Balyaj', duration: 180, price: 2000, description: 'Açma boyama işlemleri' },
+            { name: 'Manikür', duration: 30, price: 200, description: 'Klasik manikür' },
+            { name: 'Pedikür', duration: 45, price: 300, description: 'Klasik pedikür' },
+            { name: 'Kaş Bıyık', duration: 15, price: 100, description: 'İple veya ağda ile' }
+        ]
+    };
+
     if (loading && services.length === 0) return <div className="p-8 text-center">Yükleniyor...</div>;
 
     return (
@@ -85,18 +125,27 @@ export default function ServiceManagement() {
                     <h2 className="text-3xl font-bold text-gray-900">Hizmet Yönetimi</h2>
                     <p className="text-gray-500 font-medium">Verdiğiniz hizmetleri ve fiyatlarını buradan yönetebilirsiniz.</p>
                 </div>
-                <button
-                    onClick={() => {
-                        setFormData({ name: '', description: '', duration_minutes: 30, price: 0 });
-                        setShowForm(true);
-                    }}
-                    className="btn-primary py-2 px-5 flex items-center gap-2"
-                >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Yeni Hizmet
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => setShowTemplates(true)}
+                        className="btn-secondary py-2 px-5 flex items-center gap-2 text-sm font-bold border-gray-200 hover:border-violet-200 hover:bg-violet-50 text-gray-600 hover:text-violet-700"
+                    >
+                        <span className="text-lg">📋</span>
+                        Firma Hizmetleri
+                    </button>
+                    <button
+                        onClick={() => {
+                            setFormData({ name: '', description: '', duration_minutes: 30, price: 0 });
+                            setShowForm(true);
+                        }}
+                        className="btn-primary py-2 px-5 flex items-center gap-2"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Yeni Hizmet
+                    </button>
+                </div>
             </div>
 
             {error && (
@@ -265,6 +314,73 @@ export default function ServiceManagement() {
                             <button onClick={() => setShowForm(true)} className="btn-secondary py-2 px-6 text-sm">İlk Hizmeti Ekle</button>
                         </div>
                     )}
+                </div>
+            )}
+            {/* Template Modal */}
+            {showTemplates && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                            <div>
+                                <h3 className="text-2xl font-black text-gray-900">Hazır Hizmet Listesi</h3>
+                                <p className="text-sm text-gray-500 font-medium">Listenize eklemek istediğiniz hizmetleri seçin.</p>
+                            </div>
+                            <button onClick={() => setShowTemplates(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                                <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="p-8 overflow-y-auto custom-scrollbar">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                {/* Erkek Hizmetleri */}
+                                <div>
+                                    <h4 className="text-indigo-600 font-black uppercase tracking-widest text-xs mb-4 flex items-center gap-2">
+                                        <span className="bg-indigo-100 p-1.5 rounded-lg">👨</span> Erkek Kuaförü
+                                    </h4>
+                                    <div className="space-y-3">
+                                        {Templates.men.map((t, i) => (
+                                            <div key={i} className="flex items-center justify-between p-4 rounded-2xl border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all group">
+                                                <div>
+                                                    <p className="font-bold text-gray-900">{t.name}</p>
+                                                    <p className="text-xs text-gray-500 mt-0.5">{t.duration} dk • ₺{t.price}</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleAddFromTemplate(t)}
+                                                    className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-600 hover:text-white transition-colors"
+                                                >
+                                                    + Ekle
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Kadın Hizmetleri */}
+                                <div>
+                                    <h4 className="text-pink-600 font-black uppercase tracking-widest text-xs mb-4 flex items-center gap-2">
+                                        <span className="bg-pink-100 p-1.5 rounded-lg">👩</span> Kadın Kuaförü
+                                    </h4>
+                                    <div className="space-y-3">
+                                        {Templates.women.map((t, i) => (
+                                            <div key={i} className="flex items-center justify-between p-4 rounded-2xl border border-gray-100 hover:border-pink-200 hover:bg-pink-50/30 transition-all group">
+                                                <div>
+                                                    <p className="font-bold text-gray-900">{t.name}</p>
+                                                    <p className="text-xs text-gray-500 mt-0.5">{t.duration} dk • ₺{t.price}</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleAddFromTemplate(t)}
+                                                    className="px-3 py-1.5 bg-pink-100 text-pink-700 rounded-lg text-xs font-bold hover:bg-pink-600 hover:text-white transition-colors"
+                                                >
+                                                    + Ekle
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
