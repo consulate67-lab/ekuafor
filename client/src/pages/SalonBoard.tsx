@@ -367,31 +367,51 @@ export default function SalonBoard() {
                                             </div>
                                         </td>
                                         {hours.map(hour => {
-
-                                            // isCurrent logic needs update for minutes but for highlighting "NOW" simply using hour is approx okay.
-                                            // Or better:
                                             const now = new Date();
                                             const currentTotal = now.getHours() * 60 + now.getMinutes();
                                             const [hh, mm] = hour.split(':').map(Number);
                                             const slotTotal = hh * 60 + mm;
-                                            const nextSlotTotal = slotTotal + (company?.slot_interval || 60);
+                                            const slotInterval = company?.slot_interval || 30;
+                                            const nextSlotTotal = slotTotal + slotInterval;
 
                                             const isCurrent = currentTotal >= slotTotal && currentTotal < nextSlotTotal;
                                             const isPast = currentTotal >= nextSlotTotal;
 
-                                            const personApps = appointments.filter(a =>
-                                                Number(a.staff_id) === Number(pId) &&
-                                                a.start_time.startsWith(hour) && // Exact match "HH:MM"
-                                                a.status !== 'cancelled'
-                                            );
+                                            // Normalize today's date for comparison
+                                            const todayDate = selectedDate;
+
+                                            // Find appointments that START at this slot
+                                            const startsHere = appointments.filter(a => {
+                                                const appDate = (a.appointment_date || '').substring(0, 10);
+                                                return Number(a.staff_id) === Number(pId) &&
+                                                    a.start_time.substring(0, 5) === hour &&
+                                                    a.status !== 'cancelled' &&
+                                                    appDate === todayDate;
+                                            });
+
+                                            // Find appointments that OVERLAP this slot (started earlier but still running)
+                                            const overlapping = appointments.find(a => {
+                                                const appDate = (a.appointment_date || '').substring(0, 10);
+                                                if (Number(a.staff_id) !== Number(pId) || a.status === 'cancelled' || appDate !== todayDate) return false;
+                                                const [asH, asM] = a.start_time.split(':').map(Number);
+                                                const [aeH, aeM] = a.end_time.split(':').map(Number);
+                                                const appStart = asH * 60 + asM;
+                                                const appEnd = aeH * 60 + aeM;
+                                                // Slot is within appointment range BUT appointment doesn't start here
+                                                return slotTotal >= appStart && slotTotal < appEnd && a.start_time.substring(0, 5) !== hour;
+                                            });
+
+                                            const isOccupied = startsHere.length > 0 || !!overlapping;
+                                            const isSlotFree = !isOccupied;
 
                                             return (
                                                 <td
                                                     key={hour}
-                                                    className={`p-4 border-r border-slate-50 align-top transition-all relative ${isCurrent ? 'bg-indigo-50/10' : ''} ${isPast ? 'bg-slate-50/20' : 'cursor-cell hover:bg-slate-50/80'} ${(isPast && selectedDate === new Date().toISOString().split('T')[0] && personApps.length === 0) ? 'pointer-events-none' : ''}`}
+                                                    className={`p-4 border-r border-slate-50 align-top transition-all relative ${isCurrent ? 'bg-indigo-50/10' : ''} ${isPast && isSlotFree ? 'bg-slate-50/20 pointer-events-none' : !isOccupied ? 'cursor-cell hover:bg-slate-50/80' : ''}`}
                                                     onClick={() => {
+                                                        if (isOccupied) return;
                                                         const isToday = selectedDate === new Date().toISOString().split('T')[0];
-                                                        if (isToday && isPast) return; // Geçmiş saatlere eklemeyi engelle
+                                                        if (isToday && isPast) return;
 
                                                         const pId = person.user_id || person.id;
                                                         setSelectedCell({ person, hour });
@@ -406,13 +426,16 @@ export default function SalonBoard() {
                                                         setIsModalOpen(true);
                                                     }}
                                                 >
-                                                    <div className={`space-y-2 min-h-[100px] transition-all ${isPast && personApps.length === 0 ? 'opacity-20' : ''}`}>
-                                                        {personApps.length === 0 && !(isPast && selectedDate === new Date().toISOString().split('T')[0]) && (
+                                                    <div className={`space-y-2 min-h-[100px] transition-all ${isPast && isSlotFree ? 'opacity-20' : ''}`}>
+                                                        {/* Boş slot - sadece gelecekteyse Müsait göster */}
+                                                        {isSlotFree && !(isPast && selectedDate === new Date().toISOString().split('T')[0]) && (
                                                             <div className="opacity-0 group-hover:opacity-100 flex items-center justify-center h-20 border-3 border-dashed border-slate-200 rounded-3xl text-[11px] text-slate-400 font-black uppercase tracking-widest transition-all bg-white shadow-sm">
                                                                 + Müsait
                                                             </div>
                                                         )}
-                                                        {personApps.map(app => (
+
+                                                        {/* Randevu BURADA BAŞLIYOR - Detaylı kart */}
+                                                        {startsHere.map(app => (
                                                             <div
                                                                 key={app.id}
                                                                 onClick={(e) => {
@@ -429,7 +452,7 @@ export default function SalonBoard() {
                                                             >
                                                                 <div className="flex justify-between items-start mb-2">
                                                                     <div className="flex items-center gap-2">
-                                                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{app.start_time}</span>
+                                                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{app.start_time} - {app.end_time}</span>
                                                                         {isCurrent && <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping"></span>}
                                                                     </div>
                                                                     <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${app.status === 'approved' ? 'bg-indigo-100 text-indigo-600' :
@@ -443,6 +466,24 @@ export default function SalonBoard() {
                                                                 <p className="text-[10px] font-bold text-slate-400 truncate uppercase tracking-widest">{app.service_name}</p>
                                                             </div>
                                                         ))}
+
+                                                        {/* Randevu DEVAM EDİYOR - Devam barı */}
+                                                        {overlapping && startsHere.length === 0 && (
+                                                            <div
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedAppointment(overlapping);
+                                                                    setIsDetailModalOpen(true);
+                                                                }}
+                                                                className="h-20 rounded-2xl border-l-4 flex items-center px-4 cursor-pointer hover:scale-[1.02] transition-all opacity-60"
+                                                                style={{ borderLeftColor: staffColor, backgroundColor: `${staffColor}10` }}
+                                                            >
+                                                                <div>
+                                                                    <p className="text-sm font-black text-slate-600 truncate">{overlapping.customer_name || 'Misafir'}</p>
+                                                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">devam ediyor</p>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </td>
                                             );
