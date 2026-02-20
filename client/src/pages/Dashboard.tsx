@@ -202,6 +202,26 @@ Onaylıyor musunuz?
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {/* Sesli Randevu (İşletme Sahibi ve Çalışan) - EN BAŞA ALINDI */}
+                    {(user?.role === 'company_admin' || user?.role === 'staff') && (
+                        <button
+                            onClick={startVoiceCommand}
+                            className={`card group hover:scale-[1.02] transition-all duration-300 border-indigo-100 text-left relative overflow-hidden ${isListening ? 'ring-2 ring-indigo-500 ring-offset-2' : ''}`}
+                        >
+                            <div className="flex items-center gap-5 relative z-10">
+                                <div className="p-4 rounded-2xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
+                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m8 0h-8m4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-gray-900 mb-1">Sesli Randevu</h3>
+                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Konuşarak hızlıca randevu oluştur.</p>
+                                </div>
+                            </div>
+                        </button>
+                    )}
+
                     {/* Firma Tanıtımı (SADECE ADMIN) */}
                     {user?.role === 'super_admin' && (
                         <Link to="/companies" className="card group hover:scale-[1.02] transition-all duration-300 border-pink-100">
@@ -275,26 +295,6 @@ Onaylıyor musunuz?
                         </a>
                     )}
 
-                    {/* Sesli Randevu (İşletme Sahibi ve Çalışan) - YENİ BÜYÜK BUTON */}
-                    {(user?.role === 'company_admin' || user?.role === 'staff') && (
-                        <button
-                            onClick={startVoiceCommand}
-                            className={`card group hover:scale-[1.02] transition-all duration-300 border-indigo-100 text-left relative overflow-hidden ${isListening ? 'ring-2 ring-indigo-500 ring-offset-2 shadow-2xl transition-all' : ''}`}
-                        >
-                            {isListening && <div className="absolute inset-0 bg-indigo-500/10 animate-pulse"></div>}
-                            <div className="flex items-center gap-5 relative z-10">
-                                <div className={`p-4 rounded-2xl transition-all duration-300 ${isListening ? 'bg-indigo-600 text-white animate-bounce shadow-lg shadow-indigo-200' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
-                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m8 0h-8m4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-bold text-gray-900 mb-1">{isListening ? 'Dinleniyor...' : 'Sesli Randevu'}</h3>
-                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Konuşarak hızlıca randevu oluştur.</p>
-                                </div>
-                            </div>
-                        </button>
-                    )}
                 </div>
 
                 {/* İstatistikler */}
@@ -342,6 +342,30 @@ Onaylıyor musunuz?
                 </div>
             </main>
 
+            {/* Ses Dinleme Overlay */}
+            {isListening && (
+                <div className="fixed inset-0 z-[100] bg-indigo-950/90 backdrop-blur-xl flex flex-col items-center justify-center animate-fade-in">
+                    <div className="relative">
+                        <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-20 scale-150"></div>
+                        <div className="absolute inset-0 bg-indigo-400 rounded-full animate-pulse opacity-40 scale-125"></div>
+                        <div className="relative w-32 h-32 bg-indigo-600 rounded-full flex items-center justify-center shadow-[0_0_50px_rgba(79,70,229,0.6)]">
+                            <svg className="w-16 h-16 text-white animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m8 0h-8m4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                            </svg>
+                        </div>
+                    </div>
+                    <h2 className="mt-12 text-3xl font-black text-white tracking-tighter animate-pulse">Sizi Dinliyorum...</h2>
+                    <p className="mt-4 text-indigo-200 font-bold uppercase tracking-[0.3em] text-[10px]">Lütfen randevu detaylarını söyleyin</p>
+
+                    {voiceTranscript && (
+                        <div className="mt-10 max-w-lg px-8 py-4 bg-white/10 rounded-2xl border border-white/10 text-center">
+                            <p className="text-white font-medium italic text-lg leading-relaxed">
+                                "{voiceTranscript}"
+                            </p>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
