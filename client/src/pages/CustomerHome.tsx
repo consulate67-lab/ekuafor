@@ -22,6 +22,7 @@ export default function CustomerHome() {
     const [codeChecking, setCodeChecking] = useState(false);
     const [codeError, setCodeError] = useState('');
     const [codeResult, setCodeResult] = useState<any>(null);
+    const [isScanning, setIsScanning] = useState(false);
 
     const fetchData = async (query?: string, loc?: { lat: number, lng: number } | null, dist?: number) => {
         try {
@@ -215,6 +216,30 @@ export default function CustomerHome() {
         setCodeInput('');
         setCodeError('');
         setCodeResult(null);
+        setIsScanning(false);
+    };
+
+    const toggleScanner = async () => {
+        if (isScanning) {
+            setIsScanning(false);
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            setIsScanning(true);
+
+            // In a real app, we'd use a library like html5-qrcode here.
+            // For now, we'll simulate a scan or just show the video feed.
+            // When a code is detected (mocked for demo if no library):
+            // setCodeInput(detectedCode);
+            // handleCheckCode();
+
+            // Cleanup stream on close
+            return () => stream.getTracks().forEach(t => t.stop());
+        } catch (err) {
+            alert('Kameraya erişilemedi. Lütfen izinleri kontrol edin.');
+        }
     };
 
     return (
@@ -472,15 +497,46 @@ export default function CustomerHome() {
                             <p className="text-slate-400 text-sm mt-1">Yönetici veya çalışan kodunuzu girin</p>
                         </div>
 
-                        <input
-                            type="text"
-                            value={codeInput}
-                            onChange={e => setCodeInput(e.target.value.toUpperCase())}
-                            onKeyDown={e => e.key === 'Enter' && handleCheckCode()}
-                            placeholder="ADM-XXX-XXXX veya XXX-XXXX"
-                            className="w-full p-5 bg-slate-50 rounded-2xl border-2 border-slate-100 text-center text-xl font-black text-slate-900 tracking-[0.2em] outline-none mb-4 transition-all"
-                            autoFocus
-                        />
+                        <div className="relative mb-4">
+                            <input
+                                type="text"
+                                value={codeInput}
+                                onChange={e => setCodeInput(e.target.value.toUpperCase())}
+                                onKeyDown={e => e.key === 'Enter' && handleCheckCode()}
+                                placeholder="ADM-XXX-XXXX veya XXX-XXXX"
+                                className="w-full p-5 bg-slate-50 rounded-2xl border-2 border-slate-100 text-center text-xl font-black text-slate-900 tracking-[0.1em] outline-none transition-all focus:border-amber-500"
+                                autoFocus
+                                autoComplete="off"
+                                spellCheck="false"
+                            />
+                            <button
+                                onClick={toggleScanner}
+                                className={`absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isScanning ? 'bg-red-500 text-white' : 'bg-white text-slate-400 shadow-sm'}`}
+                            >
+                                {isScanning ? '✕' : '📷'}
+                            </button>
+                        </div>
+
+                        {isScanning && (
+                            <div className="mb-4 bg-black rounded-2xl overflow-hidden aspect-square flex items-center justify-center relative">
+                                <video
+                                    autoPlay
+                                    muted
+                                    playsInline
+                                    className="w-full h-full object-cover"
+                                    ref={el => {
+                                        if (el && isScanning) {
+                                            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                                                .then(s => el.srcObject = s);
+                                        }
+                                    }}
+                                />
+                                <div className="absolute inset-0 border-2 border-amber-500/50 m-12 rounded-2xl animate-pulse flex items-center justify-center">
+                                    <div className="w-full h-0.5 bg-amber-500 absolute top-1/2 animate-bounce"></div>
+                                </div>
+                                <p className="absolute bottom-4 left-0 right-0 text-center text-[10px] text-white/70 font-bold uppercase tracking-widest">QR Kodu Ortaya Getirin</p>
+                            </div>
+                        )}
 
                         {codeError && (
                             <div className="bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-2xl text-sm font-bold text-center mb-4 animate-pulse">

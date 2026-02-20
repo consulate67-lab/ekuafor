@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import { Appointment, Service, Company } from '../types';
+import { parseVoiceCommand } from '../lib/aiParser';
 
 export default function AppointmentManagement() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -121,60 +122,50 @@ export default function AppointmentManagement() {
 
     const processVoiceTranscript = async (transcript: string) => {
         try {
-            let date = new Date().toISOString().split('T')[0];
-            if (transcript.includes('yarın')) {
-                const tomorrow = new Date();
-                tomorrow.setDate(tomorrow.getDate() + 1);
-                date = tomorrow.toISOString().split('T')[0];
-            }
+            if (!company) return;
 
-            let time = '09:00';
-            const timeMatch = transcript.match(/(\d{1,2})[:\s](\d{2})/);
-            const hourOnlyMatch = transcript.match(/saat\s?(\d{1,2})/);
+            // Read company-specific AI rules if exists
+            const rules = localStorage.getItem(`ai_rules_${company.id}`) || '';
 
-            if (timeMatch) {
-                time = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
-            } else if (hourOnlyMatch) {
-                let h = parseInt(hourOnlyMatch[1]);
-                if (transcript.includes('akşam') && h < 12) h += 12;
-                time = `${String(h).padStart(2, '0')}:00`;
-            }
+            const result = parseVoiceCommand(transcript, services, rules);
 
-            const matchedService = services.find(s => transcript.includes(s.name.toLowerCase()));
-            if (!matchedService) {
-                alert(`Hizmet anlaşılamadı. Şu hizmetlerden birini söyleyin: ${services.map(s => s.name).join(', ')}`);
+            if (!result.serviceId) {
+                alert('Üzgünüm, hangi hizmeti istediğinizi anlayamadım.');
                 return;
             }
 
-            let customerPart = transcript.split('randevu')[0].split('için').pop()?.trim() || 'Sesli Müşteri';
-            customerPart = customerPart.replace(matchedService.name.toLowerCase(), '').trim();
+            const matchedService = services.find(s => s.id === result.serviceId);
 
-            const duration = matchedService.duration_minutes || 30;
-            const [h, m] = time.split(':').map(Number);
-            const totalMin = h * 60 + m + duration;
-            const endH = Math.floor(totalMin / 60);
-            const endM = totalMin % 60;
-            const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+            const confirmMsg = `
+🤖 YAPAY ZEKA ÖNERİSİ:
+-------------------------
+Müşteri: ${result.customerName}
+Hizmet: ${matchedService?.name}
+Tarih: ${new Date(result.date).toLocaleDateString('tr-TR')}
+Saat: ${result.startTime} - ${result.endTime}
+-------------------------
+Onaylıyor musunuz?
+            `;
 
-            if (window.confirm(`${date} tarihinde saat ${time} için ${matchedService.name} (Müşteri: ${customerPart}) randevusu oluşturulsun mu?`)) {
-                const finalNotes = `Sesli Komut: ${transcript} | Müşteri: ${customerPart}`;
+            if (window.confirm(confirmMsg)) {
                 await api.post('/appointments', {
-                    company_id: company?.id,
-                    service_id: matchedService.id,
-                    appointment_date: date,
-                    start_time: time,
-                    end_time: endTime,
-                    notes: finalNotes,
-                    price: matchedService.price,
+                    company_id: company.id,
+                    service_id: result.serviceId,
+                    appointment_date: result.date,
+                    start_time: result.startTime,
+                    end_time: result.endTime,
+                    notes: result.notes + ` | Müşteri: ${result.customerName}`,
+                    price: result.price,
                     status: 'approved'
                 });
+
                 fetchData();
                 alert('Randevu başarıyla eklendi.');
                 setVoiceTranscript('');
             }
         } catch (err) {
             console.error('Voice parse error', err);
-            alert('Komut anlaşılamadı. Lütfen örneğe uygun söyleyin: "Bugün akşam 5 için Saç Kesim Ahmet Yılmaza randevu oluştur"');
+            alert('Komut işlenirken bir hata oluştu.');
         }
     };
 

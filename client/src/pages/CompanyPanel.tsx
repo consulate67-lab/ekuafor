@@ -17,12 +17,13 @@ interface StaffBoard {
     department_name: string;
 }
 
-type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services';
+type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'ai';
 
 const menuItems: { key: TabKey; icon: string; label: string }[] = [
     { key: 'home', icon: '🏠', label: 'Ana Sayfa' },
     { key: 'services', icon: '✂️', label: 'Hizmetler' },
     { key: 'booking', icon: '📅', label: 'Müşteri QR' },
+    { key: 'ai', icon: '🤖', label: 'Yapay Zeka' },
     { key: 'qr', icon: '🔑', label: 'Yönetim Kodu' },
     { key: 'dept', icon: '🏢', label: 'Departmanlar' },
     { key: 'staff', icon: '👥', label: 'Personeller' },
@@ -63,6 +64,10 @@ export default function CompanyPanel() {
     });
     const [isSavingService, setIsSavingService] = useState(false);
 
+    // AI states
+    const [aiRules, setAiRules] = useState('');
+    const [isSavingAI, setIsSavingAI] = useState(false);
+
     const handleLogin = async (keyToUse?: string) => {
         const key = keyToUse || inputKey.trim();
         if (!key) return;
@@ -71,10 +76,15 @@ export default function CompanyPanel() {
         try {
             const res = await api.post('/companies/admin-login', { admin_key: key });
             if (res.data?.success && res.data.data) {
-                setCompany(res.data.data);
+                const comp = res.data.data;
+                setCompany(comp);
                 localStorage.setItem('company_admin_key', key);
                 setInputKey(key);
-                fetchData(res.data.data.id);
+                fetchData(comp.id);
+
+                // Load AI rules from localStorage for specific company
+                const savedRules = localStorage.getItem(`ai_rules_${comp.id}`);
+                setAiRules(savedRules || 'Varsayılan randevu kuralları aktiftir.');
             }
         } catch (err: any) {
             setError(err.response?.data?.error || 'Geçersiz anahtar');
@@ -152,6 +162,16 @@ export default function CompanyPanel() {
         }
     };
 
+    const handleDeleteStaff = async (id: number) => {
+        if (!confirm('Bu personeli (board kodunu) silmek istediğinize emin misiniz?')) return;
+        try {
+            await api.delete(`/companies/${company.id}/staff-boards/${id}`);
+            fetchData(company.id);
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Personel silinemedi');
+        }
+    };
+
     const handleSaveService = async () => {
         if (!serviceForm.name.trim() || !company) return;
         setIsSavingService(true);
@@ -190,6 +210,21 @@ export default function CompanyPanel() {
             fetchData(company.id);
         } catch (err: any) {
             alert(err.response?.data?.error || 'Hizmet silinemedi');
+        }
+    };
+
+    const handleSaveAIRules = () => {
+        if (!company) return;
+        setIsSavingAI(true);
+        try {
+            localStorage.setItem(`ai_rules_${company.id}`, aiRules);
+            setTimeout(() => {
+                alert('Yapay zeka kuralları başarıyla kaydedildi.');
+                setIsSavingAI(false);
+            }, 500);
+        } catch (e) {
+            alert('Kurallar kaydedilemedi');
+            setIsSavingAI(false);
         }
     };
 
@@ -652,7 +687,16 @@ export default function CompanyPanel() {
                                         </div>
 
                                         {/* QR Code */}
-                                        <div className="bg-slate-50 rounded-2xl p-5 text-center">
+                                        <div className="bg-slate-50 rounded-2xl p-5 text-center relative">
+                                            <button
+                                                onClick={() => handleDeleteStaff(staff.id)}
+                                                className="absolute top-4 right-4 w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-100 transition-all shadow-sm"
+                                                title="Personeli Sil"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                            </button>
                                             <div className="bg-white border-2 border-slate-900 rounded-xl p-3 inline-block mb-3">
                                                 <img
                                                     src={qrApiUrl(staff.board_code, 150)}
@@ -684,7 +728,73 @@ export default function CompanyPanel() {
                             )}
                         </div>
                     )}
-                    {/* SERVICES TAB */}
+                    {/* AI TAB - Yapay Zeka Ayarları */}
+                    {activeTab === 'ai' && (
+                        <div className="space-y-6">
+                            <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40 relative overflow-hidden">
+                                <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-50 rounded-full blur-3xl opacity-50"></div>
+
+                                <div className="flex items-center gap-4 mb-8">
+                                    <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center text-3xl shadow-lg shadow-indigo-200">
+                                        🤖
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl font-black text-slate-900 leading-tight">Yapay Zeka Asistanı</h2>
+                                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Randevu Akıllı Çıkarım Kuralları</p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-amber-50 border border-amber-100 rounded-3xl p-6 mb-8 text-amber-700">
+                                    <p className="font-black text-xs uppercase tracking-widest mb-2 flex items-center gap-2">
+                                        <span>💡</span> AI Nasıl Çalışır?
+                                    </p>
+                                    <p className="text-sm leading-relaxed">
+                                        Müşterileriniz veya çalışanlarınız sesli komut verdiğinde, sistem bu metni analiz eder.
+                                        Aşağıdaki alana AI'nın nasıl davranması gerektiğine dair kurallar yazabilirsiniz.
+                                    </p>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">Yapay Zeka Yönergesi (Prompts)</label>
+                                        <textarea
+                                            value={aiRules}
+                                            onChange={e => setAiRules(e.target.value)}
+                                            rows={12}
+                                            placeholder="Örn: Eğer müşteri saat belirtmezse bugün için en yakın 15 dakikalık boşluğa randevu oluştur. Eğer hizmet belirtmezse 'Saç Kesimi' seçeneğini varsayılan yap..."
+                                            className="w-full p-6 bg-slate-50 rounded-[2rem] border-2 border-slate-100 focus:border-indigo-500 text-sm font-medium text-slate-800 outline-none resize-none leading-relaxed transition-all"
+                                        />
+                                    </div>
+
+                                    <button
+                                        onClick={handleSaveAIRules}
+                                        disabled={isSavingAI}
+                                        className="w-full py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl font-black text-base tracking-wide shadow-xl shadow-indigo-500/30 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+                                    >
+                                        {isSavingAI ? 'Kaydediliyor...' : 'Kuralları Uygula & Kaydet'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="bg-indigo-900 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-indigo-200">
+                                <h3 className="font-black text-lg mb-4">Örnek Kurallar</h3>
+                                <ul className="space-y-3 text-sm text-indigo-100">
+                                    <li className="flex gap-3">
+                                        <span className="text-indigo-400">🔹</span>
+                                        <span>Saat 7 denirse akşam 19:00 olarak algıla.</span>
+                                    </li>
+                                    <li className="flex gap-3">
+                                        <span className="text-indigo-400">🔹</span>
+                                        <span>Hizmet belirtilmezse süreyi 30 dakika varsay.</span>
+                                    </li>
+                                    <li className="flex gap-3">
+                                        <span className="text-indigo-400">🔹</span>
+                                        <span>Her zaman bugün tarihini baz al.</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    )}
                     {activeTab === 'services' && (
                         <div className="space-y-4">
                             <button
