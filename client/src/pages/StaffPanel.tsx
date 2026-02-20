@@ -116,7 +116,7 @@ export default function StaffPanel() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50">
             {/* Header */}
-            <div className="bg-gradient-to-r from-slate-900 to-indigo-900 text-white px-6 pt-8 pb-12 rounded-b-[3rem] shadow-2xl shadow-indigo-200 relative overflow-hidden">
+            <div className="bg-gradient-to-r from-slate-900 to-indigo-900 text-white px-6 pt-16 pb-12 rounded-b-[3rem] shadow-2xl shadow-indigo-200 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-400/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
                 <div className="absolute bottom-0 left-0 w-28 h-28 bg-purple-400/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-2xl"></div>
 

@@ -83,7 +83,7 @@ export default function Dashboard() {
         <div className="min-h-screen bg-slate-50/50">
             {/* Header */}
             <header className="bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-gray-100">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-4">
                     <div className="relative flex justify-center items-center">
                         <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#1e1b4b] to-[#b45309] flex items-center justify-center shadow-lg shadow-indigo-500/20">
@@ -104,10 +104,10 @@ export default function Dashboard() {
             </header>
 
             {/* Main Content */}
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-                <div className="mb-10 text-center sm:text-left">
-                    <h2 className="text-3xl font-bold text-gray-900 mb-2">Merhaba, {user?.first_name}! 👋</h2>
-                    <p className="text-gray-500 font-medium">İşletmenizi yönetmek için ihtiyacınız olan her şey burada.</p>
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                <div className="mb-10 text-center sm:text-left pt-4">
+                    <h2 className="text-xl font-black text-gray-900 mb-1">Merhaba, {user?.first_name}! 👋</h2>
+                    <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest leading-loose">İşletmenizi yönetmek için ihtiyacınız olan her şey burada.</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">

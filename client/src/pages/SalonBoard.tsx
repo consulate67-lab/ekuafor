@@ -328,7 +328,7 @@ export default function SalonBoard() {
     return (
         <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans overflow-hidden selection:bg-indigo-100">
             {/* Ultra Modern Header */}
-            <header className="bg-white/70 backdrop-blur-xl px-10 py-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] border-b border-slate-100 flex justify-between items-center z-50">
+            <header className="bg-white/70 backdrop-blur-xl px-10 pt-12 pb-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] border-b border-slate-100 flex justify-between items-center z-50">
                 <div className="flex flex-col">
                     <h1 className="text-3xl font-black text-slate-900 leading-none mb-2 uppercase tracking-tighter decoration-indigo-500 underline-offset-4 decoration-4">
                         {company?.name || 'Yükleniyor...'}
