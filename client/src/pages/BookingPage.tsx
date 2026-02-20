@@ -56,6 +56,15 @@ export default function BookingPage() {
     });
 
     const dateInputRef = useRef<HTMLInputElement>(null);
+    const firstAvailableTimeRef = useRef<HTMLButtonElement>(null);
+
+    useEffect(() => {
+        if (step === 4 && firstAvailableTimeRef.current) {
+            setTimeout(() => {
+                firstAvailableTimeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+        }
+    }, [step]);
 
     useEffect(() => {
         if (step === 3 && dateInputRef.current) {
@@ -466,10 +475,10 @@ export default function BookingPage() {
                                                 disabled={isPast}
                                                 onClick={() => setSelection({ ...selection, date: dateStr })}
                                                 className={`h-12 w-full flex items-center justify-center rounded-2xl text-sm font-black transition-all ${isSelected
-                                                        ? 'bg-[#b45309] text-white shadow-xl shadow-orange-500/40 scale-110 z-10'
-                                                        : isPast
-                                                            ? 'text-slate-200 cursor-not-allowed'
-                                                            : 'text-slate-600 hover:bg-slate-50'
+                                                    ? 'bg-[#b45309] text-white shadow-xl shadow-orange-500/40 scale-110 z-10'
+                                                    : isPast
+                                                        ? 'text-slate-200 cursor-not-allowed'
+                                                        : 'text-slate-600 hover:bg-slate-50'
                                                     }`}
                                             >
                                                 {d}
@@ -497,26 +506,40 @@ export default function BookingPage() {
                         <button onClick={handleBack} className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 hover:text-gray-600">← Geri</button>
                         <h2 className="text-2xl font-black text-gray-900 mb-6">Saat Seçimi</h2>
                         <div className="grid grid-cols-3 gap-3">
-                            {generateTimeSlots().length > 0 ? generateTimeSlots().map(slot => (
-                                <button
-                                    key={slot.time}
-                                    disabled={!slot.isAvailable}
-                                    onClick={() => {
-                                        setSelection({ ...selection, time: slot.time });
-                                        handleNext();
-                                    }}
-                                    className={`py-4 rounded-2xl font-black text-sm transition-all shadow-sm ${slot.isAvailable
-                                        ? 'bg-white border-2 border-slate-100 text-[#1e1b4b] hover:border-orange-500 hover:shadow-xl hover:shadow-orange-500/20 active:scale-95'
-                                        : 'bg-slate-50 border-2 border-transparent text-slate-200 cursor-not-allowed opacity-40 select-none'
-                                        }`}
-                                >
-                                    {slot.time}
-                                </button>
-                            )) : (
-                                <div className="col-span-3 text-center py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                                    <p className="text-gray-400 font-bold">Bu tarih için çalışma saatleri dışında kalıyor.</p>
-                                </div>
-                            )}
+                            {(() => {
+                                const slots = generateTimeSlots();
+                                if (slots.length === 0) {
+                                    return (
+                                        <div className="col-span-3 text-center py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                                            <p className="text-gray-400 font-bold">Bu tarih için çalışma saatleri dışında kalıyor.</p>
+                                        </div>
+                                    );
+                                }
+
+                                let foundFirst = false;
+                                return slots.map(slot => {
+                                    const isFirstActive = !foundFirst && slot.isAvailable;
+                                    if (isFirstActive) foundFirst = true;
+
+                                    return (
+                                        <button
+                                            key={slot.time}
+                                            ref={isFirstActive ? firstAvailableTimeRef : null}
+                                            disabled={!slot.isAvailable}
+                                            onClick={() => {
+                                                setSelection({ ...selection, time: slot.time });
+                                                handleNext();
+                                            }}
+                                            className={`py-4 rounded-2xl font-black text-sm transition-all shadow-sm ${slot.isAvailable
+                                                ? 'bg-white border-2 border-slate-100 text-[#1e1b4b] hover:border-orange-500 hover:shadow-xl hover:shadow-orange-500/20 active:scale-95'
+                                                : 'bg-slate-50 border-2 border-transparent text-slate-200 cursor-not-allowed opacity-40 select-none'
+                                                }`}
+                                        >
+                                            {slot.time}
+                                        </button>
+                                    );
+                                });
+                            })()}
                         </div>
                     </div>
                 )}
