@@ -178,31 +178,27 @@ export default function BookingPage() {
         const slots: { time: string; isAvailable: boolean }[] = [];
 
         for (let time = workBegin; time < workEnd; time += slotInterval) {
-            // 1. BUGÜN ise geçmiş saatleri hiç gösterme (5dk buffer)
-            if (isToday && time < currentMin + 5) {
-                console.log(`[v1.8.0] Skipping past slot: ${String(Math.floor(time / 60)).padStart(2, '0')}:${String(time % 60).padStart(2, '0')} (Current: ${now.getHours()}:${now.getMinutes()})`);
-                continue;
-            }
-
-            const slotEnd = time + duration;
             const h = Math.floor(time / 60);
             const m = time % 60;
             const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+            const slotEnd = time + duration;
 
-            // 2. Çakışma kontrolü - mevcut randevularla kesişen slotlar DOLU (şeffaf)
-            // Periyot gridine uyumlu: randevu 13:30-14:15 ise, 13:30 ve 14:00 slotları bloke
-            // (çünkü 14:00 slotu randevunun bitiş saati 14:15'ten önce başlıyor)
+            // 1. Check if it's in the past (Bugün için 5dk buffer)
+            const isPast = isToday && (time < currentMin + 5);
+
+            // 2. Check if it's busy (Approved or Pending)
             const isBusy = staffApps.some(app => {
                 const [asH, asM] = app.start_time.split(':').map(Number);
                 const [aeH, aeM] = app.end_time.split(':').map(Number);
                 const appStart = asH * 60 + asM;
                 const appEnd = aeH * 60 + aeM;
-
-                // Bu slot aralığı (time -> slotEnd) mevcut randevuyla çakışıyor mu?
                 return (time < appEnd && slotEnd > appStart);
             });
 
-            slots.push({ time: timeStr, isAvailable: !isBusy });
+            slots.push({
+                time: timeStr,
+                isAvailable: !isPast && !isBusy
+            });
         }
         return slots;
     };
@@ -459,19 +455,21 @@ export default function BookingPage() {
                                     // Days
                                     for (let d = 1; d <= daysCount; d++) {
                                         const dDate = new Date(year, month, d);
-                                        const isSelected = selection.date === dDate.toISOString().split('T')[0];
+                                        // Use local-safe YYYY-MM-DD
+                                        const dateStr = `${dDate.getFullYear()}-${String(dDate.getMonth() + 1).padStart(2, '0')}-${String(dDate.getDate()).padStart(2, '0')}`;
+                                        const isSelected = selection.date === dateStr;
                                         const isPast = dDate < today;
 
                                         elements.push(
                                             <button
                                                 key={d}
                                                 disabled={isPast}
-                                                onClick={() => setSelection({ ...selection, date: dDate.toISOString().split('T')[0] })}
+                                                onClick={() => setSelection({ ...selection, date: dateStr })}
                                                 className={`h-12 w-full flex items-center justify-center rounded-2xl text-sm font-black transition-all ${isSelected
-                                                    ? 'bg-[#b45309] text-white shadow-xl shadow-orange-500/40 scale-110 z-10'
-                                                    : isPast
-                                                        ? 'text-slate-200 cursor-not-allowed'
-                                                        : 'text-slate-600 hover:bg-slate-50'
+                                                        ? 'bg-[#b45309] text-white shadow-xl shadow-orange-500/40 scale-110 z-10'
+                                                        : isPast
+                                                            ? 'text-slate-200 cursor-not-allowed'
+                                                            : 'text-slate-600 hover:bg-slate-50'
                                                     }`}
                                             >
                                                 {d}
