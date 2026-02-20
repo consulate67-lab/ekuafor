@@ -112,6 +112,8 @@ export default function AppointmentManagement() {
             const transcript = event.results[0][0].transcript.toLowerCase();
             setVoiceTranscript(transcript);
             await processVoiceTranscript(transcript);
+            // Clear transcript after short delay or leave for visual confirmation
+            setTimeout(() => setVoiceTranscript(''), 3000);
         };
 
         recognition.start();
@@ -273,6 +275,11 @@ export default function AppointmentManagement() {
                     </div>
                 </div>
                 <h2 className="text-xl font-black text-slate-900 tracking-tight">Randevu Yönetimi</h2>
+                {voiceTranscript && (
+                    <div className="mt-2 bg-pink-50 text-pink-600 px-3 py-1.5 rounded-xl text-[10px] font-bold animate-pulse border border-pink-100 italic">
+                        " {voiceTranscript} "
+                    </div>
+                )}
             </div>
 
             <div className="px-6 py-6">
@@ -402,7 +409,7 @@ export default function AppointmentManagement() {
                         Sistemi Sıfırla
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments v1.38</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments v1.8.1</span>
                     </div>
                 </div>
             </div>
@@ -417,6 +424,12 @@ export default function AppointmentManagement() {
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
+
+                        {formError && (
+                            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r-xl">
+                                <p className="text-red-700 font-bold text-xs">{formError}</p>
+                            </div>
+                        )}
 
                         <form onSubmit={handleAddAppointment} className="space-y-6">
                             <div>
