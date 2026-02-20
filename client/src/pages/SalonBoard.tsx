@@ -14,7 +14,8 @@ export default function SalonBoard() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [currentHour, setCurrentHour] = useState(new Date().getHours());
-    const [selectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [currentDate] = useState(new Date().toLocaleDateString('en-CA'));
+    const [selectedDate] = useState(currentDate);
 
     // Staff Mode: when a staff member logs in via board_code
     const [staffMode, setStaffMode] = useState(false);
@@ -164,6 +165,7 @@ export default function SalonBoard() {
         navigate('/');
     };
 
+
     // Auto-scroll to current hour
     useEffect(() => {
         if (staff.length > 0) {
@@ -185,6 +187,25 @@ export default function SalonBoard() {
             const date = fastForm.appointmentDate || selectedDate;
             const startTime = fastForm.startTime || selectedCell?.hour || '08:00';
             const staffId = fastForm.staffId || selectedCell?.person.user_id || selectedCell?.person.id;
+
+            // GEÇMİŞ TARİH/SAAT KONTROLÜ
+            if (date < currentDate) {
+                alert('⚠️ Geçmiş bir tarihe randevu eklenemez.');
+                setLoading(false);
+                return;
+            }
+
+            if (date === currentDate) {
+                const [sh, sm] = startTime.split(':').map(Number);
+                const selectedTotal = sh * 60 + sm;
+                const now = new Date();
+                const currentTotal = now.getHours() * 60 + now.getMinutes();
+                if (selectedTotal < currentTotal) {
+                    alert('⚠️ Geçmiş bir saate randevu eklenemez.');
+                    setLoading(false);
+                    return;
+                }
+            }
 
             if (!staffId) {
                 alert('Lütfen bir personel seçin');
@@ -328,124 +349,141 @@ export default function SalonBoard() {
     return (
         <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans overflow-hidden selection:bg-indigo-100">
             {/* Ultra Modern Header */}
-            <header className="bg-white/70 backdrop-blur-xl px-10 pt-12 pb-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] border-b border-slate-100 flex justify-between items-center z-50">
-                <div className="flex flex-col">
-                    <h1 className="text-3xl font-black text-slate-900 leading-none mb-2 uppercase tracking-tighter decoration-indigo-500 underline-offset-4 decoration-4">
-                        {company?.name || 'Yükleniyor...'}
-                    </h1>
-                    <div className="flex items-center gap-3">
-                        {staffMode && staffInfo && (
-                            <div className="bg-emerald-50 text-emerald-700 px-4 py-1.5 rounded-full flex items-center gap-2 border border-emerald-100 shadow-sm">
-                                <span className="text-[11px] font-black uppercase tracking-widest leading-none">
-                                    👤 {staffInfo.first_name} {staffInfo.last_name}
-                                </span>
+            {/* Premium Streamlined Header */}
+            <header className="bg-white px-6 lg:px-8 py-4 border-b border-slate-100 z-50 shadow-sm sticky top-0">
+                <div className="flex items-center justify-between gap-6">
+                    {/* Left: Brand & Integrated Legend */}
+                    <div className="flex items-center gap-10 flex-1 min-w-0">
+                        <div className="flex flex-col min-w-max">
+                            <h1 className="text-xl lg:text-3xl font-black text-slate-900 leading-none mb-1 uppercase tracking-tighter">
+                                {company?.name || 'Yükleniyor...'}
+                            </h1>
+                            <div className="flex items-center gap-2">
+                                <div className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest">
+                                    {new Date(selectedDate).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })} | {new Date(selectedDate).toLocaleDateString('tr-TR', { weekday: 'short' })}
+                                </div>
+                                {specialDay && (
+                                    <div className="text-amber-500 text-[10px] font-black animate-pulse flex items-center gap-1">
+                                        ✨ <span className="uppercase">{specialDay}</span>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                        <div className="bg-indigo-50 text-indigo-600 px-4 py-1.5 rounded-full flex items-center gap-2 border border-indigo-100 shadow-sm">
-                            <span className="text-[11px] font-black uppercase tracking-widest leading-none">
-                                {new Date(selectedDate).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                            </span>
-                            <span className="w-1 h-3 bg-indigo-200 rounded-full"></span>
-                            <span className="text-[11px] font-black uppercase tracking-widest leading-none text-indigo-400">
-                                {new Date(selectedDate).toLocaleDateString('tr-TR', { weekday: 'long' })}
-                            </span>
                         </div>
-                        {specialDay && (
-                            <div className="bg-amber-50 text-amber-700 px-4 py-1.5 rounded-full flex items-center gap-2 border border-amber-100 animate-pulse transition-all">
-                                <span className="text-sm">✨</span>
-                                <span className="text-[10px] font-black uppercase tracking-widest leading-none">
-                                    {specialDay}
-                                </span>
+
+                        {/* Legend: Aligned with Brand Name */}
+                        <div className="hidden lg:flex items-center gap-6 border-l-2 border-slate-50 pl-10 h-10">
+                            <div className="flex items-center gap-2.5 group cursor-default">
+                                <div className="w-3 h-3 bg-amber-500 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.4)] group-hover:scale-125 transition-transform"></div>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] group-hover:text-slate-600 transition-colors">Yeni Talep</span>
                             </div>
-                        )}
-                        <span className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-2">
-                            {new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                            <div className="flex items-center gap-2.5 group cursor-default">
+                                <div className="w-3 h-3 bg-indigo-500 rounded-full shadow-[0_0_10px_rgba(79,70,229,0.4)] group-hover:scale-125 transition-transform"></div>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] group-hover:text-slate-600 transition-colors">Onaylandı</span>
+                            </div>
+                            <div className="flex items-center gap-2.5 group cursor-default">
+                                <div className="w-3 h-3 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.4)] group-hover:scale-125 transition-transform"></div>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] group-hover:text-slate-600 transition-colors">Tamamlandı</span>
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                <div className="flex items-center gap-6">
-                    <button
-                        onClick={() => {
-                            setFastForm({
-                                customerName: '',
-                                serviceId: '',
-                                notes: '',
-                                staffId: staff[0]?.user_id || staff[0]?.id || '',
-                                appointmentDate: selectedDate,
-                                startTime: '09:00'
-                            });
-                            setIsModalOpen(true);
-                        }}
-                        className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all flex items-center gap-3"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
-                        Yeni Randevu
-                    </button>
-                    {pendingCount > 0 && (
-                        <div className="bg-amber-50 border border-amber-100 text-amber-900 px-6 py-3 rounded-[1.5rem] flex items-center gap-4 animate-bounce shadow-lg shadow-amber-200/20">
-                            <div className="flex -space-x-2">
-                                <span className="w-10 h-10 bg-amber-500 text-white rounded-full flex items-center justify-center font-black text-sm ring-4 ring-white shadow-lg">{pendingCount}</span>
+                    {/* Right: Modern Actions */}
+                    <div className="flex items-center gap-6">
+                        <div className="hidden md:flex flex-col items-end border-r border-slate-100 pr-6">
+                            <span className="text-lg font-black text-slate-900 tracking-tighter leading-none">
+                                {new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <div className="flex items-center gap-1.5 mt-1">
+                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
+                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Live Sync</span>
                             </div>
-                            <span className="text-xs font-black uppercase tracking-widest">Bekleyen İstek</span>
                         </div>
-                    )}
 
-                    <button
-                        onClick={() => {
-                            if (confirm('Sistemden çıkış yapılsın mı?')) {
-                                if (staffMode) {
-                                    handleStaffLogout();
-                                } else {
-                                    localStorage.removeItem('salon_board_key');
-                                    window.location.reload();
-                                }
-                            }
-                        }}
-                        className="group w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all flex items-center justify-center shadow-sm"
-                    >
-                        <svg className="w-7 h-7 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                    </button>
+                        <div className="flex items-center gap-3">
+                            {pendingCount > 0 && (
+                                <div className="relative group">
+                                    <div className="absolute -inset-1 bg-amber-500 rounded-xl blur opacity-25 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
+                                    <div className="relative flex items-center bg-amber-500 text-white px-4 py-2.5 rounded-xl gap-2 font-black shadow-lg shadow-amber-200 animate-bounce">
+                                        <span className="text-sm">{pendingCount}</span>
+                                        <span className="text-[10px] uppercase tracking-widest hidden sm:inline">Talep</span>
+                                    </div>
+                                </div>
+                            )}
+                            <button
+                                onClick={() => {
+                                    setFastForm({
+                                        customerName: '',
+                                        serviceId: '',
+                                        notes: '',
+                                        staffId: staff[0]?.user_id || staff[0]?.id || '',
+                                        appointmentDate: selectedDate,
+                                        startTime: '09:00'
+                                    });
+                                    setIsModalOpen(true);
+                                }}
+                                className="group relative w-12 h-12 flex items-center justify-center bg-slate-900 text-white rounded-2xl shadow-xl shadow-slate-200/50 hover:bg-black hover:scale-105 active:scale-90 transition-all duration-300 overflow-hidden"
+                                title="Yeni Randevu Ekle"
+                                style={{ margin: 0 }}
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-tr from-slate-800 to-slate-900 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                <svg className="relative z-10 w-6 h-6 transform group-hover:rotate-90 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                </svg>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (confirm('Sistemden çıkış yapılsın mı?')) {
+                                        if (staffMode) handleStaffLogout();
+                                        else { localStorage.removeItem('salon_board_key'); window.location.reload(); }
+                                    }
+                                }}
+                                className="group w-12 h-12 rounded-2xl bg-white border-2 border-slate-50 text-slate-400 hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-all duration-300 flex items-center justify-center shadow-lg shadow-slate-100/50 active:scale-90"
+                                title="Güvenli Çıkış"
+                            >
+                                <svg className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </header>
 
+
             {/* Matrix Container */}
-            <div id="matrix-container" className="flex-1 overflow-auto p-6 lg:p-10 scroll-smooth bg-slate-50/50">
-                <div className="bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.04)] border border-slate-100 inline-block min-w-full">
+            <div id="matrix-container" className="flex-1 overflow-auto p-4 lg:p-5 scroll-smooth bg-slate-50/50">
+                <div className="bg-white rounded-[1.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.04)] border border-slate-100 inline-block min-w-full overflow-hidden">
                     <table className="w-full border-separate border-spacing-0">
                         <thead>
-                            <tr className="bg-black">
-                                <th className="sticky left-0 z-[60] bg-black p-8 text-left border-b border-white/10 min-w-[300px] shadow-[10px_0_30px_-15px_rgba(0,0,0,0.3)] rounded-tl-[3rem]">
+                            <tr className="bg-slate-900">
+                                <th className="sticky left-0 z-[60] bg-slate-900 p-4 lg:p-5 text-left border-b border-white/5 min-w-[200px] shadow-[10px_0_30px_-15px_rgba(0,0,0,0.3)] rounded-tl-[1.5rem]">
                                     <div className="flex flex-col">
-                                        <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.25em] mb-1">Organizasyon</span>
-                                        <span className="text-xl font-black text-white tracking-tight">Uzmanlar</span>
+                                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-0.5">Organizasyon</span>
+                                        <span className="text-base font-black text-white tracking-tight">Uzmanlar</span>
                                     </div>
                                 </th>
                                 {hours.map(hour => {
                                     const hNum = parseInt(hour.split(':')[0]);
-                                    const isCurrent = hNum === currentHour;
-                                    const isPast = hNum < currentHour;
+                                    const isCurrent = hNum === currentHour && selectedDate === currentDate;
+                                    const isPast = (selectedDate < currentDate) || (selectedDate === currentDate && hNum < currentHour);
 
                                     return (
                                         <th
                                             key={hour}
                                             id={`hour-col-${hNum}`}
-                                            className={`p-8 text-center border-b border-white/10 min-w-[180px] transition-all relative ${isCurrent ? 'bg-white/5' : ''}`}
+                                            className={`p-2 lg:p-3 text-center border-b border-white/5 min-w-[90px] transition-all relative ${isCurrent ? 'bg-white/10' : ''}`}
                                         >
-                                            <div className={`flex flex-col items-center gap-1 transition-all ${isCurrent ? 'scale-110' : ''}`}>
-                                                <span className={`text-lg font-black tracking-tight ${isCurrent ? 'text-indigo-400' : isPast ? 'text-slate-600' : 'text-slate-200'}`}>
+                                            <div className="flex flex-col items-center gap-0.5 transition-all">
+                                                <span className={`text-sm lg:text-base font-black tracking-tight ${isCurrent ? 'text-white' : isPast ? 'text-slate-600' : 'text-slate-400'}`}>
                                                     {hour}
                                                 </span>
                                                 {isCurrent && (
-                                                    <span className="px-3 py-1 bg-indigo-500 text-[9px] text-white font-black uppercase tracking-widest rounded-full shadow-lg">
+                                                    <span className="px-1.5 py-0.2 bg-emerald-500 text-[6px] text-white font-black uppercase tracking-widest rounded-full">
                                                         ŞİMDİ
                                                     </span>
                                                 )}
-                                                {!isCurrent && isPast && selectedDate === new Date().toISOString().split('T')[0] && <span className="text-[9px] font-black text-slate-700 uppercase tracking-widest">Geçti</span>}
                                             </div>
-                                            {isCurrent && selectedDate === new Date().toISOString().split('T')[0] && <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-indigo-500 rounded-t-full"></div>}
+                                            {isCurrent && <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full"></div>}
                                         </th>
                                     );
                                 })}
@@ -456,21 +494,19 @@ export default function SalonBoard() {
                                 const pId = person.user_id || person.id;
                                 const staffColor = getStaffColor(`${person.first_name} ${person.last_name}`);
                                 return (
-                                    <tr key={pId} className="group transition-colors">
-                                        <td className="sticky left-0 z-[50] bg-white p-8 border-r border-slate-100 font-bold text-slate-900 shadow-[10px_0_30px_-15px_rgba(0,0,0,0.1)] group-hover:bg-slate-50 transition-colors">
-                                            <div className="flex items-center gap-5">
-                                                <div className="relative">
-                                                    <div
-                                                        className="w-14 h-14 rounded-2xl text-white flex items-center justify-center font-black text-lg uppercase shadow-lg shadow-inner"
-                                                        style={{ backgroundColor: staffColor }}
-                                                    >
-                                                        {person.first_name?.[0] || 'U'}{person.last_name?.[0] || 'Z'}
-                                                    </div>
-                                                    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full"></div>
+                                    <tr key={pId} className="group transition-all">
+                                        <td className="sticky left-0 z-[50] bg-white p-2 lg:p-3 border-r border-slate-100 font-bold text-slate-900 shadow-[10px_0_30px_-15px_rgba(0,0,0,0.1)] group-hover:bg-slate-50 transition-colors">
+                                            <div className="flex items-center gap-2">
+                                                <div
+                                                    className="w-8 h-8 lg:w-9 lg:h-9 rounded-lg text-white flex items-center justify-center font-black text-[10px] lg:text-xs uppercase shadow-sm shrink-0"
+                                                    style={{ backgroundColor: staffColor }}
+                                                >
+                                                    {person.first_name?.[0] || 'U'}{person.last_name?.[0] || 'Z'}
                                                 </div>
-                                                <div>
-                                                    <p className="text-lg font-black text-slate-800 leading-none mb-1.5 tracking-tight group-hover:opacity-80 transition-opacity">{person.first_name} {person.last_name}</p>
-                                                    <span className="inline-flex px-2 py-0.5 bg-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest rounded-md">Uzman</span>
+                                                <div className="min-w-0">
+                                                    <p className="text-[13px] font-black text-slate-800 leading-none tracking-tight group-hover:text-indigo-600 transition-colors truncate">
+                                                        {person.first_name} {person.last_name}
+                                                    </p>
                                                 </div>
                                             </div>
                                         </td>
@@ -482,10 +518,8 @@ export default function SalonBoard() {
                                             const slotInterval = company?.slot_interval || 30;
                                             const nextSlotTotal = slotTotal + slotInterval;
 
-                                            const isCurrent = currentTotal >= slotTotal && currentTotal < nextSlotTotal;
-                                            const isPast = currentTotal >= nextSlotTotal;
-
-                                            // Normalize today's date for comparison
+                                            const isSlotCurrent = selectedDate === currentDate && currentTotal >= slotTotal && currentTotal < nextSlotTotal;
+                                            const isSlotPast = (selectedDate < currentDate) || (selectedDate === currentDate && currentTotal >= nextSlotTotal);
                                             const todayDate = selectedDate;
 
                                             // Find appointments that START at this slot
@@ -515,11 +549,9 @@ export default function SalonBoard() {
                                             return (
                                                 <td
                                                     key={hour}
-                                                    className={`p-4 border-r border-slate-50 align-top transition-all relative ${isCurrent ? 'bg-indigo-50/10' : ''} ${isPast && isSlotFree ? 'bg-slate-50/20 pointer-events-none' : !isOccupied ? 'cursor-cell hover:bg-slate-50/80' : ''}`}
+                                                    className={`p-1 lg:p-1.5 border-r border-slate-50 align-top transition-all relative ${isSlotCurrent ? 'bg-indigo-50/10' : ''} ${isSlotPast && isSlotFree ? 'bg-slate-50/20 grayscale opacity-40 pointer-events-none' : !isOccupied ? 'cursor-cell hover:bg-slate-50/80' : ''}`}
                                                     onClick={() => {
-                                                        if (isOccupied) return;
-                                                        const isToday = selectedDate === new Date().toISOString().split('T')[0];
-                                                        if (isToday && isPast) return;
+                                                        if (isOccupied || isSlotPast) return;
 
                                                         const pId = person.user_id || person.id;
                                                         setSelectedCell({ person, hour });
@@ -534,11 +566,11 @@ export default function SalonBoard() {
                                                         setIsModalOpen(true);
                                                     }}
                                                 >
-                                                    <div className={`space-y-2 min-h-[100px] transition-all ${isPast && isSlotFree ? 'opacity-20' : ''}`}>
+                                                    <div className={`space-y-1.5 min-h-[80px] transition-all ${isSlotPast && isSlotFree ? 'opacity-10' : ''}`}>
                                                         {/* Boş slot - sadece gelecekteyse Müsait göster */}
-                                                        {isSlotFree && !(isPast && selectedDate === new Date().toISOString().split('T')[0]) && (
-                                                            <div className="opacity-0 group-hover:opacity-100 flex items-center justify-center h-20 border-3 border-dashed border-slate-200 rounded-3xl text-[11px] text-slate-400 font-black uppercase tracking-widest transition-all bg-white shadow-sm">
-                                                                + Müsait
+                                                        {isSlotFree && !isSlotPast && (
+                                                            <div className="opacity-0 group-hover:opacity-100 flex items-center justify-center h-[72px] border-2 border-dashed border-slate-200 rounded-lg text-[8px] text-slate-400 font-black uppercase tracking-widest transition-all bg-white shadow-sm">
+                                                                +
                                                             </div>
                                                         )}
 
@@ -551,27 +583,27 @@ export default function SalonBoard() {
                                                                     setSelectedAppointment(app);
                                                                     setIsDetailModalOpen(true);
                                                                 }}
-                                                                className={`p-5 rounded-3xl border-l-[6px] shadow-xl shadow-slate-200/40 transition-all hover:scale-[1.03] hover:shadow-2xl active:scale-95 cursor-pointer ${isPast && selectedDate === new Date().toISOString().split('T')[0] ? 'grayscale-[0.4] opacity-70' : ''} ${app.status === 'approved' ? 'bg-white text-slate-900 group-hover:bg-slate-50' :
+                                                                className={`p-1.5 lg:p-2 rounded-xl border-l-[3px] shadow-md shadow-slate-200/40 transition-all hover:scale-[1.03] hover:shadow-xl active:scale-95 cursor-pointer ${isSlotPast ? 'grayscale-[0.6] opacity-60' : ''} ${app.status === 'approved' ? 'bg-white text-slate-900 group-hover:bg-slate-50' :
                                                                     app.status === 'pending' ? 'bg-amber-50 border-amber-500 text-amber-900 animate-pulse' :
                                                                         app.status === 'completed' ? 'bg-emerald-50 border-emerald-500 text-emerald-900 opacity-60' :
                                                                             'bg-slate-50 border-slate-300 text-slate-500'
                                                                     }`}
                                                                 style={app.status === 'approved' ? { borderLeftColor: staffColor } : {}}
                                                             >
-                                                                <div className="flex justify-between items-start mb-2">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{app.start_time} - {app.end_time}</span>
-                                                                        {isCurrent && <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping"></span>}
+                                                                <div className="flex justify-between items-start mb-1">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{app.start_time}</span>
+                                                                        {isSlotCurrent && <span className="w-1 h-1 bg-indigo-500 rounded-full animate-ping"></span>}
                                                                     </div>
-                                                                    <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${app.status === 'approved' ? 'bg-indigo-100 text-indigo-600' :
+                                                                    <span className={`px-1 py-0.5 rounded-full text-[6px] font-black uppercase tracking-widest ${app.status === 'approved' ? 'bg-indigo-100 text-indigo-600' :
                                                                         app.status === 'pending' ? 'bg-amber-100 text-amber-600' :
                                                                             'bg-slate-100 text-slate-400'
                                                                         }`}>
-                                                                        {app.status === 'approved' ? 'ONAYLI' : app.status === 'pending' ? 'YENİ' : 'GEÇMİŞ'}
+                                                                        {app.status === 'approved' ? 'V' : app.status === 'pending' ? '!' : 'G'}
                                                                     </span>
                                                                 </div>
-                                                                <p className="text-base font-black truncate leading-tight mb-1 tracking-tight">{app.customer_name || 'Misafir'}</p>
-                                                                <p className="text-[10px] font-bold text-slate-400 truncate uppercase tracking-widest">{app.service_name}</p>
+                                                                <p className="text-xs font-black truncate leading-none mb-0.5 tracking-tight">{app.customer_name || 'Misafir'}</p>
+                                                                <p className="text-[7px] font-bold text-slate-400 truncate uppercase tracking-widest">{app.service_name}</p>
                                                             </div>
                                                         ))}
 
@@ -583,20 +615,19 @@ export default function SalonBoard() {
                                                                     setSelectedAppointment(overlapping);
                                                                     setIsDetailModalOpen(true);
                                                                 }}
-                                                                className="h-20 rounded-2xl border-l-4 flex items-center px-4 cursor-pointer hover:scale-[1.02] transition-all opacity-60"
+                                                                className="h-[72px] rounded-lg border-l-4 flex items-center px-2 cursor-pointer hover:scale-[1.02] transition-all opacity-60"
                                                                 style={{ borderLeftColor: staffColor, backgroundColor: `${staffColor}10` }}
                                                             >
                                                                 <div>
-                                                                    <p className="text-sm font-black text-slate-600 truncate">{overlapping.customer_name || 'Misafir'}</p>
-                                                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">devam ediyor</p>
+                                                                    <p className="text-[10px] font-black text-slate-600 truncate">{overlapping.customer_name || 'Misafir'}</p>
+                                                                    <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest leading-none">devam ediyor</p>
                                                                 </div>
                                                             </div>
                                                         )}
                                                     </div>
                                                 </td>
                                             );
-                                        })
-                                        }
+                                        })}
                                     </tr>
                                 );
                             })}
@@ -605,32 +636,6 @@ export default function SalonBoard() {
                 </div>
             </div>
 
-            {/* Float Premium Legend */}
-            <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-2xl px-10 py-5 rounded-[2.5rem] shadow-[0_24px_48px_-12px_rgba(0,0,0,0.3)] flex items-center gap-10 z-[100] border border-white/10">
-                <div className="flex items-center gap-3">
-                    <div className="w-4 h-4 bg-amber-500 rounded-xl shadow-lg shadow-amber-500/20"></div>
-                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">Yeni Talep</span>
-                </div>
-                <div className="flex items-center gap-3">
-                    <div className="w-4 h-4 bg-indigo-500 rounded-xl shadow-lg shadow-indigo-500/20"></div>
-                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">Onaylandı</span>
-                </div>
-                <div className="flex items-center gap-3">
-                    <div className="w-4 h-4 bg-emerald-500 rounded-xl shadow-lg shadow-emerald-500/20"></div>
-                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">Tamamlandı</span>
-                </div>
-                <div className="w-px h-6 bg-slate-800"></div>
-                <div className="flex items-center gap-3 text-emerald-400 group">
-                    <div className="relative">
-                        <svg className="w-5 h-5 animate-spin group-hover:animate-none group-hover:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-100" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <div className="absolute inset-0 bg-emerald-400/20 blur-lg animate-pulse rounded-full"></div>
-                    </div>
-                    <span className="text-[11px] font-black uppercase tracking-[0.2em] animate-pulse">Canlı Senk</span>
-                </div>
-            </div>
 
             {/* New/Fast Appointment Modal */}
             {isModalOpen && (
@@ -691,6 +696,7 @@ export default function SalonBoard() {
                                         <input
                                             type="date"
                                             disabled={!!selectedCell}
+                                            min={currentDate}
                                             value={fastForm.appointmentDate || selectedDate}
                                             onChange={e => setFastForm(prev => ({ ...prev, appointmentDate: e.target.value }))}
                                             className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-black text-xl text-slate-900 outline-none disabled:bg-slate-50"

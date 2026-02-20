@@ -362,7 +362,7 @@ Onaylıyor musunuz?
                                     <div
                                         key={app.id}
                                         onClick={() => setSelectedAppointment(app)}
-                                        className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm flex items-center gap-4 active:scale-[0.98] transition-all"
+                                        className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 active:scale-[0.98] transition-all"
                                     >
                                         <div className="w-14 h-14 bg-slate-50 rounded-2xl flex flex-col items-center justify-center border border-slate-100">
                                             <span className="text-xs font-black text-slate-900 leading-none">{app.start_time.split(':')[0]}</span>
