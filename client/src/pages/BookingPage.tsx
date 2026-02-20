@@ -180,7 +180,8 @@ export default function BookingPage() {
         for (let time = workBegin; time < workEnd; time += slotInterval) {
             // 1. BUGÜN ise geçmiş saatleri hiç gösterme (5dk buffer)
             if (isToday && time < currentMin + 5) {
-                continue; // Geçmiş slot - listeye ekleme
+                console.log(`[v1.8.0] Skipping past slot: ${String(Math.floor(time / 60)).padStart(2, '0')}:${String(time % 60).padStart(2, '0')} (Current: ${now.getHours()}:${now.getMinutes()})`);
+                continue;
             }
 
             const slotEnd = time + duration;
@@ -536,53 +537,51 @@ export default function BookingPage() {
                             </div>
                         </header>
 
-                        <div className="pt-12 pb-10">
-                            <div className="w-20 h-20 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-emerald-200 ring-8 ring-emerald-50">
-                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" /></svg>
+                        <div className="pt-2 pb-6">
+                            <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl shadow-emerald-200 ring-4 ring-emerald-50">
+                                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" /></svg>
                             </div>
-                            <h2 className="text-2xl font-black text-slate-900 mb-8 px-4 leading-tight">Randevunuzu neredeyse<br />onaylamak üzereyiz!</h2>
+                            <h2 className="text-xl font-black text-slate-900 mb-6 px-4 leading-tight">Randevunuzu neredeyse<br />onaylamak üzereyiz!</h2>
 
-                            <div className="bg-white rounded-[2.5rem] p-1 border border-slate-100 shadow-2xl shadow-slate-200/50 mb-8 mx-1 overflow-hidden">
-                                <div className="p-6 flex items-center gap-4 bg-slate-50/50">
-                                    <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-xl font-black text-slate-400">
+                            <div className="bg-white rounded-[2rem] p-1 border border-slate-100 shadow-xl shadow-slate-200/50 mb-6 mx-1 overflow-hidden">
+                                <div className="p-4 flex items-center gap-4 bg-slate-50/50">
+                                    <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-xl font-black text-slate-400">
                                         {selectedStaffUser?.first_name[0]}
                                     </div>
                                     <div className="text-left flex-1">
-                                        <h3 className="font-black text-slate-900 text-lg uppercase tracking-tight">{selectedStaffUser?.first_name} {selectedStaffUser?.last_name}</h3>
-                                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">{selectedService?.name}</p>
+                                        <h3 className="font-black text-slate-900 text-base uppercase tracking-tight">{selectedStaffUser?.first_name} {selectedStaffUser?.last_name}</h3>
+                                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">{selectedService?.name}</p>
                                     </div>
-                                    <div className="w-6 h-6 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-emerald-200">
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                    <div className="w-5 h-5 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-emerald-200">
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
                                     </div>
                                 </div>
-                                <div className="p-6 text-left border-t border-slate-100">
-                                    <p className="text-slate-500 font-bold mb-1 text-sm capitalize">
+                                <div className="p-4 text-left border-t border-slate-100">
+                                    <p className="text-slate-500 font-bold mb-0.5 text-xs capitalize">
                                         {new Date(selection.date!).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long' })}
                                     </p>
-                                    <p className="text-3xl font-black text-slate-900 tracking-tight">{selection.time}</p>
+                                    <p className="text-2xl font-black text-slate-900 tracking-tight">{selection.time}</p>
                                 </div>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="space-y-6 text-left px-2">
-                                <div className="space-y-4">
+                            <form onSubmit={handleSubmit} className="space-y-4 text-left px-2">
+                                <div className="space-y-3">
                                     <div className="relative">
                                         <input
-                                            required
                                             type="text"
                                             value={selection.customerName}
                                             onChange={e => setSelection({ ...selection, customerName: e.target.value })}
-                                            className="w-full p-5 bg-white rounded-2xl border-2 border-slate-100 font-bold text-slate-900 focus:outline-none focus:border-indigo-500 shadow-sm transition-all text-sm"
-                                            placeholder="Adınız Soyadınız"
+                                            className="w-full p-4 bg-white rounded-2xl border-2 border-slate-100 font-bold text-slate-900 focus:outline-none focus:border-indigo-500 shadow-sm transition-all text-sm"
+                                            placeholder="Adınız Soyadınız (Opsiyonel)"
                                         />
                                     </div>
                                     <div className="relative">
                                         <input
-                                            required
                                             type="tel"
                                             value={selection.customerPhone}
                                             onChange={e => setSelection({ ...selection, customerPhone: e.target.value })}
-                                            className="w-full p-5 bg-white rounded-2xl border-2 border-slate-100 font-bold text-slate-900 focus:outline-none focus:border-indigo-500 shadow-sm transition-all text-sm"
-                                            placeholder="Telefon Numaranız"
+                                            className="w-full p-4 bg-white rounded-2xl border-2 border-slate-100 font-bold text-slate-900 focus:outline-none focus:border-indigo-500 shadow-sm transition-all text-sm"
+                                            placeholder="Telefon Numaranız (Opsiyonel)"
                                         />
                                     </div>
                                 </div>
