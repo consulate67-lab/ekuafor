@@ -261,7 +261,8 @@ export default function SalonBoard() {
             setIsModalOpen(false);
             setFastForm({ customerName: '', serviceId: '', notes: '', staffId: '', appointmentDate: '', startTime: '' });
             setSelectedCell(null);
-            if (company.id) fetchData(company.id);
+            if (company.id) await fetchData(company.id);
+            window.location.reload();
         } catch (err: any) {
             console.error('Randevu kayıt hatası:', err);
             alert(err.response?.data?.error || 'Randevu kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.');

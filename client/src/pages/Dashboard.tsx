@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import api from '../lib/api';
+import { parseVoiceCommand } from '../lib/aiParser';
+import { Service } from '../types';
 
 export default function Dashboard() {
     const { user, logout } = useAuthStore();
@@ -11,6 +13,17 @@ export default function Dashboard() {
         todayIncome: 0,
         customerCount: 0
     });
+    const [services, setServices] = useState<Service[]>([]);
+    const [isListening, setIsListening] = useState(false);
+    const [voiceTranscript, setVoiceTranscript] = useState('');
+
+    const getLocalDateString = () => {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -23,7 +36,7 @@ export default function Dashboard() {
                 }
             } else if (user?.role === 'company_admin' || user?.role === 'staff') {
                 try {
-                    const todayStr = new Date().toISOString().split('T')[0];
+                    const todayStr = getLocalDateString();
                     // Safe fetch for appointments
                     let appointments: any[] = [];
                     try {
@@ -71,6 +84,8 @@ export default function Dashboard() {
                         customerCount: uniqueCustomers
                     }));
 
+                    setServices(services);
+
                 } catch (e) {
                     console.error('Stats calculation error:', e);
                 }
@@ -78,6 +93,77 @@ export default function Dashboard() {
         };
         fetchStats();
     }, [user]);
+
+    const startVoiceCommand = () => {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert('Tarayıcınız sesli komut özelliğini desteklemiyor.');
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'tr-TR';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = () => setIsListening(true);
+        recognition.onend = () => setIsListening(false);
+
+        recognition.onresult = async (event: any) => {
+            const transcript = event.results[0][0].transcript.toLowerCase();
+            setVoiceTranscript(transcript);
+            await processVoiceTranscript(transcript);
+            setTimeout(() => setVoiceTranscript(''), 3000);
+        };
+
+        recognition.start();
+    };
+
+    const processVoiceTranscript = async (transcript: string) => {
+        try {
+            if (!user?.company_id) return;
+
+            const rules = localStorage.getItem(`ai_rules_${user.company_id}`) || '';
+            const result = parseVoiceCommand(transcript, services, rules);
+
+            if (!result.serviceId) {
+                alert('Üzgünüm, hangi hizmeti istediğinizi anlayamadım.');
+                return;
+            }
+
+            const matchedService = services.find(s => s.id === result.serviceId);
+
+            const confirmMsg = `
+🤖 YAPAY ZEKA ÖNERİSİ:
+-------------------------
+Müşteri: ${result.customerName}
+Hizmet: ${matchedService?.name}
+Tarih: ${new Date(result.date).toLocaleDateString('tr-TR')}
+Saat: ${result.startTime} - ${result.endTime}
+-------------------------
+Onaylıyor musunuz?
+            `;
+
+            if (window.confirm(confirmMsg)) {
+                await api.post('/appointments', {
+                    company_id: user.company_id,
+                    service_id: result.serviceId,
+                    appointment_date: result.date,
+                    start_time: result.startTime,
+                    end_time: result.endTime,
+                    notes: result.notes + ` | Müşteri: ${result.customerName}`,
+                    price: result.price,
+                    status: 'approved'
+                });
+
+                alert('Randevu başarıyla eklendi.');
+                window.location.reload(); // Stats refresh
+            }
+        } catch (err) {
+            console.error('Voice parse error', err);
+            alert('Komut işlenirken bir hata oluştu.');
+        }
+    };
 
     return (
         <div className="min-h-screen bg-slate-50/50">
@@ -100,6 +186,11 @@ export default function Dashboard() {
                             </button>
                         </div>
                     </div>
+                    {voiceTranscript && (
+                        <div className="mt-4 bg-pink-50 text-pink-600 px-4 py-2 rounded-xl text-[11px] font-bold animate-pulse border border-pink-100 italic text-center mx-auto max-w-md">
+                            " {voiceTranscript} "
+                        </div>
+                    )}
                 </div>
             </header>
 
@@ -184,7 +275,26 @@ export default function Dashboard() {
                         </a>
                     )}
 
-
+                    {/* Sesli Randevu (İşletme Sahibi ve Çalışan) - YENİ BÜYÜK BUTON */}
+                    {(user?.role === 'company_admin' || user?.role === 'staff') && (
+                        <button
+                            onClick={startVoiceCommand}
+                            className={`card group hover:scale-[1.02] transition-all duration-300 border-indigo-100 text-left relative overflow-hidden ${isListening ? 'ring-2 ring-indigo-500 ring-offset-2 shadow-2xl transition-all' : ''}`}
+                        >
+                            {isListening && <div className="absolute inset-0 bg-indigo-500/10 animate-pulse"></div>}
+                            <div className="flex items-center gap-5 relative z-10">
+                                <div className={`p-4 rounded-2xl transition-all duration-300 ${isListening ? 'bg-indigo-600 text-white animate-bounce shadow-lg shadow-indigo-200' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
+                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m8 0h-8m4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-gray-900 mb-1">{isListening ? 'Dinleniyor...' : 'Sesli Randevu'}</h3>
+                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Konuşarak hızlıca randevu oluştur.</p>
+                                </div>
+                            </div>
+                        </button>
+                    )}
                 </div>
 
                 {/* İstatistikler */}

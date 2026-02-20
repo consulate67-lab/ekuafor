@@ -27,8 +27,11 @@ export default function AppointmentManagement() {
 
     const formatDateKey = (dateStr: any) => {
         if (!dateStr) return '';
-        const str = typeof dateStr === 'string' ? dateStr : dateStr.toISOString();
-        return str.split('T')[0];
+        const d = new Date(dateStr);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     };
 
     const getLocalDateString = () => {
@@ -193,6 +196,11 @@ Onaylıyor musunuz?
     };
 
     const handleStatusUpdate = async (id: number, status: string) => {
+        let msg = '';
+        if (status === 'cancelled') msg = 'Bu randevuyu iptal etmek istediğinize emin misiniz?';
+        if (status === 'approved') msg = 'Bu randevuyu onaylamak istiyor musunuz?';
+        if (msg && !window.confirm(msg)) return;
+
         try {
             await api.patch(`/appointments/${id}/status`, { status });
             fetchData();
@@ -231,7 +239,8 @@ Onaylıyor musunuz?
             (newAppointment as any).customer_name = '';
             setShowAddForm(false);
             alert('Randevu başarıyla ONAYLI olarak oluşturuldu.');
-            fetchData();
+            await fetchData();
+            window.location.reload();
         } catch (err: any) {
             setFormError(err.response?.data?.error || 'Randevu kaydedilirken hata oluştu');
         }
@@ -282,9 +291,9 @@ Onaylıyor musunuz?
                         for (let i = -2; i < 12; i++) {
                             const d = new Date();
                             d.setDate(start.getDate() + i);
-                            const ds = d.toISOString().split('T')[0];
+                            const ds = formatDateKey(d);
                             const isSel = selectedDate === ds;
-                            const isToday = new Date().toISOString().split('T')[0] === ds;
+                            const isToday = getLocalDateString() === ds;
                             items.push(
                                 <button
                                     key={ds}
@@ -458,6 +467,7 @@ Onaylıyor musunuz?
                                     <input
                                         type="date"
                                         required
+                                        min={getLocalDateString()}
                                         className="w-full bg-slate-50 border-none rounded-2xl py-4 px-4 font-bold text-slate-900"
                                         value={newAppointment.appointment_date}
                                         onChange={(e) => setNewAppointment({ ...newAppointment, appointment_date: e.target.value })}
@@ -492,9 +502,8 @@ Onaylıyor musunuz?
                                 <label className="block text-xs font-bold text-slate-700 mb-2 uppercase ml-1 tracking-wider">Müşteri Adı</label>
                                 <input
                                     type="text"
-                                    required
                                     className="w-full bg-slate-50 border-none rounded-2xl py-4 px-4 font-bold text-slate-900"
-                                    placeholder="Ad Soyad"
+                                    placeholder="Ad Soyad (Opsiyonel)"
                                     value={(newAppointment as any).customer_name || ''}
                                     onChange={(e) => setNewAppointment({ ...newAppointment, customer_name: e.target.value } as any)}
                                 />
