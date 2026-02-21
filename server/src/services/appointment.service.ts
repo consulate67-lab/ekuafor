@@ -95,12 +95,50 @@ class AppointmentService {
         }
     }
 
+    async getAppointmentsByPhone(phone: string, companyId?: number): Promise<Appointment[]> {
+        console.log(`[Service] getAppointmentsByPhone: Phone=${phone}, Company=${companyId}`);
+        // Search in users.phone, appointments.notes, and potentially appointments.customer_phone
+        let query = `
+            SELECT 
+                a.*, 
+                s.name as service_name, 
+                c.name as company_name,
+                COALESCE(u.first_name || ' ' || u.last_name, a.notes) as customer_display_name
+            FROM appointments a
+            LEFT JOIN services s ON a.service_id = s.id
+            LEFT JOIN companies c ON a.company_id = c.id
+            LEFT JOIN users u ON a.customer_id = u.id
+            WHERE (
+                u.phone = $1 OR 
+                a.notes LIKE '%' || $1 || '%'
+            )
+        `;
+        const values: any[] = [phone];
+
+        if (companyId) {
+            query += ` AND a.company_id = $2`;
+            values.push(companyId);
+        }
+
+        query += ' ORDER BY a.appointment_date DESC, a.start_time DESC';
+
+        try {
+            const result = await pool.query(query, values);
+            return result.rows;
+        } catch (err) {
+            console.error('[Service] getAppointmentsByPhone Error:', err);
+            throw err;
+        }
+    }
+
     async getAppointmentsByCompany(companyId: number, status?: string, staffId?: number, startDate?: string, endDate?: string): Promise<Appointment[]> {
         console.log(`[Service] getAppointmentsByCompany: ID=${companyId}, Status=${status}, Staff=${staffId}, StartDate=${startDate}, EndDate=${endDate}`);
         let query = `
-      SELECT a.*, s.name as service_name, u.first_name || ' ' || u.last_name as customer_name
+      SELECT a.*, s.name as service_name, c.name as company_name, 
+             u.first_name || ' ' || u.last_name as customer_name
       FROM appointments a
       LEFT JOIN services s ON a.service_id = s.id
+      LEFT JOIN companies c ON a.company_id = c.id
       LEFT JOIN users u ON a.customer_id = u.id
       WHERE a.company_id = $1
     `;

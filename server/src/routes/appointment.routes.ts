@@ -23,18 +23,27 @@ const appointmentSchema = z.object({
 const publicAppointmentHandler = async (req: Request, res: Response, next: any) => {
     // If company_id is present AND there is NO auth header (or we want to allow public even if logged in but searching public),
     // usually public booking check is:
-    if (req.query.company_id) {
+    const companyId = req.query.company_id ? parseInt(req.query.company_id as string) : undefined;
+    const customerPhone = req.query.customer_phone as string;
+
+    if (companyId || customerPhone) {
         try {
-            const companyId = parseInt(req.query.company_id as string);
-            // Public listing might need to be sanitized but for MVP we return full
-            console.log(`[GET /appointments] Public Access: Company=${companyId}`);
-            const appointments = await appointmentService.getAppointmentsByCompany(
-                companyId,
-                req.query.status as string,
-                undefined,
-                req.query.start_date as string,
-                req.query.end_date as string
-            );
+            console.log(`[GET /appointments] Public Access: Company=${companyId}, Phone=${customerPhone}`);
+
+            let appointments;
+            if (customerPhone) {
+                // Fetch by phone (across all companies or filtered by company if both provided)
+                appointments = await appointmentService.getAppointmentsByPhone(customerPhone, companyId);
+            } else {
+                // Classic company-based public listing
+                appointments = await appointmentService.getAppointmentsByCompany(
+                    companyId!,
+                    req.query.status as string,
+                    undefined,
+                    req.query.start_date as string,
+                    req.query.end_date as string
+                );
+            }
             return res.json({ success: true, data: appointments });
         } catch (error) {
             console.error('[GET /appointments] Public Error:', error);
