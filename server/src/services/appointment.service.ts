@@ -97,7 +97,11 @@ class AppointmentService {
 
     async getAppointmentsByPhone(phone: string, companyId?: number): Promise<Appointment[]> {
         console.log(`[Service] getAppointmentsByPhone: Phone=${phone}, Company=${companyId}`);
-        // Search in users.phone, appointments.notes, and potentially appointments.customer_phone
+
+        // Normalize phone: Remove non-digits and leading zero
+        const cleanPhone = phone.replace(/\D/g, '').replace(/^0/, '');
+        const searchPattern = `%${cleanPhone}%`;
+
         let query = `
             SELECT 
                 a.*, 
@@ -109,11 +113,12 @@ class AppointmentService {
             LEFT JOIN companies c ON a.company_id = c.id
             LEFT JOIN users u ON a.customer_id = u.id
             WHERE (
-                u.phone = $1 OR 
-                a.notes LIKE '%' || $1 || '%'
+                u.phone LIKE $1 OR 
+                a.notes LIKE $1 OR
+                a.customer_phone LIKE $1
             )
         `;
-        const values: any[] = [phone];
+        const values: any[] = [searchPattern];
 
         if (companyId) {
             query += ` AND a.company_id = $2`;
