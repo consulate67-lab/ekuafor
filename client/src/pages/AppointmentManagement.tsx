@@ -133,17 +133,33 @@ export default function AppointmentManagement() {
             const result = parseVoiceCommand(transcript, services, rules);
 
             if (!result.serviceId) {
-                alert('Üzgünüm, hangi hizmeti istediğinizi anlayamadım.');
+                alert('Üzgünüm, hangi hizmeti istediğinizi anlayamadım. (Hizmet bulunamadı)');
                 return;
             }
 
             const matchedService = services.find(s => s.id === result.serviceId);
+
+            // Fetch employees for auto-assignment if none provided
+            let staffId = undefined;
+            let staffName = 'Belirtilmedi';
+
+            try {
+                const empRes = await api.get(`/companies/${company.id}/employees`);
+                const employees = empRes.data?.data || [];
+                if (employees.length > 0) {
+                    staffId = employees[0].id;
+                    staffName = `${employees[0].first_name} ${employees[0].last_name || ''}`;
+                }
+            } catch (e) {
+                console.warn('Employees fetch failed for voice command', e);
+            }
 
             const confirmMsg = `
 🤖 YAPAY ZEKA ÖNERİSİ:
 -------------------------
 Müşteri: ${result.customerName}
 Hizmet: ${matchedService?.name}
+Personel: ${staffName}
 Tarih: ${new Date(result.date).toLocaleDateString('tr-TR')}
 Saat: ${result.startTime} - ${result.endTime}
 -------------------------
@@ -154,10 +170,12 @@ Onaylıyor musunuz?
                 await api.post('/appointments', {
                     company_id: company.id,
                     service_id: result.serviceId,
+                    staff_id: staffId,
                     appointment_date: result.date,
                     start_time: result.startTime,
                     end_time: result.endTime,
-                    notes: result.notes + ` | Müşteri: ${result.customerName}`,
+                    customer_name: result.customerName,
+                    notes: result.notes,
                     price: result.price,
                     status: 'approved'
                 });
@@ -166,9 +184,10 @@ Onaylıyor musunuz?
                 alert('Randevu başarıyla eklendi.');
                 setVoiceTranscript('');
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error('Voice parse error', err);
-            alert('Komut işlenirken bir hata oluştu.');
+            const serverMsg = err.response?.data?.error;
+            alert(serverMsg ? `Hata: ${serverMsg}` : 'Randevu oluşturulurken bir teknik hata oluştu.');
         }
     };
 

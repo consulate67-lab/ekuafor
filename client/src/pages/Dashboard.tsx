@@ -127,17 +127,35 @@ export default function Dashboard() {
             const result = parseVoiceCommand(transcript, services, rules);
 
             if (!result.serviceId) {
-                alert('Üzgünüm, hangi hizmeti istediğinizi anlayamadım.');
+                alert('Üzgünüm, hangi hizmeti istediğinizi anlayamadım. (Hizmet bulunamadı)');
                 return;
             }
 
             const matchedService = services.find(s => s.id === result.serviceId);
+
+            // Fetch employees to assign a staff_id if not present
+            let staffId = (user.role === 'staff') ? user.id : undefined;
+            let staffName = (user.role === 'staff') ? `${user.first_name} ${user.last_name || ''}` : 'Belirtilmedi';
+
+            if (!staffId) {
+                try {
+                    const empRes = await api.get(`/companies/${user.company_id}/employees`);
+                    const employees = empRes.data?.data || [];
+                    if (employees.length > 0) {
+                        staffId = employees[0].id;
+                        staffName = `${employees[0].first_name} ${employees[0].last_name || ''}`;
+                    }
+                } catch (e) {
+                    console.warn('Employees fetch failed for voice command', e);
+                }
+            }
 
             const confirmMsg = `
 🤖 YAPAY ZEKA ÖNERİSİ:
 -------------------------
 Müşteri: ${result.customerName}
 Hizmet: ${matchedService?.name}
+Personel: ${staffName}
 Tarih: ${new Date(result.date).toLocaleDateString('tr-TR')}
 Saat: ${result.startTime} - ${result.endTime}
 -------------------------
@@ -148,10 +166,12 @@ Onaylıyor musunuz?
                 await api.post('/appointments', {
                     company_id: user.company_id,
                     service_id: result.serviceId,
+                    staff_id: staffId,
                     appointment_date: result.date,
                     start_time: result.startTime,
                     end_time: result.endTime,
-                    notes: result.notes + ` | Müşteri: ${result.customerName}`,
+                    customer_name: result.customerName,
+                    notes: result.notes,
                     price: result.price,
                     status: 'approved'
                 });
@@ -159,9 +179,10 @@ Onaylıyor musunuz?
                 alert('Randevu başarıyla eklendi.');
                 window.location.reload(); // Stats refresh
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error('Voice parse error', err);
-            alert('Komut işlenirken bir hata oluştu.');
+            const serverMsg = err.response?.data?.error;
+            alert(serverMsg ? `Hata: ${serverMsg}` : 'Randevu oluşturulurken bir teknik hata oluştu.');
         }
     };
 
