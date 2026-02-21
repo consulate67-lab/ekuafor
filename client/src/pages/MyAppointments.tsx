@@ -14,7 +14,10 @@ export default function MyAppointments() {
 
     const fetchMyAppointments = async () => {
         const phone = localStorage.getItem('customer_phone');
-        if (!phone) {
+        const localIds = JSON.parse(localStorage.getItem('my_appointment_ids') || '[]');
+
+        // If no phone AND no local IDs, we need to ask for identity
+        if (!phone && localIds.length === 0) {
             setLoading(false);
             setIsIdentifying(true);
             return;
@@ -22,18 +25,26 @@ export default function MyAppointments() {
 
         try {
             setLoading(true);
-            // Normalizing phone for local matching too
-            const cleanPhone = phone.replace(/\D/g, '').replace(/^0/, '');
+            let myApps: Appointment[] = [];
 
-            const res = await api.get('/appointments', { params: { customer_phone: phone } });
-            const allApps = res.data?.data || [];
+            if (localIds.length > 0) {
+                // Priority 1: Fetch by local IDs (Device History)
+                const res = await api.get('/appointments', { params: { ids: localIds.join(',') } });
+                myApps = res.data?.data || [];
 
-            // Local fallback match if server side has any gaps
-            const myApps = allApps.filter((app: any) => {
-                const appNotes = (app.notes || '').replace(/\D/g, '');
-                const appPhone = (app.customer_phone || app.phone || '').replace(/\D/g, '');
-                return appNotes.includes(cleanPhone) || appPhone.includes(cleanPhone);
-            });
+                // If we also have a phone, we might want to merge or just use phone as fallback/extra
+                // For now, if we have local IDs, prioritize them as it's "Device Memory"
+            } else if (phone) {
+                // Priority 2: Traditional phone sync
+                const cleanPhone = phone.replace(/\D/g, '').replace(/^0/, '');
+                const res = await api.get('/appointments', { params: { customer_phone: phone } });
+                const allApps = res.data?.data || [];
+                myApps = allApps.filter((app: any) => {
+                    const appNotes = (app.notes || '').replace(/\D/g, '');
+                    const appPhone = (app.customer_phone || app.phone || '').replace(/\D/g, '');
+                    return appNotes.includes(cleanPhone) || appPhone.includes(cleanPhone);
+                });
+            }
 
             // Status Change Check for Notifications
             const savedStatuses = JSON.parse(localStorage.getItem('appointment_statuses') || '{}');
@@ -72,9 +83,10 @@ export default function MyAppointments() {
     };
 
     const handleChangePhone = () => {
-        if (window.confirm('Farklı bir numara ile randevularınızı görmek istiyor musunuz?')) {
+        if (window.confirm('Cihazdaki randevu geçmişini temizlemek ve farklı bir numara ile eşleşmek istiyor musunuz?')) {
             localStorage.removeItem('customer_phone');
             localStorage.removeItem('appointment_statuses');
+            localStorage.removeItem('my_appointment_ids');
             setAppointments([]);
             setPhoneInput('');
             setIsIdentifying(true);
@@ -131,8 +143,8 @@ export default function MyAppointments() {
                     <div className="w-20 h-20 bg-indigo-500 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-indigo-500/40 rotate-12">
                         <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                     </div>
-                    <h2 className="text-3xl font-black mb-2 tracking-tight">Kayıtlı Cihazınız</h2>
-                    <p className="text-slate-400 text-sm mb-10 font-medium">Randevularınızı takip etmek için telefon numaranızı girin.</p>
+                    <h2 className="text-3xl font-black mb-2 tracking-tight">Cihaz Hafızası</h2>
+                    <p className="text-slate-400 text-sm mb-10 font-medium">Bu cihazda henüz bir randevunuz bulunmuyor. Başka cihazdaki randevularınızı getirmek için numaranızı girin.</p>
 
                     <form onSubmit={handleIdentify} className="space-y-4">
                         <input
@@ -205,14 +217,14 @@ export default function MyAppointments() {
                         <div className="text-6xl mb-6">📅</div>
                         <h2 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">Randevu Bulunamadı</h2>
                         <p className="text-slate-500 text-sm mb-6 leading-relaxed">
-                            {localStorage.getItem('customer_phone') ? 
-                                <span><b>{localStorage.getItem('customer_phone')}</b> numarası ile eşleşen bir randevu kaydı bulunamadı.</span> : 
+                            {localStorage.getItem('customer_phone') ?
+                                <span><b>{localStorage.getItem('customer_phone')}</b> numarası ile eşleşen bir randevu kaydı bulunamadı.</span> :
                                 'Henüz bir randevu oluşturmamışsınız.'}
                         </p>
-                        
+
                         {localStorage.getItem('customer_phone') && (
-                            <button 
-                                onClick={handleChangePhone} 
+                            <button
+                                onClick={handleChangePhone}
                                 className="mb-10 text-indigo-600 font-black text-[10px] uppercase tracking-[0.2em] px-6 py-3 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-colors"
                             >
                                 Farklı Numara ile Dene

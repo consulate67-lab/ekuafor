@@ -27,13 +27,17 @@ const publicAppointmentHandler = async (req: Request, res: Response, next: any) 
     // usually public booking check is:
     const companyId = req.query.company_id ? parseInt(req.query.company_id as string) : undefined;
     const customerPhone = req.query.customer_phone as string;
+    const idsString = req.query.ids as string;
 
-    if (companyId || customerPhone) {
+    if (companyId || customerPhone || idsString) {
         try {
-            console.log(`[GET /appointments] Public Access: Company=${companyId}, Phone=${customerPhone}`);
+            console.log(`[GET /appointments] Public Access: Company=${companyId}, Phone=${customerPhone}, Ids=${idsString}`);
 
             let appointments;
-            if (customerPhone) {
+            if (idsString) {
+                const ids = idsString.split(',').map(s => parseInt(s)).filter(id => !isNaN(id));
+                appointments = await appointmentService.getAppointmentsByIds(ids);
+            } else if (customerPhone) {
                 // Fetch by phone (across all companies or filtered by company if both provided)
                 appointments = await appointmentService.getAppointmentsByPhone(customerPhone, companyId);
             } else {

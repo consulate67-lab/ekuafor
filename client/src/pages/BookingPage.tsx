@@ -247,7 +247,7 @@ export default function BookingPage() {
                 return;
             }
 
-            await api.post('/appointments', {
+            const res = await api.post('/appointments', {
                 company_id: Number(id),
                 staff_id: selection.staffId,
                 service_id: selection.serviceId,
@@ -259,6 +259,15 @@ export default function BookingPage() {
                 notes: `Müşteri: ${selection.customerName} | Tel: ${selection.customerPhone}`,
                 status: 'pending'
             });
+
+            const newApp = res.data?.data;
+            if (newApp && newApp.id) {
+                const savedIds = JSON.parse(localStorage.getItem('my_appointment_ids') || '[]');
+                if (!savedIds.includes(newApp.id)) {
+                    savedIds.push(newApp.id);
+                    localStorage.setItem('my_appointment_ids', JSON.stringify(savedIds));
+                }
+            }
 
             // Save phone locally to identify this customer in MyAppointments
             localStorage.setItem('customer_phone', selection.customerPhone);

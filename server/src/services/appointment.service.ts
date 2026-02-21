@@ -99,6 +99,30 @@ class AppointmentService {
         }
     }
 
+    async getAppointmentsByIds(ids: number[]): Promise<Appointment[]> {
+        if (!ids || ids.length === 0) return [];
+
+        const query = `
+            SELECT 
+                a.*, 
+                s.name as service_name, 
+                c.name as company_name
+            FROM appointments a
+            LEFT JOIN services s ON a.service_id = s.id
+            LEFT JOIN companies c ON a.company_id = c.id
+            WHERE a.id = ANY($1)
+            ORDER BY a.appointment_date DESC, a.start_time DESC
+        `;
+
+        try {
+            const result = await pool.query(query, [ids]);
+            return result.rows;
+        } catch (err) {
+            console.error('[Service] getAppointmentsByIds Error:', err);
+            throw err;
+        }
+    }
+
     async getAppointmentsByPhone(phone: string, companyId?: number): Promise<Appointment[]> {
         console.log(`[Service] getAppointmentsByPhone: Phone=${phone}, Company=${companyId}`);
 
