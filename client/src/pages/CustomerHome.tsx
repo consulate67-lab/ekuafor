@@ -87,6 +87,11 @@ export default function CustomerHome() {
         }
 
         const initialFetch = async () => {
+            // Request notification permission early
+            if ("Notification" in window && Notification.permission === "default") {
+                Notification.requestPermission();
+            }
+
             // First display all
             await fetchData();
 

@@ -263,8 +263,13 @@ export default function BookingPage() {
             // Save phone locally to identify this customer in MyAppointments
             localStorage.setItem('customer_phone', selection.customerPhone);
 
-            alert('Randevu talebiniz alındı! Onaylandığında size bildirim yapılacaktır.');
-            navigate('/');
+            // Request notification permission if not already granted
+            if ("Notification" in window && Notification.permission === "default") {
+                Notification.requestPermission();
+            }
+
+            alert('Randevu talebiniz alındı! Talebiniz onaylandığında size bildirim gönderilecektir. "Randevularım" sayfasından takip edebilirsiniz.');
+            navigate('/ekuafor/my-appointments');
         } catch (err: any) {
             console.error('Booking failed', err);
             const serverMsg = err.response?.data?.error || err.message;
