@@ -16,10 +16,14 @@ import SmsSettings from './pages/SmsSettings';
 import SalonBoard from './pages/SalonBoard';
 import CompanyPanel from './pages/CompanyPanel';
 import MyAppointments from './pages/MyAppointments';
+import { useAppointmentSync } from './hooks/useAppointmentSync';
 
 
 function App() {
     const { isAuthenticated, initialized, setUser, setInitialized } = useAuthStore();
+
+    // Global appointment status sync & notifications
+    useAppointmentSync();
 
     useEffect(() => {
         const checkAuth = async () => {

@@ -110,15 +110,11 @@ export default function MyAppointments() {
     useEffect(() => {
         fetchMyAppointments();
 
-        // Polling every 60 seconds to check for status updates background
-        const interval = setInterval(fetchMyAppointments, 60000);
+        // Listen for global status updates
+        const handleSync = () => fetchMyAppointments();
+        window.addEventListener('appointment-status-changed', handleSync);
 
-        // Request permission on mount
-        if ("Notification" in window && Notification.permission === "default") {
-            Notification.requestPermission();
-        }
-
-        return () => clearInterval(interval);
+        return () => window.removeEventListener('appointment-status-changed', handleSync);
     }, []);
 
     const getStatusInfo = (status: string) => {
