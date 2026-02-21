@@ -49,6 +49,7 @@ const companySchema = z.object({
     work_start_time: z.string().optional(),
     work_end_time: z.string().optional(),
     slot_interval: z.coerce.number().min(5).max(480).optional(),
+    genders: z.array(z.string()).optional(),
 });
 
 /**
@@ -97,7 +98,8 @@ router.get('/', async (req: Request, res: Response) => {
             search: req.query.search as string | undefined,
             lat: req.query.lat ? parseFloat(req.query.lat as string) : undefined,
             lng: req.query.lng ? parseFloat(req.query.lng as string) : undefined,
-            radius: req.query.radius ? parseFloat(req.query.radius as string) : undefined
+            radius: req.query.radius ? parseFloat(req.query.radius as string) : undefined,
+            gender: req.query.gender as string | undefined
         };
 
         const companies = await companyService.getAllCompanies(filters);

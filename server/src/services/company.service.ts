@@ -41,6 +41,7 @@ export interface Company {
     work_end_time?: string;
     slot_interval?: number;
     admin_key?: string;
+    genders?: string[];
 }
 
 class CompanyService {
@@ -60,8 +61,9 @@ class CompanyService {
           bank_name, bank_branch, iban, account_holder_name,
           commission_rate, payment_enabled,
           is_active, is_verified, created_by, board_key, 
-          work_start_time, work_end_time, slot_interval, admin_key
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
+          work_start_time, work_end_time, slot_interval, admin_key,
+          genders
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30)
         RETURNING *
       `;
 
@@ -94,7 +96,8 @@ class CompanyService {
                 company.work_start_time || '09:00',
                 company.work_end_time || '20:00',
                 company.slot_interval || 30,
-                company.admin_key || `ADM-${company.name.substring(0, 3).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
+                company.admin_key || `ADM-${company.name.substring(0, 3).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+                company.genders || []
             ];
 
             const result = await client.query(query, values);
@@ -118,7 +121,11 @@ class CompanyService {
             // Dinamik olarak güncelleme alanlarını oluştur
             Object.entries(company).forEach(([key, value]) => {
                 if (value !== undefined && key !== 'id') {
-                    fields.push(`${key} = $${paramIndex}`);
+                    if (key === 'genders') {
+                        fields.push(`${key} = $${paramIndex}::text[]`);
+                    } else {
+                        fields.push(`${key} = $${paramIndex}`);
+                    }
                     values.push(value);
                     paramIndex++;
                 }
@@ -136,7 +143,13 @@ class CompanyService {
         RETURNING *
       `;
 
+            console.log(`[DB Update] Updating company ${id}, Fields: ${fields.join(', ')}`);
             const result = await client.query(query, values);
+
+            if (result.rows[0]) {
+                console.log(`[DB Success] Company ${id} updated. Genders in DB:`, result.rows[0].genders);
+            }
+
             return result.rows[0] || null;
         } finally {
             client.release();
@@ -148,7 +161,11 @@ class CompanyService {
      */
     async getCompanyById(id: number): Promise<Company | null> {
         const result = await pool.query('SELECT * FROM companies WHERE id = $1', [id]);
-        return result.rows[0] || null;
+        const company = result.rows[0] || null;
+        if (company) {
+            console.log(`[DB Fetch] Company ${id} found. Name: ${company.name}, Genders:`, company.genders);
+        }
+        return company;
     }
 
     /**
@@ -161,6 +178,7 @@ class CompanyService {
         lat?: number;
         lng?: number;
         radius?: number; // in km
+        gender?: string;
     }): Promise<Company[]> {
         let query = 'SELECT * FROM companies WHERE 1=1';
         const values: any[] = [];
@@ -181,6 +199,12 @@ class CompanyService {
         if (filters?.search) {
             query += ` AND (name ILIKE $${paramIndex} OR email ILIKE $${paramIndex} OR province_name ILIKE $${paramIndex} OR district_name ILIKE $${paramIndex})`;
             values.push(`%${filters.search}%`);
+            paramIndex++;
+        }
+
+        if (filters?.gender) {
+            query += ` AND $${paramIndex} = ANY(genders)`;
+            values.push(filters.gender);
             paramIndex++;
         }
 

@@ -88,7 +88,7 @@ app.get('/api/health', healthHandler);
 
 // API Info
 app.get('/api', (req, res) => {
-    res.json({ message: 'Saloon API v1.0.5', status: 'running' });
+    res.json({ message: 'Saloon API v1.0.6', status: 'running' });
 });
 
 // API Routes (Explicit Definition)
@@ -160,6 +160,9 @@ const runMigrations = async () => {
         console.log('🔄 Running auto-migrations...');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(20)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255)');
+        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS genders TEXT[]');
+        // Initialize existing rows if they are NULL so the filter has something to work with
+        await pool.query("UPDATE companies SET genders = '{\"Erkek\", \"Kadın\", \"Çocuk\"}' WHERE genders IS NULL");
         console.log('✅ Auto-migrations completed.');
     } catch (err) {
         console.error('❌ Migration failed:', err);

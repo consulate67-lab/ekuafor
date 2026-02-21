@@ -66,6 +66,7 @@ export default function CompanyForm() {
         commission_rate: 0,
         payment_enabled: false,
         board_key: '',
+        genders: [],
     });
 
     // Address data
@@ -234,7 +235,10 @@ export default function CompanyForm() {
         try {
             const response = await api.get(`/companies/${id}`);
             const company = response.data.data;
-            setFormData(company);
+            setFormData({
+                ...company,
+                genders: Array.isArray(company.genders) ? company.genders : []
+            });
 
             if (company.province_id) setSelectedProvince(company.province_id);
             if (company.district_id) setSelectedDistrict(company.district_id);
@@ -426,6 +430,35 @@ export default function CompanyForm() {
                                     className="input-field"
                                     required
                                 />
+                            </div>
+
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Hizmet Verilen Cinsiyetler *
+                                </label>
+                                <div className="flex gap-3">
+                                    {['Erkek', 'Kadın', 'Çocuk'].map(g => (
+                                        <button
+                                            key={g}
+                                            type="button"
+                                            onClick={() => {
+                                                setFormData(prev => {
+                                                    const current = prev.genders || [];
+                                                    const next = current.includes(g)
+                                                        ? current.filter((item: string) => item !== g)
+                                                        : [...current, g];
+                                                    return { ...prev, genders: next };
+                                                });
+                                            }}
+                                            className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all border-2 ${(formData.genders || []).includes(g)
+                                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200'
+                                                : 'bg-white border-gray-100 text-gray-400 hover:border-indigo-100'
+                                                }`}
+                                        >
+                                            {g}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
                             <div className="md:col-span-2">

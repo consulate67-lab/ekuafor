@@ -440,12 +440,19 @@ export default function CompanyPanel() {
                             {/* Info Cards */}
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="bg-white rounded-2xl p-4 shadow-lg shadow-slate-200/20 border border-slate-50">
-                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Board Anahtarı</p>
-                                    <p className="text-sm font-black text-slate-900 font-mono tracking-wider truncate">{company.board_key || '—'}</p>
-                                </div>
-                                <div className="bg-white rounded-2xl p-4 shadow-lg shadow-slate-200/20 border border-slate-50">
                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Departman</p>
                                     <p className="text-sm font-black text-slate-900">{departments.length} birim</p>
+                                </div>
+                                <div className="bg-white rounded-2xl p-4 shadow-lg shadow-slate-200/20 border border-slate-50 col-span-2">
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Hizmet Verilenler</p>
+                                    <div className="flex gap-2 mt-1">
+                                        {(company?.genders || []).map((g: string) => (
+                                            <span key={g} className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-[10px] font-black">{g}</span>
+                                        ))}
+                                        {(!company?.genders || company.genders.length === 0) && (
+                                            <span className="text-[10px] text-slate-400 italic">Belirtilmemiş</span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>

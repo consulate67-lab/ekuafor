@@ -15,6 +15,7 @@ export default function CustomerHome() {
     const [distanceLimit, setDistanceLimit] = useState(50);
     const [showSlider, setShowSlider] = useState(false);
     const [locating, setLocating] = useState(false);
+    const [selectedGender, setSelectedGender] = useState<string | null>(null);
 
     // Code Scanner States
     const [showCodeModal, setShowCodeModal] = useState(false);
@@ -32,6 +33,9 @@ export default function CustomerHome() {
                 params.lat = loc.lat;
                 params.lng = loc.lng;
                 params.radius = dist || distanceLimit;
+            }
+            if (selectedGender) {
+                params.gender = selectedGender;
             }
 
             const res = await api.get('/companies', { params });
@@ -130,13 +134,11 @@ export default function CustomerHome() {
         if (locating) return;
         setLocating(true);
         try {
-            // Mobile devices need explicit permission check/request
             const permission = await Geolocation.checkPermissions();
             if (permission.location !== 'granted') {
                 const request = await Geolocation.requestPermissions();
                 if (request.location !== 'granted') {
                     setLocating(false);
-                    alert('Konum izni verilmedi. Yakınınızdaki salonları görmek için lütfen izin verin.');
                     return;
                 }
             }
@@ -148,11 +150,9 @@ export default function CustomerHome() {
             const { latitude, longitude } = position.coords;
             const newLoc = { lat: latitude, lng: longitude };
             setLocation(newLoc);
-            setShowSlider(true);
             await fetchData(searchQuery, newLoc, distanceLimit);
         } catch (err) {
             console.error('Position error', err);
-            alert('Konum bilgisi şu an alınamadı. Lütfen GPS\'inizin açık olduğundan emin olup tekrar deneyin.');
         } finally {
             setLocating(false);
         }
@@ -163,10 +163,14 @@ export default function CustomerHome() {
         fetchData(query, location, distanceLimit);
     };
 
-    const handleDistanceChange = (val: number) => {
-        setDistanceLimit(val);
-        fetchData(searchQuery, location, val);
+    const handleDistanceChange = (dist: number) => {
+        setDistanceLimit(dist);
+        fetchData(searchQuery, location, dist);
     };
+
+    useEffect(() => {
+        fetchData(searchQuery, location, distanceLimit);
+    }, [selectedGender]);
 
     const openMaps = (e: React.MouseEvent, c: Company) => {
         e.preventDefault();
@@ -270,15 +274,15 @@ export default function CustomerHome() {
                 </div>
             </header>
 
-            {/* Hero Section - Streamlined */}
-            <div className="bg-gradient-to-br from-[#1e1b4b] to-[#111827] text-white pt-8 pb-12 px-4 rounded-b-[2.5rem] shadow-xl shadow-indigo-200 relative mb-6">
-                <div className="max-w-md mx-auto text-center px-2">
-                    <h2 className="text-2xl font-black mb-3 leading-tight tracking-tight">Kusursuz Görünüm<br />Burada Başlar.</h2>
-                    <p className="text-white/40 text-[11px] font-bold uppercase tracking-widest mb-8">En iyi uzmanlar tek bir tıkla yanınızda.</p>
+            {/* Hero Section - Streamlined for Mobile */}
+            <div className="bg-gradient-to-br from-[#1e1b4b] to-[#111827] text-white pt-6 pb-10 px-4 rounded-b-[2rem] shadow-xl shadow-indigo-200 relative mb-4">
+                <div className="max-w-md mx-auto text-center px-1">
+                    <h2 className="text-xl font-black mb-2 leading-tight tracking-tight">Kusursuz Görünüm<br />Burada Başlar.</h2>
+                    <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mb-6">En iyi uzmanlar tek bir tıkla yanınızda.</p>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <div className="relative group flex-1">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                                 <svg className="w-4 h-4 text-white/30 group-focus-within:text-[#b45309] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
@@ -288,77 +292,85 @@ export default function CustomerHome() {
                                 placeholder="Salon veya şehir ara..."
                                 value={searchQuery}
                                 onChange={(e) => handleSearch(e.target.value)}
-                                className="w-full bg-white/10 backdrop-blur-xl text-white pl-11 pr-4 py-4 rounded-2xl border border-white/10 focus:ring-2 focus:ring-[#b45309]/50 focus:bg-white/20 outline-none font-bold text-sm transition-all placeholder:text-white/30"
+                                className="w-full bg-white/10 backdrop-blur-xl text-white pl-10 pr-4 py-3.5 rounded-xl border border-white/10 focus:ring-2 focus:ring-[#b45309]/50 focus:bg-white/20 outline-none font-bold text-sm transition-all placeholder:text-white/30"
                             />
                         </div>
                         <button
-                            onClick={() => setShowSlider(!showSlider)}
-                            className={`p-4 rounded-2xl shadow-xl transition-all ${showSlider ? 'bg-[#b45309] text-white' : 'bg-white/10 text-white/40 border border-white/10'}`}
+                            onClick={() => {
+                                if (!location && !showSlider) handleGetLocation();
+                                setShowSlider(!showSlider);
+                            }}
+                            className={`p-3.5 rounded-xl shadow-xl transition-all active:scale-95 ${showSlider ? 'bg-indigo-600 text-white' : 'bg-white/10 text-white/40 border border-white/10'}`}
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className={`w-5 h-5 ${locating ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                             </svg>
                         </button>
                     </div>
                 </div>
 
-                {/* Modern Distance Filter (Integrated) */}
-                {showSlider && location && (
-                    <div className="max-w-md mx-auto mt-10 animate-in slide-in-from-top-4 duration-500">
-                        <div className="bg-white/10 backdrop-blur-2xl p-6 rounded-[2rem] border border-white/10 shadow-2xl">
-                            <div className="flex justify-between items-center mb-5">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2 h-5 bg-[#b45309] rounded-full"></div>
-                                    <span className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em]">Mesafe Filtresi</span>
-                                </div>
-                                <span className="text-xs font-black text-white bg-[#b45309] px-3 py-1 rounded-full shadow-lg shadow-orange-950/20">
-                                    {distanceLimit === 50 ? 'Tümü (50 km)' : `${distanceLimit} km`}
+                {/* Modern Distance Filter (Integrated) - Compact Mobile Version */}
+                {showSlider && (
+                    <div className="max-w-md mx-auto mt-4 animate-in slide-in-from-top-4 duration-500">
+                        <div className="bg-white/10 backdrop-blur-2xl p-4 rounded-[1.5rem] border border-white/10 shadow-2xl">
+                            <div className="flex justify-between items-center mb-3">
+                                <button
+                                    onClick={handleGetLocation}
+                                    className="flex items-center gap-2 group"
+                                >
+                                    <div className={`w-1.5 h-4 rounded-full transition-colors ${location ? 'bg-emerald-500' : 'bg-indigo-500'}`}></div>
+                                    <span className="text-[9px] font-black text-white uppercase tracking-[0.1em] group-active:scale-95 transition-all">
+                                        {location ? 'Konum Açık' : (locating ? '...' : 'Konumunu Kullan')}
+                                    </span>
+                                </button>
+                                <span className={`text-[9px] font-black text-white px-2 py-0.5 rounded-full shadow-lg ${location ? 'bg-indigo-600' : 'bg-white/10 text-white/40'}`}>
+                                    {location ? (distanceLimit === 50 ? 'Tümü' : `${distanceLimit} km`) : 'GPS Kapalı'}
                                 </span>
                             </div>
-                            <input
-                                type="range"
-                                min="1"
-                                max="50"
-                                step="1"
-                                value={distanceLimit}
-                                onChange={(e) => handleDistanceChange(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#b45309]"
-                            />
-                            <div className="flex justify-between mt-3 text-[9px] font-bold text-white/20 uppercase tracking-widest">
+                            {location && (
+                                <input
+                                    type="range"
+                                    min="1"
+                                    max="50"
+                                    step="1"
+                                    value={distanceLimit}
+                                    onChange={(e) => handleDistanceChange(parseInt(e.target.value))}
+                                    className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                                />
+                            )}
+                            <div className="flex justify-between mt-2 text-[8px] font-bold text-white/20 uppercase tracking-widest">
                                 <span>1 km</span>
-                                <span>25 km</span>
                                 <span>50 km</span>
+                            </div>
+
+                            <div className="mt-4 border-t border-white/5 pt-3">
+                                <p className="text-[8px] font-black text-white/30 uppercase tracking-[0.2em] mb-2">Cinsiyet</p>
+                                <div className="flex gap-1.5">
+                                    {[
+                                        { id: null, label: 'Tümü', icon: '✨' },
+                                        { id: 'Erkek', label: 'Erkek', icon: '🧔' },
+                                        { id: 'Kadın', label: 'Kadın', icon: '👩' },
+                                        { id: 'Çocuk', label: 'Çocuk', icon: '🧒' }
+                                    ].map(g => (
+                                        <button
+                                            key={g.id || 'all'}
+                                            onClick={() => setSelectedGender(g.id)}
+                                            className={`flex-1 py-1.5 px-1 rounded-xl flex flex-col items-center gap-0.5 transition-all text-[8px] font-black border uppercase tracking-tighter ${selectedGender === g.id
+                                                ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg'
+                                                : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
+                                                }`}
+                                        >
+                                            <span className="text-sm">{g.icon}</span>
+                                            {g.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* Compact Location Card */}
-            <div className="max-w-md mx-auto px-4 -mt-8 relative z-10 mb-6">
-                <button
-                    onClick={handleGetLocation}
-                    disabled={locating}
-                    className="w-full bg-white rounded-3xl p-4 shadow-xl shadow-slate-200/50 flex items-center justify-between group active:scale-[0.98] transition-all border border-slate-50"
-                >
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-indigo-50 text-[#1e1b4b] rounded-xl flex items-center justify-center text-lg group-hover:scale-110 transition-transform">
-                            {locating ? <div className="w-4 h-4 border-2 border-[#1e1b4b] border-t-transparent rounded-full animate-spin" /> : '📍'}
-                        </div>
-                        <div className="text-left">
-                            <p className="text-slate-900 text-[13px] font-black">{locating ? 'Aranıyor...' : (location ? 'Konum Algılandı' : 'Yakınındakileri Bul')}</p>
-                            <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest leading-none mt-1">{locating ? 'Salonlar yükleniyor' : (location ? 'En yakın sonuçlar' : 'Uzmanları keşfet')}</p>
-                        </div>
-                    </div>
-                    {!locating && (
-                        <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center">
-                            <svg className="w-4 h-4 text-slate-300 group-hover:text-[#b45309] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                            </svg>
-                        </div>
-                    )}
-                </button>
-            </div>
 
             {/* Horizontal Favorites - Modern Way */}
             {favorites.length > 0 && (
@@ -441,44 +453,29 @@ export default function CustomerHome() {
                 )}
             </div>
 
-            {/* Persistent Bottom Navigation - Premium Design */}
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[360px] z-[50]">
-                <nav className="bg-slate-900/95 backdrop-blur-2xl rounded-[2.5rem] px-2 py-3 flex items-center justify-around shadow-[0_20px_50px_rgba(0,0,0,0.4)] border border-white/10">
+            {/* Persistent Bottom Navigation - Modern Minimal */}
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-48px)] max-w-[280px] z-[50]">
+                <nav className="bg-slate-900/90 backdrop-blur-3xl rounded-[3rem] p-2 flex items-center justify-around shadow-[0_15px_40px_-10px_rgba(0,0,0,0.5)] border border-white/10 h-16">
                     <button
                         onClick={() => {
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                            setSearchQuery('');
-                            fetchData();
+                            if (favorites.length > 0) {
+                                window.scrollTo({ top: 150, behavior: 'smooth' });
+                            }
                         }}
-                        className="flex flex-col items-center justify-center w-14 h-14 group"
+                        className="flex-1 flex flex-col items-center justify-center h-full group active:scale-95 transition-all text-white/50 hover:text-red-400"
                     >
-                        <div className="w-11 h-11 bg-white/5 rounded-2xl flex items-center justify-center text-xl active:scale-90 transition-all group-hover:bg-white/10 border border-white/5">
-                            🏠
-                        </div>
+                        <span className="text-xl">❤️</span>
+                        <span className="text-[8px] font-black uppercase tracking-widest mt-0.5">Favoriler</span>
                     </button>
 
-                    {/* Floating Center Favorites Button */}
-                    <div className="relative -mt-12 flex flex-col items-center">
-                        <button
-                            onClick={() => {
-                                if (favorites.length > 0) {
-                                    window.scrollTo({ top: 150, behavior: 'smooth' });
-                                }
-                            }}
-                            className="bg-gradient-to-br from-[#b45309] to-orange-500 rounded-full flex items-center justify-center text-3xl shadow-[0_10px_25px_rgba(180,83,9,0.5)] border-4 border-[#111827] active:scale-95 transition-all text-white relative z-10"
-                            style={{ width: '68px', height: '68px' }}
-                        >
-                            ❤️
-                        </button>
-                    </div>
+                    <div className="w-px h-8 bg-white/10" />
 
                     <Link
                         to="/my-appointments"
-                        className="flex flex-col items-center justify-center w-14 h-14 group"
+                        className="flex-1 flex flex-col items-center justify-center h-full group active:scale-95 transition-all font-black text-white/50 hover:text-indigo-400"
                     >
-                        <div className="w-11 h-11 bg-white/5 rounded-2xl flex items-center justify-center text-xl active:scale-90 transition-all group-hover:bg-white/10 border border-white/5">
-                            📅
-                        </div>
+                        <span className="text-xl">📅</span>
+                        <span className="text-[8px] font-black uppercase tracking-widest mt-0.5">Randevularım</span>
                     </Link>
                 </nav>
             </div>
