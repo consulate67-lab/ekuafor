@@ -14,6 +14,7 @@ export interface Appointment {
     notes?: string;
     price?: number;
     customer_name?: string;
+    customer_phone?: string;
     service_name?: string;
 }
 
@@ -49,9 +50,10 @@ class AppointmentService {
         const query = `
       INSERT INTO appointments (
         company_id, customer_id, service_id, staff_id, 
-        appointment_date, start_time, end_time, status, notes, price
+        appointment_date, start_time, end_time, status, notes, price,
+        customer_phone, customer_name
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
     `;
         console.log('[AppointmentService] Creating appointment:', JSON.stringify(appointment, null, 2));
@@ -66,7 +68,9 @@ class AppointmentService {
             appointment.end_time,
             appointment.status || 'pending',
             appointment.notes || null,
-            appointment.price || null
+            appointment.price || null,
+            appointment.customer_phone || null,
+            appointment.customer_name || null
         ];
 
         try {

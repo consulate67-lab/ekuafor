@@ -15,6 +15,8 @@ const appointmentSchema = z.object({
     end_time: z.string(),
     notes: z.string().optional(),
     price: z.union([z.number(), z.string().transform(v => parseFloat(v))]).optional(),
+    customer_name: z.string().optional(),
+    customer_phone: z.string().optional(),
 });
 
 // Randevuları listele (Firma bazlı, isteğe bağlı durum filtresiyle)
