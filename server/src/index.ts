@@ -154,8 +154,21 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     });
 });
 
+// Auto-migration on startup
+const runMigrations = async () => {
+    try {
+        console.log('🔄 Running auto-migrations...');
+        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(20)');
+        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255)');
+        console.log('✅ Auto-migrations completed.');
+    } catch (err) {
+        console.error('❌ Migration failed:', err);
+    }
+};
+
 // Start server
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
+    await runMigrations();
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });

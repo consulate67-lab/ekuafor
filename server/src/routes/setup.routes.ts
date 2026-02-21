@@ -256,6 +256,10 @@ END$$;
 
 -- MIGRATION: Board Key defined in companies
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS board_key VARCHAR(100);
+
+-- MIGRATION: Appointment customer tracking
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(20);
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255);
         `;
 
         await pool.query(sql);
