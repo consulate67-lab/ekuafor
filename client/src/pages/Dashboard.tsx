@@ -142,8 +142,9 @@ export default function Dashboard() {
                     const empRes = await api.get(`/companies/${user.company_id}/employees`);
                     const employees = empRes.data?.data || [];
                     if (employees.length > 0) {
-                        staffId = employees[0].id;
-                        staffName = `${employees[0].first_name} ${employees[0].last_name || ''}`;
+                        const firstEmp = employees[0];
+                        staffId = firstEmp.user_id || firstEmp.id;
+                        staffName = `${firstEmp.first_name} ${firstEmp.last_name || ''}`;
                     }
                 } catch (e) {
                     console.warn('Employees fetch failed for voice command', e);

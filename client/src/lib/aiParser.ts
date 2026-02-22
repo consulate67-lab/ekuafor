@@ -26,8 +26,11 @@ export const parseVoiceCommand = (
     const originalTranscript = transcript.toLowerCase();
     const normalizedTranscript = normalizeTurkish(originalTranscript);
     const rulesLower = rules.toLowerCase();
+
+    // Use local time for 'today' instead of UTC
     const now = new Date();
-    let date = now.toISOString().split('T')[0];
+    const localDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+    let date = localDate;
 
     console.log('AI Rules Active:', rulesLower.length > 0);
 

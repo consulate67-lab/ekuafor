@@ -198,18 +198,18 @@ export default function CustomerHome() {
                 setTimeout(() => {
                     const data = res.data.data;
                     if (data.type === 'admin') {
-                        navigate(data.redirect);
+                        navigate(data.redirect, { replace: true });
                     } else if (data.type === 'staff') {
                         // JWT token'ı kaydet - Dashboard'a erişim için
                         if (data.token) {
                             localStorage.setItem('token', data.token);
                         }
                         localStorage.setItem('staff_board_code', data.board_code);
-                        // Sayfa yenilenmeli ki auth store güncellensin
-                        window.location.href = `${import.meta.env.BASE_URL}dashboard`;
+                        // replace current history entry so back button doesn't return to customer home
+                        window.location.replace(`${window.location.origin}${import.meta.env.BASE_URL}dashboard`);
                     } else if (data.type === 'board') {
                         localStorage.setItem('salon_board_key', data.board_key);
-                        navigate(data.redirect);
+                        navigate(data.redirect, { replace: true });
                     }
                 }, 1200);
             }
