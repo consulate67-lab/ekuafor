@@ -21,9 +21,18 @@ export default function AppointmentManagement() {
         price: 0
     });
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+    const [isListening, setIsListening] = useState(false);
     const [voiceTranscript, setVoiceTranscript] = useState('');
     const [company, setCompany] = useState<Company | null>(null);
-    const [isListening, setIsListening] = useState(false);
+    const [voiceStep, setVoiceStep] = useState<'IDLE' | 'NAME' | 'DATE' | 'SERVICE' | 'CONFIRM'>('IDLE');
+    const [guidedData, setGuidedData] = useState<any>({
+        customerName: '',
+        date: '',
+        serviceId: null,
+        startTime: '09:00',
+        endTime: '09:30',
+        price: 0
+    });
 
     const formatDateKey = (dateStr: any) => {
         if (!dateStr) return '';
@@ -97,7 +106,27 @@ export default function AppointmentManagement() {
         fetchData();
     }, []);
 
+    const speak = (text: string) => {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'tr-TR';
+        window.speechSynthesis.speak(utterance);
+    };
+
     const startVoiceCommand = () => {
+        setVoiceStep('NAME');
+        setGuidedData({
+            customerName: '',
+            date: getLocalDateString(),
+            serviceId: null,
+            startTime: '09:00',
+            endTime: '09:30',
+            price: 0
+        });
+        speak('Müşterinin ismi nedir?');
+        listenNextStep('NAME');
+    };
+
+    const listenNextStep = (step: typeof voiceStep) => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         if (!SpeechRecognition) {
             alert('Tarayıcınız sesli komut özelliğini desteklemiyor.');
@@ -115,80 +144,77 @@ export default function AppointmentManagement() {
         recognition.onresult = async (event: any) => {
             const transcript = event.results[0][0].transcript.toLowerCase();
             setVoiceTranscript(transcript);
-            await processVoiceTranscript(transcript);
-            // Clear transcript after short delay or leave for visual confirmation
-            setTimeout(() => setVoiceTranscript(''), 3000);
+            handleGuidedStep(step, transcript);
         };
 
         recognition.start();
     };
 
-    const processVoiceTranscript = async (transcript: string) => {
+    const handleGuidedStep = async (step: typeof voiceStep, transcript: string) => {
+        const rules = localStorage.getItem(`ai_rules_${company?.id}`) || '';
+
+        if (step === 'NAME') {
+            const name = transcript.charAt(0).toUpperCase() + transcript.slice(1);
+            setGuidedData((prev: any) => ({ ...prev, customerName: name }));
+            setVoiceStep('DATE');
+            setTimeout(() => {
+                speak('Randevu tarihi nedir?');
+                listenNextStep('DATE');
+            }, 500);
+        }
+        else if (step === 'DATE') {
+            const parsed = parseVoiceCommand(transcript, [], rules);
+            setGuidedData((prev: any) => ({ ...prev, date: parsed.date, startTime: parsed.startTime }));
+            setVoiceStep('SERVICE');
+            setTimeout(() => {
+                speak('Yapılacak işlem nedir?');
+                listenNextStep('SERVICE');
+            }, 500);
+        }
+        else if (step === 'SERVICE') {
+            const parsed = parseVoiceCommand(transcript, services, rules);
+            setGuidedData((prev: any) => ({
+                ...prev,
+                serviceId: parsed.serviceId,
+                endTime: parsed.endTime,
+                price: parsed.price
+            }));
+            setVoiceStep('CONFIRM');
+            speak('Randevuyu onaylıyor musunuz?');
+        }
+    };
+
+    const confirmGuidedAppointment = async () => {
         try {
             if (!company) return;
 
-            // Read company-specific AI rules if exists
-            const rules = localStorage.getItem(`ai_rules_${company.id}`) || '';
-
-            const result = parseVoiceCommand(transcript, services, rules);
-
-            if (!result.serviceId) {
-                alert('Üzgünüm, hangi hizmeti istediğinizi anlayamadım. (Hizmet bulunamadı)');
-                return;
-            }
-
-            const matchedService = services.find(s => s.id === result.serviceId);
-
-            // Fetch employees for auto-assignment if none provided
             let staffId = undefined;
-            let staffName = 'Belirtilmedi';
-
-            try {
-                const empRes = await api.get(`/companies/${company.id}/employees`);
-                const employees = empRes.data?.data || [];
-                if (employees.length > 0) {
-                    const firstEmp = employees[0];
-                    staffId = firstEmp.user_id || firstEmp.id;
-                    staffName = `${firstEmp.first_name} ${firstEmp.last_name || ''}`;
-                }
-            } catch (e) {
-                console.warn('Employees fetch failed for voice command', e);
+            const empRes = await api.get(`/companies/${company.id}/employees`);
+            const employees = empRes.data?.data || [];
+            if (employees.length > 0) {
+                const firstEmp = employees[0];
+                staffId = firstEmp.user_id || firstEmp.id;
             }
 
-            const confirmMsg = `
-🤖 YAPAY ZEKA ÖNERİSİ:
--------------------------
-Müşteri: ${result.customerName}
-Hizmet: ${matchedService?.name}
-Personel: ${staffName}
-Tarih: ${new Date(result.date).toLocaleDateString('tr-TR')}
-Saat: ${result.startTime} - ${result.endTime}
--------------------------
-Onaylıyor musunuz?
-            `;
+            await api.post('/appointments', {
+                company_id: company.id,
+                service_id: guidedData.serviceId,
+                staff_id: staffId,
+                appointment_date: guidedData.date,
+                start_time: guidedData.startTime,
+                end_time: guidedData.endTime,
+                customer_name: guidedData.customerName,
+                notes: `Sesli Komut (Yönlendirmeli)`,
+                price: guidedData.price,
+                status: 'approved'
+            });
 
-            if (window.confirm(confirmMsg)) {
-                await api.post('/appointments', {
-                    company_id: company.id,
-                    service_id: result.serviceId,
-                    staff_id: staffId,
-                    appointment_date: result.date,
-                    start_time: result.startTime,
-                    end_time: result.endTime,
-                    customer_name: result.customerName,
-                    notes: result.notes,
-                    price: result.price,
-                    status: 'approved'
-                });
-
-                fetchData();
-                alert('Randevu başarıyla eklendi.');
-                setVoiceTranscript('');
-            }
+            alert('Randevu başarıyla eklendi.');
+            window.location.reload();
         } catch (err: any) {
-            console.error('Voice parse error', err);
-            const serverMsg = err.response?.data?.error;
-            alert(serverMsg ? `Hata: ${serverMsg}` : 'Randevu oluşturulurken bir teknik hata oluştu.');
+            console.error('Guided booking error', err);
+            alert('Randevu oluşturulurken hata oluştu.');
+            setVoiceStep('IDLE');
         }
     };
 
@@ -607,6 +633,87 @@ Onaylıyor musunuz?
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+            {/* Ses Dinleme Overlay (Yönlendirmeli) */}
+            {voiceStep !== 'IDLE' && (
+                <div className="fixed inset-0 z-[100] bg-indigo-950/95 backdrop-blur-2xl flex flex-col items-center justify-center animate-fade-in p-6">
+                    <button
+                        onClick={() => setVoiceStep('IDLE')}
+                        className="absolute top-10 right-10 text-white/40 hover:text-white"
+                    >
+                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+
+                    <div className="relative mb-12">
+                        {isListening && (
+                            <>
+                                <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-20 scale-150"></div>
+                                <div className="absolute inset-0 bg-indigo-400 rounded-full animate-pulse opacity-40 scale-125"></div>
+                            </>
+                        )}
+                        <div className={`relative w-24 h-24 rounded-full flex items-center justify-center shadow-2xl transition-all ${isListening ? 'bg-indigo-600' : 'bg-slate-800'}`}>
+                            <svg className={`w-12 h-12 text-white ${isListening ? 'animate-bounce' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m8 0h-8m4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                            </svg>
+                        </div>
+                    </div>
+
+                    <div className="text-center max-w-lg w-full">
+                        <h2 className="text-4xl font-black text-white tracking-tighter mb-4">
+                            {voiceStep === 'NAME' && '1. Müşteri İsmi?'}
+                            {voiceStep === 'DATE' && '2. Randevu Tarihi?'}
+                            {voiceStep === 'SERVICE' && '3. Yapılacak İşlem?'}
+                            {voiceStep === 'CONFIRM' && 'Son Kontrol'}
+                        </h2>
+
+                        <p className="text-indigo-300 font-bold uppercase tracking-[0.2em] text-[11px] mb-12">
+                            {voiceStep === 'NAME' && 'Müşterinin adını söyleyin'}
+                            {voiceStep === 'DATE' && 'Bugün, Yarın veya bir gün söyleyin'}
+                            {voiceStep === 'SERVICE' && 'Hangi hizmet yapılacak?'}
+                            {voiceStep === 'CONFIRM' && 'Randevu detayları aşağıdadır'}
+                        </p>
+
+                        <div className="space-y-4 bg-white/5 p-8 rounded-[2.5rem] border border-white/10 text-left">
+                            <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                                <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Müşteri</span>
+                                <span className="text-white font-black text-lg">{guidedData.customerName || '...'}</span>
+                            </div>
+                            <div className="flex justify-between items-center border-b border-white/5 py-4">
+                                <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Tarih / Saat</span>
+                                <span className="text-white font-black text-lg">{guidedData.date ? new Date(guidedData.date).toLocaleDateString('tr-TR') : '...'} - {guidedData.startTime}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-4">
+                                <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Hizmet</span>
+                                <span className="text-white font-black text-lg">
+                                    {services.find(s => s.id === guidedData.serviceId)?.name || (voiceStep === 'CONFIRM' ? 'Belirlenemedi' : '...')}
+                                </span>
+                            </div>
+                        </div>
+
+                        {voiceStep === 'CONFIRM' && (
+                            <div className="mt-12 flex gap-4 w-full">
+                                <button
+                                    onClick={() => setVoiceStep('IDLE')}
+                                    className="flex-1 py-6 bg-white/10 text-white rounded-3xl font-black uppercase tracking-widest hover:bg-white/20 transition-all"
+                                >
+                                    İptal
+                                </button>
+                                <button
+                                    onClick={confirmGuidedAppointment}
+                                    className="flex-1 py-6 bg-indigo-600 text-white rounded-3xl font-black uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:scale-105 transition-all"
+                                >
+                                    Onayla
+                                </button>
+                            </div>
+                        )}
+
+                        {voiceStep !== 'CONFIRM' && isListening && voiceTranscript && (
+                            <div className="mt-8 text-white/60 italic font-medium">
+                                "{voiceTranscript}..."
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
