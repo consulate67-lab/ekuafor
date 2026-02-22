@@ -126,25 +126,49 @@ export default function AppointmentManagement() {
         listenNextStep('NAME');
     };
 
-    const listenNextStep = (step: typeof voiceStep) => {
+    const listenNextStep = async (step: typeof voiceStep) => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         if (!SpeechRecognition) {
             alert('Tarayıcınız sesli komut özelliğini desteklemiyor.');
             return;
         }
 
+        // Force permission check via getUserMedia (helps on mobile webviews)
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach(track => track.stop());
+        } catch (err) {
+            console.error('Mic permission denied', err);
+            alert('Mikrofon izni verilmedi. Lütfen ayarlardan izin verin.');
+            setVoiceStep('IDLE');
+            return;
+        }
+
         const recognition = new SpeechRecognition();
         recognition.lang = 'tr-TR';
-        recognition.interimResults = false;
+        recognition.interimResults = true;
         recognition.maxAlternatives = 1;
+        recognition.continuous = false;
 
         recognition.onstart = () => setIsListening(true);
         recognition.onend = () => setIsListening(false);
 
-        recognition.onresult = async (event: any) => {
-            const transcript = event.results[0][0].transcript.toLowerCase();
+        recognition.onresult = (event: any) => {
+            const result = event.results[event.results.length - 1];
+            const transcript = result[0].transcript.toLowerCase();
             setVoiceTranscript(transcript);
-            handleGuidedStep(step, transcript);
+
+            if (result.isFinal) {
+                setTimeout(() => handleGuidedStep(step, transcript), 300);
+            }
+        };
+
+        recognition.onerror = (event: any) => {
+            console.error('Recognition error', event.error);
+            if (event.error === 'not-allowed') {
+                alert('Mikrofon izni kapalı.');
+            }
+            setVoiceStep('IDLE');
         };
 
         recognition.start();
@@ -154,13 +178,14 @@ export default function AppointmentManagement() {
         const rules = localStorage.getItem(`ai_rules_${company?.id}`) || '';
 
         if (step === 'NAME') {
-            const name = transcript.charAt(0).toUpperCase() + transcript.slice(1);
+            const cleanName = transcript.replace(/(ismini|adi|olan|musteri|isim)/gi, '').trim();
+            const name = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
             setGuidedData((prev: any) => ({ ...prev, customerName: name }));
             setVoiceStep('DATE');
             setTimeout(() => {
                 speak('Randevu tarihi nedir?');
                 listenNextStep('DATE');
-            }, 500);
+            }, 600);
         }
         else if (step === 'DATE') {
             const parsed = parseVoiceCommand(transcript, [], rules);
@@ -169,7 +194,7 @@ export default function AppointmentManagement() {
             setTimeout(() => {
                 speak('Yapılacak işlem nedir?');
                 listenNextStep('SERVICE');
-            }, 500);
+            }, 600);
         }
         else if (step === 'SERVICE') {
             const parsed = parseVoiceCommand(transcript, services, rules);

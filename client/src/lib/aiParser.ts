@@ -39,13 +39,15 @@ export const parseVoiceCommand = (
         const d = new Date();
         d.setDate(d.getDate() + 1);
         date = d.toISOString().split('T')[0];
+    } else if (normalizedTranscript.includes('bugun')) {
+        date = localDate;
     } else if (normalizedTranscript.includes('pazartesi')) {
         date = getNextDay(1);
     } else if (normalizedTranscript.includes('sali')) {
         date = getNextDay(2);
-    } else if (normalizedTranscript.includes('carsamba')) {
+    } else if (normalizedTranscript.includes('carsamba') || normalizedTranscript.includes('carşamba')) {
         date = getNextDay(3);
-    } else if (normalizedTranscript.includes('persembe')) {
+    } else if (normalizedTranscript.includes('persembe') || normalizedTranscript.includes('perşembe')) {
         date = getNextDay(4);
     } else if (normalizedTranscript.includes('cuma')) {
         date = getNextDay(5);
@@ -95,17 +97,22 @@ export const parseVoiceCommand = (
 
     if (!matchedService) {
         const keywords: Record<string, string[]> = {
-            'kesim': ['kesim', 'tiras', 'sac'],
-            'boya': ['boya', 'dip'],
-            'bakim': ['bakim', 'maske', 'keratin'],
-            'manikur': ['manikur', 'el'],
-            'pedikur': ['pedikur', 'ayak'],
-            'agda': ['agda', 'sir']
+            'kesim': ['kesim', 'tiras', 'tıraş', 'makina', 'ustura', 'sac'],
+            'boya': ['boya', 'dip', 'renk', 'balyaj', 'ombre', 'isilti'],
+            'bakim': ['bakim', 'maske', 'keratin', 'protein', 'botoks'],
+            'manikur': ['manikur', 'manikür', 'el', 'oje', 'kalici'],
+            'pedikur': ['pedikur', 'pedikür', 'ayak', 'topuk'],
+            'agda': ['agda', 'ağda', 'sir', 'epilasyon', 'lazer'],
+            'kas': ['kaş', 'biyik', 'bıyık', 'alm'],
+            'fon': ['fon', 'fön', 'fule', 'masa', 'maşa']
         };
 
         for (const [key, aliases] of Object.entries(keywords)) {
-            if (aliases.some(a => normalizedTranscript.includes(a))) {
-                matchedService = services.find(s => normalizeTurkish(s.name).includes(key));
+            if (aliases.some(a => normalizedTranscript.includes(a) || originalTranscript.includes(a))) {
+                matchedService = services.find(s =>
+                    normalizeTurkish(s.name).includes(key) ||
+                    s.name.toLowerCase().includes(key)
+                );
                 if (matchedService) break;
             }
         }

@@ -116,36 +116,34 @@ export default function ServiceManagement() {
     if (loading && services.length === 0) return <div className="p-8 text-center">Yükleniyor...</div>;
 
     return (
-        <div className="max-w-6xl mx-auto p-4 md:p-10">
-            <div className="flex justify-between items-center mb-6">
-                <div>
-                    <Link to="/dashboard" className="text-violet-600 hover:text-violet-800 text-xs font-bold uppercase tracking-widest mb-1 inline-block">
-                        ← Dashboard
+        <div className="min-h-screen bg-slate-50/30 pb-20">
+            <div className="bg-white px-6 pt-12 pb-6 border-b border-slate-100 sticky top-0 z-40 backdrop-blur-xl bg-white/80">
+                <div className="flex justify-between items-center mb-4">
+                    <Link to="/dashboard" className="flex items-center gap-1 text-violet-600 font-bold text-xs uppercase tracking-widest">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+                        Panel
                     </Link>
-                    <h2 className="text-3xl font-bold text-gray-900">Hizmet Yönetimi</h2>
-                    <p className="text-gray-500 font-medium">Verdiğiniz hizmetleri ve fiyatlarını buradan yönetebilirsiniz.</p>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setShowTemplates(true)}
+                            className="p-2.5 bg-slate-50 text-slate-400 hover:text-violet-600 rounded-xl transition-all"
+                            title="Şablonlar"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                        </button>
+                        <button
+                            onClick={() => {
+                                setFormData({ name: '', description: '', duration_minutes: 30, price: 0 });
+                                setShowForm(true);
+                            }}
+                            className="bg-slate-900 text-white p-2.5 rounded-xl shadow-lg hover:bg-slate-800 transition-all"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                        </button>
+                    </div>
                 </div>
-                <div className="flex gap-3">
-                    <button
-                        onClick={() => setShowTemplates(true)}
-                        className="btn-secondary py-2 px-5 flex items-center gap-2 text-sm font-bold border-gray-200 hover:border-violet-200 hover:bg-violet-50 text-gray-600 hover:text-violet-700"
-                    >
-                        <span className="text-lg">📋</span>
-                        Firma Hizmetleri
-                    </button>
-                    <button
-                        onClick={() => {
-                            setFormData({ name: '', description: '', duration_minutes: 30, price: 0 });
-                            setShowForm(true);
-                        }}
-                        className="btn-primary py-2 px-5 flex items-center gap-2"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        Yeni Hizmet
-                    </button>
-                </div>
+                <h2 className="text-xl font-black text-slate-900 tracking-tight">Hizmet Yönetimi</h2>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Hizmetlerinizi ve fiyatlarınızı yönetin</p>
             </div>
 
             {error && (
@@ -198,158 +196,164 @@ export default function ServiceManagement() {
             )}
 
             {showForm ? (
-                <div className="card animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="md:col-span-2">
-                                <label className="block text-xs font-bold text-gray-700 mb-2 uppercase ml-1">Hizmet Adı</label>
-                                <input
-                                    type="text"
-                                    required
-                                    className="input-field py-3"
-                                    placeholder="Örn: Saç Kesimi"
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                />
+                <div className="px-6 py-8">
+                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <h3 className="text-lg font-black text-slate-900 mb-6 uppercase tracking-tight">
+                            {formData.id ? 'Hizmeti Düzenle' : 'Yeni Hizmet Ekle'}
+                        </h3>
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="md:col-span-2">
+                                    <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest ml-1">Hizmet Adı</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        className="w-full bg-slate-50 border-none rounded-2xl py-4 px-4 font-bold text-slate-900 placeholder:text-slate-300"
+                                        placeholder="Örn: Saç Kesimi"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest ml-1">Süre (Dakika)</label>
+                                    <input
+                                        type="number"
+                                        required
+                                        className="w-full bg-slate-50 border-none rounded-2xl py-4 px-4 font-bold text-slate-900"
+                                        placeholder="30"
+                                        value={formData.duration_minutes}
+                                        onChange={(e) => {
+                                            const val = parseInt(e.target.value);
+                                            setFormData({ ...formData, duration_minutes: isNaN(val) ? 0 : val });
+                                        }}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest ml-1">Ücret (₺)</label>
+                                    <input
+                                        type="number"
+                                        required
+                                        className="w-full bg-slate-50 border-none rounded-2xl py-4 px-4 font-bold text-slate-900"
+                                        placeholder="150"
+                                        value={formData.price}
+                                        onChange={(e) => {
+                                            const val = parseFloat(e.target.value);
+                                            setFormData({ ...formData, price: isNaN(val) ? 0 : val });
+                                        }}
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest ml-1">Açıklama (Opsiyonel)</label>
+                                    <textarea
+                                        className="w-full bg-slate-50 border-none rounded-2xl py-4 px-4 font-bold text-slate-900 min-h-[100px] placeholder:text-slate-300"
+                                        placeholder="Hizmet hakkında kısa bilgi..."
+                                        value={formData.description}
+                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                    />
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-xs font-bold text-gray-700 mb-2 uppercase ml-1">Süre (Dakika)</label>
-                                <input
-                                    type="number"
-                                    required
-                                    className="input-field py-3"
-                                    placeholder="30"
-                                    value={formData.duration_minutes}
-                                    onChange={(e) => {
-                                        const val = parseInt(e.target.value);
-                                        setFormData({ ...formData, duration_minutes: isNaN(val) ? 0 : val });
-                                    }}
-                                />
+                            <div className="flex gap-4 pt-4">
+                                <button type="submit" className="flex-1 bg-violet-600 text-white py-5 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-violet-100 active:scale-95 transition-all">
+                                    {formData.id ? 'Güncelle' : 'Kaydet'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowForm(false); setFormData({ name: '', description: '', duration_minutes: 30, price: 0 }); }}
+                                    className="flex-1 bg-slate-50 text-slate-400 py-5 rounded-2xl text-xs font-black uppercase tracking-widest border border-slate-100"
+                                >
+                                    İptal
+                                </button>
                             </div>
-                            <div>
-                                <label className="block text-xs font-bold text-gray-700 mb-2 uppercase ml-1">Ücret (₺)</label>
-                                <input
-                                    type="number"
-                                    required
-                                    className="input-field py-3"
-                                    placeholder="150"
-                                    value={formData.price}
-                                    onChange={(e) => {
-                                        const val = parseFloat(e.target.value);
-                                        setFormData({ ...formData, price: isNaN(val) ? 0 : val });
-                                    }}
-                                />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-xs font-bold text-gray-700 mb-2 uppercase ml-1">Açıklama (Opsiyonel)</label>
-                                <textarea
-                                    className="input-field py-3 min-h-[100px]"
-                                    placeholder="Hizmet hakkında kısa bilgi..."
-                                    value={formData.description}
-                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                />
-                            </div>
-                        </div>
-                        <div className="flex gap-4 pt-4 border-t border-gray-100">
-                            <button type="submit" className="btn-primary flex-1 py-3 text-sm font-bold shadow-lg shadow-pink-500/20">
-                                {formData.id ? 'Güncelle' : 'Kaydet'}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => { setShowForm(false); setFormData({ name: '', description: '', duration_minutes: 30, price: 0 }); }}
-                                className="btn-secondary flex-1 py-3 text-sm font-bold border-gray-100"
-                            >
-                                İptal
-                            </button>
-                        </div>
-                    </form>
+                        </form>
+                    </div>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {services.map((service) => (
-                        <div key={service.id} className="card group hover:scale-[1.01] transition-all duration-300">
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="bg-pink-50 p-3 rounded-xl text-pink-600 group-hover:bg-pink-600 group-hover:text-white transition-colors">
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758L5 19m0-14l4.121 4.121" />
-                                    </svg>
+                <div className="px-6 py-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
+                        {services.map((service) => (
+                            <div key={service.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm relative group hover:scale-[1.01] transition-all">
+                                <div className="flex justify-between items-start mb-6">
+                                    <div className="w-14 h-14 bg-violet-50 rounded-2xl flex items-center justify-center text-violet-600">
+                                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758L5 19m0-14l4.121 4.121" />
+                                        </svg>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleEdit(service)}
+                                            className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:text-violet-600 transition-colors"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(service.id!)}
+                                            className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:text-red-500 transition-colors"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => handleEdit(service)}
-                                        className="p-2 text-gray-400 hover:text-pink-600 transition-colors"
-                                        title="Düzenle"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(service.id!)}
-                                        className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                                        title="Sil"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                    </button>
+                                <h3 className="text-xl font-black text-slate-900 mb-2 uppercase tracking-tight">{service.name}</h3>
+                                <p className="text-xs font-bold text-slate-400 line-clamp-2 mb-6 h-8">{service.description || 'Hizmet açıklaması eklenmemiş.'}</p>
+                                <div className="flex items-center justify-between pt-6 border-t border-slate-50">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{service.duration_minutes} Dakika</span>
+                                    </div>
+                                    <span className="text-xl font-black text-violet-600">₺{service.price}</span>
                                 </div>
                             </div>
-                            <h3 className="text-xl font-bold text-gray-900 mb-1">{service.name}</h3>
-                            <p className="text-sm text-gray-500 line-clamp-2 mb-4 h-10">{service.description || 'Açıklama belirtilmemiş.'}</p>
-                            <div className="flex items-center justify-between pt-4 border-t border-gray-50">
-                                <span className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase">
-                                    <svg className="w-4 h-4 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    {service.duration_minutes} Dakika
-                                </span>
-                                <span className="text-lg font-black text-pink-600">₺{service.price}</span>
+                        ))}
+                        {services.length === 0 && (
+                            <div className="md:col-span-2 py-20 text-center bg-white rounded-[3rem] border border-slate-100 border-dashed">
+                                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-200 text-3xl">✂️</div>
+                                <p className="text-slate-400 font-bold mb-6">Henüz hizmet tanımlanmamış.</p>
+                                <button onClick={() => setShowForm(true)} className="bg-violet-600 text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest">İlk Hizmeti Ekle</button>
                             </div>
-                        </div>
-                    ))}
-                    {services.length === 0 && (
-                        <div className="md:col-span-2 card border-dashed py-20 text-center">
-                            <p className="text-gray-400 font-bold mb-4">Henüz bir hizmet tanımlanmamış.</p>
-                            <button onClick={() => setShowForm(true)} className="btn-secondary py-2 px-6 text-sm">İlk Hizmeti Ekle</button>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             )}
             {/* Template Modal */}
             {showTemplates && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                            <div>
-                                <h3 className="text-2xl font-black text-gray-900">Hazır Hizmet Listesi</h3>
-                                <p className="text-sm text-gray-500 font-medium">Listenize eklemek istediğiniz hizmetleri seçin.</p>
-                            </div>
-                            <button onClick={() => setShowTemplates(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
-                                <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col relative">
+                        <button onClick={() => setShowTemplates(false)} className="absolute top-6 right-6 p-2 bg-slate-50 text-slate-400 rounded-full hover:bg-slate-100 transition-colors z-10">
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+
+                        <div className="p-10 border-b border-slate-50 flex flex-col bg-slate-50/30">
+                            <h3 className="text-2xl font-black text-slate-900 tracking-tight">Hizmet Şablonları</h3>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Hızlıca hizmet eklemek için kategorileri inceleyin</p>
                         </div>
-                        <div className="p-8 overflow-y-auto custom-scrollbar">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+
+                        <div className="p-10 overflow-y-auto no-scrollbar">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                 {/* Erkek Hizmetleri */}
                                 <div>
-                                    <h4 className="text-indigo-600 font-black uppercase tracking-widest text-xs mb-4 flex items-center gap-2">
-                                        <span className="bg-indigo-100 p-1.5 rounded-lg">👨</span> Erkek Kuaförü
+                                    <h4 className="flex items-center gap-2 text-indigo-600 font-black uppercase tracking-widest text-xs mb-6">
+                                        <span className="w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center">👨</span> Erkek Kuaförü
                                     </h4>
-                                    <div className="space-y-3">
+                                    <div className="space-y-4">
                                         {Templates.men.map((t, i) => (
-                                            <div key={i} className="flex items-center justify-between p-4 rounded-2xl border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all group">
+                                            <div key={i} className="flex items-center justify-between p-5 rounded-3xl border border-slate-100 hover:border-indigo-100 hover:bg-indigo-50/20 transition-all group">
                                                 <div>
-                                                    <p className="font-bold text-gray-900">{t.name}</p>
-                                                    <p className="text-xs text-gray-500 mt-0.5">{t.duration} dk • ₺{t.price}</p>
+                                                    <p className="font-bold text-slate-900 text-sm">{t.name}</p>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{t.duration} dk</span>
+                                                        <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                                                        <span className="text-[10px] font-black text-indigo-500 uppercase tracking-tighter">₺{t.price}</span>
+                                                    </div>
                                                 </div>
                                                 <button
                                                     onClick={() => handleAddFromTemplate(t)}
-                                                    className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-600 hover:text-white transition-colors"
+                                                    className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-bold hover:bg-indigo-600 hover:text-white transition-all active:scale-90"
                                                 >
-                                                    + Ekle
+                                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
                                                 </button>
                                             </div>
                                         ))}
@@ -358,21 +362,25 @@ export default function ServiceManagement() {
 
                                 {/* Kadın Hizmetleri */}
                                 <div>
-                                    <h4 className="text-pink-600 font-black uppercase tracking-widest text-xs mb-4 flex items-center gap-2">
-                                        <span className="bg-pink-100 p-1.5 rounded-lg">👩</span> Kadın Kuaförü
+                                    <h4 className="flex items-center gap-2 text-pink-600 font-black uppercase tracking-widest text-xs mb-6">
+                                        <span className="w-8 h-8 bg-pink-50 rounded-lg flex items-center justify-center">👩</span> Kadın Kuaförü
                                     </h4>
-                                    <div className="space-y-3">
+                                    <div className="space-y-4">
                                         {Templates.women.map((t, i) => (
-                                            <div key={i} className="flex items-center justify-between p-4 rounded-2xl border border-gray-100 hover:border-pink-200 hover:bg-pink-50/30 transition-all group">
+                                            <div key={i} className="flex items-center justify-between p-5 rounded-3xl border border-slate-100 hover:border-pink-100 hover:bg-pink-50/20 transition-all group">
                                                 <div>
-                                                    <p className="font-bold text-gray-900">{t.name}</p>
-                                                    <p className="text-xs text-gray-500 mt-0.5">{t.duration} dk • ₺{t.price}</p>
+                                                    <p className="font-bold text-slate-900 text-sm">{t.name}</p>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{t.duration} dk</span>
+                                                        <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                                                        <span className="text-[10px] font-black text-pink-500 uppercase tracking-tighter">₺{t.price}</span>
+                                                    </div>
                                                 </div>
                                                 <button
                                                     onClick={() => handleAddFromTemplate(t)}
-                                                    className="px-3 py-1.5 bg-pink-100 text-pink-700 rounded-lg text-xs font-bold hover:bg-pink-600 hover:text-white transition-colors"
+                                                    className="w-10 h-10 bg-pink-50 text-pink-600 rounded-xl flex items-center justify-center font-bold hover:bg-pink-600 hover:text-white transition-all active:scale-90"
                                                 >
-                                                    + Ekle
+                                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
                                                 </button>
                                             </div>
                                         ))}
