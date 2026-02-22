@@ -257,9 +257,9 @@ export default function BookingPage() {
                 customer_name: selection.customerName,
                 customer_phone: selection.customerPhone,
                 notes: `Müşteri: ${selection.customerName} | Tel: ${selection.customerPhone}`,
+                price: service?.price || 0,
                 status: 'pending'
             });
-
             const newApp = res.data?.data;
             if (newApp && newApp.id) {
                 const savedIds = JSON.parse(localStorage.getItem('my_appointment_ids') || '[]');

@@ -130,13 +130,20 @@ export default function Dashboard() {
     }, []);
 
     const startVoiceCommand = () => {
+        // Warm up speech synthesis for mobile
+        if (window.speechSynthesis) {
+            const warmUp = new SpeechSynthesisUtterance('');
+            warmUp.lang = 'tr-TR';
+            window.speechSynthesis.speak(warmUp);
+        }
+
         setVoiceStep('NAME');
         setGuidedData({
             customerName: '',
             date: getLocalDateString(),
-            serviceId: null,
             startTime: '09:00',
             endTime: '09:30',
+            serviceId: null,
             price: 0
         });
         speak('Müşterinin ismi nedir?');
@@ -277,7 +284,7 @@ export default function Dashboard() {
                 start_time: guidedData.startTime,
                 end_time: guidedData.endTime,
                 customer_name: guidedData.customerName,
-                notes: `Sesli Komut (Yönlendirmeli)`,
+                notes: `Müşteri: ${guidedData.customerName} | Sesli Komut`,
                 price: guidedData.price,
                 status: 'approved'
             });
@@ -496,13 +503,15 @@ export default function Dashboard() {
                         <h2 className="text-4xl font-black text-white tracking-tighter mb-4">
                             {voiceStep === 'NAME' && '1. Müşteri İsmi?'}
                             {voiceStep === 'DATE' && '2. Randevu Tarihi?'}
-                            {voiceStep === 'SERVICE' && '3. Yapılacak İşlem?'}
+                            {voiceStep === 'TIME' && '3. Randevu Saati?'}
+                            {voiceStep === 'SERVICE' && '4. Yapılacak İşlem?'}
                             {voiceStep === 'CONFIRM' && 'Son Kontrol'}
                         </h2>
 
                         <p className="text-indigo-300 font-bold uppercase tracking-[0.2em] text-[11px] mb-12">
                             {voiceStep === 'NAME' && 'Müşterinin adını söyleyin'}
                             {voiceStep === 'DATE' && 'Bugün, Yarın veya bir gün söyleyin'}
+                            {voiceStep === 'TIME' && 'Saat bilgisini söyleyin (örn: 14:30)'}
                             {voiceStep === 'SERVICE' && 'Hangi hizmet yapılacak?'}
                             {voiceStep === 'CONFIRM' && 'Randevu detayları aşağıdadır'}
                         </p>
