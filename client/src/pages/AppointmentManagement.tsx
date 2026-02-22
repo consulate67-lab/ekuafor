@@ -17,6 +17,8 @@ export default function AppointmentManagement() {
         appointment_date: '',
         start_time: '09:00',
         end_time: '10:00',
+        customer_name: '',
+        customer_phone: '',
         notes: '',
         price: 0
     });
@@ -24,13 +26,13 @@ export default function AppointmentManagement() {
     const [isListening, setIsListening] = useState(false);
     const [voiceTranscript, setVoiceTranscript] = useState('');
     const [company, setCompany] = useState<Company | null>(null);
-    const [voiceStep, setVoiceStep] = useState<'IDLE' | 'NAME' | 'DATE' | 'SERVICE' | 'CONFIRM'>('IDLE');
+    const [voiceStep, setVoiceStep] = useState<'IDLE' | 'NAME' | 'DATE' | 'TIME' | 'SERVICE' | 'CONFIRM'>('IDLE');
     const [guidedData, setGuidedData] = useState<any>({
         customerName: '',
         date: '',
-        serviceId: null,
         startTime: '09:00',
         endTime: '09:30',
+        serviceId: null,
         price: 0
     });
 
@@ -208,7 +210,16 @@ export default function AppointmentManagement() {
         }
         else if (step === 'DATE') {
             const parsed = parseVoiceCommand(transcript, [], rules);
-            setGuidedData((prev: any) => ({ ...prev, date: parsed.date, startTime: parsed.startTime }));
+            setGuidedData((prev: any) => ({ ...prev, date: parsed.date }));
+            setVoiceStep('TIME');
+            setTimeout(() => {
+                speak('Randevu saati kaçta olsun?');
+                listenNextStep('TIME');
+            }, 600);
+        }
+        else if (step === 'TIME') {
+            const parsed = parseVoiceCommand(transcript, [], rules);
+            setGuidedData((prev: any) => ({ ...prev, startTime: parsed.startTime }));
             setVoiceStep('SERVICE');
             setTimeout(() => {
                 speak('Yapılacak işlem nedir?');
@@ -217,10 +228,23 @@ export default function AppointmentManagement() {
         }
         else if (step === 'SERVICE') {
             const parsed = parseVoiceCommand(transcript, services, rules);
+            const service = services.find(s => s.id === parsed.serviceId);
+
+            // Calculate end time based on previously captured startTime and service duration
+            let finalEndTime = parsed.endTime;
+            if (service && guidedData.startTime) {
+                const [h, m] = guidedData.startTime.split(':').map(Number);
+                const duration = service.duration_minutes || 30;
+                const totalMin = h * 60 + m + duration;
+                const endH = Math.floor(totalMin / 60) % 24;
+                const endM = totalMin % 60;
+                finalEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+            }
+
             setGuidedData((prev: any) => ({
                 ...prev,
                 serviceId: parsed.serviceId,
-                endTime: parsed.endTime,
+                endTime: finalEndTime,
                 price: parsed.price
             }));
             setVoiceStep('CONFIRM');
@@ -306,14 +330,18 @@ export default function AppointmentManagement() {
         e.preventDefault();
         setFormError('');
         try {
-            const customerName = (newAppointment as any).customer_name;
-            const finalNotes = customerName ? `Müşteri: ${customerName} | ${newAppointment.notes}` : newAppointment.notes;
+            const customerName = newAppointment.customer_name;
+            const customerPhone = newAppointment.customer_phone;
+            let finalNotes = '';
+            if (customerName) finalNotes += `Müşteri: ${customerName} `;
+            if (customerPhone) finalNotes += `| Tel: ${customerPhone} `;
+            if (newAppointment.notes) finalNotes += `| ${newAppointment.notes}`;
 
             await api.post('/appointments', {
                 ...newAppointment,
                 staff_id: newAppointment.staff_id === 0 ? undefined : newAppointment.staff_id,
                 company_id: company?.id,
-                notes: finalNotes,
+                notes: finalNotes.trim(),
                 status: 'approved'
             });
 
@@ -323,10 +351,11 @@ export default function AppointmentManagement() {
                 appointment_date: getLocalDateString(),
                 start_time: '09:00',
                 end_time: '10:00',
+                customer_name: '',
+                customer_phone: '',
                 notes: '',
                 price: 0
             });
-            (newAppointment as any).customer_name = '';
             setShowAddForm(false);
             alert('Randevu başarıyla ONAYLI olarak oluşturuldu.');
             await fetchData();
@@ -588,15 +617,27 @@ export default function AppointmentManagement() {
                                     />
                                 </div>
                             </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-700 mb-2 uppercase ml-1 tracking-wider">Müşteri Adı</label>
-                                <input
-                                    type="text"
-                                    className="w-full bg-slate-50 border-none rounded-2xl py-4 px-4 font-bold text-slate-900"
-                                    placeholder="Ad Soyad (Opsiyonel)"
-                                    value={(newAppointment as any).customer_name || ''}
-                                    onChange={(e) => setNewAppointment({ ...newAppointment, customer_name: e.target.value } as any)}
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-2 uppercase ml-1 tracking-wider">Müşteri Adı</label>
+                                    <input
+                                        type="text"
+                                        className="w-full bg-slate-50 border-none rounded-2xl py-4 px-4 font-bold text-slate-900"
+                                        placeholder="Ad Soyad"
+                                        value={newAppointment.customer_name}
+                                        onChange={(e) => setNewAppointment({ ...newAppointment, customer_name: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-2 uppercase ml-1 tracking-wider">Telefon</label>
+                                    <input
+                                        type="tel"
+                                        className="w-full bg-slate-50 border-none rounded-2xl py-4 px-4 font-bold text-slate-900"
+                                        placeholder="05XX XXX XX XX"
+                                        value={newAppointment.customer_phone}
+                                        onChange={(e) => setNewAppointment({ ...newAppointment, customer_phone: e.target.value })}
+                                    />
+                                </div>
                             </div>
                             <button type="submit" className="w-full bg-pink-600 text-white py-5 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-pink-200 hover:bg-pink-700 active:scale-95 transition-all">
                                 Randevu Oluştur

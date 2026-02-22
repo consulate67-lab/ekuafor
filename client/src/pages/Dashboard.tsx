@@ -16,7 +16,7 @@ export default function Dashboard() {
     const [services, setServices] = useState<Service[]>([]);
     const [isListening, setIsListening] = useState(false);
     const [voiceTranscript, setVoiceTranscript] = useState('');
-    const [voiceStep, setVoiceStep] = useState<'IDLE' | 'NAME' | 'DATE' | 'SERVICE' | 'CONFIRM'>('IDLE');
+    const [voiceStep, setVoiceStep] = useState<'IDLE' | 'NAME' | 'DATE' | 'TIME' | 'SERVICE' | 'CONFIRM'>('IDLE');
     const [guidedData, setGuidedData] = useState<any>({
         customerName: '',
         date: '',
@@ -214,7 +214,16 @@ export default function Dashboard() {
         else if (step === 'DATE') {
             // Use aiParser just for date extraction from this transcript
             const parsed = parseVoiceCommand(transcript, [], rules);
-            setGuidedData((prev: any) => ({ ...prev, date: parsed.date, startTime: parsed.startTime }));
+            setGuidedData((prev: any) => ({ ...prev, date: parsed.date }));
+            setVoiceStep('TIME');
+            setTimeout(() => {
+                speak('Randevu saati kaçta olsun?');
+                listenNextStep('TIME');
+            }, 600);
+        }
+        else if (step === 'TIME') {
+            const parsed = parseVoiceCommand(transcript, [], rules);
+            setGuidedData((prev: any) => ({ ...prev, startTime: parsed.startTime }));
             setVoiceStep('SERVICE');
             setTimeout(() => {
                 speak('Yapılacak işlem nedir?');
@@ -223,11 +232,23 @@ export default function Dashboard() {
         }
         else if (step === 'SERVICE') {
             const parsed = parseVoiceCommand(transcript, services, rules);
+            const service = services.find(s => s.id === parsed.serviceId);
+
+            // Calculate end time based on previously captured startTime and service duration
+            let finalEndTime = parsed.endTime;
+            if (service && guidedData.startTime) {
+                const [h, m] = guidedData.startTime.split(':').map(Number);
+                const duration = service.duration_minutes || 30;
+                const totalMin = h * 60 + m + duration;
+                const endH = Math.floor(totalMin / 60) % 24;
+                const endM = totalMin % 60;
+                finalEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+            }
 
             setGuidedData((prev: any) => ({
                 ...prev,
                 serviceId: parsed.serviceId,
-                endTime: parsed.endTime,
+                endTime: finalEndTime,
                 price: parsed.price
             }));
             setVoiceStep('CONFIRM');
