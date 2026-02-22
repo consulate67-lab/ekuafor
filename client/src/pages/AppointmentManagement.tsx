@@ -107,10 +107,24 @@ export default function AppointmentManagement() {
     }, []);
 
     const speak = (text: string) => {
+        if (!window.speechSynthesis) return;
+        window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'tr-TR';
+        utterance.rate = 1.0;
+
+        const voices = window.speechSynthesis.getVoices();
+        const trVoice = voices.find(v => v.lang.includes('tr'));
+        if (trVoice) utterance.voice = trVoice;
+
         window.speechSynthesis.speak(utterance);
     };
+
+    useEffect(() => {
+        if (window.speechSynthesis) {
+            window.speechSynthesis.getVoices();
+        }
+    }, []);
 
     const startVoiceCommand = () => {
         setVoiceStep('NAME');
@@ -130,18 +144,23 @@ export default function AppointmentManagement() {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         if (!SpeechRecognition) {
             alert('Tarayıcınız sesli komut özelliğini desteklemiyor.');
+            setVoiceStep('IDLE');
             return;
         }
 
-        // Force permission check via getUserMedia (helps on mobile webviews)
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            stream.getTracks().forEach(track => track.stop());
-        } catch (err) {
-            console.error('Mic permission denied', err);
-            alert('Mikrofon izni verilmedi. Lütfen ayarlardan izin verin.');
-            setVoiceStep('IDLE');
-            return;
+        // Force permission check via getUserMedia - check if mediaDevices exists
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(track => track.stop());
+            } catch (err) {
+                console.error('Mic permission denied', err);
+                alert('Mikrofon izni verilmedi. Lütfen uygulama ayarlarından mikrofon iznini etkinleştirin.');
+                setVoiceStep('IDLE');
+                return;
+            }
+        } else {
+            console.warn('mediaDevices not supported, proceeding with SpeechRecognition directly');
         }
 
         const recognition = new SpeechRecognition();

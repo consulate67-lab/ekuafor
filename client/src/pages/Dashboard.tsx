@@ -104,10 +104,30 @@ export default function Dashboard() {
     }, [user]);
 
     const speak = (text: string) => {
+        if (!window.speechSynthesis) return;
+
+        // Cancel any ongoing speech
+        window.speechSynthesis.cancel();
+
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'tr-TR';
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+
+        // Mobile browsers often need to load voices first
+        const voices = window.speechSynthesis.getVoices();
+        const trVoice = voices.find(v => v.lang.includes('tr'));
+        if (trVoice) utterance.voice = trVoice;
+
         window.speechSynthesis.speak(utterance);
     };
+
+    // Pre-initialize voices
+    useEffect(() => {
+        if (window.speechSynthesis) {
+            window.speechSynthesis.getVoices();
+        }
+    }, []);
 
     const startVoiceCommand = () => {
         setVoiceStep('NAME');
@@ -127,18 +147,24 @@ export default function Dashboard() {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         if (!SpeechRecognition) {
             alert('Tarayıcınız sesli komut özelliğini desteklemiyor.');
+            setVoiceStep('IDLE');
             return;
         }
 
-        // Force permission check via getUserMedia (helps on mobile webviews)
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            stream.getTracks().forEach(track => track.stop());
-        } catch (err) {
-            console.error('Mic permission denied', err);
-            alert('Mikrofon izni verilmedi. Lütfen ayarlardan izin verin.');
-            setVoiceStep('IDLE');
-            return;
+        // Force permission check via getUserMedia - check if mediaDevices exists
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(track => track.stop());
+                console.log('Mic permission granted');
+            } catch (err) {
+                console.error('Mic permission denied', err);
+                alert('Mikrofon izni verilmedi. Lütfen uygulama ayarlarından mikrofon iznini etkinleştirin.');
+                setVoiceStep('IDLE');
+                return;
+            }
+        } else {
+            console.warn('mediaDevices not supported, proceeding with SpeechRecognition directly');
         }
 
         const recognition = new SpeechRecognition();
