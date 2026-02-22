@@ -493,17 +493,18 @@ export default function AppointmentManagement() {
                                         className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 active:scale-[0.98] transition-all"
                                     >
                                         <div className="w-14 h-14 bg-slate-50 rounded-2xl flex flex-col items-center justify-center border border-slate-100">
-                                            <span className="text-xs font-black text-slate-900 leading-none">{app.start_time.split(':')[0]}</span>
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">:{app.start_time.split(':')[1]}</span>
+                                            <span className="text-xs font-black text-slate-900 leading-none">{(app.start_time || '00:00').split(':')[0]}</span>
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">:{(app.start_time || '00:00').split(':')[1]}</span>
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <h4 className="font-black text-slate-900 text-sm truncate uppercase tracking-tight">
                                                 {(() => {
                                                     const nameMatch = app.notes?.match(/Müşteri:\s*([^|]+)/);
-                                                    return nameMatch ? nameMatch[1].trim() : (app.customer_name || 'Misafir');
+                                                    const extracted = nameMatch ? nameMatch[1].trim() : '';
+                                                    return extracted || app.customer_name || 'Misafir';
                                                 })()}
                                             </h4>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{app.service_name}</p>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{app.service_name || 'Hizmet Bilgisi Yok'}</p>
                                         </div>
                                         <div className="text-right">
                                             <span className="text-xs font-black text-pink-600 block">₺{app.price || '0'}</span>
@@ -666,15 +667,17 @@ export default function AppointmentManagement() {
                                 <div className="w-12 h-12 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-black text-xl">
                                     {(() => {
                                         const nameMatch = selectedAppointment.notes?.match(/Müşteri:\s*([^|]+)/);
-                                        const name = nameMatch ? nameMatch[1].trim() : (selectedAppointment.customer_name || 'M');
-                                        return name[0].toUpperCase();
+                                        const extracted = nameMatch ? nameMatch[1].trim() : '';
+                                        const name = extracted || selectedAppointment.customer_name || 'Misafir';
+                                        return name.charAt(0).toUpperCase();
                                     })()}
                                 </div>
                                 <div className="min-w-0">
                                     <h4 className="font-black text-slate-900 text-lg leading-none truncate">
                                         {(() => {
                                             const nameMatch = selectedAppointment.notes?.match(/Müşteri:\s*([^|]+)/);
-                                            return nameMatch ? nameMatch[1].trim() : (selectedAppointment.customer_name || 'Misafir');
+                                            const extracted = nameMatch ? nameMatch[1].trim() : '';
+                                            return extracted || selectedAppointment.customer_name || 'Misafir';
                                         })()}
                                     </h4>
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Müşteri</p>
@@ -695,7 +698,7 @@ export default function AppointmentManagement() {
                             <div className="bg-slate-50 p-4 rounded-2xl">
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Hizmet</p>
                                 <div className="flex justify-between items-center">
-                                    <span className="font-black text-slate-900">{selectedAppointment.service_name}</span>
+                                    <span className="font-black text-slate-900">{selectedAppointment.service_name || 'Hizmet Bilgisi Yok'}</span>
                                     <span className="font-black text-pink-600">₺{selectedAppointment.price || 0}</span>
                                 </div>
                             </div>
