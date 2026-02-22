@@ -68,7 +68,10 @@ function App() {
             <Router basename={import.meta.env.BASE_URL}>
                 <Routes>
                     {/* Public Routes */}
-                    <Route path="/" element={<CustomerHome />} />
+                    <Route
+                        path="/"
+                        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <CustomerHome />}
+                    />
                     <Route path="/book/:id" element={<BookingPage />} />
                     <Route path="/my-appointments" element={<MyAppointments />} />
                     <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />

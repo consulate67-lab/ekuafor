@@ -20,7 +20,7 @@ export default function Login() {
             const response = await api.post('/auth/login', { email, password });
             const { user, token } = response.data.data;
             login(user, token);
-            navigate('/');
+            navigate('/dashboard');
         } catch (err: any) {
             if (!err.response) {
                 setError(`Sunucu şu an başlatılıyor veya ulaşılamıyor. Lütfen 10-15 saniye bekleyip tekrar deneyin. (${api.defaults.baseURL})`);

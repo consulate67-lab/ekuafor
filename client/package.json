@@ -1,7 +1,7 @@
 {
     "name": "saloon-client",
     "private": true,
-    "version": "1.8.3",
+    "version": "1.8.4",
     "type": "module",
     "homepage": "https://consulate67-lab.github.io/ekuafor/",
     "scripts": {
