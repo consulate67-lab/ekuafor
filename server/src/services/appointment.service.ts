@@ -143,9 +143,9 @@ class AppointmentService {
             LEFT JOIN companies c ON a.company_id = c.id
             LEFT JOIN users u ON a.customer_id = u.id
             WHERE (
-                u.phone LIKE $1 OR 
-                a.notes LIKE $1 OR
-                a.customer_phone LIKE $1
+                regexp_replace(COALESCE(u.phone, ''), '\\D', '', 'g') LIKE $1 OR 
+                regexp_replace(COALESCE(a.notes, ''), '\\D', '', 'g') LIKE $1 OR
+                regexp_replace(COALESCE(a.customer_phone, ''), '\\D', '', 'g') LIKE $1
             )
         `;
         const values: any[] = [searchPattern];
@@ -293,7 +293,8 @@ class AppointmentService {
         if (phone) {
             const cleanPhone = phone.replace(/\D/g, '').replace(/^0/, '');
             const searchPattern = `%${cleanPhone}%`;
-            query += ` OR a.customer_phone LIKE $2 OR a.notes LIKE $2`;
+            query += ` OR regexp_replace(COALESCE(a.customer_phone, ''), '\\D', '', 'g') LIKE $2 
+                       OR regexp_replace(COALESCE(a.notes, ''), '\\D', '', 'g') LIKE $2`;
             values.push(searchPattern);
         }
 

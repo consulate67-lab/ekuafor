@@ -52,16 +52,21 @@ export default function MyAppointments() {
             let myApps: Appointment[] = [];
 
             if (phone) {
-                // Priority 1: Fetch by device-phone link (Sync across re-installs)
+                // Fetch by BOTH phone and device to ensure total sync (Dual-Verification)
                 const deviceId = localStorage.getItem('device_id') || 'web-browser';
-                const res = await api.get('/appointments', { params: { device_id: deviceId } });
-                myApps = res.data?.data || [];
 
-                // If nothing found by device, try phone search as fallback
-                if (myApps.length === 0) {
-                    const phoneRes = await api.get('/appointments', { params: { customer_phone: phone } });
-                    myApps = phoneRes.data?.data || [];
-                }
+                const [deviceRes, phoneRes] = await Promise.all([
+                    api.get('/appointments', { params: { device_id: deviceId } }),
+                    api.get('/appointments', { params: { customer_phone: phone } })
+                ]);
+
+                const deviceApps = deviceRes.data?.data || [];
+                const phoneApps = phoneRes.data?.data || [];
+
+                // Deduplicate by ID
+                const allMap = new Map();
+                [...phoneApps, ...deviceApps].forEach(a => allMap.set(a.id, a));
+                myApps = Array.from(allMap.values());
             } else if (localIds.length > 0) {
                 // Priority 2: Fetch by local IDs (Classic)
                 const res = await api.get('/appointments', { params: { ids: localIds.join(',') } });
