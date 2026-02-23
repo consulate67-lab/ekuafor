@@ -434,29 +434,32 @@ export default function CustomerHome() {
                             key={c.id}
                             className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-shadow active:scale-[0.98] relative group"
                         >
-                            <button
-                                onClick={(e) => toggleFavorite(e, c.id)}
-                                className="absolute top-2 right-2 p-2 z-10 text-gray-300 hover:text-red-500 transition-colors"
-                            >
-                                <svg className={`w-6 h-6 ${favorites.includes(c.id) ? 'text-red-500 fill-current' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                                </svg>
-                            </button>
+                            <div className="absolute top-2 right-2 flex flex-col items-center gap-1 z-10">
+                                <button
+                                    onClick={(e) => toggleFavorite(e, c.id)}
+                                    className="p-2 text-gray-300 hover:text-red-500 transition-colors"
+                                >
+                                    <svg className={`w-6 h-6 ${favorites.includes(c.id) ? 'text-red-500 fill-current' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                                    </svg>
+                                </button>
+                                <button
+                                    onClick={(e) => openMaps(e, c)}
+                                    className="p-2 bg-blue-50/80 text-blue-500 rounded-xl transition-all hover:bg-blue-100 hover:scale-110 shadow-sm"
+                                    title="Haritada Gör"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5-2V4l5 2m0 14l6-2V8l-6 2m6 8l5-2V7l-5 2m0 0v11" />
+                                    </svg>
+                                </button>
+                            </div>
 
                             <div className="w-16 h-16 bg-gray-100 rounded-xl flex-shrink-0 flex items-center justify-center text-2xl">
                                 🏢
                             </div>
-                            <div className="flex-1 min-w-0 pr-8">
+                            <div className="flex-1 min-w-0 pr-10">
                                 <div className="flex items-center gap-1.5 mb-0.5">
                                     <h4 className="font-bold text-gray-900 truncate">{c.name}</h4>
-                                    <button
-                                        onClick={(e) => openMaps(e, c)}
-                                        className="p-1 px-2 bg-blue-50 text-blue-500 rounded-lg transition-colors flex items-center gap-1"
-                                        title="Haritada Gör"
-                                    >
-                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>
-                                        <span className="text-[8px] font-black uppercase">Git</span>
-                                    </button>
                                 </div>
                                 <div className="flex items-center gap-2 mb-1">
                                     <div className="flex items-center gap-0.5 text-amber-500">
