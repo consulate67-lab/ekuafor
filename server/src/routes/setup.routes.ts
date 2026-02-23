@@ -273,6 +273,9 @@ CREATE INDEX IF NOT EXISTS idx_customer_devices_id ON customer_devices(device_id
 -- MIGRATION: Appointment reviews
 ALTER TABLE appointments ADD COLUMN IF NOT EXISTS rating INTEGER CHECK (rating BETWEEN 1 AND 5);
 ALTER TABLE appointments ADD COLUMN IF NOT EXISTS comment TEXT;
+
+-- MIGRATION: Company genders
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS genders TEXT[] DEFAULT '{}';
         `;
 
         await pool.query(sql);

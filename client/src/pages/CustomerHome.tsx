@@ -61,9 +61,12 @@ export default function CustomerHome() {
             const resultWithDistance = allCompanies.map((c: Company) => {
                 let distance = undefined;
                 if (loc) {
-                    const lat2 = typeof c.latitude === 'string' ? parseFloat(c.latitude) : c.latitude;
-                    const lng2 = typeof c.longitude === 'string' ? parseFloat(c.longitude) : c.longitude;
-                    distance = calculateDistance(loc.lat, loc.lng, lat2 || 41.0082, lng2 || 28.9784);
+                    const lat2 = c.latitude ? (typeof c.latitude === 'string' ? parseFloat(c.latitude) : c.latitude) : null;
+                    const lng2 = c.longitude ? (typeof c.longitude === 'string' ? parseFloat(c.longitude) : c.longitude) : null;
+
+                    if (lat2 !== null && lng2 !== null && lat2 !== 0 && lng2 !== 0) {
+                        distance = calculateDistance(loc.lat, loc.lng, lat2, lng2);
+                    }
                 }
                 return { ...c, distance };
             });

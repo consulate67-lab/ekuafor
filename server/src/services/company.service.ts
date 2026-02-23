@@ -183,38 +183,31 @@ class CompanyService {
         gender?: string;
         sort?: 'rating' | 'reviews' | 'newest';
     }): Promise<Company[]> {
-        let query = `
-            SELECT 
-                c.*,
-                COALESCE(AVG(a.rating), 0) as rating_avg,
-                COUNT(a.rating) as review_count
-            FROM companies c
-            LEFT JOIN appointments a ON c.id = a.company_id AND a.rating IS NOT NULL
-            WHERE 1=1
-        `;
         const values: any[] = [];
         let paramIndex = 1;
 
+        let whereClauses = ['1=1'];
+
         if (filters?.is_active !== undefined) {
-            query += ` AND c.is_active = $${paramIndex}`;
+            whereClauses.push(`c.is_active = $${paramIndex}`);
             values.push(filters.is_active);
             paramIndex++;
         }
 
         if (filters?.is_verified !== undefined) {
-            query += ` AND c.is_verified = $${paramIndex}`;
+            whereClauses.push(`c.is_verified = $${paramIndex}`);
             values.push(filters.is_verified);
             paramIndex++;
         }
 
         if (filters?.search) {
-            query += ` AND (c.name ILIKE $${paramIndex} OR c.email ILIKE $${paramIndex} OR c.province_name ILIKE $${paramIndex} OR c.district_name ILIKE $${paramIndex})`;
+            whereClauses.push(`(c.name ILIKE $${paramIndex} OR c.email ILIKE $${paramIndex} OR c.province_name ILIKE $${paramIndex} OR c.district_name ILIKE $${paramIndex})`);
             values.push(`%${filters.search}%`);
             paramIndex++;
         }
 
         if (filters?.gender) {
-            query += ` AND $${paramIndex} = ANY(c.genders)`;
+            whereClauses.push(`$${paramIndex} = ANY(c.genders)`);
             values.push(filters.gender);
             paramIndex++;
         }
@@ -222,20 +215,28 @@ class CompanyService {
         // Spatial filtering (Haversine formula)
         if (filters?.lat && filters?.lng && filters?.radius) {
             // Earth radius: 6371 km
-            // Use bounding box first for optimization if possible, but for simple use just Haversine
-            query += ` AND (
-                (c.latitude IS NULL OR c.longitude IS NULL) OR
+            whereClauses.push(`(
+                (c.latitude IS NULL OR c.longitude IS NULL OR c.latitude = 0 OR c.longitude = 0) OR
                 (6371 * acos(
-                    cos(radians($${paramIndex})) * cos(radians(c.latitude)) * 
-                    cos(radians(c.longitude) - radians($${paramIndex + 1})) + 
-                    sin(radians($${paramIndex})) * sin(radians(c.latitude))
+                    LEAST(1.0, GREATEST(-1.0, 
+                        cos(radians($${paramIndex})) * cos(radians(c.latitude)) * 
+                        cos(radians(c.longitude) - radians($${paramIndex + 1})) + 
+                        sin(radians($${paramIndex})) * sin(radians(c.latitude))
+                    ))
                 )) <= $${paramIndex + 2}
-            )`;
+            )`);
             values.push(filters.lat, filters.lng, filters.radius);
             paramIndex += 3;
         }
 
-        query += ' GROUP BY c.id';
+        let query = `
+            SELECT 
+                c.*,
+                (SELECT COALESCE(AVG(rating), 0) FROM appointments WHERE company_id = c.id AND rating IS NOT NULL) as rating_avg,
+                (SELECT COUNT(rating) FROM appointments WHERE company_id = c.id AND rating IS NOT NULL) as review_count
+            FROM companies c
+            WHERE ${whereClauses.join(' AND ')}
+        `;
 
         if (filters?.sort === 'rating') {
             query += ' ORDER BY rating_avg DESC, review_count DESC';
