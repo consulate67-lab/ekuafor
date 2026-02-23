@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import { Appointment, Service, Company, User } from '../types';
 import { App } from '@capacitor/app';
+import { Device } from '@capacitor/device';
 
 export default function BookingPage() {
     const { id } = useParams<{ id: string }>();
@@ -247,6 +248,13 @@ export default function BookingPage() {
                 return;
             }
 
+            // Get Device ID
+            let deviceId = undefined;
+            try {
+                const info = await Device.getId();
+                deviceId = info.identifier;
+            } catch (e) { }
+
             const res = await api.post('/appointments', {
                 company_id: Number(id),
                 staff_id: selection.staffId,
@@ -258,6 +266,7 @@ export default function BookingPage() {
                 customer_phone: selection.customerPhone,
                 notes: `Müşteri: ${selection.customerName} | Tel: ${selection.customerPhone}`,
                 price: service?.price || 0,
+                device_id: deviceId,
                 status: 'pending'
             });
             const newApp = res.data?.data;

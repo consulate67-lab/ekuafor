@@ -160,6 +160,18 @@ const runMigrations = async () => {
         console.log('🔄 Running auto-migrations...');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(20)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255)');
+        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS device_id VARCHAR(255)');
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS customer_devices (
+                id SERIAL PRIMARY KEY,
+                device_id VARCHAR(255) UNIQUE NOT NULL,
+                customer_phone VARCHAR(20) NOT NULL,
+                last_sync TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_customer_devices_id ON customer_devices(device_id)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_customer_devices_phone ON customer_devices(customer_phone)');
+
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS genders TEXT[]');
         // Initialize existing rows if they are NULL so the filter has something to work with
         await pool.query("UPDATE companies SET genders = '{\"Erkek\", \"Kadın\", \"Çocuk\"}' WHERE genders IS NULL");

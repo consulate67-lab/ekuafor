@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import { Appointment, Service, Company } from '../types';
 import { parseVoiceCommand } from '../lib/aiParser';
+import { Device } from '@capacitor/device';
 
 export default function AppointmentManagement() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -271,6 +272,13 @@ export default function AppointmentManagement() {
                 staffId = firstEmp.user_id || firstEmp.id;
             }
 
+            // Get Device ID
+            let deviceId = undefined;
+            try {
+                const info = await Device.getId();
+                deviceId = info.identifier;
+            } catch (e) { }
+
             await api.post('/appointments', {
                 company_id: company.id,
                 service_id: guidedData.serviceId,
@@ -281,6 +289,7 @@ export default function AppointmentManagement() {
                 customer_name: guidedData.customerName,
                 notes: `Müşteri: ${guidedData.customerName} | Sesli Komut`,
                 price: guidedData.price,
+                device_id: deviceId,
                 status: 'approved'
             });
 

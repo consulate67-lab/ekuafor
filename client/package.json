@@ -1,7 +1,7 @@
 {
     "name": "saloon-client",
     "private": true,
-    "version": "1.8.9",
+    "version": "1.9.0",
     "type": "module",
     "homepage": "https://consulate67-lab.github.io/ekuafor/",
     "scripts": {
@@ -19,6 +19,7 @@
         "@capacitor/app": "^8.0.1",
         "@capacitor/cli": "^8.1.0",
         "@capacitor/core": "^8.1.0",
+        "@capacitor/device": "^8.0.1",
         "@capacitor/geolocation": "^8.1.0",
         "@capacitor/ios": "^8.1.0",
         "@hookform/resolvers": "^3.3.4",

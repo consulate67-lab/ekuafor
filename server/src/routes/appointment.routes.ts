@@ -17,6 +17,7 @@ const appointmentSchema = z.object({
     price: z.union([z.number(), z.string().transform(v => parseFloat(v))]).optional(),
     customer_name: z.string().optional(),
     customer_phone: z.string().optional(),
+    device_id: z.string().optional(),
 });
 
 // Randevuları listele (Firma bazlı, isteğe bağlı durum filtresiyle)
@@ -28,8 +29,9 @@ const publicAppointmentHandler = async (req: Request, res: Response, next: any) 
     const companyId = req.query.company_id ? parseInt(req.query.company_id as string) : undefined;
     const customerPhone = req.query.customer_phone as string;
     const idsString = req.query.ids as string;
+    const deviceId = req.query.device_id as string;
 
-    if (companyId || customerPhone || idsString) {
+    if (companyId || customerPhone || idsString || deviceId) {
         try {
             console.log(`[GET /appointments] Public Access: Company=${companyId}, Phone=${customerPhone}, Ids=${idsString}`);
 
@@ -37,6 +39,9 @@ const publicAppointmentHandler = async (req: Request, res: Response, next: any) 
             if (idsString) {
                 const ids = idsString.split(',').map(s => parseInt(s)).filter(id => !isNaN(id));
                 appointments = await appointmentService.getAppointmentsByIds(ids);
+            } else if (deviceId) {
+                // Fetch by device ID (prioritize this for auto-sync)
+                appointments = await appointmentService.getAppointmentsByDevice(deviceId);
             } else if (customerPhone) {
                 // Fetch by phone (across all companies or filtered by company if both provided)
                 appointments = await appointmentService.getAppointmentsByPhone(customerPhone, companyId);
@@ -286,6 +291,21 @@ router.patch('/:id', async (req: Request, res: Response) => {
         res.status(400).json({ success: false, error: 'Status gereklidir' });
     } catch (error) {
         res.status(500).json({ success: false, error: 'Güncelleme hatası' });
+    }
+});
+
+// Cihaz ve Telefonu eşleştir
+router.post('/customers/sync', async (req: Request, res: Response) => {
+    try {
+        const { device_id, customer_phone } = req.body;
+        if (!device_id || !customer_phone) {
+            return res.status(400).json({ success: false, error: 'Device ID ve Telefon gereklidir' });
+        }
+        await appointmentService.syncDeviceWithPhone(device_id, customer_phone);
+        res.json({ success: true, message: 'Senkronizasyon başarılı' });
+    } catch (err) {
+        console.error('Sync Error:', err);
+        res.status(500).json({ success: false, error: 'Senkronizasyon hatası' });
     }
 });
 

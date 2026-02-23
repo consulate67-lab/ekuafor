@@ -15,6 +15,7 @@ export interface Appointment {
     price?: number;
     customer_name?: string;
     customer_phone?: string;
+    device_id?: string;
     service_name?: string;
 }
 
@@ -51,9 +52,9 @@ class AppointmentService {
       INSERT INTO appointments (
         company_id, customer_id, service_id, staff_id, 
         appointment_date, start_time, end_time, status, notes, price,
-        customer_phone, customer_name
+        customer_phone, customer_name, device_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
     `;
         console.log('[AppointmentService] Creating appointment:', JSON.stringify(appointment, null, 2));
@@ -70,7 +71,8 @@ class AppointmentService {
             appointment.notes || null,
             appointment.price || null,
             appointment.customer_phone || null,
-            appointment.customer_name || null
+            appointment.customer_name || null,
+            appointment.device_id || null
         ];
 
         try {
@@ -267,6 +269,54 @@ class AppointmentService {
             console.error('[Service] Range Query Error:', err);
             throw err;
         }
+    }
+
+    async getAppointmentsByDevice(deviceId: string): Promise<Appointment[]> {
+        console.log(`[Service] getAppointmentsByDevice: ${deviceId}`);
+
+        // Önce bu cihazın hangi telefona bağlı olduğunu bulalım
+        const deviceRes = await pool.query('SELECT customer_phone FROM customer_devices WHERE device_id = $1', [deviceId]);
+        const phone = deviceRes.rows[0]?.customer_phone;
+
+        let query = `
+            SELECT 
+                a.*, 
+                s.name as service_name, 
+                c.name as company_name
+            FROM appointments a
+            LEFT JOIN services s ON a.service_id = s.id
+            LEFT JOIN companies c ON a.company_id = c.id
+            WHERE a.device_id = $1
+        `;
+        const values = [deviceId];
+
+        if (phone) {
+            const cleanPhone = phone.replace(/\D/g, '').replace(/^0/, '');
+            const searchPattern = `%${cleanPhone}%`;
+            query += ` OR a.customer_phone LIKE $2 OR a.notes LIKE $2`;
+            values.push(searchPattern);
+        }
+
+        query += ' ORDER BY a.appointment_date DESC, a.start_time DESC';
+
+        try {
+            const result = await pool.query(query, values);
+            return result.rows;
+        } catch (err) {
+            console.error('[Service] getAppointmentsByDevice Error:', err);
+            throw err;
+        }
+    }
+
+    async syncDeviceWithPhone(deviceId: string, phone: string) {
+        console.log(`[Service] syncDeviceWithPhone: Device=${deviceId}, Phone=${phone}`);
+        const query = `
+            INSERT INTO customer_devices (device_id, customer_phone, last_sync)
+            VALUES ($1, $2, CURRENT_TIMESTAMP)
+            ON CONFLICT (device_id) 
+            DO UPDATE SET customer_phone = $2, last_sync = CURRENT_TIMESTAMP
+        `;
+        await pool.query(query, [deviceId, phone]);
     }
 }
 

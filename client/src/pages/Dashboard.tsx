@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import api from '../lib/api';
-import { parseVoiceCommand } from '../lib/aiParser';
 import { Service } from '../types';
+import { parseVoiceCommand } from '../lib/aiParser';
+import { Device } from '@capacitor/device';
 
 export default function Dashboard() {
     const { user, logout } = useAuthStore();
@@ -205,7 +206,7 @@ export default function Dashboard() {
     };
 
     const handleGuidedStep = async (step: typeof voiceStep, transcript: string) => {
-        const rules = localStorage.getItem(`ai_rules_${user?.company_id}`) || '';
+        const rules = localStorage.getItem(`ai_rules_${user?.company_id} `) || '';
 
         if (step === 'NAME') {
             // Clean common filler words
@@ -276,6 +277,13 @@ export default function Dashboard() {
                 }
             }
 
+            // Get Device ID
+            let deviceId = undefined;
+            try {
+                const info = await Device.getId();
+                deviceId = info.identifier;
+            } catch (e) { }
+
             await api.post('/appointments', {
                 company_id: user.company_id,
                 service_id: guidedData.serviceId,
@@ -286,6 +294,7 @@ export default function Dashboard() {
                 customer_name: guidedData.customerName,
                 notes: `Müşteri: ${guidedData.customerName} | Sesli Komut`,
                 price: guidedData.price,
+                device_id: deviceId,
                 status: 'approved'
             });
 

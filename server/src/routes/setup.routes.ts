@@ -260,6 +260,17 @@ ALTER TABLE companies ADD COLUMN IF NOT EXISTS board_key VARCHAR(100);
 -- MIGRATION: Appointment customer tracking
 ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(20);
 ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255);
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS device_id VARCHAR(255);
+
+-- Cihaz-Telefon Eşleşmesi
+CREATE TABLE IF NOT EXISTS customer_devices (
+    id SERIAL PRIMARY KEY,
+    device_id VARCHAR(255) UNIQUE NOT NULL,
+    customer_phone VARCHAR(20) NOT NULL,
+    last_sync TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_customer_devices_id ON customer_devices(device_id);
+CREATE INDEX IF NOT EXISTS idx_customer_devices_phone ON customer_devices(customer_phone);
         `;
 
         await pool.query(sql);

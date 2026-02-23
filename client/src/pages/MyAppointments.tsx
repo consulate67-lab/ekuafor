@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { Appointment } from '../types';
+import { Device } from '@capacitor/device';
 
 export default function MyAppointments() {
     const navigate = useNavigate();
@@ -16,8 +17,31 @@ export default function MyAppointments() {
         const phone = localStorage.getItem('customer_phone');
         const localIds = JSON.parse(localStorage.getItem('my_appointment_ids') || '[]');
 
+        // Get Unique Device ID
+        let deviceId = 'web-browser';
+        try {
+            const info = await Device.getId();
+            deviceId = info.identifier;
+            localStorage.setItem('device_id', deviceId);
+        } catch (e) {
+            console.warn('Capacitor Device ID not available, using fallback');
+        }
+
         // If no phone AND no local IDs, we need to ask for identity
         if (!phone && localIds.length === 0) {
+            // Try automatic sync by deviceId first (to detect re-installs)
+            try {
+                const autoSyncRes = await api.get('/appointments', { params: { device_id: deviceId } });
+                const foundApps = autoSyncRes.data?.data || [];
+                if (foundApps.length > 0) {
+                    setAppointments(foundApps);
+                    setLoading(false);
+                    return;
+                }
+            } catch (e) {
+                console.log('Auto-sync failed/Empty');
+            }
+
             setLoading(false);
             setIsIdentifying(true);
             return;
@@ -27,23 +51,21 @@ export default function MyAppointments() {
             setLoading(true);
             let myApps: Appointment[] = [];
 
-            if (localIds.length > 0) {
-                // Priority 1: Fetch by local IDs (Device History)
-                const res = await api.get('/appointments', { params: { ids: localIds.join(',') } });
+            if (phone) {
+                // Priority 1: Fetch by device-phone link (Sync across re-installs)
+                const deviceId = localStorage.getItem('device_id') || 'web-browser';
+                const res = await api.get('/appointments', { params: { device_id: deviceId } });
                 myApps = res.data?.data || [];
 
-                // If we also have a phone, we might want to merge or just use phone as fallback/extra
-                // For now, if we have local IDs, prioritize them as it's "Device Memory"
-            } else if (phone) {
-                // Priority 2: Traditional phone sync
-                const cleanPhone = phone.replace(/\D/g, '').replace(/^0/, '');
-                const res = await api.get('/appointments', { params: { customer_phone: phone } });
-                const allApps = res.data?.data || [];
-                myApps = allApps.filter((app: any) => {
-                    const appNotes = (app.notes || '').replace(/\D/g, '');
-                    const appPhone = (app.customer_phone || app.phone || '').replace(/\D/g, '');
-                    return appNotes.includes(cleanPhone) || appPhone.includes(cleanPhone);
-                });
+                // If nothing found by device, try phone search as fallback
+                if (myApps.length === 0) {
+                    const phoneRes = await api.get('/appointments', { params: { customer_phone: phone } });
+                    myApps = phoneRes.data?.data || [];
+                }
+            } else if (localIds.length > 0) {
+                // Priority 2: Fetch by local IDs (Classic)
+                const res = await api.get('/appointments', { params: { ids: localIds.join(',') } });
+                myApps = res.data?.data || [];
             }
 
             // Status Change Check for Notifications
@@ -72,14 +94,30 @@ export default function MyAppointments() {
         }
     };
 
-    const handleIdentify = (e: React.FormEvent) => {
+    const handleIdentify = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!phoneInput || phoneInput.length < 10) {
             alert('Lütfen geçerli bir telefon numarası girin.');
             return;
         }
-        localStorage.setItem('customer_phone', phoneInput);
-        fetchMyAppointments();
+
+        try {
+            setLoading(true);
+            const deviceId = localStorage.getItem('device_id') || 'web-browser';
+
+            // Sync this device with this phone in DB
+            await api.post('/appointments/customers/sync', {
+                device_id: deviceId,
+                customer_phone: phoneInput
+            });
+
+            localStorage.setItem('customer_phone', phoneInput);
+            fetchMyAppointments();
+        } catch (err) {
+            console.error('Identification/Sync failed', err);
+            alert('Senkronizasyon başarısız oldu. Lütfen tekrar deneyin.');
+            setLoading(false);
+        }
     };
 
     const handleChangePhone = () => {
