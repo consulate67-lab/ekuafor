@@ -16,7 +16,7 @@ export default function CustomerHome() {
     const [showSlider, setShowSlider] = useState(false);
     const [locating, setLocating] = useState(false);
     const [selectedGender, setSelectedGender] = useState<string | null>(null);
-    const [sort, setSort] = useState<'rating' | 'reviews' | 'newest'>('newest');
+    const [sort, setSort] = useState<'rating' | 'reviews'>('rating');
 
     // Code Scanner States
     const [showCodeModal, setShowCodeModal] = useState(false);
@@ -401,23 +401,32 @@ export default function CustomerHome() {
                 </div>
             )}
 
-            {/* Main List */}
-            <div className="max-w-md mx-auto px-4 py-8 space-y-4">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-black text-gray-900 uppercase tracking-widest text-[10px]">
+            {/* Main List Section */}
+            <main className="max-w-md mx-auto px-6 py-6 space-y-6">
+                <div className="flex flex-col gap-6 mb-8">
+                    <div>
+                        <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mb-4">Sıralama Krallığı</h3>
+                        <div className="inline-flex p-1.5 bg-slate-100 rounded-[2rem] shadow-inner">
+                            <button
+                                onClick={() => setSort('rating')}
+                                className={`flex items-center gap-2 px-6 py-3 rounded-[1.8rem] text-[10px] font-bold uppercase tracking-widest transition-all duration-500 ${sort === 'rating' ? 'bg-white text-indigo-600 shadow-xl shadow-indigo-100/50 scale-105' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                <span className={`${sort === 'rating' ? 'scale-125' : ''} transition-transform`}>⭐</span>
+                                En Yüksek Puan
+                            </button>
+                            <button
+                                onClick={() => setSort('reviews')}
+                                className={`flex items-center gap-2 px-6 py-3 rounded-[1.8rem] text-[10px] font-bold uppercase tracking-widest transition-all duration-500 ${sort === 'reviews' ? 'bg-white text-indigo-600 shadow-xl shadow-indigo-100/50 scale-105' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                <span className={`${sort === 'reviews' ? 'scale-125' : ''} transition-transform`}>🔥</span>
+                                Çok Yorumlanan
+                            </button>
+                        </div>
+                    </div>
+
+                    <h3 className="font-black text-slate-900 uppercase tracking-widest text-[10px] mt-2">
                         {location ? `${distanceLimit} km İçindeki Salonlar` : 'Tüm Salonlar'}
                     </h3>
-                    <div className="flex gap-2">
-                        <select
-                            value={sort}
-                            onChange={(e) => setSort(e.target.value as any)}
-                            className="bg-white border-none text-[9px] font-black uppercase tracking-widest text-indigo-600 outline-none p-1 rounded-lg"
-                        >
-                            <option value="newest">Yeni</option>
-                            <option value="rating">En İyi</option>
-                            <option value="reviews">En Çok Yorum</option>
-                        </select>
-                    </div>
                 </div>
 
                 {loading ? (
@@ -469,15 +478,15 @@ export default function CustomerHome() {
                         </Link>
                     ))
                 )}
+            </main>
 
-                {!loading && filteredCompanies.length === 0 && (
-                    <div className="text-center py-24 bg-white rounded-[3rem] border-2 border-dashed border-slate-100 p-10">
-                        <div className="text-5xl mb-6 opacity-30">🔍</div>
-                        <p className="text-slate-400 font-bold mb-2">Eşleşen salon bulunamadı.</p>
-                        <p className="text-slate-300 text-[10px] font-bold uppercase tracking-widest">Arama kelimesini veya mesafeyi değiştirin</p>
-                    </div>
-                )}
-            </div>
+            {!loading && filteredCompanies.length === 0 && (
+                <div className="text-center py-24 bg-white rounded-[3rem] border-2 border-dashed border-slate-100 p-10">
+                    <div className="text-5xl mb-6 opacity-30">🔍</div>
+                    <p className="text-slate-400 font-bold mb-2">Eşleşen salon bulunamadı.</p>
+                    <p className="text-slate-300 text-[10px] font-bold uppercase tracking-widest">Arama kelimesini veya mesafeyi değiştirin</p>
+                </div>
+            )}
 
             {/* Persistent Bottom Navigation - Modern Minimal */}
             <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-48px)] max-w-[280px] z-[50]">
@@ -510,103 +519,105 @@ export default function CustomerHome() {
             <div className="h-32"></div>
 
             {/* Code Entry Modal */}
-            {showCodeModal && (
-                <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowCodeModal(false)}>
-                    <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl" onClick={e => e.stopPropagation()}
-                        style={{ animation: 'slideUp 0.3s ease-out' }}>
-                        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6" />
+            {
+                showCodeModal && (
+                    <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowCodeModal(false)}>
+                        <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl" onClick={e => e.stopPropagation()}
+                            style={{ animation: 'slideUp 0.3s ease-out' }}>
+                            <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6" />
 
-                        <div className="text-center mb-6">
-                            <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-amber-200">
-                                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                                </svg>
-                            </div>
-                            <h2 className="text-2xl font-black text-slate-900">Kod ile Giriş</h2>
-                            <p className="text-slate-400 text-sm mt-1">Yönetici veya çalışan kodunuzu girin</p>
-                        </div>
-
-                        <div className="relative mb-4">
-                            <input
-                                type="text"
-                                value={codeInput}
-                                onChange={e => setCodeInput(e.target.value.toUpperCase())}
-                                onKeyDown={e => e.key === 'Enter' && handleCheckCode()}
-                                placeholder="ADM-XXX-XXXX veya XXX-XXXX"
-                                className="w-full p-5 bg-slate-50 rounded-2xl border-2 border-slate-100 text-center text-xl font-black text-slate-900 tracking-[0.1em] outline-none transition-all focus:border-amber-500"
-                                autoFocus
-                                autoComplete="off"
-                                spellCheck="false"
-                            />
-                            <button
-                                onClick={toggleScanner}
-                                className={`absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isScanning ? 'bg-red-500 text-white' : 'bg-white text-slate-400 shadow-sm'}`}
-                            >
-                                {isScanning ? '✕' : '📷'}
-                            </button>
-                        </div>
-
-                        {isScanning && (
-                            <div className="mb-4 bg-black rounded-2xl overflow-hidden aspect-square flex items-center justify-center relative">
-                                <video
-                                    autoPlay
-                                    muted
-                                    playsInline
-                                    className="w-full h-full object-cover"
-                                    ref={el => {
-                                        if (el && isScanning) {
-                                            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-                                                .then(s => el.srcObject = s);
-                                        }
-                                    }}
-                                />
-                                <div className="absolute inset-0 border-2 border-amber-500/50 m-12 rounded-2xl animate-pulse flex items-center justify-center">
-                                    <div className="w-full h-0.5 bg-amber-500 absolute top-1/2 animate-bounce"></div>
+                            <div className="text-center mb-6">
+                                <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-amber-200">
+                                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                    </svg>
                                 </div>
-                                <p className="absolute bottom-4 left-0 right-0 text-center text-[10px] text-white/70 font-bold uppercase tracking-widest">QR Kodu Ortaya Getirin</p>
+                                <h2 className="text-2xl font-black text-slate-900">Kod ile Giriş</h2>
+                                <p className="text-slate-400 text-sm mt-1">Yönetici veya çalışan kodunuzu girin</p>
                             </div>
-                        )}
 
-                        {codeError && (
-                            <div className="bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-2xl text-sm font-bold text-center mb-4 animate-pulse">
-                                ❌ {codeError}
+                            <div className="relative mb-4">
+                                <input
+                                    type="text"
+                                    value={codeInput}
+                                    onChange={e => setCodeInput(e.target.value.toUpperCase())}
+                                    onKeyDown={e => e.key === 'Enter' && handleCheckCode()}
+                                    placeholder="ADM-XXX-XXXX veya XXX-XXXX"
+                                    className="w-full p-5 bg-slate-50 rounded-2xl border-2 border-slate-100 text-center text-xl font-black text-slate-900 tracking-[0.1em] outline-none transition-all focus:border-amber-500"
+                                    autoFocus
+                                    autoComplete="off"
+                                    spellCheck="false"
+                                />
+                                <button
+                                    onClick={toggleScanner}
+                                    className={`absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isScanning ? 'bg-red-500 text-white' : 'bg-white text-slate-400 shadow-sm'}`}
+                                >
+                                    {isScanning ? '✕' : '📷'}
+                                </button>
                             </div>
-                        )}
 
-                        {codeResult && (
-                            <div className="bg-emerald-50 border border-emerald-100 text-emerald-700 px-4 py-4 rounded-2xl text-center mb-4">
-                                <div className="text-3xl mb-2">✅</div>
-                                <p className="font-black text-base">
-                                    {codeResult.type === 'admin' && `${codeResult.company_name} - Yönetici Paneli`}
-                                    {codeResult.type === 'staff' && `${codeResult.staff_name} - ${codeResult.company_name}`}
-                                    {codeResult.type === 'board' && `${codeResult.company_name} - Salon Board`}
-                                </p>
-                                <p className="text-emerald-500 text-xs font-bold mt-1 animate-pulse">Yönlendiriliyor...</p>
+                            {isScanning && (
+                                <div className="mb-4 bg-black rounded-2xl overflow-hidden aspect-square flex items-center justify-center relative">
+                                    <video
+                                        autoPlay
+                                        muted
+                                        playsInline
+                                        className="w-full h-full object-cover"
+                                        ref={el => {
+                                            if (el && isScanning) {
+                                                navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                                                    .then(s => el.srcObject = s);
+                                            }
+                                        }}
+                                    />
+                                    <div className="absolute inset-0 border-2 border-amber-500/50 m-12 rounded-2xl animate-pulse flex items-center justify-center">
+                                        <div className="w-full h-0.5 bg-amber-500 absolute top-1/2 animate-bounce"></div>
+                                    </div>
+                                    <p className="absolute bottom-4 left-0 right-0 text-center text-[10px] text-white/70 font-bold uppercase tracking-widest">QR Kodu Ortaya Getirin</p>
+                                </div>
+                            )}
+
+                            {codeError && (
+                                <div className="bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-2xl text-sm font-bold text-center mb-4 animate-pulse">
+                                    ❌ {codeError}
+                                </div>
+                            )}
+
+                            {codeResult && (
+                                <div className="bg-emerald-50 border border-emerald-100 text-emerald-700 px-4 py-4 rounded-2xl text-center mb-4">
+                                    <div className="text-3xl mb-2">✅</div>
+                                    <p className="font-black text-base">
+                                        {codeResult.type === 'admin' && `${codeResult.company_name} - Yönetici Paneli`}
+                                        {codeResult.type === 'staff' && `${codeResult.staff_name} - ${codeResult.company_name}`}
+                                        {codeResult.type === 'board' && `${codeResult.company_name} - Salon Board`}
+                                    </p>
+                                    <p className="text-emerald-500 text-xs font-bold mt-1 animate-pulse">Yönlendiriliyor...</p>
+                                </div>
+                            )}
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowCodeModal(false)}
+                                    className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-base active:scale-95 transition-all"
+                                >
+                                    İptal
+                                </button>
+                                <button
+                                    onClick={handleCheckCode}
+                                    disabled={codeChecking || !codeInput.trim()}
+                                    className="flex-1 py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-2xl font-black text-base active:scale-95 transition-all shadow-lg shadow-amber-200 disabled:opacity-50"
+                                >
+                                    {codeChecking ? 'Kontrol Ediliyor...' : 'Giriş Yap'}
+                                </button>
                             </div>
-                        )}
 
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowCodeModal(false)}
-                                className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-base active:scale-95 transition-all"
-                            >
-                                İptal
-                            </button>
-                            <button
-                                onClick={handleCheckCode}
-                                disabled={codeChecking || !codeInput.trim()}
-                                className="flex-1 py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-2xl font-black text-base active:scale-95 transition-all shadow-lg shadow-amber-200 disabled:opacity-50"
-                            >
-                                {codeChecking ? 'Kontrol Ediliyor...' : 'Giriş Yap'}
-                            </button>
+                            <p className="text-center text-[10px] text-slate-400 mt-4 font-bold uppercase tracking-widest">
+                                QR kodu okutun veya kodu elle yazın
+                            </p>
                         </div>
-
-                        <p className="text-center text-[10px] text-slate-400 mt-4 font-bold uppercase tracking-widest">
-                            QR kodu okutun veya kodu elle yazın
-                        </p>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             <style>{`
                 @keyframes slideUp {

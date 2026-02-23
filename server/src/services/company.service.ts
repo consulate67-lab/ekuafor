@@ -196,25 +196,25 @@ class CompanyService {
         let paramIndex = 1;
 
         if (filters?.is_active !== undefined) {
-            query += ` AND is_active = $${paramIndex}`;
+            query += ` AND c.is_active = $${paramIndex}`;
             values.push(filters.is_active);
             paramIndex++;
         }
 
         if (filters?.is_verified !== undefined) {
-            query += ` AND is_verified = $${paramIndex}`;
+            query += ` AND c.is_verified = $${paramIndex}`;
             values.push(filters.is_verified);
             paramIndex++;
         }
 
         if (filters?.search) {
-            query += ` AND (name ILIKE $${paramIndex} OR email ILIKE $${paramIndex} OR province_name ILIKE $${paramIndex} OR district_name ILIKE $${paramIndex})`;
+            query += ` AND (c.name ILIKE $${paramIndex} OR c.email ILIKE $${paramIndex} OR c.province_name ILIKE $${paramIndex} OR c.district_name ILIKE $${paramIndex})`;
             values.push(`%${filters.search}%`);
             paramIndex++;
         }
 
         if (filters?.gender) {
-            query += ` AND $${paramIndex} = ANY(genders)`;
+            query += ` AND $${paramIndex} = ANY(c.genders)`;
             values.push(filters.gender);
             paramIndex++;
         }
@@ -224,12 +224,13 @@ class CompanyService {
             // Earth radius: 6371 km
             // Use bounding box first for optimization if possible, but for simple use just Haversine
             query += ` AND (
-                6371 * acos(
-                    cos(radians($${paramIndex})) * cos(radians(latitude)) * 
-                    cos(radians(longitude) - radians($${paramIndex + 1})) + 
-                    sin(radians($${paramIndex})) * sin(radians(latitude))
-                )
-            ) <= $${paramIndex + 2}`;
+                (c.latitude IS NULL OR c.longitude IS NULL) OR
+                (6371 * acos(
+                    cos(radians($${paramIndex})) * cos(radians(c.latitude)) * 
+                    cos(radians(c.longitude) - radians($${paramIndex + 1})) + 
+                    sin(radians($${paramIndex})) * sin(radians(c.latitude))
+                )) <= $${paramIndex + 2}
+            )`;
             values.push(filters.lat, filters.lng, filters.radius);
             paramIndex += 3;
         }
@@ -241,7 +242,7 @@ class CompanyService {
         } else if (filters?.sort === 'reviews') {
             query += ' ORDER BY review_count DESC, rating_avg DESC';
         } else {
-            query += ' ORDER BY created_at DESC';
+            query += ' ORDER BY c.created_at DESC';
         }
 
         const result = await pool.query(query, values);
