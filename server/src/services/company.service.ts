@@ -188,6 +188,14 @@ class CompanyService {
 
         let whereClauses = ['1=1'];
 
+        // Caching column check to avoid repetitive schema queries
+        const columnCheck = await pool.query(`
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'appointments' AND column_name = 'rating'
+        `);
+        const hasRatingColumn = columnCheck.rowCount && columnCheck.rowCount > 0;
+
         if (filters?.is_active !== undefined) {
             whereClauses.push(`c.is_active = $${paramIndex}`);
             values.push(filters.is_active);
@@ -229,18 +237,26 @@ class CompanyService {
             paramIndex += 3;
         }
 
+        const ratingSubquery = hasRatingColumn
+            ? `(SELECT COALESCE(AVG(rating), 0) FROM appointments WHERE company_id = c.id AND rating IS NOT NULL)`
+            : `0`;
+
+        const reviewCountSubquery = hasRatingColumn
+            ? `(SELECT COUNT(rating) FROM appointments WHERE company_id = c.id AND rating IS NOT NULL)`
+            : `0`;
+
         let query = `
             SELECT 
                 c.*,
-                (SELECT COALESCE(AVG(rating), 0) FROM appointments WHERE company_id = c.id AND rating IS NOT NULL) as rating_avg,
-                (SELECT COUNT(rating) FROM appointments WHERE company_id = c.id AND rating IS NOT NULL) as review_count
+                ${ratingSubquery} as rating_avg,
+                ${reviewCountSubquery} as review_count
             FROM companies c
             WHERE ${whereClauses.join(' AND ')}
         `;
 
-        if (filters?.sort === 'rating') {
+        if (filters?.sort === 'rating' && hasRatingColumn) {
             query += ' ORDER BY rating_avg DESC, review_count DESC';
-        } else if (filters?.sort === 'reviews') {
+        } else if (filters?.sort === 'reviews' && hasRatingColumn) {
             query += ' ORDER BY review_count DESC, rating_avg DESC';
         } else {
             query += ' ORDER BY c.created_at DESC';
