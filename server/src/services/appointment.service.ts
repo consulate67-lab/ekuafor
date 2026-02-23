@@ -16,6 +16,8 @@ export interface Appointment {
     customer_name?: string;
     customer_phone?: string;
     device_id?: string;
+    rating?: number;
+    comment?: string;
     service_name?: string;
 }
 
@@ -318,6 +320,15 @@ class AppointmentService {
             DO UPDATE SET customer_phone = $2, last_sync = CURRENT_TIMESTAMP
         `;
         await pool.query(query, [deviceId, phone]);
+    }
+
+    async rateAppointment(id: number, rating: number, comment?: string): Promise<Appointment | null> {
+        console.log(`[Service] rateAppointment: ID=${id}, Rating=${rating}`);
+        const result = await pool.query(
+            'UPDATE appointments SET rating = $1, comment = $2 WHERE id = $3 RETURNING *',
+            [rating, comment || null, id]
+        );
+        return result.rows[0] || null;
     }
 }
 

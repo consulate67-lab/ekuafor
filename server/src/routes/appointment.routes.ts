@@ -309,4 +309,23 @@ router.post('/customers/sync', async (req: Request, res: Response) => {
     }
 });
 
+// Randevuyu puanla ve yorumla
+router.patch('/:id/rate', async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id);
+        const { rating, comment } = req.body;
+        if (!rating) {
+            return res.status(400).json({ success: false, error: 'Puan zorunludur' });
+        }
+        const appointment = await appointmentService.rateAppointment(id, rating, comment);
+        if (!appointment) {
+            return res.status(404).json({ success: false, error: 'Randevu bulunamadı' });
+        }
+        res.json({ success: true, data: appointment });
+    } catch (err) {
+        console.error('Rating Error:', err);
+        res.status(500).json({ success: false, error: 'Puanlama hatası' });
+    }
+});
+
 export default router;

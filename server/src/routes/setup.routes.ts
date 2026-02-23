@@ -270,7 +270,9 @@ CREATE TABLE IF NOT EXISTS customer_devices (
     last_sync TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_customer_devices_id ON customer_devices(device_id);
-CREATE INDEX IF NOT EXISTS idx_customer_devices_phone ON customer_devices(customer_phone);
+-- MIGRATION: Appointment reviews
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS rating INTEGER CHECK (rating BETWEEN 1 AND 5);
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS comment TEXT;
         `;
 
         await pool.query(sql);

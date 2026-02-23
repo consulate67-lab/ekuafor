@@ -12,6 +12,10 @@ export default function MyAppointments() {
     const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
     const [phoneInput, setPhoneInput] = useState('');
     const [isIdentifying, setIsIdentifying] = useState(false);
+    const [ratingModal, setRatingModal] = useState<{ open: boolean; app: Appointment | null }>({ open: false, app: null });
+    const [tempRating, setTempRating] = useState(5);
+    const [tempComment, setTempComment] = useState('');
+    const [isRating, setIsRating] = useState(false);
 
     const fetchMyAppointments = async () => {
         const phone = localStorage.getItem('customer_phone');
@@ -133,6 +137,23 @@ export default function MyAppointments() {
             setAppointments([]);
             setPhoneInput('');
             setIsIdentifying(true);
+        }
+    };
+
+    const handleRate = async () => {
+        if (!ratingModal.app?.id) return;
+        try {
+            setIsRating(true);
+            await api.patch(`/appointments/${ratingModal.app.id}/rate`, {
+                rating: tempRating,
+                comment: tempComment
+            });
+            setRatingModal({ open: false, app: null });
+            fetchMyAppointments();
+        } catch (err) {
+            alert('Puanlama kaydedilemedi. Lütfen tekrar deneyin.');
+        } finally {
+            setIsRating(false);
         }
     };
 
@@ -280,9 +301,10 @@ export default function MyAppointments() {
                         {appointments.map((app) => {
                             const status = getStatusInfo(app.status);
                             const appDate = new Date(app.appointment_date);
+                            const isRated = (app.rating || 0) > 0;
 
                             return (
-                                <div key={app.id} className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                                <div key={app.id} className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all">
                                     <div className="flex justify-between items-start mb-4">
                                         <div>
                                             <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mb-1">{app.company_name || 'Salon'}</p>
@@ -316,12 +338,86 @@ export default function MyAppointments() {
                                             </p>
                                         </div>
                                     )}
+
+                                    {/* Rating Section */}
+                                    {app.status === 'completed' && (
+                                        <div className="mt-6 pt-5 border-t border-slate-50 flex items-center justify-between">
+                                            {isRated ? (
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex gap-1 text-sm">
+                                                        {[...Array(5)].map((_, i) => (
+                                                            <span key={i} className={i < (app.rating || 0) ? 'text-amber-400' : 'text-slate-200'}>★</span>
+                                                        ))}
+                                                    </div>
+                                                    {app.comment && <p className="text-[11px] text-slate-500 italic font-medium">"{app.comment}"</p>}
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Memnun kaldınız mı?</p>
+                                                    <button
+                                                        onClick={() => setRatingModal({ open: true, app })}
+                                                        className="px-5 py-2.5 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 active:scale-95 transition-all"
+                                                    >
+                                                        Hizmeti Puanla
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
                     </div>
                 )}
             </main>
+
+            {/* Rating Modal */}
+            {ratingModal.open && (
+                <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="w-full max-w-sm bg-white rounded-[2.5rem] p-8 shadow-2xl animate-in slide-in-from-bottom-10 duration-500">
+                        <div className="text-center mb-8">
+                            <div className="text-4xl mb-4">⭐</div>
+                            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Hizmeti Puanlayın</h2>
+                            <p className="text-slate-500 text-sm mt-1">{ratingModal.app?.service_name} işlemi nasıldı?</p>
+                        </div>
+
+                        <div className="flex justify-center gap-2 mb-8">
+                            {[1, 2, 3, 4, 5].map((s) => (
+                                <button
+                                    key={s}
+                                    onClick={() => setTempRating(s)}
+                                    className={`w-12 h-12 text-2xl rounded-2xl transition-all duration-300 ${s <= tempRating ? 'bg-amber-100 text-amber-500 scale-110 shadow-lg shadow-amber-200/50' : 'bg-slate-50 text-slate-300'}`}
+                                >
+                                    ★
+                                </button>
+                            ))}
+                        </div>
+
+                        <textarea
+                            placeholder="Görüşlerinizi buraya yazabilirsiniz (isteğe bağlı)..."
+                            value={tempComment}
+                            onChange={(e) => setTempComment(e.target.value)}
+                            className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 text-sm font-medium focus:border-indigo-500 outline-none transition-all h-24 resize-none mb-8"
+                        />
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setRatingModal({ open: false, app: null })}
+                                className="flex-1 py-4 bg-slate-100 text-slate-500 font-bold rounded-2xl hover:bg-slate-200 transition-colors"
+                            >
+                                Vazgeç
+                            </button>
+                            <button
+                                onClick={handleRate}
+                                disabled={isRating}
+                                className="flex-[2] py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-600/30 hover:bg-indigo-500 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                            >
+                                {isRating ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Gönder'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Bottom Nav Spacer */}
             <div className="h-20"></div>

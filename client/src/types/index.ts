@@ -115,6 +115,8 @@ export interface Appointment {
     price?: number;
     customer_name?: string;
     customer_phone?: string;
+    rating?: number;
+    comment?: string;
     service_name?: string;
     staff_name?: string;
     company_name?: string;
