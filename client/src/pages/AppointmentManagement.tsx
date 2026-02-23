@@ -720,6 +720,17 @@ export default function AppointmentManagement() {
                             </div>
 
                             <div className="flex flex-col gap-3">
+                                {selectedAppointment.status === 'approved' && (
+                                    <button
+                                        onClick={() => {
+                                            handleStatusUpdate(selectedAppointment.id!, 'completed');
+                                            setSelectedAppointment(null);
+                                        }}
+                                        className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                                    >
+                                        Hizmeti Tamamla
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => handleWhatsAppNotify(selectedAppointment)}
                                     className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-emerald-100 hover:bg-emerald-600 transition-all"
