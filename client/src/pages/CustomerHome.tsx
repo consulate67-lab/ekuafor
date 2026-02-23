@@ -405,31 +405,24 @@ export default function CustomerHome() {
             )}
 
             {/* Main List Section */}
-            <main className="max-w-md mx-auto px-6 py-6 space-y-6">
-                <div className="flex flex-col gap-6 mb-8">
-                    <div>
-                        <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mb-4">Sıralama Krallığı</h3>
-                        <div className="inline-flex p-1.5 bg-slate-100 rounded-[2rem] shadow-inner">
-                            <button
-                                onClick={() => setSort('rating')}
-                                className={`flex items-center gap-2 px-6 py-3 rounded-[1.8rem] text-[10px] font-bold uppercase tracking-widest transition-all duration-500 ${sort === 'rating' ? 'bg-white text-indigo-600 shadow-xl shadow-indigo-100/50 scale-105' : 'text-slate-500 hover:text-slate-700'}`}
-                            >
-                                <span className={`${sort === 'rating' ? 'scale-125' : ''} transition-transform`}>⭐</span>
-                                En Yüksek Puan
-                            </button>
-                            <button
-                                onClick={() => setSort('reviews')}
-                                className={`flex items-center gap-2 px-6 py-3 rounded-[1.8rem] text-[10px] font-bold uppercase tracking-widest transition-all duration-500 ${sort === 'reviews' ? 'bg-white text-indigo-600 shadow-xl shadow-indigo-100/50 scale-105' : 'text-slate-500 hover:text-slate-700'}`}
-                            >
-                                <span className={`${sort === 'reviews' ? 'scale-125' : ''} transition-transform`}>🔥</span>
-                                Çok Yorumlanan
-                            </button>
-                        </div>
+            <main className="max-w-md mx-auto px-6 py-4 space-y-4">
+                <div className="flex flex-col gap-4">
+                    <div className="inline-flex p-1 bg-slate-100/50 rounded-2xl self-center">
+                        <button
+                            onClick={() => setSort('rating')}
+                            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all duration-500 ${sort === 'rating' ? 'bg-white text-indigo-600 shadow-lg shadow-indigo-100/50 scale-105' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <span className="text-xs">⭐</span>
+                            En İyi
+                        </button>
+                        <button
+                            onClick={() => setSort('reviews')}
+                            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all duration-500 ${sort === 'reviews' ? 'bg-white text-indigo-600 shadow-lg shadow-indigo-100/50 scale-105' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <span className="text-xs">🔥</span>
+                            Popüler
+                        </button>
                     </div>
-
-                    <h3 className="font-black text-slate-900 uppercase tracking-widest text-[10px] mt-2">
-                        {location ? `${distanceLimit} km İçindeki Salonlar` : 'Tüm Salonlar'}
-                    </h3>
                 </div>
 
                 {loading ? (
