@@ -161,6 +161,8 @@ const runMigrations = async () => {
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(20)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS device_id VARCHAR(255)');
+        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS rating INTEGER CHECK (rating BETWEEN 1 AND 5)');
+        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS comment TEXT');
         await pool.query(`
             CREATE TABLE IF NOT EXISTS customer_devices (
                 id SERIAL PRIMARY KEY,
