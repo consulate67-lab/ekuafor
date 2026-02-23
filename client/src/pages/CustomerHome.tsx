@@ -16,6 +16,7 @@ export default function CustomerHome() {
     const [showSlider, setShowSlider] = useState(false);
     const [locating, setLocating] = useState(false);
     const [selectedGender, setSelectedGender] = useState<string | null>(null);
+    const [sort, setSort] = useState<'rating' | 'reviews' | 'newest'>('newest');
 
     // Code Scanner States
     const [showCodeModal, setShowCodeModal] = useState(false);
@@ -36,6 +37,9 @@ export default function CustomerHome() {
             }
             if (selectedGender) {
                 params.gender = selectedGender;
+            }
+            if (sort) {
+                params.sort = sort;
             }
 
             const res = await api.get('/companies', { params });
@@ -170,7 +174,7 @@ export default function CustomerHome() {
 
     useEffect(() => {
         fetchData(searchQuery, location, distanceLimit);
-    }, [selectedGender]);
+    }, [selectedGender, sort]);
 
     const openMaps = (e: React.MouseEvent, c: Company) => {
         e.preventDefault();
@@ -399,9 +403,22 @@ export default function CustomerHome() {
 
             {/* Main List */}
             <div className="max-w-md mx-auto px-4 py-8 space-y-4">
-                <h3 className="font-black text-gray-900 uppercase tracking-widest text-[10px] mb-4">
-                    {location ? `${distanceLimit} km İçindeki Salonlar` : 'Tüm Salonlar'}
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-black text-gray-900 uppercase tracking-widest text-[10px]">
+                        {location ? `${distanceLimit} km İçindeki Salonlar` : 'Tüm Salonlar'}
+                    </h3>
+                    <div className="flex gap-2">
+                        <select
+                            value={sort}
+                            onChange={(e) => setSort(e.target.value as any)}
+                            className="bg-white border-none text-[9px] font-black uppercase tracking-widest text-indigo-600 outline-none p-1 rounded-lg"
+                        >
+                            <option value="newest">Yeni</option>
+                            <option value="rating">En İyi</option>
+                            <option value="reviews">En Çok Yorum</option>
+                        </select>
+                    </div>
+                </div>
 
                 {loading ? (
                     <div className="text-center py-10 text-gray-400 font-bold animate-pulse">Yükleniyor...</div>
@@ -425,15 +442,24 @@ export default function CustomerHome() {
                                 🏢
                             </div>
                             <div className="flex-1 min-w-0 pr-8">
-                                <div className="flex items-center gap-1.5 mb-1">
+                                <div className="flex items-center gap-1.5 mb-0.5">
                                     <h4 className="font-bold text-gray-900 truncate">{c.name}</h4>
                                     <button
                                         onClick={(e) => openMaps(e, c)}
-                                        className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                                        className="p-1 px-2 bg-blue-50 text-blue-500 rounded-lg transition-colors flex items-center gap-1"
                                         title="Haritada Gör"
                                     >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>
+                                        <span className="text-[8px] font-black uppercase">Git</span>
                                     </button>
+                                </div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className="flex items-center gap-0.5 text-amber-500">
+                                        <span className="text-xs">★</span>
+                                        <span className="text-[10px] font-black">{parseFloat(c.rating_avg || 0).toFixed(1)}</span>
+                                    </div>
+                                    <div className="w-1 h-1 bg-slate-200 rounded-full" />
+                                    <span className="text-[10px] font-bold text-slate-400">{c.review_count || 0} Yorum</span>
                                 </div>
                                 <p className="text-xs text-gray-500 truncate">{c.district_name || 'Merkez'}, {c.province_name || 'İstanbul'}</p>
                                 {c.distance !== undefined && (

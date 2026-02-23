@@ -42,6 +42,8 @@ export interface Company {
     slot_interval?: number;
     admin_key?: string;
     genders?: string[];
+    rating_avg?: number;
+    review_count?: number;
 }
 
 class CompanyService {
@@ -179,8 +181,17 @@ class CompanyService {
         lng?: number;
         radius?: number; // in km
         gender?: string;
+        sort?: 'rating' | 'reviews' | 'newest';
     }): Promise<Company[]> {
-        let query = 'SELECT * FROM companies WHERE 1=1';
+        let query = `
+            SELECT 
+                c.*,
+                COALESCE(AVG(a.rating), 0) as rating_avg,
+                COUNT(a.rating) as review_count
+            FROM companies c
+            LEFT JOIN appointments a ON c.id = a.company_id AND a.rating IS NOT NULL
+            WHERE 1=1
+        `;
         const values: any[] = [];
         let paramIndex = 1;
 
@@ -223,7 +234,15 @@ class CompanyService {
             paramIndex += 3;
         }
 
-        query += ' ORDER BY created_at DESC';
+        query += ' GROUP BY c.id';
+
+        if (filters?.sort === 'rating') {
+            query += ' ORDER BY rating_avg DESC, review_count DESC';
+        } else if (filters?.sort === 'reviews') {
+            query += ' ORDER BY review_count DESC, rating_avg DESC';
+        } else {
+            query += ' ORDER BY created_at DESC';
+        }
 
         const result = await pool.query(query, values);
         return result.rows;

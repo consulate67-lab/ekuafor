@@ -99,7 +99,8 @@ router.get('/', async (req: Request, res: Response) => {
             lat: req.query.lat ? parseFloat(req.query.lat as string) : undefined,
             lng: req.query.lng ? parseFloat(req.query.lng as string) : undefined,
             radius: req.query.radius ? parseFloat(req.query.radius as string) : undefined,
-            gender: req.query.gender as string | undefined
+            gender: req.query.gender as string | undefined,
+            sort: req.query.sort as 'rating' | 'reviews' | 'newest' | undefined
         };
 
         const companies = await companyService.getAllCompanies(filters);
