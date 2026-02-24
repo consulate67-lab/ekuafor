@@ -15,7 +15,7 @@ export default function SalonBoard() {
     const [error, setError] = useState('');
     const [currentHour, setCurrentHour] = useState(new Date().getHours());
     const [currentDate] = useState(new Date().toLocaleDateString('en-CA'));
-    const [selectedDate] = useState(currentDate);
+    const [selectedDate, setSelectedDate] = useState(currentDate);
 
     // Staff Mode: when a staff member logs in via board_code
     const [staffMode, setStaffMode] = useState(false);
@@ -88,22 +88,24 @@ export default function SalonBoard() {
         }
     }, [selectedDate]);
 
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleLogin = async (e?: React.FormEvent | string) => {
+        if (e && typeof e !== 'string') e.preventDefault();
+        const keyToUse = typeof e === 'string' ? e : inputKey;
+
         setLoading(true);
         setError('');
         try {
-            const res = await api.post('/companies/board-login', { board_key: inputKey });
+            const res = await api.post('/companies/board-login', { board_key: keyToUse });
             if (res.data.success) {
                 const companyData = res.data.data;
-                localStorage.setItem('salon_board_key', inputKey);
+                localStorage.setItem('salon_board_key', keyToUse);
                 localStorage.setItem('salon_board_company_id', companyData.id.toString());
-                setBoardKey(inputKey);
+                setBoardKey(keyToUse);
                 setCompany(companyData);
                 fetchData(companyData.id);
             }
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Giriş başarısız. Lütfen anahtarı kontrol edin.');
+            setError(err.response?.data?.error || 'Geçersiz anahtar');
         } finally {
             setLoading(false);
         }
@@ -305,9 +307,9 @@ export default function SalonBoard() {
                         <input
                             type="text"
                             value={inputKey}
-                            onChange={e => setInputKey(e.target.value.toUpperCase())}
+                            onChange={e => setInputKey(e.target.value)}
                             placeholder="•••• •••• ••••"
-                            className="w-full p-6 bg-white/5 rounded-2xl border-2 border-white/10 font-mono text-center text-2xl tracking-[0.4em] text-amber-400 focus:border-amber-500 focus:bg-white/10 transition-all outline-none"
+                            className="w-full p-6 bg-white/5 rounded-2xl border-2 border-white/10 font-mono text-center text-2xl tracking-[0.4em] text-amber-400 focus:border-amber-500 focus:bg-white/10 transition-all outline-none uppercase"
                             required
                         />
                         {error && <p className="text-red-400 text-sm font-bold bg-red-400/10 py-3 rounded-xl">{error}</p>}
@@ -360,8 +362,13 @@ export default function SalonBoard() {
                                 {company?.name || 'Yükleniyor...'}
                             </h1>
                             <div className="flex items-center gap-2">
-                                <div className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest">
-                                    {new Date(selectedDate).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })} | {new Date(selectedDate).toLocaleDateString('tr-TR', { weekday: 'short' })}
+                                <div className="flex items-center gap-1">
+                                    <input
+                                        type="date"
+                                        value={selectedDate}
+                                        onChange={(e) => setSelectedDate(e.target.value)}
+                                        className="bg-slate-100 text-slate-900 border-none rounded-lg px-3 py-1 text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+                                    />
                                 </div>
                                 {specialDay && (
                                     <div className="text-amber-500 text-[10px] font-black animate-pulse flex items-center gap-1">

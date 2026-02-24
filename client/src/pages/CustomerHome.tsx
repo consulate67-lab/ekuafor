@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { Company } from '../types';
@@ -24,6 +24,8 @@ export default function CustomerHome() {
     const [codeChecking, setCodeChecking] = useState(false);
     const [codeError, setCodeError] = useState('');
     const [codeResult, setCodeResult] = useState<any>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isScanning, setIsScanning] = useState(false);
 
     const fetchData = async (query?: string, loc?: { lat: number, lng: number } | null, dist?: number) => {
@@ -244,17 +246,80 @@ export default function CustomerHome() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
             setIsScanning(true);
+            setCodeError('');
 
-            // In a real app, we'd use a library like html5-qrcode here.
-            // For now, we'll simulate a scan or just show the video feed.
-            // When a code is detected (mocked for demo if no library):
-            // setCodeInput(detectedCode);
-            // handleCheckCode();
+            // Small delay to ensure video element is rendered
+            setTimeout(() => {
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                    scanLoop();
+                }
+            }, 500);
 
-            // Cleanup stream on close
-            return () => stream.getTracks().forEach(t => t.stop());
         } catch (err) {
-            alert('Kameraya erişilemedi. Lütfen izinleri kontrol edin.');
+            console.error('Camera error:', err);
+            setCodeError('Kameraya erişilemedi. Lütfen tarayıcı ayarlarından kamera izni verin.');
+        }
+    };
+
+    const scanLoop = () => {
+        if (!isScanning) return;
+
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.height = video.videoHeight;
+            canvas.width = video.videoWidth;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                // @ts-ignore - jsQR is loaded via CDN
+                const code = window.jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: "dontInvert",
+                });
+
+                if (code) {
+                    setIsScanning(false);
+                    setCodeInput(code.data);
+                    // Stop all tracks
+                    const stream = video.srcObject as MediaStream;
+                    stream.getTracks().forEach(track => track.stop());
+
+                    // Trigger check
+                    setTimeout(() => handleCheckCodeWithCode(code.data), 100);
+                    return;
+                }
+            }
+        }
+        requestAnimationFrame(scanLoop);
+    };
+
+    const handleCheckCodeWithCode = async (c: string) => {
+        setCodeChecking(true);
+        setCodeError('');
+        setCodeResult(null);
+        try {
+            const res = await api.post('/companies/check-code', { code: c.trim().toUpperCase() });
+            if (res.data?.success) {
+                setCodeResult(res.data.data);
+                setTimeout(() => {
+                    const data = res.data.data;
+                    if (data.type === 'admin') navigate(data.redirect, { replace: true });
+                    else if (data.type === 'staff') {
+                        if (data.token) localStorage.setItem('token', data.token);
+                        localStorage.setItem('staff_board_code', data.board_code);
+                        window.location.replace(`${window.location.origin}${import.meta.env.BASE_URL}dashboard`);
+                    } else if (data.type === 'board') {
+                        localStorage.setItem('salon_board_key', data.board_key);
+                        navigate(data.redirect, { replace: true });
+                    }
+                }, 1200);
+            }
+        } catch (err: any) {
+            setCodeError(err.response?.data?.error || 'Geçersiz kod');
+        } finally {
+            setCodeChecking(false);
         }
     };
 
@@ -535,23 +600,38 @@ export default function CustomerHome() {
                                 <p className="text-slate-400 text-sm mt-1">Yönetici veya çalışan kodunuzu girin</p>
                             </div>
 
-                            <div className="relative mb-4">
-                                <input
-                                    type="text"
-                                    value={codeInput}
-                                    onChange={e => setCodeInput(e.target.value.toUpperCase())}
-                                    onKeyDown={e => e.key === 'Enter' && handleCheckCode()}
-                                    placeholder="ADM-XXX-XXXX veya XXX-XXXX"
-                                    className="w-full p-5 bg-slate-50 rounded-2xl border-2 border-slate-100 text-center text-xl font-black text-slate-900 tracking-[0.1em] outline-none transition-all focus:border-amber-500"
-                                    autoFocus
-                                    autoComplete="off"
-                                    spellCheck="false"
-                                />
+                            <div className="flex flex-col gap-4 mb-6">
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        value={codeInput}
+                                        onChange={e => setCodeInput(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && handleCheckCode()}
+                                        placeholder="ADM-XXX-XXXX veya XXX-XXXX"
+                                        className="w-full p-5 bg-slate-50 rounded-2xl border-2 border-slate-100 text-center text-xl font-black text-slate-900 tracking-[0.1em] outline-none transition-all focus:border-amber-500 uppercase"
+                                        autoFocus
+                                        autoComplete="off"
+                                        spellCheck="false"
+                                    />
+                                </div>
+
                                 <button
                                     onClick={toggleScanner}
-                                    className={`absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isScanning ? 'bg-red-500 text-white' : 'bg-white text-slate-400 shadow-sm'}`}
+                                    className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 transition-all font-black text-sm ${isScanning
+                                        ? 'bg-red-50 text-red-600 border-2 border-red-100'
+                                        : 'bg-indigo-50 text-indigo-600 border-2 border-indigo-100 hover:bg-indigo-100'
+                                        }`}
                                 >
-                                    {isScanning ? '✕' : '📷'}
+                                    {isScanning ? (
+                                        <><span>✕</span> Tarayıcıyı Kapat</>
+                                    ) : (
+                                        <>
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                            </svg>
+                                            Barkod / QR Tarat
+                                        </>
+                                    )}
                                 </button>
                             </div>
 
@@ -561,14 +641,10 @@ export default function CustomerHome() {
                                         autoPlay
                                         muted
                                         playsInline
+                                        ref={videoRef}
                                         className="w-full h-full object-cover"
-                                        ref={el => {
-                                            if (el && isScanning) {
-                                                navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-                                                    .then(s => el.srcObject = s);
-                                            }
-                                        }}
                                     />
+                                    <canvas ref={canvasRef} className="hidden" />
                                     <div className="absolute inset-0 border-2 border-amber-500/50 m-12 rounded-2xl animate-pulse flex items-center justify-center">
                                         <div className="w-full h-0.5 bg-amber-500 absolute top-1/2 animate-bounce"></div>
                                     </div>
