@@ -554,7 +554,7 @@ export default function AppointmentManagement() {
                         Sistemi Sıfırla
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments v1.9.2</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments v1.9.3</span>
                     </div>
                 </div>
             </div>
@@ -741,11 +741,28 @@ export default function AppointmentManagement() {
                             </div>
 
                             <div className="bg-slate-50 p-4 rounded-2xl">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Hizmet</p>
-                                <div className="flex justify-between items-center">
-                                    <span className="font-black text-slate-900">{selectedAppointment.service_name || 'Hizmet Bilgisi Yok'}</span>
-                                    <span className="font-black text-pink-600">₺{selectedAppointment.price || 0}</span>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Hizmetler</p>
+                                <div className="space-y-2">
+                                    {selectedAppointment.services && selectedAppointment.services.length > 0 ? (
+                                        selectedAppointment.services.map((s: any, idx: number) => (
+                                            <div key={idx} className="flex justify-between items-center bg-white/50 p-2 rounded-lg border border-slate-100">
+                                                <span className="font-black text-slate-800 text-xs uppercase tracking-tight">{s.name}</span>
+                                                <span className="font-black text-slate-400 text-[10px]">₺{s.price}</span>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-black text-slate-900">{selectedAppointment.service_name || 'Hizmet Bilgisi Yok'}</span>
+                                            <span className="font-black text-pink-600">₺{selectedAppointment.price || 0}</span>
+                                        </div>
+                                    )}
                                 </div>
+                                {selectedAppointment.services && selectedAppointment.services.length > 0 && (
+                                    <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center px-1">
+                                        <span className="text-[9px] font-black text-slate-400 uppercase">Toplam</span>
+                                        <span className="text-sm font-black text-indigo-600">₺{selectedAppointment.price}</span>
+                                    </div>
+                                )}
                             </div>
 
                             {selectedAppointment.status !== 'completed' && (

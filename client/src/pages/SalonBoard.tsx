@@ -781,11 +781,28 @@ export default function SalonBoard() {
                             </div>
 
                             <div className="space-y-6">
-                                <div className="flex items-center gap-6 p-6 bg-slate-50 rounded-[2.5rem]">
-                                    <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center text-2xl shadow-sm">✂️</div>
-                                    <div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Hizmet</p>
-                                        <p className="text-xl font-black text-slate-800 uppercase tracking-tight">{selectedAppointment.service_name}</p>
+                                <div className="flex items-start gap-6 p-6 bg-slate-50 rounded-[2.5rem]">
+                                    <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center text-2xl shadow-sm shrink-0">✂️</div>
+                                    <div className="flex-1">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Hizmetler</p>
+                                        <div className="space-y-1">
+                                            {selectedAppointment.services && selectedAppointment.services.length > 0 ? (
+                                                selectedAppointment.services.map((item: any, idx: number) => (
+                                                    <div key={idx} className="flex justify-between items-center group">
+                                                        <p className="text-sm font-black text-slate-800 uppercase tracking-tight">{item.name}</p>
+                                                        <span className="text-[10px] font-black text-slate-400">₺{item.price}</span>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <p className="text-xl font-black text-slate-800 uppercase tracking-tight">{selectedAppointment.service_name || 'Hizmet Bilgisi Yok'}</p>
+                                            )}
+                                        </div>
+                                        {selectedAppointment.services && selectedAppointment.services.length > 0 && (
+                                            <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center">
+                                                <span className="text-[9px] font-black text-slate-400 uppercase">Toplam</span>
+                                                <span className="text-base font-black text-indigo-600">₺{selectedAppointment.price}</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
