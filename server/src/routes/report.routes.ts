@@ -35,4 +35,33 @@ router.get('/employee-stats', authMiddleware, async (req: Request, res: Response
     }
 });
 
+/**
+ * GET /api/reports/company-detailed
+ * Get comprehensive reports for company admin
+ */
+router.get('/company-detailed', authMiddleware, async (req: Request, res: Response) => {
+    try {
+        const companyId = req.user?.companyId;
+        const role = req.user?.role;
+        const period = (req.query.period as 'today' | 'week' | 'month' | 'year') || 'today';
+
+        if (!companyId || role !== 'company_admin') {
+            return res.status(403).json({ success: false, error: 'Yetkisiz erişim' });
+        }
+
+        const reports = await reportService.getDetailedCompanyReports(companyId, period);
+
+        res.json({
+            success: true,
+            data: reports
+        });
+    } catch (error) {
+        console.error('Detailed Report Error:', error);
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Detaylı raporlar yüklenirken hata oluştu'
+        });
+    }
+});
+
 export default router;

@@ -421,11 +421,14 @@ export default function SalonBoard() {
                                 onClick={() => {
                                     setFastForm({
                                         customerName: '',
-                                        serviceId: '',
+                                        serviceId: services[0]?.id?.toString() || '',
                                         notes: '',
                                         staffId: staff[0]?.user_id || staff[0]?.id || '',
                                         appointmentDate: selectedDate,
-                                        startTime: '09:00'
+                                        startTime: hours.find(h => {
+                                            const hNum = parseInt(h.split(':')[0]);
+                                            return hNum >= currentHour;
+                                        }) || '09:00'
                                     });
                                     setIsModalOpen(true);
                                 }}
@@ -712,7 +715,7 @@ export default function SalonBoard() {
                                             type="date"
                                             disabled={!!selectedCell}
                                             min={currentDate}
-                                            value={fastForm.appointmentDate || selectedDate}
+                                            value={fastForm.appointmentDate}
                                             onChange={e => setFastForm(prev => ({ ...prev, appointmentDate: e.target.value }))}
                                             className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-black text-xl text-slate-900 outline-none disabled:bg-slate-50"
                                         />

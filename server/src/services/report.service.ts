@@ -38,6 +38,84 @@ class ReportService {
             total_revenue: parseFloat(result.rows[0].total_revenue) || 0
         };
     }
+
+    async getDetailedCompanyReports(companyId: number, period: 'today' | 'week' | 'month' | 'year') {
+        let dateFilter = '';
+        switch (period) {
+            case 'today': dateFilter = "appointment_date = CURRENT_DATE"; break;
+            case 'week': dateFilter = "appointment_date >= date_trunc('week', CURRENT_DATE)"; break;
+            case 'month': dateFilter = "appointment_date >= date_trunc('month', CURRENT_DATE)"; break;
+            case 'year': dateFilter = "appointment_date >= date_trunc('year', CURRENT_DATE)"; break;
+        }
+
+        // 1. Staff Breakdown
+        const staffQuery = `
+            SELECT 
+                u.id as staff_id,
+                u.first_name || ' ' || u.last_name as staff_name,
+                COUNT(a.id) as count,
+                SUM(COALESCE(a.price, s.price, 0)) as revenue
+            FROM users u
+            LEFT JOIN appointments a ON u.id = a.staff_id AND a.company_id = $1 AND a.status != 'cancelled' AND ${dateFilter}
+            LEFT JOIN services s ON a.service_id = s.id
+            WHERE u.company_id = $1 AND u.role != 'customer'
+            GROUP BY u.id, u.first_name, u.last_name
+            ORDER BY count DESC
+        `;
+
+        // 2. Hourly Distribution
+        const hourlyQuery = `
+            SELECT 
+                EXTRACT(HOUR FROM start_time::time) as hour,
+                COUNT(*) as count
+            FROM appointments
+            WHERE company_id = $1 AND status != 'cancelled' AND ${dateFilter}
+            GROUP BY hour
+            ORDER BY hour
+        `;
+
+        // 3. Weekly Distribution (Day names)
+        const weeklyQuery = `
+            SELECT 
+                TO_CHAR(appointment_date, 'Day') as day_name,
+                EXTRACT(DOW FROM appointment_date) as day_index,
+                COUNT(*) as count,
+                SUM(COALESCE(a.price, s.price, 0)) as revenue
+            FROM appointments a
+            LEFT JOIN services s ON a.service_id = s.id
+            WHERE a.company_id = $1 AND a.status != 'cancelled' AND ${dateFilter}
+            GROUP BY day_name, day_index
+            ORDER BY day_index
+        `;
+
+        // 4. Monthly Distribution (for Year)
+        const monthlyQuery = `
+            SELECT 
+                TO_CHAR(appointment_date, 'Month') as month_name,
+                EXTRACT(MONTH FROM appointment_date) as month_index,
+                COUNT(*) as count,
+                SUM(COALESCE(a.price, s.price, 0)) as revenue
+            FROM appointments a
+            LEFT JOIN services s ON a.service_id = s.id
+            WHERE a.company_id = $1 AND a.status != 'cancelled' AND ${dateFilter}
+            GROUP BY month_name, month_index
+            ORDER BY month_index
+        `;
+
+        const [staffRes, hourlyRes, weeklyRes, monthlyRes] = await Promise.all([
+            pool.query(staffQuery, [companyId]),
+            pool.query(hourlyQuery, [companyId]),
+            pool.query(weeklyQuery, [companyId]),
+            pool.query(monthlyQuery, [companyId])
+        ]);
+
+        return {
+            staffStats: staffRes.rows.map(r => ({ ...r, count: parseInt(r.count), revenue: parseFloat(r.revenue || 0) })),
+            hourlyStats: hourlyRes.rows.map(r => ({ hour: parseInt(r.hour), count: parseInt(r.count) })),
+            weeklyStats: weeklyRes.rows.map(r => ({ day: r.day_name.trim(), count: parseInt(r.count), revenue: parseFloat(r.revenue || 0) })),
+            monthlyStats: monthlyRes.rows.map(r => ({ month: r.month_name.trim(), count: parseInt(r.count), revenue: parseFloat(r.revenue || 0) }))
+        };
+    }
 }
 
 export default new ReportService();

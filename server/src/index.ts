@@ -13,12 +13,16 @@ import smsRoutes from './routes/sms.routes';
 import mapsRoutes from './routes/maps.routes';
 import departmentRoutes from './routes/department.routes';
 import reportRoutes from './routes/report.routes';
+import cronService from './services/cron.service';
 
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Initialize Cron Jobs
+cronService.init();
 
 // Middleware
 app.use(cors({

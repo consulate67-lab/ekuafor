@@ -19,10 +19,11 @@ interface StaffBoard {
     photo: string | null;
 }
 
-type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'ai';
+type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'ai' | 'reports';
 
 const menuItems: { key: TabKey; icon: string; label: string }[] = [
     { key: 'home', icon: '🏠', label: 'Ana Sayfa' },
+    { key: 'reports', icon: '📊', label: 'Raporlar' },
     { key: 'services', icon: '✂️', label: 'Hizmetler' },
     { key: 'booking', icon: '📅', label: 'Müşteri QR' },
     { key: 'ai', icon: '🤖', label: 'Yapay Zeka' },
@@ -71,6 +72,11 @@ export default function CompanyPanel() {
     const [aiRules, setAiRules] = useState('');
     const [isSavingAI, setIsSavingAI] = useState(false);
 
+    // Reports states
+    const [reportData, setReportData] = useState<any>(null);
+    const [reportPeriod, setReportPeriod] = useState<'today' | 'week' | 'month' | 'year'>('today');
+    const [loadingReport, setLoadingReport] = useState(false);
+
     const handleLogin = async (keyToUse?: string) => {
         const key = keyToUse || inputKey.trim();
         if (!key) return;
@@ -106,6 +112,25 @@ export default function CompanyPanel() {
             handleLogin(keyToUse);
         }
     }, []);
+
+    const fetchReports = async (period: string) => {
+        if (!company) return;
+        setLoadingReport(true);
+        try {
+            const res = await api.get('/reports/company-detailed', { params: { period } });
+            setReportData(res.data?.data);
+        } catch (err) {
+            console.error('Report fetch error', err);
+        } finally {
+            setLoadingReport(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'reports' && company) {
+            fetchReports(reportPeriod);
+        }
+    }, [activeTab, reportPeriod, company]);
 
     const fetchData = async (companyId: number) => {
         try {
@@ -917,6 +942,8 @@ export default function CompanyPanel() {
                             </div>
                         </div>
                     )}
+
+                    {/* SERVICES TAB */}
                     {activeTab === 'services' && (
                         <div className="space-y-4">
                             <button
@@ -980,224 +1007,367 @@ export default function CompanyPanel() {
                         </div>
                     )}
 
+                    {/* REPORTS TAB - Şirket Raporları */}
+                    {activeTab === 'reports' && (
+                        <div className="space-y-6">
+                            {/* Period Selector */}
+                            <div className="bg-white p-2 rounded-2xl shadow-sm inline-flex gap-1 border border-slate-100">
+                                {(['today', 'week', 'month', 'year'] as const).map(p => (
+                                    <button
+                                        key={p}
+                                        onClick={() => setReportPeriod(p)}
+                                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${reportPeriod === p ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'text-slate-400 hover:bg-slate-50'}`}
+                                    >
+                                        {p === 'today' ? 'Bugün' : p === 'week' ? 'Bu Hafta' : p === 'month' ? 'Bu Ay' : 'Bu Yıl'}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {loadingReport ? (
+                                <div className="text-center py-20">
+                                    <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                                    <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">Veriler Analiz Ediliyor...</p>
+                                </div>
+                            ) : reportData && (
+                                <>
+                                    {/* Stats Cards */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-white p-6 rounded-[2rem] shadow-xl shadow-slate-200/40 border border-slate-50">
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Toplam Randevu</p>
+                                            <p className="text-3xl font-black text-slate-900">{reportData.staffStats.reduce((sum: number, s: any) => sum + s.count, 0)}</p>
+                                        </div>
+                                        <div className="bg-white p-6 rounded-[2rem] shadow-xl shadow-slate-200/40 border border-slate-50">
+                                            <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">Toplam Ciro</p>
+                                            <p className="text-3xl font-black text-slate-900">{reportData.staffStats.reduce((sum: number, s: any) => sum + s.revenue, 0).toLocaleString('tr-TR')} ₺</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Staff Table */}
+                                    <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40">
+                                        <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
+                                            <span>👤</span> Personel Performansı
+                                        </h3>
+                                        <div className="space-y-4">
+                                            {reportData.staffStats.map((s: any, i: number) => (
+                                                <div key={s.staff_id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl group hover:bg-indigo-50 transition-all">
+                                                    <div className="flex items-center gap-4">
+                                                        <span className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-xs font-black text-slate-400 border border-slate-100 group-hover:border-indigo-200 group-hover:text-indigo-600">
+                                                            #{i + 1}
+                                                        </span>
+                                                        <div>
+                                                            <p className="font-black text-slate-900">{s.staff_name}</p>
+                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.count} Randevu</p>
+                                                        </div>
+                                                    </div>
+                                                    <p className="font-black text-indigo-600">{s.revenue.toLocaleString('tr-TR')} ₺</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Hourly & Weekly Distribution */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                        {/* Hourly Chart */}
+                                        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40">
+                                            <h3 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
+                                                <span>⏰</span> Yoğun Saatler
+                                            </h3>
+                                            <div className="flex items-end gap-1 h-32 px-2">
+                                                {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21].map(h => {
+                                                    const stat = reportData.hourlyStats.find((s: any) => s.hour === h);
+                                                    const maxCount = Math.max(...reportData.hourlyStats.map((s: any) => s.count), 1);
+                                                    const heightScale = stat ? (stat.count / maxCount) * 100 : 5;
+                                                    return (
+                                                        <div key={h} className="flex-1 flex flex-col items-center gap-2">
+                                                            <div className="w-full bg-indigo-50 rounded-t-lg relative group overflow-hidden" style={{ height: `${heightScale}%` }}>
+                                                                <div className="absolute inset-0 bg-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                                                {stat && stat.count > 0 && (
+                                                                    <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-black text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                        {stat.count}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <span className="text-[8px] font-black text-slate-400">{h}</span>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {/* Weekly Performance */}
+                                        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40">
+                                            <h3 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
+                                                <span>📅</span> Günlük Ciro Performansı
+                                            </h3>
+                                            <div className="space-y-4">
+                                                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
+                                                    const dayNames: any = { 'Monday': 'Pzt', 'Tuesday': 'Sal', 'Wednesday': 'Çar', 'Thursday': 'Per', 'Friday': 'Cum', 'Saturday': 'Cmt', 'Sunday': 'Paz' };
+                                                    const stat = reportData.weeklyStats.find((s: any) => s.day === day);
+                                                    const maxRevenue = Math.max(...reportData.weeklyStats.map((s: any) => s.revenue), 1);
+                                                    const widthScale = stat ? (stat.revenue / maxRevenue) * 100 : 2;
+                                                    return (
+                                                        <div key={day} className="flex items-center gap-4">
+                                                            <span className="w-8 text-[10px] font-black text-slate-400 uppercase">{dayNames[day]}</span>
+                                                            <div className="flex-1 h-3 bg-slate-50 rounded-full overflow-hidden">
+                                                                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${widthScale}%` }}></div>
+                                                            </div>
+                                                            <span className="text-[10px] font-black text-slate-900 text-right min-w-[50px]">
+                                                                {stat ? stat.revenue.toLocaleString('tr-TR') : 0} ₺
+                                                            </span>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Monthly Distribution (Show only for Year period) */}
+                                    {reportPeriod === 'year' && (
+                                        <div className="bg-indigo-900 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-indigo-200">
+                                            <h3 className="text-lg font-black mb-6">🗓️ Aylık Performans (Ciro)</h3>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                                {reportData.monthlyStats.map((m: any) => (
+                                                    <div key={m.month} className="bg-white/10 p-4 rounded-3xl backdrop-blur-sm border border-white/10">
+                                                        <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest truncate">{m.month}</p>
+                                                        <p className="text-lg font-black">{m.revenue.toLocaleString('tr-TR')} ₺</p>
+                                                        <p className="text-[10px] font-bold text-white/40">{m.count} Randevu</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="text-center py-4">
+                                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Raporlar her gece 23:00'da e-posta adresinize gönderilir.</p>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
                 </div>
             </main>
 
             {/* Department Modal */}
-            {showDeptModal && (
-                <div className="fixed inset-0 z-[200] flex items-end justify-center bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowDeptModal(false)}>
-                    <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl" onClick={e => e.stopPropagation()}
-                        style={{ animation: 'slideUp 0.3s ease-out' }}>
-                        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
-                        <h2 className="text-2xl font-black text-slate-900 mb-6">Yeni Departman</h2>
-                        <input
-                            type="text"
-                            value={deptName}
-                            onChange={e => setDeptName(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleAddDepartment()}
-                            placeholder="Departman adı..."
-                            className="w-full p-5 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 text-lg font-bold text-slate-900 outline-none mb-6"
-                            autoFocus
-                        />
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowDeptModal(false)}
-                                className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-base active:scale-95 transition-all"
-                            >
-                                İptal
-                            </button>
-                            <button
-                                onClick={handleAddDepartment}
-                                className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black text-base active:scale-95 transition-all"
-                            >
-                                Ekle
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Staff Board Modal */}
-            {showStaffModal && (
-                <div className="fixed inset-0 z-[200] flex items-end justify-center bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowStaffModal(false)}>
-                    <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl" onClick={e => e.stopPropagation()}
-                        style={{ animation: 'slideUp 0.3s ease-out' }}>
-                        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
-                        <h2 className="text-2xl font-black text-slate-900 mb-6">Personel Board Kodu Oluştur</h2>
-
-                        <div className="flex flex-col items-center mb-8">
-                            <div className="relative group">
-                                <div className="w-24 h-24 rounded-full bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden shadow-inner">
-                                    {staffForm.photo ? (
-                                        <img src={staffForm.photo} className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="text-center">
-                                            <span className="text-4xl block mb-1">📷</span>
-                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Resim Seç</span>
-                                        </div>
-                                    )}
-                                </div>
-                                <div
-                                    onClick={() => handlePhotoSelection(true)}
-                                    className="absolute inset-0 cursor-pointer flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/5 transition-all rounded-full"
-                                >
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">İsim</label>
-                                <input
-                                    type="text"
-                                    value={staffForm.first_name}
-                                    onChange={e => setStaffForm(p => ({ ...p, first_name: e.target.value }))}
-                                    placeholder="İsim"
-                                    className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 text-base font-bold text-slate-900 outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Soyisim</label>
-                                <input
-                                    type="text"
-                                    value={staffForm.last_name}
-                                    onChange={e => setStaffForm(p => ({ ...p, last_name: e.target.value }))}
-                                    placeholder="Soyisim"
-                                    className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 text-base font-bold text-slate-900 outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Cinsiyet</label>
-                                <div className="flex gap-3">
-                                    {['erkek', 'kadın'].map(g => (
-                                        <button
-                                            key={g}
-                                            type="button"
-                                            onClick={() => setStaffForm(p => ({ ...p, gender: g }))}
-                                            className={`flex-1 py-4 rounded-2xl text-base font-black transition-all ${staffForm.gender === g
-                                                ? g === 'erkek'
-                                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
-                                                    : 'bg-pink-600 text-white shadow-lg shadow-pink-500/30'
-                                                : 'bg-slate-100 text-slate-400'
-                                                }`}
-                                        >
-                                            {g === 'erkek' ? '♂ Erkek' : '♀ Kadın'}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Departman</label>
-                                <select
-                                    value={staffForm.department_id}
-                                    onChange={e => setStaffForm(p => ({ ...p, department_id: e.target.value }))}
-                                    className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 text-base font-bold text-slate-900 outline-none appearance-none"
-                                >
-                                    <option value="">Departman seçin...</option>
-                                    {departments.map(d => (
-                                        <option key={d.id} value={d.id}>{d.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-3 mt-6">
-                            <button
-                                onClick={() => setShowStaffModal(false)}
-                                className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-base active:scale-95 transition-all"
-                            >
-                                İptal
-                            </button>
-                            <button
-                                onClick={handleCreateStaffBoard}
-                                disabled={isCreating}
-                                className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-base active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            >
-                                {isCreating ? (
-                                    <>
-                                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                        </svg>
-                                        Oluşturuluyor...
-                                    </>
-                                ) : 'Oluştur'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Service Modal */}
-            {showServiceModal && (
-                <div className="fixed inset-0 z-[200] flex items-end justify-center bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowServiceModal(false)}>
-                    <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}
-                        style={{ animation: 'slideUp 0.3s ease-out' }}>
-                        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
-                        <h2 className="text-2xl font-black text-slate-900 mb-6">{serviceForm.id ? 'Hizmeti Düzenle' : 'Yeni Hizmet'}</h2>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Hizmet Adı</label>
-                                <input
-                                    type="text"
-                                    value={serviceForm.name}
-                                    onChange={e => setServiceForm(p => ({ ...p, name: e.target.value }))}
-                                    placeholder="Örn: Saç Kesimi"
-                                    className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-pink-500 text-base font-bold text-slate-900 outline-none"
-                                />
-                            </div>
-
-                            <div className="flex gap-4">
-                                <div className="flex-1">
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Süre (Dk)</label>
-                                    <input
-                                        type="number"
-                                        value={serviceForm.duration_minutes}
-                                        onChange={e => setServiceForm(p => ({ ...p, duration_minutes: parseInt(e.target.value) || 0 }))}
-                                        className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-pink-500 text-base font-bold text-slate-900 outline-none"
-                                    />
-                                </div>
-                                <div className="flex-1">
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Ücret (₺)</label>
-                                    <input
-                                        type="number"
-                                        value={serviceForm.price}
-                                        onChange={e => setServiceForm(p => ({ ...p, price: parseFloat(e.target.value) || 0 }))}
-                                        className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-pink-500 text-base font-bold text-slate-900 outline-none"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Açıklama</label>
-                                <textarea
-                                    value={serviceForm.description}
-                                    onChange={e => setServiceForm(p => ({ ...p, description: e.target.value }))}
-                                    rows={3}
-                                    className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-pink-500 text-base font-bold text-slate-900 outline-none resize-none"
-                                />
-                            </div>
-
-                            <div className="flex gap-3 mt-6 pt-4">
+            {
+                showDeptModal && (
+                    <div className="fixed inset-0 z-[200] flex items-end justify-center bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowDeptModal(false)}>
+                        <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl" onClick={e => e.stopPropagation()}
+                            style={{ animation: 'slideUp 0.3s ease-out' }}>
+                            <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
+                            <h2 className="text-2xl font-black text-slate-900 mb-6">Yeni Departman</h2>
+                            <input
+                                type="text"
+                                value={deptName}
+                                onChange={e => setDeptName(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleAddDepartment()}
+                                placeholder="Departman adı..."
+                                className="w-full p-5 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 text-lg font-bold text-slate-900 outline-none mb-6"
+                                autoFocus
+                            />
+                            <div className="flex gap-3">
                                 <button
-                                    onClick={() => setShowServiceModal(false)}
+                                    onClick={() => setShowDeptModal(false)}
                                     className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-base active:scale-95 transition-all"
                                 >
                                     İptal
                                 </button>
                                 <button
-                                    onClick={handleSaveService}
-                                    disabled={isSavingService}
-                                    className="flex-1 py-4 bg-pink-600 text-white rounded-2xl font-black text-base active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+                                    onClick={handleAddDepartment}
+                                    className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black text-base active:scale-95 transition-all"
                                 >
-                                    {isSavingService ? 'Kaydediliyor...' : (serviceForm.id ? 'Güncelle' : 'Kaydet')}
+                                    Ekle
                                 </button>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
+
+            {/* Staff Board Modal */}
+            {
+                showStaffModal && (
+                    <div className="fixed inset-0 z-[200] flex items-end justify-center bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowStaffModal(false)}>
+                        <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl" onClick={e => e.stopPropagation()}
+                            style={{ animation: 'slideUp 0.3s ease-out' }}>
+                            <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
+                            <h2 className="text-2xl font-black text-slate-900 mb-6">Personel Board Kodu Oluştur</h2>
+
+                            <div className="flex flex-col items-center mb-8">
+                                <div className="relative group">
+                                    <div className="w-24 h-24 rounded-full bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden shadow-inner">
+                                        {staffForm.photo ? (
+                                            <img src={staffForm.photo || undefined} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="text-center">
+                                                <span className="text-4xl block mb-1">📷</span>
+                                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Resim Seç</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div
+                                        onClick={() => handlePhotoSelection(true)}
+                                        className="absolute inset-0 cursor-pointer flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/5 transition-all rounded-full"
+                                    >
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">İsim</label>
+                                    <input
+                                        type="text"
+                                        value={staffForm.first_name}
+                                        onChange={e => setStaffForm(p => ({ ...p, first_name: e.target.value }))}
+                                        placeholder="İsim"
+                                        className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 text-base font-bold text-slate-900 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Soyisim</label>
+                                    <input
+                                        type="text"
+                                        value={staffForm.last_name}
+                                        onChange={e => setStaffForm(p => ({ ...p, last_name: e.target.value }))}
+                                        placeholder="Soyisim"
+                                        className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 text-base font-bold text-slate-900 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Cinsiyet</label>
+                                    <div className="flex gap-3">
+                                        {['erkek', 'kadın'].map(g => (
+                                            <button
+                                                key={g}
+                                                type="button"
+                                                onClick={() => setStaffForm(p => ({ ...p, gender: g }))}
+                                                className={`flex-1 py-4 rounded-2xl text-base font-black transition-all ${staffForm.gender === g
+                                                    ? g === 'erkek'
+                                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+                                                        : 'bg-pink-600 text-white shadow-lg shadow-pink-500/30'
+                                                    : 'bg-slate-100 text-slate-400'
+                                                    }`}
+                                            >
+                                                {g === 'erkek' ? '♂ Erkek' : '♀ Kadın'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Departman</label>
+                                    <select
+                                        value={staffForm.department_id}
+                                        onChange={e => setStaffForm(p => ({ ...p, department_id: e.target.value }))}
+                                        className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 text-base font-bold text-slate-900 outline-none appearance-none"
+                                    >
+                                        <option value="">Departman seçin...</option>
+                                        {departments.map(d => (
+                                            <option key={d.id} value={d.id}>{d.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    onClick={() => setShowStaffModal(false)}
+                                    className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-base active:scale-95 transition-all"
+                                >
+                                    İptal
+                                </button>
+                                <button
+                                    onClick={handleCreateStaffBoard}
+                                    disabled={isCreating}
+                                    className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-base active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {isCreating ? (
+                                        <>
+                                            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                            </svg>
+                                            Oluşturuluyor...
+                                        </>
+                                    ) : 'Oluştur'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Service Modal */}
+            {
+                showServiceModal && (
+                    <div className="fixed inset-0 z-[200] flex items-end justify-center bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowServiceModal(false)}>
+                        <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}
+                            style={{ animation: 'slideUp 0.3s ease-out' }}>
+                            <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
+                            <h2 className="text-2xl font-black text-slate-900 mb-6">{serviceForm.id ? 'Hizmeti Düzenle' : 'Yeni Hizmet'}</h2>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Hizmet Adı</label>
+                                    <input
+                                        type="text"
+                                        value={serviceForm.name}
+                                        onChange={e => setServiceForm(p => ({ ...p, name: e.target.value }))}
+                                        placeholder="Örn: Saç Kesimi"
+                                        className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-pink-500 text-base font-bold text-slate-900 outline-none"
+                                    />
+                                </div>
+
+                                <div className="flex gap-4">
+                                    <div className="flex-1">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Süre (Dk)</label>
+                                        <input
+                                            type="number"
+                                            value={serviceForm.duration_minutes}
+                                            onChange={e => setServiceForm(p => ({ ...p, duration_minutes: parseInt(e.target.value) || 0 }))}
+                                            className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-pink-500 text-base font-bold text-slate-900 outline-none"
+                                        />
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Ücret (₺)</label>
+                                        <input
+                                            type="number"
+                                            value={serviceForm.price}
+                                            onChange={e => setServiceForm(p => ({ ...p, price: parseFloat(e.target.value) || 0 }))}
+                                            className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-pink-500 text-base font-bold text-slate-900 outline-none"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Açıklama</label>
+                                    <textarea
+                                        value={serviceForm.description}
+                                        onChange={e => setServiceForm(p => ({ ...p, description: e.target.value }))}
+                                        rows={3}
+                                        className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-pink-500 text-base font-bold text-slate-900 outline-none resize-none"
+                                    />
+                                </div>
+
+                                <div className="flex gap-3 mt-6 pt-4">
+                                    <button
+                                        onClick={() => setShowServiceModal(false)}
+                                        className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-base active:scale-95 transition-all"
+                                    >
+                                        İptal
+                                    </button>
+                                    <button
+                                        onClick={handleSaveService}
+                                        disabled={isSavingService}
+                                        className="flex-1 py-4 bg-pink-600 text-white rounded-2xl font-black text-base active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+                                    >
+                                        {isSavingService ? 'Kaydediliyor...' : (serviceForm.id ? 'Güncelle' : 'Kaydet')}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
 
             <style>{`
                 @keyframes slideUp {

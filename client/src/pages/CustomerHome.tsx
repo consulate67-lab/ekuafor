@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { Company } from '../types';
 import { Geolocation } from '@capacitor/geolocation';
+import { Camera } from '@capacitor/camera';
 
 export default function CustomerHome() {
     const navigate = useNavigate();
@@ -17,6 +18,11 @@ export default function CustomerHome() {
     const [locating, setLocating] = useState(false);
     const [selectedGender, setSelectedGender] = useState<string | null>(null);
     const [sort, setSort] = useState<'rating' | 'reviews'>('rating');
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const [permissions, setPermissions] = useState<any>({
+        location: 'unknown',
+        camera: 'unknown'
+    });
 
     // Code Scanner States
     const [showCodeModal, setShowCodeModal] = useState(false);
@@ -94,6 +100,7 @@ export default function CustomerHome() {
     };
 
     useEffect(() => {
+        checkPermissions();
         const savedFavs = localStorage.getItem('saloon_favorites');
         if (savedFavs) {
             setFavorites(JSON.parse(savedFavs));
@@ -124,6 +131,33 @@ export default function CustomerHome() {
         };
         initialFetch();
     }, []);
+
+    const checkPermissions = async () => {
+        try {
+            const locPerm = await Geolocation.checkPermissions();
+            const camPerm = await Camera.checkPermissions();
+            setPermissions({
+                location: locPerm.location,
+                camera: camPerm.camera
+            });
+        } catch (e) {
+            console.error('Permission check failed', e);
+        }
+    };
+
+    const requestPermission = async (type: 'location' | 'camera') => {
+        try {
+            if (type === 'location') {
+                const res = await Geolocation.requestPermissions();
+                setPermissions((p: any) => ({ ...p, location: res.location }));
+            } else if (type === 'camera') {
+                const res = await Camera.requestPermissions();
+                setPermissions((p: any) => ({ ...p, camera: res.camera }));
+            }
+        } catch (e) {
+            console.error(`Request permission ${type} failed`, e);
+        }
+    };
 
     const toggleFavorite = (e: React.MouseEvent, id: number) => {
         e.preventDefault();
@@ -240,10 +274,24 @@ export default function CustomerHome() {
     const toggleScanner = async () => {
         if (isScanning) {
             setIsScanning(false);
+            if (videoRef.current && videoRef.current.srcObject) {
+                const stream = videoRef.current.srcObject as MediaStream;
+                stream.getTracks().forEach(track => track.stop());
+            }
             return;
         }
 
         try {
+            // First check/request permission
+            const perm = await Camera.checkPermissions();
+            if (perm.camera !== 'granted') {
+                const req = await Camera.requestPermissions();
+                if (req.camera !== 'granted') {
+                    setCodeError('Kamera izni verilmedi. Barkod tarayıcı için kamera izni gerekiyor.');
+                    return;
+                }
+            }
+
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
             setIsScanning(true);
             setCodeError('');
@@ -334,15 +382,27 @@ export default function CustomerHome() {
                         </div>
                         <h1 className="text-xl font-black text-slate-900 tracking-tighter">Saloon</h1>
                     </div>
-                    <button
-                        onClick={openCodeModal}
-                        className="w-11 h-11 bg-slate-50 text-slate-500 rounded-2xl flex items-center justify-center active:scale-90 transition-all border border-slate-100 shadow-sm"
-                        title="Kod ile Giriş"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                        </svg>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => { setShowSettingsModal(true); checkPermissions(); }}
+                            className="w-11 h-11 bg-slate-50 text-slate-500 rounded-2xl flex items-center justify-center active:scale-90 transition-all border border-slate-100 shadow-sm"
+                            title="Ayarlar"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </button>
+                        <button
+                            onClick={openCodeModal}
+                            className="w-11 h-11 bg-slate-50 text-slate-500 rounded-2xl flex items-center justify-center active:scale-90 transition-all border border-slate-100 shadow-sm"
+                            title="Kod ile Giriş"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -689,6 +749,61 @@ export default function CustomerHome() {
                             <p className="text-center text-[10px] text-slate-400 mt-4 font-bold uppercase tracking-widest">
                                 QR kodu okutun veya kodu elle yazın
                             </p>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Settings Modal */}
+            {
+                showSettingsModal && (
+                    <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowSettingsModal(false)}>
+                        <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl" onClick={e => e.stopPropagation()}
+                            style={{ animation: 'slideUp 0.3s ease-out' }}>
+                            <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6" />
+
+                            <div className="text-center mb-8">
+                                <div className="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center mx-auto mb-4">
+                                    <span className="text-3xl">⚙️</span>
+                                </div>
+                                <h2 className="text-2xl font-black text-slate-900">Uygulama Ayarları</h2>
+                                <p className="text-slate-400 text-sm mt-1">İzinleri ve tercihleri yönetin</p>
+                            </div>
+
+                            <div className="space-y-4 mb-8">
+                                {[
+                                    { id: 'location', label: 'Konum İzni', desc: 'Size en yakın salonları bulmak için', icon: '📍', status: permissions.location },
+                                    { id: 'camera', label: 'Kamera İzni', desc: 'Barkod ve QR okutmak için', icon: '📷', status: permissions.camera },
+                                    { id: 'voice', label: 'Ses İzni', desc: 'Sesli komutlar için (YAKINDA)', icon: '🎙️', status: 'denied', disabled: true }
+                                ].map(p => (
+                                    <div key={p.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-xl">{p.icon}</div>
+                                            <div>
+                                                <p className="font-black text-sm text-slate-900">{p.label}</p>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{p.desc}</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            disabled={p.disabled || p.status === 'granted'}
+                                            onClick={() => requestPermission(p.id as any)}
+                                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${p.status === 'granted'
+                                                ? 'bg-emerald-50 text-emerald-600'
+                                                : 'bg-indigo-600 text-white shadow-lg active:scale-95'
+                                                }`}
+                                        >
+                                            {p.status === 'granted' ? '✅ İzin Verildi' : 'İzin Ver'}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <button
+                                onClick={() => setShowSettingsModal(false)}
+                                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-base active:scale-95 transition-all"
+                            >
+                                Kapat
+                            </button>
                         </div>
                     </div>
                 )
