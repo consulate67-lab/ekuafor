@@ -417,7 +417,7 @@ router.post('/staff-login', async (req: Request, res: Response) => {
         }
 
         const userResult = await pool.query(
-            `SELECT u.id, u.first_name, u.last_name, u.board_code, u.gender, u.department_id, u.company_id, d.name as department_name
+            `SELECT u.id, u.first_name, u.last_name, u.board_code, u.gender, u.department_id, u.company_id, u.photo, d.name as department_name
              FROM users u
              LEFT JOIN departments d ON u.department_id = d.id
              WHERE UPPER(u.board_code) = UPPER($1)`,
