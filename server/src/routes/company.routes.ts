@@ -284,11 +284,12 @@ router.post('/admin-login', async (req: Request, res: Response) => {
         }
 
         const company = result.rows[0];
+        const userId = company.created_by || 0;
 
         // JWT token oluştur - admin panelindeki korumalı rotalara erişim için
         const token = jwt.sign(
             {
-                userId: 0, // Admin users context'te 0 veya özel bir ID olabilir
+                userId: userId,
                 email: company.email || `admin@${company.id}.local`,
                 role: 'company_admin',
                 companyId: company.id

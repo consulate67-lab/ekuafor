@@ -25,6 +25,8 @@ export default function AppointmentManagement() {
 
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [services, setServices] = useState<Service[]>([]);
+    const [packages, setPackages] = useState<any[]>([]);
+    const [staff, setStaff] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [formError, setFormError] = useState('');
@@ -38,8 +40,10 @@ export default function AppointmentManagement() {
         end_time: '10:00',
         customer_name: '',
         customer_phone: '',
+        package_id: 0,
         notes: '',
-        price: 0
+        price: 0,
+        serviceStaffOverrides: {} as Record<number, number>
     });
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
     const [isListening, setIsListening] = useState(false);
@@ -89,13 +93,19 @@ export default function AppointmentManagement() {
             }
 
             try {
-                const svcResponse = await api.get('/services', {
-                    params: { company_id: companyId }
-                });
+                const [svcResponse, pkgResponse, staffResponse] = await Promise.all([
+                    api.get('/services', { params: { company_id: companyId } }),
+                    api.get('/packages', { params: { company_id: companyId } }),
+                    api.get(`/companies/${companyId}/employees`)
+                ]);
                 setServices(svcResponse.data?.data || []);
+                setPackages(pkgResponse.data?.data || []);
+                setStaff(staffResponse.data?.data || []);
             } catch (err) {
-                console.warn('Services fetch failed', err);
+                console.warn('Services/Packages/Staff fetch failed', err);
                 setServices([]);
+                setPackages([]);
+                setStaff([]);
             }
 
         } catch (err) {
@@ -354,9 +364,29 @@ export default function AppointmentManagement() {
             if (customerPhone) finalNotes += `| Tel: ${customerPhone} `;
             if (newAppointment.notes) finalNotes += `| ${newAppointment.notes}`;
 
+            const selectedPackage = newAppointment.package_id ? packages.find(p => p.id === newAppointment.package_id) : null;
+            const selectedServices = services.filter(s => newAppointment.service_ids.includes(s.id!));
+
+            const sSelections = selectedPackage
+                ? selectedPackage.services.map((s: any) => ({
+                    id: s.id,
+                    price: s.price,
+                    duration_minutes: s.duration_minutes,
+                    staff_id: newAppointment.serviceStaffOverrides[s.id] || newAppointment.staff_id || undefined
+                }))
+                : selectedServices.map(s => ({
+                    id: s.id,
+                    price: s.price,
+                    duration_minutes: s.duration_minutes,
+                    staff_id: newAppointment.staff_id || undefined
+                }));
+
             await api.post('/appointments', {
                 ...newAppointment,
                 service_id: newAppointment.service_ids[0], // First one as primary for compatibility
+                service_ids: newAppointment.service_ids,
+                services: sSelections,
+                package_id: newAppointment.package_id === 0 ? undefined : newAppointment.package_id,
                 staff_id: newAppointment.staff_id === 0 ? undefined : newAppointment.staff_id,
                 company_id: company?.id,
                 notes: finalNotes.trim(),
@@ -372,8 +402,10 @@ export default function AppointmentManagement() {
                 end_time: '10:00',
                 customer_name: '',
                 customer_phone: '',
+                package_id: 0,
                 notes: '',
-                price: 0
+                price: 0,
+                serviceStaffOverrides: {}
             });
             setShowAddForm(false);
             alert('Randevu başarıyla ONAYLI olarak oluşturuldu.');
@@ -524,6 +556,9 @@ export default function AppointmentManagement() {
                                                 })()}
                                             </h4>
                                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">
+                                                {app.package_name ? (
+                                                    <span className="text-amber-600">[{app.package_name}] </span>
+                                                ) : null}
                                                 {app.services && app.services.length > 0
                                                     ? app.services.map((s: any) => s.name).join(', ')
                                                     : (app.service_name || 'Hizmet Bilgisi Yok')}
@@ -578,52 +613,142 @@ export default function AppointmentManagement() {
 
                         <form onSubmit={handleAddAppointment} className="space-y-6">
                             <div>
-                                <label className="block text-xs font-bold text-slate-700 mb-2 uppercase ml-1 tracking-wider">Hizmet Seçimi</label>
-                                <div className="space-y-2 max-h-48 overflow-y-auto bg-slate-50 p-4 rounded-2xl">
-                                    {services.map(s => {
-                                        const isSelected = newAppointment.service_ids.includes(s.id!);
-                                        return (
-                                            <label key={s.id} className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all cursor-pointer ${isSelected ? 'bg-white border-pink-500 shadow-sm' : 'bg-transparent border-transparent'}`}>
-                                                <div className="flex items-center gap-3">
-                                                    <input
-                                                        type="checkbox"
-                                                        className="w-5 h-5 rounded border-slate-300 text-pink-600 focus:ring-pink-500"
-                                                        checked={isSelected}
-                                                        onChange={(e) => {
-                                                            let newIds = [...newAppointment.service_ids];
-                                                            if (e.target.checked) {
-                                                                newIds.push(s.id!);
-                                                            } else {
-                                                                newIds = newIds.filter(id => id !== s.id);
-                                                            }
-
-                                                            // Calculate total duration and price
-                                                            const selectedServices = services.filter(sv => newIds.includes(sv.id!));
-                                                            const totalDur = selectedServices.reduce((sum, sv) => sum + (sv.duration_minutes || 0), 0);
-                                                            const totalPr = selectedServices.reduce((sum, sv) => sum + (sv.price || 0), 0);
-
-                                                            let newEndTime = newAppointment.end_time;
-                                                            if (newAppointment.start_time) {
-                                                                const [h, m] = newAppointment.start_time.split(':').map(Number);
-                                                                const totalMin = h * 60 + m + totalDur;
-                                                                const endH = Math.floor(totalMin / 60);
-                                                                const endM = totalMin % 60;
-                                                                newEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-                                                            }
-
-                                                            setNewAppointment({ ...newAppointment, service_ids: newIds, end_time: newEndTime, price: totalPr });
-                                                        }}
-                                                    />
-                                                    <div>
-                                                        <p className={`text-xs font-black ${isSelected ? 'text-slate-900' : 'text-slate-500'}`}>{s.name}</p>
-                                                        <p className="text-[10px] font-bold text-slate-400">{s.duration_minutes} Dakika</p>
-                                                    </div>
-                                                </div>
-                                                <span className="text-xs font-black text-pink-600">₺{s.price}</span>
-                                            </label>
-                                        );
-                                    })}
+                                <div className="flex gap-4 mb-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setNewAppointment({ ...newAppointment, package_id: 0 })}
+                                        className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${newAppointment.package_id === 0 ? 'bg-pink-600 text-white' : 'bg-slate-100 text-slate-400'}`}
+                                    >
+                                        Hizmetler
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setNewAppointment({ ...newAppointment, service_ids: [], package_id: packages[0]?.id || 0 })}
+                                        className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${newAppointment.package_id !== 0 ? 'bg-pink-600 text-white' : 'bg-slate-100 text-slate-400'}`}
+                                    >
+                                        Paketler
+                                    </button>
                                 </div>
+
+                                {newAppointment.package_id === 0 ? (
+                                    <>
+                                        <label className="block text-xs font-bold text-slate-700 mb-2 uppercase ml-1 tracking-wider">Hizmet Seçimi</label>
+                                        <div className="space-y-2 max-h-48 overflow-y-auto bg-slate-50 p-4 rounded-2xl">
+                                            {services.map(s => {
+                                                const isSelected = newAppointment.service_ids.includes(s.id!);
+                                                return (
+                                                    <label key={s.id} className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all cursor-pointer ${isSelected ? 'bg-white border-pink-500 shadow-sm' : 'bg-transparent border-transparent'}`}>
+                                                        <div className="flex items-center gap-3">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="w-5 h-5 rounded border-slate-300 text-pink-600 focus:ring-pink-500"
+                                                                checked={isSelected}
+                                                                onChange={(e) => {
+                                                                    let newIds = [...newAppointment.service_ids];
+                                                                    if (e.target.checked) {
+                                                                        newIds.push(s.id!);
+                                                                    } else {
+                                                                        newIds = newIds.filter(id => id !== s.id);
+                                                                    }
+
+                                                                    // Calculate total duration and price
+                                                                    const selectedServices = services.filter(sv => newIds.includes(sv.id!));
+                                                                    const totalDur = selectedServices.reduce((sum, sv) => sum + (sv.duration_minutes || 0), 0);
+                                                                    const totalPr = selectedServices.reduce((sum, sv) => sum + (sv.price || 0), 0);
+
+                                                                    let newEndTime = newAppointment.end_time;
+                                                                    if (newAppointment.start_time) {
+                                                                        const [h, m] = newAppointment.start_time.split(':').map(Number);
+                                                                        const totalMin = h * 60 + m + totalDur;
+                                                                        const endH = Math.floor(totalMin / 60);
+                                                                        const endM = totalMin % 60;
+                                                                        newEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+                                                                    }
+
+                                                                    setNewAppointment({ ...newAppointment, service_ids: newIds, end_time: newEndTime, price: totalPr });
+                                                                }}
+                                                            />
+                                                            <div>
+                                                                <p className={`text-xs font-black ${isSelected ? 'text-slate-900' : 'text-slate-500'}`}>{s.name}</p>
+                                                                <p className="text-[10px] font-bold text-slate-400">{s.duration_minutes} Dakika</p>
+                                                            </div>
+                                                        </div>
+                                                        <span className="text-xs font-black text-pink-600">₺{s.price}</span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="space-y-3 max-h-64 overflow-y-auto bg-slate-50 p-4 rounded-2xl">
+                                            {packages.map(p => {
+                                                const isSelected = newAppointment.package_id === p.id;
+                                                return (
+                                                    <div key={p.id} className="space-y-3">
+                                                        <button
+                                                            key={p.id}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const totalDur = p.duration_minutes || 30;
+                                                                const totalPr = Number(p.price);
+
+                                                                let newEndTime = newAppointment.end_time;
+                                                                if (newAppointment.start_time) {
+                                                                    const [h, m] = newAppointment.start_time.split(':').map(Number);
+                                                                    const totalMin = h * 60 + m + totalDur;
+                                                                    const endH = Math.floor(totalMin / 60);
+                                                                    const endM = totalMin % 60;
+                                                                    newEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+                                                                }
+
+                                                                setNewAppointment({ ...newAppointment, package_id: p.id, service_ids: [], end_time: newEndTime, price: totalPr, serviceStaffOverrides: {} });
+                                                            }}
+                                                            className={`flex flex-col p-4 rounded-xl border-2 transition-all text-left w-full ${isSelected ? 'bg-white border-pink-500 shadow-sm' : 'bg-transparent border-transparent'}`}
+                                                        >
+                                                            <div className="flex justify-between items-center w-full mb-1">
+                                                                <p className={`text-xs font-black ${isSelected ? 'text-slate-900' : 'text-slate-500'}`}>{p.name}</p>
+                                                                <span className="text-xs font-black text-pink-600">₺{p.price}</span>
+                                                            </div>
+                                                            <p className="text-[9px] font-bold text-slate-400">{p.duration_minutes} Dakika | {p.services?.length || 0} Hizmet</p>
+                                                        </button>
+
+                                                        {isSelected && (
+                                                            <div className="pl-4 space-y-3">
+                                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hizmet Personel Atamaları</p>
+                                                                {p.services?.map((ps: any) => (
+                                                                    <div key={ps.id} className="flex items-center justify-between gap-4 bg-white p-3 rounded-xl border border-slate-100">
+                                                                        <span className="text-[10px] font-black text-slate-700 uppercase truncate flex-1">{ps.name}</span>
+                                                                        <select
+                                                                            value={newAppointment.serviceStaffOverrides[ps.id] || newAppointment.staff_id || ''}
+                                                                            onChange={(e) => {
+                                                                                setNewAppointment(prev => ({
+                                                                                    ...prev,
+                                                                                    serviceStaffOverrides: {
+                                                                                        ...prev.serviceStaffOverrides,
+                                                                                        [ps.id]: Number(e.target.value)
+                                                                                    }
+                                                                                }));
+                                                                            }}
+                                                                            className="text-[10px] font-bold bg-slate-50 border-none rounded-lg p-1.5 outline-none"
+                                                                        >
+                                                                            <option value="">Uzman Seçin</option>
+                                                                            {staff.map(s => (
+                                                                                <option key={s.user_id || s.id} value={s.user_id || s.id}>
+                                                                                    {s.first_name} {s.last_name}
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
@@ -647,17 +772,21 @@ export default function AppointmentManagement() {
                                         value={newAppointment.start_time}
                                         onChange={(e) => {
                                             const start = e.target.value;
-                                            let end = newAppointment.end_time;
-                                            if (newAppointment.service_id) {
-                                                const service = services.find(s => s.id === newAppointment.service_id);
-                                                if (service) {
-                                                    const [h, m] = start.split(':').map(Number);
-                                                    const totalMin = h * 60 + m + (service.duration_minutes || 30);
-                                                    const endH = Math.floor(totalMin / 60);
-                                                    const endM = totalMin % 60;
-                                                    end = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-                                                }
+                                            let duration = 30;
+                                            if (newAppointment.package_id) {
+                                                const pkg = packages.find(p => p.id === newAppointment.package_id);
+                                                if (pkg) duration = pkg.duration_minutes;
+                                            } else if (newAppointment.service_ids.length > 0) {
+                                                const selectedServices = services.filter(sv => newAppointment.service_ids.includes(sv.id!));
+                                                duration = selectedServices.reduce((sum, sv) => sum + (sv.duration_minutes || 0), 0);
                                             }
+
+                                            const [h, m] = start.split(':').map(Number);
+                                            const totalMin = h * 60 + m + duration;
+                                            const endH = Math.floor(totalMin / 60);
+                                            const endM = totalMin % 60;
+                                            const end = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
                                             setNewAppointment({ ...newAppointment, start_time: start, end_time: end });
                                         }}
                                     />
@@ -752,7 +881,7 @@ export default function AppointmentManagement() {
                                         ))
                                     ) : (
                                         <div className="flex justify-between items-center">
-                                            <span className="font-black text-slate-900">{selectedAppointment.service_name || 'Hizmet Bilgisi Yok'}</span>
+                                            <span className="font-black text-slate-900">{selectedAppointment.package_name || selectedAppointment.service_name || 'Hizmet Bilgisi Yok'}</span>
                                             <span className="font-black text-pink-600">₺{selectedAppointment.price || 0}</span>
                                         </div>
                                     )}

@@ -5,6 +5,17 @@ import { Appointment, Service, Company, User } from '../types';
 import { App } from '@capacitor/app';
 import { Device } from '@capacitor/device';
 
+interface SelectionState {
+    staffId: number | null;
+    serviceId: number | null;
+    serviceIds: number[];
+    packageId: number | null;
+    date: string | null;
+    time: string | null;
+    customerName: string;
+    customerPhone: string;
+}
+
 export default function BookingPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -12,6 +23,7 @@ export default function BookingPage() {
     const [company, setCompany] = useState<Company | null>(null);
     const [staff, setStaff] = useState<User[]>([]);
     const [services, setServices] = useState<Service[]>([]);
+    const [packages, setPackages] = useState<any[]>([]);
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -40,18 +52,11 @@ export default function BookingPage() {
         };
     }, [step, navigate, initialStaffId]);
 
-    const [selection, setSelection] = useState<{
-        staffId: number | null;
-        serviceId: number | null;
-        serviceIds: number[];
-        date: string | null;
-        time: string | null;
-        customerName: string;
-        customerPhone: string;
-    }>({
+    const [selection, setSelection] = useState<SelectionState>({
         staffId: initialStaffId,
         serviceId: null,
         serviceIds: [],
+        packageId: null as number | null,
         date: null,
         time: null,
         customerName: '',
@@ -107,12 +112,16 @@ export default function BookingPage() {
                     }
                 }
 
-                // 2. Services
+                // 2. Services & Packages
                 try {
-                    const servicesRes = await api.get('/services', { params: { company_id: id } });
+                    const [servicesRes, packagesRes] = await Promise.all([
+                        api.get('/services', { params: { company_id: id } }),
+                        api.get('/packages', { params: { company_id: id } })
+                    ]);
                     setServices(servicesRes.data?.data || []);
+                    setPackages(packagesRes.data?.data || []);
                 } catch (e) {
-                    console.error('Failed to load services', e);
+                    console.error('Failed to load services or packages', e);
                 }
 
                 // 3. Employees (Staff)
@@ -156,8 +165,14 @@ export default function BookingPage() {
 
     const generateTimeSlots = () => {
         if (!company || !selection.date) return [];
-        const selectedServices = services.filter(s => selection.serviceIds.includes(s.id!));
-        const duration = selectedServices.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+        let duration = 0;
+        if (selection.packageId) {
+            const pkg = packages.find(p => p.id === selection.packageId);
+            duration = pkg?.duration_minutes || 0;
+        } else {
+            const selectedServices = services.filter(s => selection.serviceIds.includes(s.id!));
+            duration = selectedServices.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+        }
 
         if (duration === 0) return [];
 
@@ -219,9 +234,22 @@ export default function BookingPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const selectedServices = services.filter(s => selection.serviceIds.includes(s.id!));
-            const duration = selectedServices.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
-            const totalPrice = selectedServices.reduce((sum, s) => sum + Number(s.price), 0);
+            let duration = 0;
+            let totalPrice = 0;
+            let serviceIds = [...selection.serviceIds];
+
+            if (selection.packageId) {
+                const pkg = packages.find(p => p.id === selection.packageId);
+                if (pkg) {
+                    duration = pkg.duration_minutes;
+                    totalPrice = Number(pkg.price);
+                    serviceIds = pkg.services?.map((s: any) => s.id) || [];
+                }
+            } else {
+                const selectedServices = services.filter(s => selection.serviceIds.includes(s.id!));
+                duration = selectedServices.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+                totalPrice = selectedServices.reduce((sum, s) => sum + Number(s.price), 0);
+            }
 
             const [h, m] = (selection.time || '00:00').split(':').map(Number);
             const newStart = h * 60 + m;
@@ -229,6 +257,9 @@ export default function BookingPage() {
             const endH = Math.floor(newEnd / 60);
             const endM = newEnd % 60;
             const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+            const serviceNames = selection.packageId
+                ? packages.find(p => p.id === selection.packageId)?.name
+                : services.filter(s => selection.serviceIds.includes(s.id!)).map(s => s.name).join(', ');
 
             // Çakışma kontrolü - son güvenlik katmanı
             const staffApps = appointments.filter(a => {
@@ -263,14 +294,15 @@ export default function BookingPage() {
             const res = await api.post('/appointments', {
                 company_id: Number(id),
                 staff_id: selection.staffId,
-                service_id: selection.serviceIds[0], // Primary for backward support
-                service_ids: selection.serviceIds,
+                service_id: serviceIds[0],
+                service_ids: serviceIds,
+                package_id: selection.packageId,
                 appointment_date: selection.date,
                 start_time: selection.time,
                 end_time: endTime,
                 customer_name: selection.customerName,
                 customer_phone: selection.customerPhone,
-                notes: `Müşteri: ${selection.customerName} | Tel: ${selection.customerPhone} | ${selectedServices.map(s => s.name).join(', ')}`,
+                notes: `Müşteri: ${selection.customerName} | Tel: ${selection.customerPhone} | ${serviceNames}`,
                 price: totalPrice,
                 device_id: deviceId,
                 status: 'pending'
@@ -334,8 +366,17 @@ export default function BookingPage() {
     );
 
     const selectedStaffUser = staff.find(u => (u.id === selection.staffId) || ((u as any).user_id === selection.staffId));
-    const selectedSvs = services.filter(s => selection.serviceIds.includes(s.id!));
-    const totalPrice = selectedSvs.reduce((sum, s) => sum + Number(s.price), 0);
+    let totalPrice = 0;
+    let selectedSvsNames = '';
+    if (selection.packageId) {
+        const pkg = packages.find(p => p.id === selection.packageId);
+        totalPrice = Number(pkg?.price || 0);
+        selectedSvsNames = pkg?.name || '';
+    } else {
+        const selectedSvs = services.filter(s => selection.serviceIds.includes(s.id!));
+        totalPrice = selectedSvs.reduce((sum, s) => sum + Number(s.price), 0);
+        selectedSvsNames = selectedSvs.map(s => s.name).join(', ');
+    }
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -407,48 +448,99 @@ export default function BookingPage() {
                     </div>
                 )}
 
-                {/* Step 2: Service Selection */}
+                {/* Step 2: Service/Package Selection */}
                 {step === 2 && (
                     <div className="animate-in slide-in-from-right duration-300 fade-in pb-32">
                         <button onClick={handleBack} className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 hover:text-gray-600">← Geri</button>
                         <h2 className="text-2xl font-black text-gray-900 mb-2">Hizmet Seçimi</h2>
-                        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-6">Birden fazla hizmet seçebilirsiniz</p>
 
-                        <div className="space-y-3">
-                            {services.map(s => {
-                                const isSelected = selection.serviceIds.includes(s.id!);
-                                return (
-                                    <button
-                                        key={s.id}
-                                        onClick={() => {
-                                            const newIds = isSelected
-                                                ? selection.serviceIds.filter(id => id !== s.id)
-                                                : [...selection.serviceIds, s.id!];
-                                            setSelection({ ...selection, serviceIds: newIds });
-                                        }}
-                                        className={`w-full p-5 rounded-[2rem] border-2 transition-all flex items-center gap-4 text-left ${isSelected ? 'bg-indigo-50 border-indigo-500 shadow-lg' : 'bg-white border-transparent shadow-sm'}`}
-                                    >
-                                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-indigo-500 border-indigo-500 text-white' : 'bg-white border-slate-200'}`}>
-                                            {isSelected && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                                        </div>
-                                        <div className="flex-1">
-                                            <h3 className={`font-black text-sm uppercase tracking-tight ${isSelected ? 'text-indigo-900' : 'text-slate-900'}`}>{s.name}</h3>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.duration_minutes} dakika</p>
-                                        </div>
-                                        <div className={`font-black text-base ${isSelected ? 'text-indigo-600' : 'text-slate-900'}`}>₺{s.price}</div>
-                                    </button>
-                                );
-                            })}
+                        <div className="flex gap-4 mb-6">
+                            <button
+                                onClick={() => setSelection({ ...selection, packageId: null })}
+                                className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all ${!selection.packageId ? 'bg-[#b45309] text-white shadow-lg shadow-orange-500/20' : 'bg-white text-slate-400 border border-slate-100'}`}
+                            >
+                                Tekli Hizmetler
+                            </button>
+                            <button
+                                onClick={() => setSelection({ ...selection, serviceIds: [], packageId: packages[0]?.id || null })}
+                                className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all ${selection.packageId ? 'bg-[#b45309] text-white shadow-lg shadow-orange-500/20' : 'bg-white text-slate-400 border border-slate-100'}`}
+                            >
+                                Avantajlı Paketler
+                            </button>
                         </div>
+
+                        {!selection.packageId ? (
+                            <div className="space-y-3">
+                                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4 ml-2">İstediğiniz hizmetleri seçin</p>
+                                {services.map(s => {
+                                    const isSelected = selection.serviceIds.includes(s.id!);
+                                    return (
+                                        <button
+                                            key={s.id}
+                                            onClick={() => {
+                                                const newIds = isSelected
+                                                    ? selection.serviceIds.filter(id => id !== s.id)
+                                                    : [...selection.serviceIds, s.id!];
+                                                setSelection({ ...selection, serviceIds: newIds });
+                                            }}
+                                            className={`w-full p-5 rounded-[2rem] border-2 transition-all flex items-center gap-4 text-left ${isSelected ? 'bg-indigo-50 border-indigo-500 shadow-lg' : 'bg-white border-transparent shadow-sm'}`}
+                                        >
+                                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-indigo-500 border-indigo-500 text-white' : 'bg-white border-slate-200'}`}>
+                                                {isSelected && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                                            </div>
+                                            <div className="flex-1">
+                                                <h3 className={`font-black text-sm uppercase tracking-tight ${isSelected ? 'text-indigo-900' : 'text-slate-900'}`}>{s.name}</h3>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.duration_minutes} dakika</p>
+                                            </div>
+                                            <div className={`font-black text-base ${isSelected ? 'text-indigo-600' : 'text-slate-900'}`}>₺{s.price}</div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-4 ml-2">Size özel hazırlanmış paketler</p>
+                                {packages.map(p => {
+                                    const isSelected = selection.packageId === p.id;
+                                    return (
+                                        <button
+                                            key={p.id}
+                                            onClick={() => setSelection({ ...selection, packageId: p.id, serviceIds: [] })}
+                                            className={`w-full p-6 rounded-[2.5rem] border-2 transition-all text-left relative overflow-hidden ${isSelected ? 'bg-amber-50 border-amber-500 shadow-xl' : 'bg-white border-transparent shadow-sm'}`}
+                                        >
+                                            {isSelected && (
+                                                <div className="absolute top-0 right-0 bg-amber-500 text-white px-4 py-1 rounded-bl-2xl text-[8px] font-black uppercase tracking-widest shadow-lg">SEÇİLDİ</div>
+                                            )}
+                                            <h3 className={`font-black text-lg uppercase tracking-tight mb-1 ${isSelected ? 'text-amber-900' : 'text-slate-900'}`}>{p.name}</h3>
+                                            <div className="flex flex-wrap gap-1.5 mb-4">
+                                                {p.services?.map((ps: any) => (
+                                                    <span key={ps.id} className={`px-2 py-0.5 rounded-lg text-[8px] font-bold uppercase ${isSelected ? 'bg-amber-200/50 text-amber-700' : 'bg-slate-50 text-slate-400'}`}>
+                                                        {ps.name}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                            <div className="flex items-center justify-between mt-auto">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{p.duration_minutes} DK</span>
+                                                    <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{p.services?.length || 0} HİZMET</span>
+                                                </div>
+                                                <div className="text-xl font-black text-amber-600">₺{p.price}</div>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
 
                         {/* Sticky Next Button */}
                         <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white to-transparent z-50">
                             <button
-                                disabled={selection.serviceIds.length === 0}
+                                disabled={selection.serviceIds.length === 0 && !selection.packageId}
                                 onClick={handleNext}
                                 className="w-full max-w-md mx-auto block bg-slate-900 text-white py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-2xl disabled:opacity-30 disabled:grayscale transition-all hover:bg-indigo-600 active:scale-95"
                             >
-                                Devam Et ({selection.serviceIds.length} Hizmet)
+                                Devam Et {selection.packageId ? '(Paket Seçildi)' : selection.serviceIds.length > 0 ? `(${selection.serviceIds.length} Hizmet)` : ''}
                             </button>
                         </div>
                     </div>
@@ -627,7 +719,7 @@ export default function BookingPage() {
                                     <div className="text-left flex-1">
                                         <h3 className="font-black text-slate-900 text-base uppercase tracking-tight">{selectedStaffUser?.first_name} {selectedStaffUser?.last_name}</h3>
                                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-                                            {selectedSvs.map(s => s.name).join(', ')}
+                                            {selectedSvsNames}
                                         </p>
                                         <p className="text-indigo-600 text-xs font-black mt-1">₺{totalPrice}</p>
                                     </div>

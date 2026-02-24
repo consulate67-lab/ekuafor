@@ -58,7 +58,11 @@ export default function CompanyPanel() {
 
     // Services states
     const [companyServices, setCompanyServices] = useState<any[]>([]);
+    const [packages, setPackages] = useState<any[]>([]);
+    const [activeServiceTab, setActiveServiceTab] = useState<'services' | 'packages'>('services');
     const [showServiceModal, setShowServiceModal] = useState(false);
+    const [showPackageModal, setShowPackageModal] = useState(false);
+    const [showTemplatesModal, setShowTemplatesModal] = useState(false);
     const [serviceForm, setServiceForm] = useState({
         id: null as number | null,
         name: '',
@@ -66,7 +70,16 @@ export default function CompanyPanel() {
         duration_minutes: 30,
         price: 0
     });
+    const [packageForm, setPackageForm] = useState({
+        id: null as number | null,
+        name: '',
+        description: '',
+        duration_minutes: 0,
+        price: 0,
+        service_ids: [] as number[]
+    });
     const [isSavingService, setIsSavingService] = useState(false);
+    const [isSavingPackage, setIsSavingPackage] = useState(false);
 
     // AI states
     const [aiRules, setAiRules] = useState('');
@@ -148,14 +161,16 @@ export default function CompanyPanel() {
 
     const fetchData = async (companyId: number) => {
         try {
-            const [deptRes, staffRes, svcRes] = await Promise.all([
+            const [deptRes, staffRes, svcRes, pkgRes] = await Promise.all([
                 api.get('/departments', { params: { company_id: companyId } }),
                 api.get(`/companies/${companyId}/staff-boards`),
-                api.get('/services', { params: { company_id: companyId } })
+                api.get('/services', { params: { company_id: companyId } }),
+                api.get('/packages', { params: { company_id: companyId } })
             ]);
-            setDepartments(deptRes.data?.data || []);
-            setStaffBoards(staffRes.data?.data || []);
-            setCompanyServices(svcRes.data?.data || []);
+            setDepartments(deptRes.data?.data || deptRes.data || []);
+            setStaffBoards(staffRes.data?.data || staffRes.data || []);
+            setCompanyServices(svcRes.data?.data || svcRes.data || []);
+            setPackages(pkgRes.data?.data || pkgRes.data || []);
         } catch (e) {
             console.error('Data fetch error', e);
         }
@@ -313,6 +328,7 @@ export default function CompanyPanel() {
             if (serviceForm.id) {
                 // Güncelle
                 await api.put(`/services/${serviceForm.id}`, {
+                    company_id: company.id,
                     name: serviceForm.name.trim(),
                     description: serviceForm.description.trim(),
                     duration_minutes: serviceForm.duration_minutes,
@@ -321,6 +337,7 @@ export default function CompanyPanel() {
             } else {
                 // Yeni ekle
                 await api.post('/services', {
+                    company_id: company.id,
                     name: serviceForm.name.trim(),
                     description: serviceForm.description.trim(),
                     duration_minutes: serviceForm.duration_minutes,
@@ -347,6 +364,114 @@ export default function CompanyPanel() {
         }
     };
 
+    const handleSavePackage = async () => {
+        if (!packageForm.name.trim() || !company) return;
+        if (packageForm.service_ids.length === 0) {
+            alert('Lütfen en az bir hizmet seçin');
+            return;
+        }
+        if (companyServices.length === 0) {
+            alert('Paket oluşturmak için önce hizmet eklemelisiniz.');
+            return;
+        }
+        setIsSavingPackage(true);
+        try {
+            if (packageForm.id) {
+                await api.put(`/packages/${packageForm.id}`, {
+                    ...packageForm,
+                    company_id: company.id
+                });
+            } else {
+                await api.post('/packages', {
+                    name: packageForm.name.trim(),
+                    description: packageForm.description.trim(),
+                    duration_minutes: packageForm.duration_minutes,
+                    price: packageForm.price,
+                    service_ids: packageForm.service_ids
+                });
+            }
+            setPackageForm({ id: null, name: '', description: '', duration_minutes: 0, price: 0, service_ids: [] });
+            setShowPackageModal(false);
+            fetchData(company.id);
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Paket kaydedilemedi');
+        } finally {
+            setIsSavingPackage(false);
+        }
+    };
+
+    const handleDeletePackage = async (id: number) => {
+        if (!confirm('Bu paketi silmek istediğinize emin misiniz?')) return;
+        try {
+            await api.delete(`/packages/${id}`);
+            fetchData(company.id);
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Paket silinemedi');
+        }
+    };
+
+    const toggleServiceInPackage = (serviceId: number) => {
+        const currentIds = [...packageForm.service_ids];
+        const index = currentIds.indexOf(serviceId);
+
+        if (index > -1) {
+            currentIds.splice(index, 1);
+        } else {
+            currentIds.push(serviceId);
+        }
+
+        // Calculate total duration and price from selected services
+        const selectedServices = companyServices.filter(s => currentIds.includes(s.id!));
+        const totalDuration = selectedServices.reduce((sum, s) => sum + s.duration_minutes, 0);
+        const totalPrice = selectedServices.reduce((sum, s) => sum + Number(s.price), 0);
+
+        setPackageForm({
+            ...packageForm,
+            service_ids: currentIds,
+            duration_minutes: totalDuration,
+            price: totalPrice
+        });
+    };
+
+    const handleAddFromTemplate = async (template: any) => {
+        if (!company) return;
+        setIsSavingService(true);
+        try {
+            await api.post('/services', {
+                name: template.name,
+                description: template.description || '',
+                duration_minutes: template.duration,
+                price: template.price
+            });
+            fetchData(company.id);
+        } catch (err: any) {
+            alert('Hizmet eklenirken hata: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setIsSavingService(false);
+        }
+    };
+
+    const templates = {
+        men: [
+            { name: 'Saç Kesimi', duration: 30, price: 200, description: 'Yıkama dahil saç kesimi' },
+            { name: 'Sakal Tıraşı', duration: 15, price: 100, description: 'Sakal düzeltme ve şekillendirme' },
+            { name: 'Saç & Sakal', duration: 45, price: 280, description: 'Komple bakım paketi' },
+            { name: 'Çocuk Tıraşı', duration: 20, price: 150, description: '12 yaş altı' },
+            { name: 'Saç Boyama', duration: 60, price: 500, description: 'Dip boya veya komple' },
+            { name: 'Fön', duration: 15, price: 80, description: 'Yıkama ve fön' }
+        ],
+        women: [
+            { name: 'Saç Kesimi', duration: 45, price: 300, description: 'Yıkama ve şekillendirme dahil' },
+            { name: 'Fön', duration: 30, price: 150, description: 'Düz veya dalgalı fön' },
+            { name: 'Dip Boya', duration: 90, price: 600, description: 'Dip boyama işlemi' },
+            { name: 'Komple Boya', duration: 120, price: 1000, description: 'Tüm saç boyama' },
+            { name: 'Ombre / Balyaj', duration: 180, price: 2000, description: 'Açma boyama işlemleri' },
+            { name: 'Manikür', duration: 30, price: 200, description: 'Klasik manikür' },
+            { name: 'Pedikür', duration: 45, price: 300, description: 'Klasik pedikür' },
+            { name: 'Kaş Bıyık', duration: 15, price: 100, description: 'İple veya ağda ile' }
+        ]
+    };
+
     const handleSaveAIRules = () => {
         if (!company) return;
         setIsSavingAI(true);
@@ -364,10 +489,13 @@ export default function CompanyPanel() {
 
     const handleLogout = () => {
         localStorage.removeItem('company_admin_key');
+        localStorage.removeItem('token');
         setCompany(null);
         setInputKey('');
         setDepartments([]);
         setStaffBoards([]);
+        setCompanyServices([]);
+        setPackages([]);
     };
 
     const copyText = (text: string, field: string) => {
@@ -960,64 +1088,159 @@ export default function CompanyPanel() {
 
                     {/* SERVICES TAB */}
                     {activeTab === 'services' && (
-                        <div className="space-y-4">
-                            <button
-                                onClick={() => {
-                                    setServiceForm({ id: null, name: '', description: '', duration_minutes: 30, price: 0 });
-                                    setShowServiceModal(true);
-                                }}
-                                className="w-full py-5 bg-gradient-to-r from-pink-600 to-rose-600 text-white rounded-2xl font-black text-base tracking-wide shadow-xl shadow-pink-500/20 active:scale-95 transition-all"
-                            >
-                                + Yeni Hizmet Ekle
-                            </button>
+                        <div className="space-y-6">
+                            {/* Nested Tabs for Services/Packages */}
+                            <div className="flex bg-white/50 backdrop-blur-sm p-1.5 rounded-2xl border border-slate-100 shadow-sm gap-1 self-start">
+                                <button
+                                    onClick={() => setActiveServiceTab('services')}
+                                    className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeServiceTab === 'services' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:bg-slate-50'}`}
+                                >
+                                    Hizmetler
+                                </button>
+                                <button
+                                    onClick={() => setActiveServiceTab('packages')}
+                                    className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeServiceTab === 'packages' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:bg-slate-50'}`}
+                                >
+                                    Paketler
+                                </button>
+                            </div>
 
-                            {companyServices.length === 0 ? (
-                                <div className="bg-white rounded-3xl p-10 text-center shadow-lg shadow-slate-200/20">
-                                    <span className="text-4xl mb-3 block">✂️</span>
-                                    <p className="text-slate-400 font-bold">Henüz hizmet tanımlanmadı</p>
-                                    <p className="text-slate-300 text-xs mt-1">Firmanız için hizmet listesi oluşturun</p>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {companyServices.map(svc => (
-                                        <div key={svc.id} className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/20 relative group">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div>
-                                                    <h3 className="font-black text-slate-900 text-lg">{svc.name}</h3>
-                                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
-                                                        ⏱️ {svc.duration_minutes} dk • 💰 {svc.price} ₺
-                                                    </p>
-                                                </div>
-                                                <div className="flex bg-slate-50 rounded-xl p-1 gap-1">
-                                                    <button
-                                                        onClick={() => {
-                                                            setServiceForm({
-                                                                id: svc.id,
-                                                                name: svc.name,
-                                                                description: svc.description || '',
-                                                                duration_minutes: svc.duration_minutes,
-                                                                price: svc.price
-                                                            });
-                                                            setShowServiceModal(true);
-                                                        }}
-                                                        className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-400 hover:text-indigo-600 transition-all"
-                                                    >
-                                                        ✏️
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteService(svc.id)}
-                                                        className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-400 hover:text-red-600 transition-all"
-                                                    >
-                                                        🗑️
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            {svc.description && (
-                                                <p className="text-sm text-slate-500 mt-2 line-clamp-2">{svc.description}</p>
-                                            )}
+                            {activeServiceTab === 'services' ? (
+                                <>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setShowTemplatesModal(true)}
+                                            className="flex-1 py-5 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            📋 Şablonlardan Ekle
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setServiceForm({ id: null, name: '', description: '', duration_minutes: 30, price: 0 });
+                                                setShowServiceModal(true);
+                                            }}
+                                            className="flex-[2] py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl font-black text-base tracking-wide shadow-xl shadow-indigo-500/20 active:scale-95 transition-all"
+                                        >
+                                            + Yeni Hizmet Ekle
+                                        </button>
+                                    </div>
+
+                                    {companyServices.length === 0 ? (
+                                        <div className="bg-white rounded-3xl p-10 text-center shadow-lg shadow-slate-200/20">
+                                            <span className="text-4xl mb-3 block">✂️</span>
+                                            <p className="text-slate-400 font-bold">Henüz hizmet tanımlanmadı</p>
+                                            <p className="text-slate-300 text-xs mt-1">Firmanız için hizmet listesi oluşturun</p>
                                         </div>
-                                    ))}
-                                </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {companyServices.map(svc => (
+                                                <div key={svc.id} className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/20 relative group">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div>
+                                                            <h3 className="font-black text-slate-900 text-lg">{svc.name}</h3>
+                                                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+                                                                ⏱️ {svc.duration_minutes} dk • 💰 {svc.price} ₺
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex bg-slate-50 rounded-xl p-1 gap-1">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setServiceForm({
+                                                                        id: svc.id,
+                                                                        name: svc.name,
+                                                                        description: svc.description || '',
+                                                                        duration_minutes: svc.duration_minutes,
+                                                                        price: svc.price
+                                                                    });
+                                                                    setShowServiceModal(true);
+                                                                }}
+                                                                className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-400 hover:text-indigo-600 transition-all font-bold"
+                                                            >
+                                                                ✏️
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteService(svc.id)}
+                                                                className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-400 hover:text-red-600 transition-all font-bold"
+                                                            >
+                                                                🗑️
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    {svc.description && (
+                                                        <p className="text-sm text-slate-500 mt-2 line-clamp-2">{svc.description}</p>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={() => {
+                                            setPackageForm({ id: null, name: '', description: '', duration_minutes: 0, price: 0, service_ids: [] });
+                                            setShowPackageModal(true);
+                                        }}
+                                        className="w-full py-5 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-2xl font-black text-base tracking-wide shadow-xl shadow-amber-500/20 active:scale-95 transition-all"
+                                    >
+                                        + Yeni Paket Ekle
+                                    </button>
+
+                                    {packages.length === 0 ? (
+                                        <div className="bg-white rounded-3xl p-10 text-center shadow-lg shadow-slate-200/20">
+                                            <span className="text-4xl mb-3 block">🎁</span>
+                                            <p className="text-slate-400 font-bold">Henüz paket tanımlanmadı</p>
+                                            <p className="text-slate-300 text-xs mt-1">Firmanız için özel paketler oluşturun</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {packages.map(pkg => (
+                                                <div key={pkg.id} className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/20 relative group">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div>
+                                                            <h3 className="font-black text-slate-900 text-lg">{pkg.name}</h3>
+                                                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+                                                                ⏱️ {pkg.duration_minutes} dk • 💰 {pkg.price} ₺
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex bg-slate-50 rounded-xl p-1 gap-1">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setPackageForm({
+                                                                        id: pkg.id,
+                                                                        name: pkg.name,
+                                                                        description: pkg.description || '',
+                                                                        duration_minutes: pkg.duration_minutes,
+                                                                        price: pkg.price,
+                                                                        service_ids: pkg.services?.map((s: any) => s.id) || []
+                                                                    });
+                                                                    setShowPackageModal(true);
+                                                                }}
+                                                                className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-400 hover:text-indigo-600 transition-all font-bold"
+                                                            >
+                                                                ✏️
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeletePackage(pkg.id)}
+                                                                className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-400 hover:text-red-600 transition-all font-bold"
+                                                            >
+                                                                🗑️
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-1 mt-2">
+                                                        {pkg.services?.map((s: any) => (
+                                                            <span key={s.id} className="px-2 py-0.5 bg-slate-50 text-slate-500 rounded-md text-[9px] font-black uppercase">{s.name}</span>
+                                                        ))}
+                                                    </div>
+                                                    {pkg.description && (
+                                                        <p className="text-sm text-slate-500 mt-2 line-clamp-2">{pkg.description}</p>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     )}
@@ -1440,6 +1663,171 @@ export default function CompanyPanel() {
                                         className="flex-1 py-4 bg-pink-600 text-white rounded-2xl font-black text-base active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
                                     >
                                         {isSavingService ? 'Kaydediliyor...' : (serviceForm.id ? 'Güncelle' : 'Kaydet')}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Templates Modal */}
+            {showTemplatesModal && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setShowTemplatesModal(false)}>
+                    <div className="bg-white w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col relative" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setShowTemplatesModal(false)} className="absolute top-6 right-6 p-2 bg-slate-50 text-slate-400 rounded-full hover:bg-slate-100 transition-colors z-10">
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                        <div className="p-10 border-b border-slate-50 flex flex-col bg-slate-50/30">
+                            <h3 className="text-2xl font-black text-slate-900 tracking-tight">Hizmet Şablonları</h3>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Sık kullanılan hizmetleri hızlıca ekleyin</p>
+                        </div>
+                        <div className="p-10 overflow-y-auto">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                <div>
+                                    <h4 className="text-indigo-600 font-black uppercase tracking-widest text-xs mb-6 flex items-center gap-2">
+                                        <span className="w-2 h-2 bg-indigo-600 rounded-full"></span>
+                                        Erkek Kuaförü
+                                    </h4>
+                                    <div className="space-y-3">
+                                        {templates.men.map((t, i) => (
+                                            <div key={i} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-indigo-100 hover:bg-indigo-50/30 transition-all group">
+                                                <div>
+                                                    <p className="font-bold text-sm text-slate-900">{t.name}</p>
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">{t.duration} dk • ₺{t.price}</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        handleAddFromTemplate(t);
+                                                        setShowTemplatesModal(false);
+                                                    }}
+                                                    className="w-10 h-10 bg-white shadow-sm border border-slate-100 text-indigo-600 rounded-xl font-black flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 className="text-pink-600 font-black uppercase tracking-widest text-xs mb-6 flex items-center gap-2">
+                                        <span className="w-2 h-2 bg-pink-600 rounded-full"></span>
+                                        Kadın Kuaförü
+                                    </h4>
+                                    <div className="space-y-3">
+                                        {templates.women.map((t, i) => (
+                                            <div key={i} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-pink-100 hover:bg-pink-50/30 transition-all group">
+                                                <div>
+                                                    <p className="font-bold text-sm text-slate-900">{t.name}</p>
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">{t.duration} dk • ₺{t.price}</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        handleAddFromTemplate(t);
+                                                        setShowTemplatesModal(false);
+                                                    }}
+                                                    className="w-10 h-10 bg-white shadow-sm border border-slate-100 text-pink-600 rounded-xl font-black flex items-center justify-center group-hover:bg-pink-600 group-hover:text-white transition-all"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Package Modal */}
+            {
+                showPackageModal && (
+                    <div className="fixed inset-0 z-[200] flex items-end justify-center bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowPackageModal(false)}>
+                        <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}
+                            style={{ animation: 'slideUp 0.3s ease-out' }}>
+                            <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
+                            <h2 className="text-2xl font-black text-slate-900 mb-6">{packageForm.id ? 'Paketi Düzenle' : 'Yeni Paket'}</h2>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Paket Adı</label>
+                                    <input
+                                        type="text"
+                                        value={packageForm.name}
+                                        onChange={e => setPackageForm(p => ({ ...p, name: e.target.value }))}
+                                        placeholder="Örn: Gelin Paketi"
+                                        className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-amber-500 text-base font-bold text-slate-900 outline-none"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Hizmet Seçimi</label>
+                                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 bg-slate-50 rounded-2xl border border-slate-100">
+                                        {companyServices.length === 0 ? (
+                                            <div className="col-span-2 py-4 text-center">
+                                                <p className="text-[10px] text-slate-400">Henüz hizmet tanımlanmamış. Önce hizmet ekleyin.</p>
+                                            </div>
+                                        ) : companyServices.map(svc => (
+                                            <button
+                                                key={svc.id}
+                                                type="button"
+                                                onClick={() => toggleServiceInPackage(svc.id)}
+                                                className={`p-3 rounded-xl border text-left transition-all ${packageForm.service_ids.includes(svc.id) ? 'bg-amber-50 border-amber-200 text-amber-900 shadow-sm' : 'bg-white border-transparent text-slate-400'}`}
+                                            >
+                                                <p className="font-black text-[10px] truncate">{svc.name}</p>
+                                                <p className="text-[8px] opacity-60">{svc.duration_minutes} dk | ₺{svc.price}</p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <p className="text-[9px] text-slate-400 mt-2 ml-1">* Pakete dahil edilecek hizmetleri seçin</p>
+                                </div>
+
+                                <div className="flex gap-4">
+                                    <div className="flex-1">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Toplam Süre (Dk)</label>
+                                        <input
+                                            type="number"
+                                            value={packageForm.duration_minutes}
+                                            onChange={e => setPackageForm(p => ({ ...p, duration_minutes: parseInt(e.target.value) || 0 }))}
+                                            className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-amber-500 text-base font-bold text-slate-900 outline-none"
+                                        />
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Paket Ücreti (₺)</label>
+                                        <input
+                                            type="number"
+                                            value={packageForm.price}
+                                            onChange={e => setPackageForm(p => ({ ...p, price: parseFloat(e.target.value) || 0 }))}
+                                            className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-amber-500 text-base font-bold text-slate-900 outline-none"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Açıklama</label>
+                                    <textarea
+                                        value={packageForm.description}
+                                        onChange={e => setPackageForm(p => ({ ...p, description: e.target.value }))}
+                                        rows={3}
+                                        placeholder="Paket içeriği ve detaylar..."
+                                        className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-amber-500 text-base font-bold text-slate-900 outline-none resize-none"
+                                    />
+                                </div>
+
+                                <div className="flex gap-3 mt-6 pt-4">
+                                    <button
+                                        onClick={() => setShowPackageModal(false)}
+                                        className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-base active:scale-95 transition-all"
+                                    >
+                                        İptal
+                                    </button>
+                                    <button
+                                        onClick={handleSavePackage}
+                                        disabled={isSavingPackage}
+                                        className="flex-1 py-4 bg-amber-600 text-white rounded-2xl font-black text-base active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+                                    >
+                                        {isSavingPackage ? 'Kaydediliyor...' : (packageForm.id ? 'Güncelle' : 'Kaydet')}
                                     </button>
                                 </div>
                             </div>

@@ -102,13 +102,26 @@ export interface Service {
     is_active?: boolean;
 }
 
+export interface Package {
+    id?: number;
+    company_id: number;
+    name: string;
+    description?: string;
+    duration_minutes: number;
+    price: number;
+    is_active?: boolean;
+    services?: Service[];
+}
+
 export interface Appointment {
     id?: number;
     company_id: number;
     customer_id?: number;
     service_id: number;
     service_ids?: number[];
+    package_id?: number;
     staff_id?: number;
+    duration_minutes?: number;
     appointment_date: string;
     start_time: string;
     end_time: string;
@@ -120,7 +133,16 @@ export interface Appointment {
     rating?: number;
     comment?: string;
     service_name?: string;
+    package_name?: string;
     staff_name?: string;
     company_name?: string;
-    services?: any[];
+    services?: Array<{
+        id: number;
+        service_id?: number;
+        name?: string;
+        price: number;
+        duration_minutes: number;
+        staff_id?: number;
+        staff_name?: string;
+    }>;
 }

@@ -28,18 +28,20 @@ router.get('/ping', (req, res) => {
 // Tüm hizmetleri listele (Firma bazlı) - Hem '/' hem de boş string '' yakalasın
 // Tüm hizmetleri listele (Firma bazlı) - Hem '/' hem de boş string '' yakalasın
 const publicServiceHandler = async (req: Request, res: Response, next: any) => {
-    if (req.query.company_id) {
+    const { company_id } = req.query;
+    if (company_id) {
         try {
-            const companyId = parseInt(req.query.company_id as string);
-            console.log(`[GET /services] Public Access: Company=${companyId}`);
+            const companyId = parseInt(company_id as string);
+            console.log(`[GET /services] Public Access Attempt: Company=${companyId}`);
             if (isNaN(companyId)) {
+                console.log(`[GET /services] Invalid Company ID: ${company_id}`);
                 return res.status(400).json({ success: false, error: 'Geçersiz firma ID' });
             }
             const services = await serviceService.getServicesByCompany(companyId);
+            console.log(`[GET /services] Found ${services.length} services for Company=${companyId}`);
             return res.json({ success: true, data: services });
         } catch (error) {
             console.error('[GET /services] Public Error:', error);
-            // Pass to error handler
             return next(error);
         }
     }

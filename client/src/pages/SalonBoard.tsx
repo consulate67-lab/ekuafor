@@ -11,6 +11,7 @@ export default function SalonBoard() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [staff, setStaff] = useState<any[]>([]);
     const [services, setServices] = useState<any[]>([]);
+    const [packages, setPackages] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [currentHour, setCurrentHour] = useState(new Date().getHours());
@@ -30,10 +31,12 @@ export default function SalonBoard() {
         customerName: '',
         serviceId: '',
         serviceIds: [] as number[],
+        packageId: '',
         notes: '',
-        staffId: '',
+        staffId: '' as string | number,
         appointmentDate: '',
-        startTime: ''
+        startTime: '',
+        serviceStaffOverrides: {} as Record<number, number> // {serviceId: staffId}
     });
 
     // Helper to generate consistent color for staff
@@ -75,15 +78,17 @@ export default function SalonBoard() {
         try {
             const dateToFetch = date || selectedDate;
 
-            const [appsRes, staffRes, servRes] = await Promise.all([
+            const [appsRes, staffRes, servRes, pkgRes] = await Promise.all([
                 api.get('/appointments', { params: { company_id: compId, start_date: dateToFetch, end_date: dateToFetch } }),
                 api.get(`/companies/${compId}/employees`),
-                api.get('/services', { params: { company_id: compId } })
+                api.get('/services', { params: { company_id: compId } }),
+                api.get('/packages', { params: { company_id: compId } })
             ]);
 
             setAppointments(appsRes.data.data || []);
             setStaff(staffRes.data.data || []);
             setServices(servRes.data.data || []);
+            setPackages(pkgRes.data.data || []);
         } catch (err) {
             console.error('Veri senkronizasyonu başarısız', err);
         }
@@ -216,14 +221,31 @@ export default function SalonBoard() {
                 return;
             }
 
-            const sIds = fastForm.serviceIds.length > 0 ? fastForm.serviceIds : [(services[0]?.id || 1)];
-            const selectedServices = services.filter(s => sIds.includes(s.id));
-            const duration = selectedServices.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
-            const totalPrice = selectedServices.reduce((sum, s) => sum + Number(s.price), 0);
+            let totalDuration = 0;
+            let totalPrice = 0;
+            let sIds = [...fastForm.serviceIds];
+
+            if (fastForm.packageId) {
+                const pkg = packages.find(p => p.id === parseInt(fastForm.packageId));
+                if (pkg) {
+                    totalDuration = pkg.duration_minutes;
+                    totalPrice = Number(pkg.price);
+                    sIds = pkg.services?.map((s: any) => s.id) || [];
+                }
+            } else {
+                const selectedServices = services.filter(s => sIds.includes(s.id));
+                totalDuration = selectedServices.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+                totalPrice = selectedServices.reduce((sum, s) => sum + Number(s.price), 0);
+                if (sIds.length === 0 && services[0]) {
+                    sIds = [services[0].id];
+                    totalDuration = services[0].duration_minutes;
+                    totalPrice = Number(services[0].price);
+                }
+            }
 
             const [sh, sm] = startTime.split(':').map(Number);
             const newStart = sh * 60 + sm;
-            const newEnd = newStart + duration;
+            const newEnd = newStart + totalDuration;
             const eh = Math.floor(newEnd / 60);
             const em = newEnd % 60;
             const endTime = `${eh.toString().padStart(2, '0')}:${em.toString().padStart(2, '0')}`;
@@ -245,16 +267,36 @@ export default function SalonBoard() {
             });
 
             if (conflict) {
-                alert(`⚠️ Çakışma tespit edildi!\n\nSeçilen saat: ${startTime} - ${endTime} (${duration} dk)\nMevcut randevu: ${conflict.start_time} - ${conflict.end_time} (${conflict.customer_name || 'Misafir'})\n\nLütfen başka bir saat seçin.`);
+                alert(`⚠️ Çakışma tespit edildi!\n\nSeçilen saat: ${startTime} - ${endTime} (${totalDuration} dk)\nMevcut randevu: ${conflict.start_time} - ${conflict.end_time} (${conflict.customer_name || 'Misafir'})\n\nLütfen başka bir saat seçin.`);
                 setLoading(false);
                 return;
             }
+
+            const selectedPackage = fastForm.packageId ? packages.find(p => p.id === parseInt(fastForm.packageId)) : null;
+            const selectedServices = services.filter(s => sIds.includes(s.id));
+
+            // Map service selection to include requested staff
+            const sSelections = selectedPackage
+                ? selectedPackage.services.map((s: any) => ({
+                    id: s.id,
+                    price: s.price,
+                    duration_minutes: s.duration_minutes,
+                    staff_id: fastForm.serviceStaffOverrides[s.id] || Number(staffId)
+                }))
+                : selectedServices.map(s => ({
+                    id: s.id,
+                    price: s.price,
+                    duration_minutes: s.duration_minutes,
+                    staff_id: Number(staffId)
+                }));
 
             await api.post('/appointments', {
                 company_id: company.id,
                 staff_id: parseInt(staffId.toString()),
                 service_id: sIds[0],
                 service_ids: sIds,
+                services: sSelections, // Pass the detailed selections with staff_id
+                package_id: fastForm.packageId ? parseInt(fastForm.packageId) : null,
                 appointment_date: date,
                 start_time: startTime,
                 end_time: endTime,
@@ -265,7 +307,7 @@ export default function SalonBoard() {
             });
 
             setIsModalOpen(false);
-            setFastForm({ customerName: '', serviceId: '', serviceIds: [], notes: '', staffId: '', appointmentDate: '', startTime: '' });
+            setFastForm({ customerName: '', serviceId: '', serviceIds: [], packageId: '', notes: '', staffId: '', appointmentDate: '', startTime: '', serviceStaffOverrides: {} });
             setSelectedCell(null);
             if (company.id) await fetchData(company.id);
             window.location.reload();
@@ -427,13 +469,15 @@ export default function SalonBoard() {
                                         customerName: '',
                                         serviceId: services[0]?.id?.toString() || '',
                                         serviceIds: [] as number[],
+                                        packageId: '',
                                         notes: '',
                                         staffId: staff[0]?.user_id || staff[0]?.id || '',
                                         appointmentDate: selectedDate,
                                         startTime: hours.find(h => {
                                             const hNum = parseInt(h.split(':')[0]);
                                             return hNum >= currentHour;
-                                        }) || '09:00'
+                                        }) || '09:00',
+                                        serviceStaffOverrides: {}
                                     });
                                     setIsModalOpen(true);
                                 }}
@@ -575,10 +619,12 @@ export default function SalonBoard() {
                                                             customerName: '',
                                                             serviceId: services[0]?.id?.toString() || '',
                                                             serviceIds: [],
+                                                            packageId: '',
                                                             notes: '',
                                                             staffId: pId.toString(),
                                                             appointmentDate: selectedDate,
-                                                            startTime: hour
+                                                            startTime: hour,
+                                                            serviceStaffOverrides: {}
                                                         });
                                                         setIsModalOpen(true);
                                                     }}
@@ -676,28 +722,99 @@ export default function SalonBoard() {
                                     </div>
 
                                     <div className="space-y-4 col-span-1 md:col-span-2">
-                                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Hizmet Seçimi (Birden Fazla Seçebilirsiniz)</label>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-48 overflow-y-auto p-4 bg-slate-50 rounded-[2.5rem]">
-                                            {services.map(s => {
-                                                const isSelected = fastForm.serviceIds.includes(s.id);
-                                                return (
-                                                    <button
-                                                        key={s.id}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const newIds = isSelected
-                                                                ? fastForm.serviceIds.filter(id => id !== s.id)
-                                                                : [...fastForm.serviceIds, s.id];
-                                                            setFastForm({ ...fastForm, serviceIds: newIds });
-                                                        }}
-                                                        className={`p-3 rounded-2xl border-2 transition-all flex flex-col gap-1 text-center items-center justify-center ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-white border-transparent text-slate-600'}`}
-                                                    >
-                                                        <p className={`text-[9px] font-black uppercase leading-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{s.name}</p>
-                                                        <p className={`text-[8px] font-bold ${isSelected ? 'text-indigo-100' : 'text-slate-400'}`}>₺{s.price}</p>
-                                                    </button>
-                                                );
-                                            })}
+                                        <div className="flex gap-4 mb-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setFastForm({ ...fastForm, packageId: '' })}
+                                                className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${!fastForm.packageId ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}
+                                            >
+                                                Hizmetler
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFastForm({ ...fastForm, serviceIds: [], packageId: packages[0]?.id?.toString() || '' })}
+                                                className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${fastForm.packageId ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}
+                                            >
+                                                Paketler
+                                            </button>
                                         </div>
+
+                                        {!fastForm.packageId ? (
+                                            <>
+                                                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Hizmet Seçimi (Birden Fazla Seçebilirsiniz)</label>
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-48 overflow-y-auto p-4 bg-slate-50 rounded-[2.5rem]">
+                                                    {services.map(s => {
+                                                        const isSelected = fastForm.serviceIds.includes(s.id);
+                                                        return (
+                                                            <button
+                                                                key={s.id}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const newIds = isSelected
+                                                                        ? fastForm.serviceIds.filter(id => id !== s.id)
+                                                                        : [...fastForm.serviceIds, s.id];
+                                                                    setFastForm({ ...fastForm, serviceIds: newIds });
+                                                                }}
+                                                                className={`p-3 rounded-2xl border-2 transition-all flex flex-col gap-1 text-center items-center justify-center ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-white border-transparent text-slate-600'}`}
+                                                            >
+                                                                <p className={`text-[9px] font-black uppercase leading-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{s.name}</p>
+                                                                <p className={`text-[8px] font-bold ${isSelected ? 'text-indigo-100' : 'text-slate-400'}`}>₺{s.price}</p>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="space-y-3 max-h-64 overflow-y-auto p-4 bg-slate-50 rounded-[2.5rem]">
+                                                    {packages.map(p => {
+                                                        const isSelected = parseInt(fastForm.packageId) === p.id;
+                                                        return (
+                                                            <div key={p.id} className="space-y-4">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setFastForm({ ...fastForm, packageId: p.id.toString(), serviceIds: [], serviceStaffOverrides: {} })}
+                                                                    className={`w-full p-4 rounded-2xl border-2 transition-all flex flex-col gap-1 text-left ${isSelected ? 'bg-amber-600 border-amber-600 text-white shadow-lg' : 'bg-white border-transparent text-slate-600'}`}
+                                                                >
+                                                                    <p className={`text-xs font-black uppercase leading-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{p.name}</p>
+                                                                    <p className={`text-[8px] font-bold ${isSelected ? 'text-amber-100' : 'text-slate-400'}`}>₺{p.price} | {p.duration_minutes} dk</p>
+                                                                </button>
+
+                                                                {isSelected && (
+                                                                    <div className="pl-6 space-y-3 animate-in slide-in-from-left duration-300">
+                                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hizmet Personel Atamaları</p>
+                                                                        {p.services?.map((ps: any) => (
+                                                                            <div key={ps.id} className="flex items-center justify-between gap-4 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                                                                                <span className="text-[10px] font-black text-slate-700 uppercase truncate flex-1">{ps.name}</span>
+                                                                                <select
+                                                                                    value={fastForm.serviceStaffOverrides[ps.id] || fastForm.staffId || selectedCell?.person.user_id || selectedCell?.person.id}
+                                                                                    onChange={(e) => {
+                                                                                        setFastForm(prev => ({
+                                                                                            ...prev,
+                                                                                            serviceStaffOverrides: {
+                                                                                                ...prev.serviceStaffOverrides,
+                                                                                                [ps.id]: Number(e.target.value)
+                                                                                            }
+                                                                                        }));
+                                                                                    }}
+                                                                                    className="text-[10px] font-bold bg-slate-50 border-none rounded-lg p-1.5 outline-none focus:ring-2 focus:ring-indigo-500"
+                                                                                >
+                                                                                    {staff.map(s => (
+                                                                                        <option key={s.user_id || s.id} value={s.user_id || s.id}>
+                                                                                            {s.first_name} {s.last_name}
+                                                                                        </option>
+                                                                                    ))}
+                                                                                </select>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
 
                                     <div className="space-y-2">
@@ -794,7 +911,7 @@ export default function SalonBoard() {
                                                     </div>
                                                 ))
                                             ) : (
-                                                <p className="text-xl font-black text-slate-800 uppercase tracking-tight">{selectedAppointment.service_name || 'Hizmet Bilgisi Yok'}</p>
+                                                <p className="text-xl font-black text-slate-800 uppercase tracking-tight">{selectedAppointment.package_name || selectedAppointment.service_name || 'Hizmet Bilgisi Yok'}</p>
                                             )}
                                         </div>
                                         {selectedAppointment.services && selectedAppointment.services.length > 0 && (

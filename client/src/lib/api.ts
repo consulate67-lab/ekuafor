@@ -48,8 +48,13 @@ api.interceptors.request.use(
     async (config) => {
         // Token ekle
         const token = localStorage.getItem('token');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
+        if (token && token.length > 10) { // Basic validation
+            config.headers = config.headers || {};
+            config.headers['Authorization'] = `Bearer ${token}`;
+            // Also set via method if available (Axios v1+)
+            if (typeof (config.headers as any).set === 'function') {
+                (config.headers as any).set('Authorization', `Bearer ${token}`);
+            }
         }
 
         // MOCK SERVER KONTROLÜ

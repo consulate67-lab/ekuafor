@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.routes';
 import companyRoutes from './routes/company.routes';
 import addressRoutes from './routes/address.routes';
 import serviceRoutes from './routes/service.routes';
+import packageRoutes from './routes/package.routes';
 import appointmentRoutes from './routes/appointment.routes';
 import smsRoutes from './routes/sms.routes';
 import mapsRoutes from './routes/maps.routes';
@@ -110,6 +111,9 @@ app.use('/ekuafor/api/address', addressRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/ekuafor/api/services', serviceRoutes);
 
+app.use('/api/packages', packageRoutes);
+app.use('/ekuafor/api/packages', packageRoutes);
+
 app.use('/api/appointments', appointmentRoutes);
 app.use('/ekuafor/api/appointments', appointmentRoutes);
 
@@ -195,10 +199,42 @@ const runMigrations = async () => {
                 service_id INTEGER REFERENCES services(id) ON DELETE CASCADE,
                 price DECIMAL(10, 2), -- Snapshot of price at booking time
                 duration_minutes INTEGER, -- Snapshot of duration
+                staff_id INTEGER REFERENCES users(id), -- Specific staff for this service
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+        await pool.query('ALTER TABLE appointment_services ADD COLUMN IF NOT EXISTS staff_id INTEGER REFERENCES users(id)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_appointment_services_appointment ON appointment_services(appointment_id)');
+
+        // Package support
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS packages (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+                name VARCHAR(255) NOT NULL,
+                description TEXT,
+                duration_minutes INTEGER NOT NULL,
+                price DECIMAL(10, 2) NOT NULL,
+                is_active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS package_services (
+                id SERIAL PRIMARY KEY,
+                package_id INTEGER REFERENCES packages(id) ON DELETE CASCADE,
+                service_id INTEGER REFERENCES services(id) ON DELETE CASCADE,
+                order_index INTEGER DEFAULT 0
+            )
+        `);
+
+        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS package_id INTEGER REFERENCES packages(id)');
+
+        // Ensure is_active is true for existing rows if it was NULL (to fix visibility issues)
+        await pool.query('UPDATE services SET is_active = true WHERE is_active IS NULL');
+        await pool.query('UPDATE packages SET is_active = true WHERE is_active IS NULL');
 
         console.log('✅ Auto-migrations completed.');
     } catch (err) {
