@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/authStore';
 import api from '../lib/api';
 import { Company } from '../types';
 import { Geolocation } from '@capacitor/geolocation';
@@ -18,6 +19,7 @@ export default function CustomerHome() {
     const [locating, setLocating] = useState(false);
     const [selectedGender, setSelectedGender] = useState<string | null>(null);
     const [sort, setSort] = useState<'rating' | 'reviews'>('rating');
+    const { login: setLogin } = useAuthStore();
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [permissions, setPermissions] = useState<any>({
         location: 'unknown',
@@ -243,13 +245,19 @@ export default function CustomerHome() {
                     if (data.type === 'admin') {
                         navigate(data.redirect, { replace: true });
                     } else if (data.type === 'staff') {
-                        // JWT token'ı kaydet - Dashboard'a erişim için
+                        // JWT token'ı kaydet ve store'u güncelle - Dashboard'a erişim için
                         if (data.token) {
-                            localStorage.setItem('token', data.token);
+                            setLogin({
+                                id: data.user_id,
+                                email: `${data.board_code}@staff.local`,
+                                first_name: data.staff_name.split(' ')[0],
+                                last_name: data.staff_name.split(' ').slice(1).join(' '),
+                                role: 'company_admin',
+                                company_id: data.company_id
+                            } as any, data.token);
                         }
                         localStorage.setItem('staff_board_code', data.board_code);
-                        // replace current history entry so back button doesn't return to customer home
-                        window.location.replace(`${window.location.origin}${import.meta.env.BASE_URL}dashboard`);
+                        navigate('/dashboard', { replace: true });
                     } else if (data.type === 'board') {
                         localStorage.setItem('salon_board_key', data.board_key);
                         navigate(data.redirect, { replace: true });
@@ -355,9 +363,18 @@ export default function CustomerHome() {
                     const data = res.data.data;
                     if (data.type === 'admin') navigate(data.redirect, { replace: true });
                     else if (data.type === 'staff') {
-                        if (data.token) localStorage.setItem('token', data.token);
+                        if (data.token) {
+                            setLogin({
+                                id: data.user_id,
+                                email: `${data.board_code}@staff.local`,
+                                first_name: data.staff_name.split(' ')[0],
+                                last_name: data.staff_name.split(' ').slice(1).join(' '),
+                                role: 'company_admin',
+                                company_id: data.company_id
+                            } as any, data.token);
+                        }
                         localStorage.setItem('staff_board_code', data.board_code);
-                        window.location.replace(`${window.location.origin}${import.meta.env.BASE_URL}dashboard`);
+                        navigate('/dashboard', { replace: true });
                     } else if (data.type === 'board') {
                         localStorage.setItem('salon_board_key', data.board_key);
                         navigate(data.redirect, { replace: true });
