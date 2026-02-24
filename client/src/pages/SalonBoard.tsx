@@ -463,11 +463,11 @@ export default function SalonBoard() {
 
             {/* Matrix Container */}
             <div id="matrix-container" className="flex-1 overflow-auto p-4 lg:p-5 scroll-smooth bg-slate-50/50">
-                <div className="bg-white rounded-[1.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.04)] border border-slate-100 inline-block min-w-full overflow-hidden">
+                <div className="bg-white rounded-[1.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.04)] border border-slate-100 inline-block min-w-full">
                     <table className="w-full border-separate border-spacing-0">
                         <thead>
                             <tr className="bg-slate-900">
-                                <th className="sticky left-0 z-[60] bg-slate-900 p-4 lg:p-5 text-left border-b border-white/5 min-w-[240px] lg:min-w-[280px] shadow-[10px_0_30px_-15px_rgba(0,0,0,0.3)] rounded-tl-[1.5rem]">
+                                <th className="sticky top-0 left-0 z-[100] bg-slate-900 p-4 lg:p-5 text-left border-b border-white/5 min-w-[240px] lg:min-w-[280px] shadow-[10px_0_30px_-15px_rgba(0,0,0,0.3)] rounded-tl-[1.5rem]">
                                     <div className="flex flex-col">
                                         <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-0.5">Organizasyon</span>
                                         <span className="text-base font-black text-white tracking-tight">Uzmanlar</span>
@@ -482,7 +482,7 @@ export default function SalonBoard() {
                                         <th
                                             key={hour}
                                             id={`hour-col-${hNum}`}
-                                            className={`p-2 lg:p-3 text-center border-b border-white/5 min-w-[90px] transition-all relative ${isCurrent ? 'bg-white/10' : ''}`}
+                                            className={`sticky top-0 z-[80] p-2 lg:p-3 text-center border-b border-white/5 min-w-[90px] transition-all relative ${isCurrent ? 'bg-white/10' : 'bg-slate-900'}`}
                                         >
                                             <div className="flex flex-col items-center gap-0.5 transition-all">
                                                 <span className={`text-sm lg:text-base font-black tracking-tight ${isCurrent ? 'text-white' : isPast ? 'text-slate-600' : 'text-slate-400'}`}>
