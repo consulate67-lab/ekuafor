@@ -52,8 +52,19 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Upload APK
+      - name: Upload APK as Artifact
         uses: actions/upload-artifact@v4
         with:
           name: saloon-app-debug
           path: client/android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "client/android/app/build/outputs/apk/debug/app-debug.apk"
+          tag: "latest"
+          name: "Latest Mobile App (APK)"
+          body: "Saloon Mobil Uygulaması (Android APK). Bu sürüm her güncellemede otomatik olarak yenilenir."
+          allowUpdates: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          makeLatest: true
