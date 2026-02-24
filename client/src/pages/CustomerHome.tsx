@@ -35,6 +35,7 @@ export default function CustomerHome() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isScanning, setIsScanning] = useState(false);
+    const isScanningRef = useRef(false);
 
     const fetchData = async (query?: string, loc?: { lat: number, lng: number } | null, dist?: number) => {
         try {
@@ -283,12 +284,18 @@ export default function CustomerHome() {
     const toggleScanner = async () => {
         if (isScanning) {
             setIsScanning(false);
+            isScanningRef.current = false;
             if (videoRef.current && videoRef.current.srcObject) {
                 const stream = videoRef.current.srcObject as MediaStream;
                 stream.getTracks().forEach(track => track.stop());
             }
             return;
         }
+
+        setIsScanning(true);
+        isScanningRef.current = true;
+        setCodeChecking(false);
+        setCodeError('');
 
         try {
             // Enhanced permissions check for both Web and Native
@@ -297,6 +304,8 @@ export default function CustomerHome() {
                 if (perm.camera !== 'granted') {
                     const req = await Camera.requestPermissions();
                     if (req.camera !== 'granted') {
+                        setIsScanning(false);
+                        isScanningRef.current = false;
                         setCodeError('Kamera izni verilmedi. Lütfen ayarlardan izin verin.');
                         return;
                     }
@@ -304,10 +313,6 @@ export default function CustomerHome() {
             } catch (e) {
                 console.log('Native permission fail, falling back to browser prompts');
             }
-
-            // Loading state while camera starts
-            setCodeChecking(true);
-            setCodeError('');
 
             // Multi-constraint attempt for maximum compatibility
             const constraints = [
@@ -333,13 +338,20 @@ export default function CustomerHome() {
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
                 videoRef.current.setAttribute("playsinline", "true");
-                // Wait for video to be ready before playing to avoid "abort" errors on some tablets
-                videoRef.current.onloadedmetadata = () => {
-                    videoRef.current?.play().catch(e => console.error("Video play failed", e));
-                };
 
-                setIsScanning(true);
-                setCodeChecking(false);
+                // Force play
+                const playPromise = videoRef.current.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(() => {
+                        // Fallback to onloadedmetadata
+                        if (videoRef.current) {
+                            videoRef.current.onloadedmetadata = () => {
+                                videoRef.current?.play().catch(e => console.error("Video play failed", e));
+                            };
+                        }
+                    });
+                }
+
                 requestAnimationFrame(scanLoop);
             }
 
@@ -347,6 +359,7 @@ export default function CustomerHome() {
             console.error('Camera error:', err);
             setCodeChecking(false);
             setIsScanning(false);
+            isScanningRef.current = false;
 
             if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
                 setCodeError('Kamera izni reddedildi. Lütfen ayarlardan izin verin.');
@@ -357,7 +370,7 @@ export default function CustomerHome() {
     };
 
     const scanLoop = async () => {
-        if (!isScanning) return;
+        if (!isScanningRef.current) return;
 
         const video = videoRef.current;
         const canvas = canvasRef.current;
@@ -414,6 +427,7 @@ export default function CustomerHome() {
 
     const handleScanSuccess = (codeData: string) => {
         setIsScanning(false);
+        isScanningRef.current = false;
         setCodeInput(codeData);
         if (videoRef.current && videoRef.current.srcObject) {
             const stream = videoRef.current.srcObject as MediaStream;
@@ -790,34 +804,33 @@ export default function CustomerHome() {
                                 </button>
                             </div>
 
-                            {isScanning && (
-                                <div className="mb-6 bg-slate-950 rounded-[2.5rem] overflow-hidden aspect-square flex items-center justify-center relative shadow-2xl border-4 border-white">
-                                    <video
-                                        autoPlay
-                                        muted
-                                        playsInline
-                                        ref={videoRef}
-                                        className="w-full h-full object-cover opacity-80"
-                                    />
-                                    <canvas ref={canvasRef} className="hidden" />
+                            <div className={`${isScanning ? 'flex' : 'hidden'} mb-6 bg-slate-950 rounded-[2.5rem] overflow-hidden aspect-square items-center justify-center relative shadow-2xl border-4 border-white`}>
+                                <video
+                                    autoPlay
+                                    muted
+                                    playsInline
+                                    ref={videoRef}
+                                    className="w-full h-full object-cover opacity-80"
+                                />
+                                <canvas ref={canvasRef} className="hidden" />
 
-                                    {/* Scanner Overlay UI */}
-                                    <div className="absolute inset-x-12 inset-y-12 border-2 border-indigo-500/30 rounded-3xl">
-                                        <div className="absolute inset-0 border-[6px] border-indigo-500/80 rounded-3xl clip-corners"></div>
-                                        <div className="w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent absolute top-1/2 -translate-y-1/2 animate-scan shadow-[0_0_15px_rgba(79,70,229,0.5)]"></div>
-                                    </div>
+                                {/* Scanner Overlay UI */}
+                                <div className="absolute inset-x-12 inset-y-12 border-2 border-indigo-500/30 rounded-3xl">
+                                    <div className="absolute inset-0 border-[6px] border-indigo-500/80 rounded-3xl clip-corners"></div>
+                                    <div className="w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent absolute top-1/2 -translate-y-1/2 animate-scan shadow-[0_0_15px_rgba(79,70,229,0.5)]"></div>
+                                </div>
 
-                                    <div className="absolute top-6 left-0 right-0 text-center">
-                                        <span className="px-4 py-1.5 bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg animate-pulse">
-                                            Tarayıcı Aktif
-                                        </span>
-                                    </div>
+                                <div className="absolute top-6 left-0 right-0 text-center">
+                                    <span className="px-4 py-1.5 bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg animate-pulse">
+                                        Tarayıcı Aktif
+                                    </span>
+                                </div>
 
-                                    <p className="absolute bottom-6 left-0 right-0 text-center text-[10px] text-white/80 font-black uppercase tracking-[0.2em]">
-                                        QR Kodu Karenin İçine Getirin
-                                    </p>
+                                <p className="absolute bottom-6 left-0 right-0 text-center text-[10px] text-white/80 font-black uppercase tracking-[0.2em]">
+                                    QR Kodu Karenin İçine Getirin
+                                </p>
 
-                                    <style>{`
+                                <style>{`
                                         .clip-corners {
                                             mask: 
                                                 linear-gradient(#000 0 0) content-box,
@@ -834,8 +847,7 @@ export default function CustomerHome() {
                                             animation: scan 2s linear infinite;
                                         }
                                     `}</style>
-                                </div>
-                            )}
+                            </div>
 
                             {codeError && (
                                 <div className="bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-2xl text-sm font-bold text-center mb-4 animate-pulse">
