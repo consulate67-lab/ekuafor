@@ -80,7 +80,7 @@ class ReportService {
         // 2. Hourly Distribution (Uses chartFilter)
         const hourlyQuery = `
             SELECT 
-                CAST(SPLIT_PART(start_time, ':', 1) AS INTEGER) as hour,
+                EXTRACT(HOUR FROM start_time)::INTEGER as hour,
                 COUNT(*) as count
             FROM appointments
             WHERE company_id = $1 AND status != 'cancelled' AND ${chartFilter}
