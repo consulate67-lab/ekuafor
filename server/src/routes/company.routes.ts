@@ -278,16 +278,32 @@ router.post('/board-login', async (req: Request, res: Response) => {
 router.post('/admin-login', async (req: Request, res: Response) => {
     try {
         const { admin_key } = req.body;
-        if (!admin_key) {
-            return res.status(400).json({ success: false, error: 'Admin anahtarı gereklidir' });
-        }
-
         const result = await pool.query('SELECT * FROM companies WHERE UPPER(admin_key) = UPPER($1)', [admin_key]);
         if (result.rows.length === 0) {
             return res.status(404).json({ success: false, error: 'Geçersiz admin anahtarı' });
         }
 
-        res.json({ success: true, data: result.rows[0] });
+        const company = result.rows[0];
+
+        // JWT token oluştur - admin panelindeki korumalı rotalara erişim için
+        const token = jwt.sign(
+            {
+                userId: 0, // Admin users context'te 0 veya özel bir ID olabilir
+                email: company.email || `admin@${company.id}.local`,
+                role: 'company_admin',
+                companyId: company.id
+            },
+            process.env.JWT_SECRET || 'your-secret-key',
+            { expiresIn: '7d' }
+        );
+
+        res.json({
+            success: true,
+            data: {
+                company: company,
+                token: token
+            }
+        });
     } catch (error) {
         res.status(500).json({
             success: false,

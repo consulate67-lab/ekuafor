@@ -85,9 +85,12 @@ export default function CompanyPanel() {
         try {
             const res = await api.post('/companies/admin-login', { admin_key: key });
             if (res.data?.success && res.data.data) {
-                const comp = res.data.data;
+                const { company: comp, token } = res.data.data;
                 setCompany(comp);
                 localStorage.setItem('company_admin_key', key);
+                if (token) {
+                    localStorage.setItem('token', token);
+                }
                 setInputKey(key);
                 fetchData(comp.id);
 
