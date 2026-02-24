@@ -8,7 +8,8 @@ import { z } from 'zod';
 const router = Router();
 
 const appointmentSchema = z.object({
-    service_id: z.union([z.number(), z.string().transform(v => parseInt(v, 10))]),
+    service_id: z.union([z.number(), z.string().transform(v => parseInt(v, 10))]).optional(),
+    service_ids: z.array(z.number()).optional(),
     staff_id: z.union([z.number(), z.string().transform(v => parseInt(v, 10))]).optional().nullable(),
     appointment_date: z.string(),
     start_time: z.string(),
