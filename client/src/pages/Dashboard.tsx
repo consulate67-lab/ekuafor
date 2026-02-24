@@ -26,6 +26,14 @@ export default function Dashboard() {
         endTime: '09:30',
         price: 0
     });
+    const [employeeStats, setEmployeeStats] = useState({
+        total_appointments: 0,
+        total_revenue: 0
+    });
+    const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'year'>('today');
+    const [statsLoading, setStatsLoading] = useState(false);
+    const [showReports, setShowReports] = useState(false);
+
 
     const getLocalDateString = () => {
         const d = new Date();
@@ -103,6 +111,28 @@ export default function Dashboard() {
         };
         fetchStats();
     }, [user]);
+
+    const fetchEmployeeStats = async (period: 'today' | 'week' | 'month' | 'year') => {
+        if (user?.role !== 'staff') return;
+        setStatsLoading(true);
+        try {
+            const res = await api.get('/reports/employee-stats', { params: { period } });
+            if (res.data.success) {
+                setEmployeeStats(res.data.data);
+            }
+        } catch (e) {
+            console.error('Employee stats fetch error:', e);
+        } finally {
+            setStatsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (user?.role === 'staff') {
+            fetchEmployeeStats(selectedPeriod);
+        }
+    }, [user, selectedPeriod]);
+
 
     const speak = (text: string) => {
         if (!window.speechSynthesis) return;
@@ -338,10 +368,77 @@ export default function Dashboard() {
 
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                <div className="mb-10 text-center sm:text-left pt-4">
-                    <h2 className="text-xl font-black text-gray-900 mb-1">Merhaba, {user?.first_name}! 👋</h2>
-                    <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest leading-loose">İşletmenizi yönetmek için ihtiyacınız olan her şey burada.</p>
+                <div className="mb-10 flex flex-col sm:flex-row items-center gap-4 pt-4 sm:text-left text-center">
+                    {user?.photo ? (
+                        <img
+                            src={user.photo}
+                            alt={user.first_name}
+                            className="w-14 h-14 rounded-2xl object-cover shadow-md border-2 border-white"
+                        />
+                    ) : (
+                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-500 to-indigo-600 flex items-center justify-center text-white font-black text-xl shadow-md border-2 border-white">
+                            {user?.first_name?.[0]}{user?.last_name?.[0]}
+                        </div>
+                    )}
+                    <div>
+                        <h2 className="text-xl font-black text-gray-900 mb-1">Merhaba, {user?.first_name}! 👋</h2>
+                        <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest leading-loose">İşletmenizi yönetmek için ihtiyacınız olan her şey burada.</p>
+                    </div>
                 </div>
+
+                {/* Raporlama Bölümü - Modal Olarak Güncellendi */}
+                {showReports && (user?.role === 'staff' || user?.role === 'company_admin') && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+                        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowReports(false)}></div>
+
+                        <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+                            <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Çalışan Raporu</h3>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">İstatistiki veriler ve kazanç özeti</p>
+                                </div>
+                                <button onClick={() => setShowReports(false)} className="p-2 bg-white rounded-full shadow-sm text-slate-400 hover:text-slate-600">
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+
+                            <div className="p-8 space-y-8">
+                                <div className="flex bg-slate-100 p-1 rounded-2xl w-fit mx-auto">
+                                    {(['today', 'week', 'month', 'year'] as const).map((p) => (
+                                        <button
+                                            key={p}
+                                            onClick={() => setSelectedPeriod(p)}
+                                            className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${selectedPeriod === p
+                                                ? 'bg-white text-slate-900 shadow-sm'
+                                                : 'text-gray-400 hover:text-slate-600'
+                                                }`}
+                                        >
+                                            {p === 'today' ? 'Bugün' : p === 'week' ? 'Hafta' : p === 'month' ? 'Ay' : 'Yıl'}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pb-4">
+                                    <div className="bg-indigo-50/50 p-8 rounded-[2rem] border border-indigo-100 flex flex-col items-center text-center">
+                                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm mb-4">
+                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                        </div>
+                                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Toplam Randevu</p>
+                                        <p className={`text-4xl font-black text-indigo-900 ${statsLoading ? 'animate-pulse' : ''}`}>{employeeStats.total_appointments}</p>
+                                    </div>
+
+                                    <div className="bg-amber-50/50 p-8 rounded-[2rem] border border-amber-100 flex flex-col items-center text-center">
+                                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-amber-600 shadow-sm mb-4">
+                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3z" /><path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zM7.001 11a1 1 0 011-1h8a1 1 0 110 2h-8a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
+                                        </div>
+                                        <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1">Toplam Gelir</p>
+                                        <p className={`text-4xl font-black text-amber-900 ${statsLoading ? 'animate-pulse' : ''}`}>₺{employeeStats.total_revenue.toLocaleString()}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {/* Sesli Randevu (İşletme Sahibi ve Çalışan) - EN BAŞA ALINDI */}
@@ -437,6 +534,26 @@ export default function Dashboard() {
                         </a>
                     )}
 
+                    {/* Çalışan Raporu Butonu */}
+                    {(user?.role === 'company_admin' || user?.role === 'staff') && (
+                        <button
+                            onClick={() => setShowReports(true)}
+                            className="card group hover:scale-[1.02] transition-all duration-300 border-amber-100 text-left"
+                        >
+                            <div className="flex items-center gap-5">
+                                <div className="bg-amber-50 p-4 rounded-2xl group-hover:bg-amber-600 group-hover:text-white transition-colors duration-300">
+                                    <svg className="w-8 h-8 text-amber-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-gray-900 mb-1">Çalışan Raporu</h3>
+                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Kazanç ve randevu istatistiklerini gör.</p>
+                                </div>
+                            </div>
+                        </button>
+                    )}
+
                 </div>
 
                 {/* İstatistikler */}
@@ -451,21 +568,61 @@ export default function Dashboard() {
 
                     {/* Çalışan İstatistikleri */}
                     {user?.role === 'staff' && (
-                        <>
-                            <div className="card py-8 flex flex-col items-center justify-center border-none bg-gradient-to-br from-white to-gray-50">
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Aktif Randevu</p>
-                                <p className="text-5xl font-bold text-gray-300 tracking-tight">{stats.activeAppointments}</p>
+                        <div className="col-span-full space-y-8">
+                            {/* Rapor Filtreleri */}
+                            <div className="flex bg-white/50 backdrop-blur-sm p-1.5 rounded-2xl border border-gray-100 w-fit mx-auto sm:mx-0">
+                                {(['today', 'week', 'month', 'year'] as const).map((p) => (
+                                    <button
+                                        key={p}
+                                        onClick={() => setSelectedPeriod(p)}
+                                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${selectedPeriod === p
+                                            ? 'bg-slate-900 text-white shadow-lg'
+                                            : 'text-gray-400 hover:text-slate-600 hover:bg-white'
+                                            }`}
+                                    >
+                                        {p === 'today' ? 'Bugün' : p === 'week' ? 'Bu Hafta' : p === 'month' ? 'Bu Ay' : 'Bu Yıl'}
+                                    </button>
+                                ))}
                             </div>
-                            <div className="card py-8 flex flex-col items-center justify-center border-none bg-gradient-to-br from-white to-gray-50">
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Bugünkü Gelir</p>
-                                <p className="text-5xl font-bold text-gray-300 tracking-tight">₺{stats.todayIncome.toLocaleString()}</p>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <div className="card group relative overflow-hidden flex flex-col items-center justify-center border-none bg-gradient-to-br from-indigo-50/50 to-white hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-500 py-10">
+                                    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                                        <svg className="w-24 h-24 text-indigo-900" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                    </div>
+                                    <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] mb-3 relative z-10">Toplam Randevu</p>
+                                    <p className={`text-6xl font-black text-slate-900 tracking-tight relative z-10 ${statsLoading ? 'animate-pulse opacity-50' : ''}`}>
+                                        {employeeStats.total_appointments}
+                                    </p>
+                                    <div className="mt-4 flex items-center gap-2 px-3 py-1 bg-indigo-100/50 rounded-full">
+                                        <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></div>
+                                        <span className="text-[9px] font-black text-indigo-700 uppercase tracking-widest">Performans</span>
+                                    </div>
+                                </div>
+
+                                <div className="card group relative overflow-hidden flex flex-col items-center justify-center border-none bg-gradient-to-br from-amber-50/50 to-white hover:shadow-2xl hover:shadow-amber-500/10 transition-all duration-500 py-10">
+                                    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                                        <svg className="w-24 h-24 text-amber-900" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3z" />
+                                            <path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zM7.001 11a1 1 0 011-1h8a1 1 0 110 2h-8a1 1 0 01-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                    </div>
+                                    <p className="text-[10px] font-bold text-amber-600 uppercase tracking-[0.2em] mb-3 relative z-10">Toplam Gelir</p>
+                                    <p className={`text-6xl font-black text-slate-900 tracking-tight relative z-10 ${statsLoading ? 'animate-pulse opacity-50' : ''}`}>
+                                        <span className="text-3xl text-amber-600 mr-1">₺</span>
+                                        {employeeStats.total_revenue.toLocaleString()}
+                                    </p>
+                                    <div className="mt-4 flex items-center gap-2 px-3 py-1 bg-amber-100/50 rounded-full">
+                                        <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></div>
+                                        <span className="text-[9px] font-black text-amber-700 uppercase tracking-widest">Hakediş</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="card py-8 flex flex-col items-center justify-center border-none bg-gradient-to-br from-white to-gray-50">
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Toplam Müşteri</p>
-                                <p className="text-5xl font-bold text-gray-300 tracking-tight">{stats.customerCount}</p>
-                            </div>
-                        </>
+                        </div>
                     )}
+
                 </div>
 
                 {/* Footer Reset & Version */}

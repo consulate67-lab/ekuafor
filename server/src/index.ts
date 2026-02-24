@@ -12,6 +12,8 @@ import appointmentRoutes from './routes/appointment.routes';
 import smsRoutes from './routes/sms.routes';
 import mapsRoutes from './routes/maps.routes';
 import departmentRoutes from './routes/department.routes';
+import reportRoutes from './routes/report.routes';
+
 
 dotenv.config();
 
@@ -114,7 +116,9 @@ app.use('/api/maps', mapsRoutes);
 app.use('/ekuafor/api/maps', mapsRoutes);
 
 app.use('/api/departments', departmentRoutes);
-app.use('/ekuafor/api/departments', departmentRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/ekuafor/api/reports', reportRoutes);
+
 
 // Setup Route (For DB Init)
 import setupRoutes from './routes/setup.routes';
