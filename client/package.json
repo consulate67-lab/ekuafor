@@ -1,7 +1,7 @@
 {
     "name": "saloon-client",
     "private": true,
-    "version": "1.9.9",
+    "version": "2.0.0",
     "type": "module",
     "homepage": "https://consulate67-lab.github.io/ekuafor/",
     "scripts": {
@@ -17,6 +17,7 @@
     "dependencies": {
         "@capacitor/android": "^8.1.0",
         "@capacitor/app": "^8.0.1",
+        "@capacitor/camera": "^8.0.1",
         "@capacitor/cli": "^8.1.0",
         "@capacitor/core": "^8.1.0",
         "@capacitor/device": "^8.0.1",

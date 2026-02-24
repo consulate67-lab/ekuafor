@@ -26,8 +26,8 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Request logging
 app.use((req, res, next) => {
@@ -163,6 +163,7 @@ const runMigrations = async () => {
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS device_id VARCHAR(255)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS rating INTEGER CHECK (rating BETWEEN 1 AND 5)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS comment TEXT');
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS photo TEXT');
         await pool.query(`
             CREATE TABLE IF NOT EXISTS customer_devices (
                 id SERIAL PRIMARY KEY,

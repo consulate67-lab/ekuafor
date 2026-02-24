@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../lib/api';
+import { Camera, CameraResultType, CameraSource, CameraDirection } from '@capacitor/camera';
 
 interface Department {
     id: number;
@@ -15,6 +16,7 @@ interface StaffBoard {
     gender: string;
     department_id: number;
     department_name: string;
+    photo: string | null;
 }
 
 type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'ai';
@@ -47,7 +49,8 @@ export default function CompanyPanel() {
         first_name: '',
         last_name: '',
         gender: 'erkek',
-        department_id: ''
+        department_id: '',
+        photo: '' as string | null
     });
     const [copiedField, setCopiedField] = useState('');
     const [isCreating, setIsCreating] = useState(false);
@@ -149,9 +152,10 @@ export default function CompanyPanel() {
                 first_name: staffForm.first_name.trim(),
                 last_name: staffForm.last_name.trim(),
                 gender: staffForm.gender,
-                department_id: staffForm.department_id || null
+                department_id: staffForm.department_id || null,
+                photo: staffForm.photo
             });
-            setStaffForm({ first_name: '', last_name: '', gender: 'erkek', department_id: '' });
+            setStaffForm({ first_name: '', last_name: '', gender: 'erkek', department_id: '', photo: null });
             setShowStaffModal(false);
             fetchData(company.id);
         } catch (err: any) {
@@ -169,6 +173,97 @@ export default function CompanyPanel() {
             fetchData(company.id);
         } catch (err: any) {
             alert(err.response?.data?.error || 'Personel silinemedi');
+        }
+    };
+
+    const handleUpdateStaffPhoto = async (staffId: number, photoBase64: string) => {
+        try {
+            await api.patch(`/companies/${company.id}/staff/${staffId}/photo`, { photo: photoBase64 });
+            fetchData(company.id);
+        } catch (err: any) {
+            const msg = err.response?.data?.error || err.message || 'Fotoğraf güncellenemedi';
+            alert('Hata: ' + msg);
+        }
+    };
+
+    const handlePhotoSelection = async (isForNewStaff: boolean, staffId?: number) => {
+        try {
+            // Check if we are running in a native context or if Camera is available
+            const isNative = (window as any).Capacitor?.isNativePlatform();
+
+            if (isNative) {
+                const image = await Camera.getPhoto({
+                    quality: 80,
+                    allowEditing: true,
+                    resultType: CameraResultType.Base64,
+                    source: CameraSource.Prompt,
+                    direction: CameraDirection.Rear,
+                    width: 400,
+                    height: 400
+                });
+
+                if (image.base64String) {
+                    const base64String = `data:image/jpeg;base64,${image.base64String}`;
+                    if (isForNewStaff) {
+                        setStaffForm(p => ({ ...p, photo: base64String }));
+                    } else if (staffId) {
+                        handleUpdateStaffPhoto(staffId, base64String);
+                    }
+                }
+            } else {
+                // FALLBACK FOR WEB BROWSERS
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.onchange = (e: any) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const MAX_WIDTH = 400;
+                            const MAX_HEIGHT = 400;
+                            let width = img.width;
+                            let height = img.height;
+
+                            if (width > height) {
+                                if (width > MAX_WIDTH) {
+                                    height *= MAX_WIDTH / width;
+                                    width = MAX_WIDTH;
+                                }
+                            } else {
+                                if (height > MAX_HEIGHT) {
+                                    width *= MAX_HEIGHT / height;
+                                    height = MAX_HEIGHT;
+                                }
+                            }
+
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx?.drawImage(img, 0, 0, width, height);
+                            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+
+                            if (isForNewStaff) {
+                                setStaffForm(p => ({ ...p, photo: compressedBase64 }));
+                            } else if (staffId) {
+                                handleUpdateStaffPhoto(staffId, compressedBase64);
+                            }
+                        };
+                        img.src = event.target?.result as string;
+                    };
+                    reader.readAsDataURL(file);
+                };
+                input.click();
+            }
+        } catch (err: any) {
+            console.error('Camera/Selection error:', err);
+            if (err.message !== 'User cancelled photos app') {
+                alert('Fotoğraf seçiminde hata oluştu: ' + (err.message || 'Bilinmeyen hata'));
+            }
         }
     };
 
@@ -675,20 +770,40 @@ export default function CompanyPanel() {
                                 staffBoards.map(staff => (
                                     <div key={staff.id} className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/20">
                                         <div className="flex items-start justify-between mb-4">
-                                            <div>
-                                                <p className="font-black text-slate-900 text-xl">{staff.first_name} {staff.last_name}</p>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${staff.gender === 'erkek'
-                                                        ? 'bg-blue-50 text-blue-600'
-                                                        : 'bg-pink-50 text-pink-600'
-                                                        }`}>
-                                                        {staff.gender === 'erkek' ? '♂ Erkek' : '♀ Kadın'}
-                                                    </span>
-                                                    {staff.department_name && (
-                                                        <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[9px] font-black uppercase tracking-widest">
-                                                            {staff.department_name}
+                                            <div className="flex items-center gap-4">
+                                                <div className="relative group/photo flex-shrink-0">
+                                                    <div className="w-16 h-16 rounded-full bg-slate-100 border-2 border-white shadow-md overflow-hidden flex items-center justify-center">
+                                                        {staff.photo ? (
+                                                            <img src={staff.photo} alt={staff.first_name} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <span className="text-2xl">👤</span>
+                                                        )}
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handlePhotoSelection(false, staff.id)}
+                                                        className="absolute -bottom-1 -right-1 w-7 h-7 bg-indigo-600 text-white rounded-full flex items-center justify-center cursor-pointer shadow-lg hover:bg-indigo-700 transition-all border-2 border-white"
+                                                    >
+                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                                <div>
+                                                    <p className="font-black text-slate-900 text-xl">{staff.first_name} {staff.last_name}</p>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${staff.gender === 'erkek'
+                                                            ? 'bg-blue-50 text-blue-600'
+                                                            : 'bg-pink-50 text-pink-600'
+                                                            }`}>
+                                                            {staff.gender === 'erkek' ? '♂ Erkek' : '♀ Kadın'}
                                                         </span>
-                                                    )}
+                                                        {staff.department_name && (
+                                                            <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[9px] font-black uppercase tracking-widest">
+                                                                {staff.department_name}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -909,6 +1024,26 @@ export default function CompanyPanel() {
                         style={{ animation: 'slideUp 0.3s ease-out' }}>
                         <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
                         <h2 className="text-2xl font-black text-slate-900 mb-6">Personel Board Kodu Oluştur</h2>
+
+                        <div className="flex flex-col items-center mb-8">
+                            <div className="relative group">
+                                <div className="w-24 h-24 rounded-full bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden shadow-inner">
+                                    {staffForm.photo ? (
+                                        <img src={staffForm.photo} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="text-center">
+                                            <span className="text-4xl block mb-1">📷</span>
+                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Resim Seç</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <div
+                                    onClick={() => handlePhotoSelection(true)}
+                                    className="absolute inset-0 cursor-pointer flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/5 transition-all rounded-full"
+                                >
+                                </div>
+                            </div>
+                        </div>
 
                         <div className="space-y-4">
                             <div>

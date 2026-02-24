@@ -6,6 +6,7 @@ export interface User {
     phone?: string;
     role: 'super_admin' | 'company_admin' | 'staff' | 'customer';
     company_id?: number;
+    photo?: string | null;
     created_at: string;
 }
 

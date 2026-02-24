@@ -360,8 +360,12 @@ export default function BookingPage() {
                                     }}
                                     className="w-full bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-indigo-100 transition-all flex items-center gap-5 text-left group active:scale-[0.98]"
                                 >
-                                    <div className="w-16 h-16 bg-slate-50 text-[#1e1b4b] rounded-2xl flex items-center justify-center font-black text-xl group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner">
-                                        {u.first_name[0]}
+                                    <div className="w-16 h-16 bg-slate-50 text-[#1e1b4b] rounded-2xl flex items-center justify-center font-black text-xl group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner overflow-hidden">
+                                        {u.photo ? (
+                                            <img src={u.photo} alt={u.first_name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            u.first_name[0]
+                                        )}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <h3 className="font-black text-slate-900 text-lg group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{u.first_name} {u.last_name}</h3>
