@@ -300,12 +300,12 @@ export default function CustomerHome() {
                 console.log('Capacitor camera check skipped (not on native)');
             }
 
-            // Web context camera request
+            // Web context camera request - Better performance on mobile webviews
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     facingMode: 'environment',
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
+                    width: { ideal: 640 },
+                    height: { ideal: 640 }
                 }
             });
 
@@ -316,9 +316,10 @@ export default function CustomerHome() {
             setTimeout(() => {
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
-                    scanLoop();
+                    // Trigger scan after video is stable
+                    setTimeout(scanLoop, 1000);
                 }
-            }, 500);
+            }, 600);
 
         } catch (err: any) {
             console.error('Camera error:', err);
@@ -343,6 +344,15 @@ export default function CustomerHome() {
 
         const video = videoRef.current;
         const canvas = canvasRef.current;
+
+        // Safety check for jsQR
+        // @ts-ignore
+        if (!window.jsQR) {
+            console.error('jsQR not found! Retrying...');
+            requestAnimationFrame(scanLoop);
+            return;
+        }
+
         if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
             canvas.height = video.videoHeight;
             canvas.width = video.videoWidth;
@@ -410,8 +420,9 @@ export default function CustomerHome() {
 
     return (
         <div className="min-h-screen bg-slate-50">
-            {/* Header - Modern & Minimal */}
-            <header className="bg-white/80 backdrop-blur-md sticky top-0 z-40 border-b border-slate-100 safe-top">
+            {/* Header - Modern & Minimal - Optimized for mobile notches */}
+            <header className="bg-white/80 backdrop-blur-md sticky top-0 z-40 border-b border-slate-100"
+                style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
                 <div className="max-w-md mx-auto px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-slate-900 to-indigo-900 flex items-center justify-center shadow-lg shadow-indigo-500/20">

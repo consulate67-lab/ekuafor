@@ -76,6 +76,7 @@ export default function CompanyPanel() {
     const [reportData, setReportData] = useState<any>(null);
     const [reportPeriod, setReportPeriod] = useState<'today' | 'week' | 'month' | 'year'>('today');
     const [loadingReport, setLoadingReport] = useState(false);
+    const [reportError, setReportError] = useState('');
 
     const handleLogin = async (keyToUse?: string) => {
         const key = keyToUse || inputKey.trim();
@@ -119,11 +120,17 @@ export default function CompanyPanel() {
     const fetchReports = async (period: string) => {
         if (!company) return;
         setLoadingReport(true);
+        setReportError('');
         try {
             const res = await api.get('/reports/company-detailed', { params: { period } });
-            setReportData(res.data?.data);
-        } catch (err) {
+            if (res.data?.success) {
+                setReportData(res.data?.data);
+            } else {
+                setReportError('Veri alınamadı.');
+            }
+        } catch (err: any) {
             console.error('Report fetch error', err);
+            setReportError(err.response?.data?.error || 'Raporlar yüklenirken bir bağlantı hatası oluştu.');
         } finally {
             setLoadingReport(false);
         }
@@ -132,6 +139,10 @@ export default function CompanyPanel() {
     useEffect(() => {
         if (activeTab === 'reports' && company) {
             fetchReports(reportPeriod);
+            // Debug: Check if token exists
+            if (!localStorage.getItem('token')) {
+                console.warn('Reports tab active but NO token found in localStorage!');
+            }
         }
     }, [activeTab, reportPeriod, company]);
 
@@ -477,8 +488,9 @@ export default function CompanyPanel() {
 
             {/* Main Content */}
             <main className="flex-1 min-h-screen lg:pl-0">
-                {/* Mobile Top Bar */}
-                <div className="lg:hidden sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 py-3 flex items-center justify-between">
+                {/* Mobile Top Bar - Optimized for Notches */}
+                <div className="lg:hidden sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-4 flex items-center justify-between"
+                    style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)', paddingBottom: '0.75rem' }}>
                     <button
                         onClick={() => setSidebarOpen(true)}
                         className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center active:scale-90 transition-all"
@@ -1031,7 +1043,13 @@ export default function CompanyPanel() {
                                     <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                                     <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">Veriler Analiz Ediliyor...</p>
                                 </div>
-                            ) : reportData && (
+                            ) : reportError ? (
+                                <div className="text-center py-10 bg-red-50 rounded-3xl border border-red-100 p-6">
+                                    <p className="text-red-600 font-black text-sm mb-2">Rapor Hatası</p>
+                                    <p className="text-red-400 text-xs mb-4">{reportError}</p>
+                                    <button onClick={() => fetchReports(reportPeriod)} className="px-6 py-2 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase">Tekrar Dene</button>
+                                </div>
+                            ) : reportData ? (
                                 <>
                                     {/* Stats Cards */}
                                     <div className="grid grid-cols-2 gap-4">
@@ -1144,7 +1162,7 @@ export default function CompanyPanel() {
                                         <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Raporlar her gece 23:00'da e-posta adresinize gönderilir.</p>
                                     </div>
                                 </>
-                            )}
+                            ) : null}
                         </div>
                     )}
                 </div>
