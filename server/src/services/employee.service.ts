@@ -43,6 +43,7 @@ class EmployeeService {
                 email,
                 phone,
                 role,
+                photo,
                 true as is_active
             FROM users
             WHERE company_id = $1
