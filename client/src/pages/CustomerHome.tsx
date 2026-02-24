@@ -291,30 +291,53 @@ export default function CustomerHome() {
         }
 
         try {
-            // Check permissions
+            // Enhanced permissions check for both Web and Native
             try {
                 const perm = await Camera.checkPermissions();
                 if (perm.camera !== 'granted') {
-                    await Camera.requestPermissions();
+                    const req = await Camera.requestPermissions();
+                    if (req.camera !== 'granted') {
+                        setCodeError('Kamera izni verilmedi. Lütfen ayarlardan izin verin.');
+                        return;
+                    }
                 }
-            } catch (e) { }
+            } catch (e) {
+                console.log('Native permission fail, falling back to browser prompts');
+            }
 
             // Loading state while camera starts
             setCodeChecking(true);
             setCodeError('');
 
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: 'environment',
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
+            // Multi-constraint attempt for maximum compatibility
+            const constraints = [
+                { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } },
+                { video: { facingMode: 'environment' } },
+                { video: true }
+            ];
+
+            let stream = null;
+            for (const constraint of constraints) {
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia(constraint);
+                    if (stream) break;
+                } catch (e) {
+                    console.log(`Constraint fail:`, constraint);
                 }
-            });
+            }
+
+            if (!stream) {
+                throw new Error('Hiçbir kamera kaynağına erişilemedi.');
+            }
 
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
-                videoRef.current.setAttribute("playsinline", "true"); // required to tell iOS safari we don't want fullscreen
-                await videoRef.current.play();
+                videoRef.current.setAttribute("playsinline", "true");
+                // Wait for video to be ready before playing to avoid "abort" errors on some tablets
+                videoRef.current.onloadedmetadata = () => {
+                    videoRef.current?.play().catch(e => console.error("Video play failed", e));
+                };
+
                 setIsScanning(true);
                 setCodeChecking(false);
                 requestAnimationFrame(scanLoop);
@@ -333,17 +356,35 @@ export default function CustomerHome() {
         }
     };
 
-    const scanLoop = () => {
+    const scanLoop = async () => {
         if (!isScanning) return;
 
         const video = videoRef.current;
         const canvas = canvasRef.current;
 
-        if (!video || !canvas) {
+        if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
             requestAnimationFrame(scanLoop);
             return;
         }
 
+        // 1. Try Native Barcode Detector API if available (Modern Chrome/Android/iOS)
+        // @ts-ignore
+        if (window.BarcodeDetector) {
+            try {
+                // @ts-ignore
+                const barcodeDetector = new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'aztec'] });
+                const barcodes = await barcodeDetector.detect(video);
+                if (barcodes.length > 0) {
+                    const code = barcodes[0].rawValue;
+                    handleScanSuccess(code);
+                    return;
+                }
+            } catch (e) {
+                console.log('Native BarcodeDetector fail, falling back to jsQR');
+            }
+        }
+
+        // 2. Fallback to jsQR
         // @ts-ignore
         if (!window.jsQR) {
             console.error('jsQR missing');
@@ -351,33 +392,39 @@ export default function CustomerHome() {
             return;
         }
 
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            canvas.height = video.videoHeight;
-            canvas.width = video.videoWidth;
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-            if (ctx) {
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                // @ts-ignore
-                const code = window.jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: "attemptBoth", // Better for various lighting
-                });
+        canvas.height = video.videoHeight;
+        canvas.width = video.videoWidth;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            // @ts-ignore
+            const code = window.jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "attemptBoth",
+            });
 
-                if (code) {
-                    setIsScanning(false);
-                    setCodeInput(code.data);
-                    const stream = video.srcObject as MediaStream;
-                    if (stream) stream.getTracks().forEach(track => track.stop());
-
-                    // Trigger sound/vibrate if possible
-                    try { window.navigator?.vibrate?.(100); } catch (e) { }
-
-                    setTimeout(() => handleCheckCodeWithCode(code.data), 100);
-                    return;
-                }
+            if (code) {
+                handleScanSuccess(code.data);
+                return;
             }
         }
+
         requestAnimationFrame(scanLoop);
+    };
+
+    const handleScanSuccess = (codeData: string) => {
+        setIsScanning(false);
+        setCodeInput(codeData);
+        if (videoRef.current && videoRef.current.srcObject) {
+            const stream = videoRef.current.srcObject as MediaStream;
+            stream.getTracks().forEach(track => track.stop());
+        }
+
+        // Feedback
+        try { window.navigator?.vibrate?.(100); } catch (e) { }
+
+        // Short delay to show the scanned code in input before checking
+        setTimeout(() => handleCheckCodeWithCode(codeData), 100);
     };
 
     const handleCheckCodeWithCode = async (c: string) => {
