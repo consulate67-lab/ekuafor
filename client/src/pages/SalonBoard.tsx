@@ -499,7 +499,7 @@ export default function SalonBoard() {
                                         <td className="sticky left-0 z-[50] bg-white p-2 lg:p-3 border-r border-slate-100 font-bold text-slate-900 shadow-[10px_0_30px_-15px_rgba(0,0,0,0.1)] group-hover:bg-slate-50 transition-colors">
                                             <div className="flex items-center gap-2">
                                                 <div
-                                                    className="w-8 h-8 lg:w-9 lg:h-9 rounded-lg text-white flex items-center justify-center font-black text-[10px] lg:text-xs uppercase shadow-sm shrink-0 overflow-hidden"
+                                                    className="w-12 h-12 lg:w-14 lg:h-14 rounded-2xl text-white flex items-center justify-center font-black text-xs lg:text-base uppercase shadow-md shrink-0 overflow-hidden border-2 border-white"
                                                     style={{ backgroundColor: person.photo ? 'transparent' : staffColor }}
                                                 >
                                                     {person.photo ? (
