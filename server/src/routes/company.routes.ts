@@ -477,7 +477,7 @@ router.post('/check-code', async (req: Request, res: Response) => {
 
         // Sonra board_code mu kontrol et
         const staffResult = await pool.query(
-            `SELECT u.id, u.first_name, u.last_name, u.board_code, u.company_id, c.name as company_name
+            `SELECT u.id, u.first_name, u.last_name, u.board_code, u.company_id, u.photo, c.name as company_name
              FROM users u
              JOIN companies c ON u.company_id = c.id
              WHERE UPPER(u.board_code) = UPPER($1)`,
@@ -503,6 +503,7 @@ router.post('/check-code', async (req: Request, res: Response) => {
                     board_code: sr.board_code,
                     company_id: sr.company_id,
                     user_id: sr.id,
+                    photo: sr.photo,
                     token: token
                 }
             });

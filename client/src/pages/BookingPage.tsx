@@ -43,6 +43,7 @@ export default function BookingPage() {
     const [selection, setSelection] = useState<{
         staffId: number | null;
         serviceId: number | null;
+        serviceIds: number[];
         date: string | null;
         time: string | null;
         customerName: string;
@@ -50,6 +51,7 @@ export default function BookingPage() {
     }>({
         staffId: initialStaffId,
         serviceId: null,
+        serviceIds: [],
         date: null,
         time: null,
         customerName: '',
@@ -85,7 +87,7 @@ export default function BookingPage() {
                 // ... fetch company details
                 const compRes = await api.get(`/companies/${id}`);
                 const companyData = compRes.data.data;
-                console.log('[BookingPage v1.7.3] Company data:', JSON.stringify({
+                console.log('[BookingPage v1.9.0] Company data:', JSON.stringify({
                     work_start_time: companyData.work_start_time,
                     work_end_time: companyData.work_end_time,
                     slot_interval: companyData.slot_interval
@@ -153,10 +155,11 @@ export default function BookingPage() {
     const handleBack = () => setStep(prev => prev - 1);
 
     const generateTimeSlots = () => {
-        if (!company || !selection.date || !selection.serviceId) return [];
+        if (!company || !selection.date) return [];
+        const selectedServices = services.filter(s => selection.serviceIds.includes(s.id!));
+        const duration = selectedServices.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
 
-        const service = services.find(s => s.id === selection.serviceId);
-        const duration = service?.duration_minutes || 30;
+        if (duration === 0) return [];
 
         const [startH, startM] = (company.work_start_time || '09:00').split(':').map(Number);
         const [endH, endM] = (company.work_end_time || '20:00').split(':').map(Number);
@@ -216,8 +219,10 @@ export default function BookingPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const service = services.find(s => s.id === selection.serviceId);
-            const duration = service?.duration_minutes || 30;
+            const selectedServices = services.filter(s => selection.serviceIds.includes(s.id!));
+            const duration = selectedServices.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+            const totalPrice = selectedServices.reduce((sum, s) => sum + Number(s.price), 0);
+
             const [h, m] = (selection.time || '00:00').split(':').map(Number);
             const newStart = h * 60 + m;
             const newEnd = newStart + duration;
@@ -258,14 +263,15 @@ export default function BookingPage() {
             const res = await api.post('/appointments', {
                 company_id: Number(id),
                 staff_id: selection.staffId,
-                service_id: selection.serviceId,
+                service_id: selection.serviceIds[0], // Primary for backward support
+                service_ids: selection.serviceIds,
                 appointment_date: selection.date,
                 start_time: selection.time,
                 end_time: endTime,
                 customer_name: selection.customerName,
                 customer_phone: selection.customerPhone,
-                notes: `Müşteri: ${selection.customerName} | Tel: ${selection.customerPhone}`,
-                price: service?.price || 0,
+                notes: `Müşteri: ${selection.customerName} | Tel: ${selection.customerPhone} | ${selectedServices.map(s => s.name).join(', ')}`,
+                price: totalPrice,
                 device_id: deviceId,
                 status: 'pending'
             });
@@ -323,12 +329,13 @@ export default function BookingPage() {
                     Sistemi Sıfırla (Veri Sorunu Varsa)
                 </button>
             </div>
-            <p className="text-[10px] text-gray-300 mt-10 uppercase tracking-widest">ID: {id} | v1.7</p>
+            <p className="text-[10px] text-gray-300 mt-10 uppercase tracking-widest">ID: {id} | v1.9.0</p>
         </div>
     );
 
     const selectedStaffUser = staff.find(u => (u.id === selection.staffId) || ((u as any).user_id === selection.staffId));
-    const selectedService = services.find(s => s.id === selection.serviceId);
+    const selectedSvs = services.filter(s => selection.serviceIds.includes(s.id!));
+    const totalPrice = selectedSvs.reduce((sum, s) => sum + Number(s.price), 0);
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -402,26 +409,47 @@ export default function BookingPage() {
 
                 {/* Step 2: Service Selection */}
                 {step === 2 && (
-                    <div className="animate-in slide-in-from-right duration-300 fade-in">
+                    <div className="animate-in slide-in-from-right duration-300 fade-in pb-32">
                         <button onClick={handleBack} className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 hover:text-gray-600">← Geri</button>
-                        <h2 className="text-2xl font-black text-gray-900 mb-6">Hizmet Seçimi</h2>
+                        <h2 className="text-2xl font-black text-gray-900 mb-2">Hizmet Seçimi</h2>
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-6">Birden fazla hizmet seçebilirsiniz</p>
+
                         <div className="space-y-3">
-                            {services.map(s => (
-                                <button
-                                    key={s.id}
-                                    onClick={() => {
-                                        setSelection({ ...selection, serviceId: s.id! });
-                                        handleNext();
-                                    }}
-                                    className="w-full bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-pink-200 transition-all flex items-center gap-4 text-left"
-                                >
-                                    <div className="flex-1">
-                                        <h3 className="font-bold text-gray-900">{s.name}</h3>
-                                        <p className="text-xs text-gray-500">{s.duration_minutes} dakika</p>
-                                    </div>
-                                    <div className="font-black text-[#b45309]">₺{s.price}</div>
-                                </button>
-                            ))}
+                            {services.map(s => {
+                                const isSelected = selection.serviceIds.includes(s.id!);
+                                return (
+                                    <button
+                                        key={s.id}
+                                        onClick={() => {
+                                            const newIds = isSelected
+                                                ? selection.serviceIds.filter(id => id !== s.id)
+                                                : [...selection.serviceIds, s.id!];
+                                            setSelection({ ...selection, serviceIds: newIds });
+                                        }}
+                                        className={`w-full p-5 rounded-[2rem] border-2 transition-all flex items-center gap-4 text-left ${isSelected ? 'bg-indigo-50 border-indigo-500 shadow-lg' : 'bg-white border-transparent shadow-sm'}`}
+                                    >
+                                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-indigo-500 border-indigo-500 text-white' : 'bg-white border-slate-200'}`}>
+                                            {isSelected && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className={`font-black text-sm uppercase tracking-tight ${isSelected ? 'text-indigo-900' : 'text-slate-900'}`}>{s.name}</h3>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.duration_minutes} dakika</p>
+                                        </div>
+                                        <div className={`font-black text-base ${isSelected ? 'text-indigo-600' : 'text-slate-900'}`}>₺{s.price}</div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Sticky Next Button */}
+                        <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white to-transparent z-50">
+                            <button
+                                disabled={selection.serviceIds.length === 0}
+                                onClick={handleNext}
+                                className="w-full max-w-md mx-auto block bg-slate-900 text-white py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-2xl disabled:opacity-30 disabled:grayscale transition-all hover:bg-indigo-600 active:scale-95"
+                            >
+                                Devam Et ({selection.serviceIds.length} Hizmet)
+                            </button>
                         </div>
                     </div>
                 )}
@@ -598,7 +626,10 @@ export default function BookingPage() {
                                     </div>
                                     <div className="text-left flex-1">
                                         <h3 className="font-black text-slate-900 text-base uppercase tracking-tight">{selectedStaffUser?.first_name} {selectedStaffUser?.last_name}</h3>
-                                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">{selectedService?.name}</p>
+                                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                                            {selectedSvs.map(s => s.name).join(', ')}
+                                        </p>
+                                        <p className="text-indigo-600 text-xs font-black mt-1">₺{totalPrice}</p>
                                     </div>
                                     <div className="w-5 h-5 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-emerald-200">
                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
@@ -671,7 +702,7 @@ export default function BookingPage() {
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
                         <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse"></div>
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">ID: {id} | Staff: {staff.length} | Svc: {services.length} | v1.7.3</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">ID: {id} | Staff: {staff.length} | Svc: {services.length} | v1.9.0</span>
                     </div>
                 </div>
             </div>

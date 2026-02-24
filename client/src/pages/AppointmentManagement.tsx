@@ -6,6 +6,23 @@ import { parseVoiceCommand } from '../lib/aiParser';
 import { Device } from '@capacitor/device';
 
 export default function AppointmentManagement() {
+    const getLocalDateString = () => {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const formatDateKey = (dateStr: any) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [services, setServices] = useState<Service[]>([]);
     const [loading, setLoading] = useState(true);
@@ -14,8 +31,9 @@ export default function AppointmentManagement() {
     const [showAddForm, setShowAddForm] = useState(false);
     const [newAppointment, setNewAppointment] = useState({
         service_id: 0,
+        service_ids: [] as number[],
         staff_id: 0,
-        appointment_date: '',
+        appointment_date: getLocalDateString(),
         start_time: '09:00',
         end_time: '10:00',
         customer_name: '',
@@ -36,23 +54,6 @@ export default function AppointmentManagement() {
         serviceId: null,
         price: 0
     });
-
-    const formatDateKey = (dateStr: any) => {
-        if (!dateStr) return '';
-        const d = new Date(dateStr);
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-
-    const getLocalDateString = () => {
-        const d = new Date();
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
 
     const [selectedDate, setSelectedDate] = useState(getLocalDateString());
 
@@ -355,6 +356,7 @@ export default function AppointmentManagement() {
 
             await api.post('/appointments', {
                 ...newAppointment,
+                service_id: newAppointment.service_ids[0], // First one as primary for compatibility
                 staff_id: newAppointment.staff_id === 0 ? undefined : newAppointment.staff_id,
                 company_id: company?.id,
                 notes: finalNotes.trim(),
@@ -363,6 +365,7 @@ export default function AppointmentManagement() {
 
             setNewAppointment({
                 service_id: 0,
+                service_ids: [],
                 staff_id: 0,
                 appointment_date: getLocalDateString(),
                 start_time: '09:00',
@@ -520,7 +523,11 @@ export default function AppointmentManagement() {
                                                     return extracted || app.customer_name || 'Misafir';
                                                 })()}
                                             </h4>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{app.service_name || 'Hizmet Bilgisi Yok'}</p>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">
+                                                {app.services && app.services.length > 0
+                                                    ? app.services.map((s: any) => s.name).join(', ')
+                                                    : (app.service_name || 'Hizmet Bilgisi Yok')}
+                                            </p>
                                         </div>
                                         <div className="text-right">
                                             <span className={`text-xs font-black block ${app.status === 'completed' ? 'text-slate-400' : 'text-pink-600'}`}>₺{app.price || '0'}</span>
@@ -547,7 +554,7 @@ export default function AppointmentManagement() {
                         Sistemi Sıfırla
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments v1.8.1</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments v1.9.0</span>
                     </div>
                 </div>
             </div>
@@ -572,31 +579,51 @@ export default function AppointmentManagement() {
                         <form onSubmit={handleAddAppointment} className="space-y-6">
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 mb-2 uppercase ml-1 tracking-wider">Hizmet Seçimi</label>
-                                <select
-                                    required
-                                    className="w-full bg-slate-50 border-none rounded-2xl py-4 px-4 font-bold text-slate-900"
-                                    value={newAppointment.service_id}
-                                    onChange={(e) => {
-                                        const serviceId = parseInt(e.target.value);
-                                        const service = services.find(s => s.id === serviceId);
-                                        let newEndTime = newAppointment.end_time;
-                                        let price = newAppointment.price;
-                                        if (service) {
-                                            price = service.price || 0;
-                                            if (newAppointment.start_time) {
-                                                const [h, m] = newAppointment.start_time.split(':').map(Number);
-                                                const totalMin = h * 60 + m + (service.duration_minutes || 30);
-                                                const endH = Math.floor(totalMin / 60);
-                                                const endM = totalMin % 60;
-                                                newEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-                                            }
-                                        }
-                                        setNewAppointment({ ...newAppointment, service_id: serviceId, end_time: newEndTime, price: price });
-                                    }}
-                                >
-                                    <option value="">Seçiniz...</option>
-                                    {services.map(s => <option key={s.id} value={s.id}>{s.name} - ₺{s.price}</option>)}
-                                </select>
+                                <div className="space-y-2 max-h-48 overflow-y-auto bg-slate-50 p-4 rounded-2xl">
+                                    {services.map(s => {
+                                        const isSelected = newAppointment.service_ids.includes(s.id!);
+                                        return (
+                                            <label key={s.id} className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all cursor-pointer ${isSelected ? 'bg-white border-pink-500 shadow-sm' : 'bg-transparent border-transparent'}`}>
+                                                <div className="flex items-center gap-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="w-5 h-5 rounded border-slate-300 text-pink-600 focus:ring-pink-500"
+                                                        checked={isSelected}
+                                                        onChange={(e) => {
+                                                            let newIds = [...newAppointment.service_ids];
+                                                            if (e.target.checked) {
+                                                                newIds.push(s.id!);
+                                                            } else {
+                                                                newIds = newIds.filter(id => id !== s.id);
+                                                            }
+
+                                                            // Calculate total duration and price
+                                                            const selectedServices = services.filter(sv => newIds.includes(sv.id!));
+                                                            const totalDur = selectedServices.reduce((sum, sv) => sum + (sv.duration_minutes || 0), 0);
+                                                            const totalPr = selectedServices.reduce((sum, sv) => sum + (sv.price || 0), 0);
+
+                                                            let newEndTime = newAppointment.end_time;
+                                                            if (newAppointment.start_time) {
+                                                                const [h, m] = newAppointment.start_time.split(':').map(Number);
+                                                                const totalMin = h * 60 + m + totalDur;
+                                                                const endH = Math.floor(totalMin / 60);
+                                                                const endM = totalMin % 60;
+                                                                newEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+                                                            }
+
+                                                            setNewAppointment({ ...newAppointment, service_ids: newIds, end_time: newEndTime, price: totalPr });
+                                                        }}
+                                                    />
+                                                    <div>
+                                                        <p className={`text-xs font-black ${isSelected ? 'text-slate-900' : 'text-slate-500'}`}>{s.name}</p>
+                                                        <p className="text-[10px] font-bold text-slate-400">{s.duration_minutes} Dakika</p>
+                                                    </div>
+                                                </div>
+                                                <span className="text-xs font-black text-pink-600">₺{s.price}</span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">

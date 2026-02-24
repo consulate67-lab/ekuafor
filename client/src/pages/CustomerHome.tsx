@@ -253,7 +253,8 @@ export default function CustomerHome() {
                                 first_name: data.staff_name.split(' ')[0],
                                 last_name: data.staff_name.split(' ').slice(1).join(' '),
                                 role: 'company_admin',
-                                company_id: data.company_id
+                                company_id: data.company_id,
+                                photo: data.photo
                             } as any, data.token);
                         }
                         localStorage.setItem('staff_board_code', data.board_code);
@@ -290,51 +291,44 @@ export default function CustomerHome() {
         }
 
         try {
-            // First check/request permission (Mobile/Capacitor context)
+            // Check permissions
             try {
                 const perm = await Camera.checkPermissions();
                 if (perm.camera !== 'granted') {
                     await Camera.requestPermissions();
                 }
-            } catch (e) {
-                console.log('Capacitor camera check skipped (not on native)');
-            }
+            } catch (e) { }
 
-            // Web context camera request - Better performance on mobile webviews
+            // Loading state while camera starts
+            setCodeChecking(true);
+            setCodeError('');
+
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     facingMode: 'environment',
-                    width: { ideal: 640 },
-                    height: { ideal: 640 }
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
                 }
             });
 
-            setIsScanning(true);
-            setCodeError('');
-
-            // Small delay to ensure video element is rendered
-            setTimeout(() => {
-                if (videoRef.current) {
-                    videoRef.current.srcObject = stream;
-                    // Trigger scan after video is stable
-                    setTimeout(scanLoop, 1000);
-                }
-            }, 600);
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                videoRef.current.setAttribute("playsinline", "true"); // required to tell iOS safari we don't want fullscreen
+                await videoRef.current.play();
+                setIsScanning(true);
+                setCodeChecking(false);
+                requestAnimationFrame(scanLoop);
+            }
 
         } catch (err: any) {
             console.error('Camera error:', err);
-            const isNative = window.location.protocol === 'capacitor:';
+            setCodeChecking(false);
+            setIsScanning(false);
 
             if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                if (isNative) {
-                    setCodeError('Kamera izni reddedildi. Lütfen uygulama ayarlarından Saloon uygulamasına kamera izni verin.');
-                } else {
-                    setCodeError('Kamera izni reddedildi. Lütfen tarayıcı adres çubuğundaki kilit simgesine tıklayarak kamera iznini aktif edin.');
-                }
-            } else if (err.name === 'NotFoundError') {
-                setCodeError('Kamera bulunamadı. Lütfen cihazınızda bir kamera olduğundan emin olun.');
+                setCodeError('Kamera izni reddedildi. Lütfen ayarlardan izin verin.');
             } else {
-                setCodeError('Kameraya erişilemedi. Lütfen uygulama ayarlarınızı kontrol edin.');
+                setCodeError('Kameraya erişilemedi: ' + err.message);
             }
         }
     };
@@ -345,34 +339,39 @@ export default function CustomerHome() {
         const video = videoRef.current;
         const canvas = canvasRef.current;
 
-        // Safety check for jsQR
-        // @ts-ignore
-        if (!window.jsQR) {
-            console.error('jsQR not found! Retrying...');
+        if (!video || !canvas) {
             requestAnimationFrame(scanLoop);
             return;
         }
 
-        if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
+        // @ts-ignore
+        if (!window.jsQR) {
+            console.error('jsQR missing');
+            requestAnimationFrame(scanLoop);
+            return;
+        }
+
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
             canvas.height = video.videoHeight;
             canvas.width = video.videoWidth;
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
             if (ctx) {
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                // @ts-ignore - jsQR is loaded via CDN
+                // @ts-ignore
                 const code = window.jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: "dontInvert",
+                    inversionAttempts: "attemptBoth", // Better for various lighting
                 });
 
                 if (code) {
                     setIsScanning(false);
                     setCodeInput(code.data);
-                    // Stop all tracks
                     const stream = video.srcObject as MediaStream;
-                    stream.getTracks().forEach(track => track.stop());
+                    if (stream) stream.getTracks().forEach(track => track.stop());
 
-                    // Trigger check
+                    // Trigger sound/vibrate if possible
+                    try { window.navigator?.vibrate?.(100); } catch (e) { }
+
                     setTimeout(() => handleCheckCodeWithCode(code.data), 100);
                     return;
                 }
@@ -400,7 +399,8 @@ export default function CustomerHome() {
                                 first_name: data.staff_name.split(' ')[0],
                                 last_name: data.staff_name.split(' ').slice(1).join(' '),
                                 role: 'company_admin',
-                                company_id: data.company_id
+                                company_id: data.company_id,
+                                photo: data.photo
                             } as any, data.token);
                         }
                         localStorage.setItem('staff_board_code', data.board_code);
@@ -744,19 +744,49 @@ export default function CustomerHome() {
                             </div>
 
                             {isScanning && (
-                                <div className="mb-4 bg-black rounded-2xl overflow-hidden aspect-square flex items-center justify-center relative">
+                                <div className="mb-6 bg-slate-950 rounded-[2.5rem] overflow-hidden aspect-square flex items-center justify-center relative shadow-2xl border-4 border-white">
                                     <video
                                         autoPlay
                                         muted
                                         playsInline
                                         ref={videoRef}
-                                        className="w-full h-full object-cover"
+                                        className="w-full h-full object-cover opacity-80"
                                     />
                                     <canvas ref={canvasRef} className="hidden" />
-                                    <div className="absolute inset-0 border-2 border-amber-500/50 m-12 rounded-2xl animate-pulse flex items-center justify-center">
-                                        <div className="w-full h-0.5 bg-amber-500 absolute top-1/2 animate-bounce"></div>
+
+                                    {/* Scanner Overlay UI */}
+                                    <div className="absolute inset-x-12 inset-y-12 border-2 border-indigo-500/30 rounded-3xl">
+                                        <div className="absolute inset-0 border-[6px] border-indigo-500/80 rounded-3xl clip-corners"></div>
+                                        <div className="w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent absolute top-1/2 -translate-y-1/2 animate-scan shadow-[0_0_15px_rgba(79,70,229,0.5)]"></div>
                                     </div>
-                                    <p className="absolute bottom-4 left-0 right-0 text-center text-[10px] text-white/70 font-bold uppercase tracking-widest">QR Kodu Ortaya Getirin</p>
+
+                                    <div className="absolute top-6 left-0 right-0 text-center">
+                                        <span className="px-4 py-1.5 bg-indigo-500 text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg animate-pulse">
+                                            Tarayıcı Aktif
+                                        </span>
+                                    </div>
+
+                                    <p className="absolute bottom-6 left-0 right-0 text-center text-[10px] text-white/80 font-black uppercase tracking-[0.2em]">
+                                        QR Kodu Karenin İçine Getirin
+                                    </p>
+
+                                    <style>{`
+                                        .clip-corners {
+                                            mask: 
+                                                linear-gradient(#000 0 0) content-box,
+                                                linear-gradient(#000 0 0);
+                                            mask-composite: exclude;
+                                            padding: 40px;
+                                        }
+                                        @keyframes scan {
+                                            0%, 100% { transform: translateY(-80px); opacity: 0; }
+                                            10%, 90% { opacity: 1; }
+                                            50% { transform: translateY(80px); }
+                                        }
+                                        .animate-scan {
+                                            animation: scan 2s linear infinite;
+                                        }
+                                    `}</style>
                                 </div>
                             )}
 

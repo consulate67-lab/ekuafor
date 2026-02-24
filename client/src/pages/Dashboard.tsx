@@ -113,7 +113,7 @@ export default function Dashboard() {
     }, [user]);
 
     const fetchEmployeeStats = async (period: 'today' | 'week' | 'month' | 'year') => {
-        if (user?.role !== 'staff') return;
+        if (user?.role !== 'staff' && user?.role !== 'company_admin') return;
         setStatsLoading(true);
         try {
             const res = await api.get('/reports/employee-stats', { params: { period } });
@@ -128,7 +128,7 @@ export default function Dashboard() {
     };
 
     useEffect(() => {
-        if (user?.role === 'staff') {
+        if (user?.role === 'staff' || user?.role === 'company_admin') {
             fetchEmployeeStats(selectedPeriod);
         }
     }, [user, selectedPeriod]);

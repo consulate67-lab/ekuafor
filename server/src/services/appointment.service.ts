@@ -5,7 +5,8 @@ export interface Appointment {
     id?: number;
     company_id: number;
     customer_id?: number;
-    service_id: number;
+    service_id?: number; // Kept for DB compatibility, but optional
+    service_ids?: number[]; // For multi-service selection
     staff_id?: number;
     appointment_date: string;
     start_time: string;
@@ -18,11 +19,42 @@ export interface Appointment {
     device_id?: string;
     rating?: number;
     comment?: string;
-    service_name?: string;
+    service_name?: string; // Legacy/Main service name
+    services?: any[]; // Detailed services list
 }
 
 class AppointmentService {
     async createAppointment(appointment: Appointment): Promise<Appointment> {
+        const serviceIds = appointment.service_ids || (appointment.service_id ? [appointment.service_id] : []);
+
+        if (serviceIds.length === 0) {
+            throw new Error('En az bir hizmet seçilmelidir.');
+        }
+
+        // Fetch services to calculate total duration and price
+        const servicesRes = await pool.query('SELECT id, duration_minutes, price, name FROM services WHERE id = ANY($1)', [serviceIds]);
+        const services = servicesRes.rows;
+
+        if (services.length === 0) {
+            throw new Error('Seçilen hizmetler bulunamadı.');
+        }
+
+        const totalDuration = services.reduce((sum, s) => sum + s.duration_minutes, 0);
+        const totalPrice = services.reduce((sum, s) => sum + Number(s.price), 0);
+
+        // Calculate end_time based on start_time and total duration
+        if (appointment.start_time) {
+            const [h, m] = appointment.start_time.split(':').map(Number);
+            const dummyDate = new Date();
+            dummyDate.setHours(h, m, 0, 0);
+            const endDate = new Date(dummyDate.getTime() + totalDuration * 60000);
+            appointment.end_time = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
+        }
+
+        if (!appointment.price) {
+            appointment.price = totalPrice;
+        }
+
         // 1. Check for overlapping appointments (Conflict Prevention)
         const conflictQuery = `
             SELECT id FROM appointments 
@@ -50,6 +82,9 @@ class AppointmentService {
             throw new Error('Bu saat diliminde zaten başka bir randevu bulunuyor.');
         }
 
+        // Use the first service_id as the primary for legacy support
+        const primaryServiceId = serviceIds[0];
+
         const query = `
       INSERT INTO appointments (
         company_id, customer_id, service_id, staff_id, 
@@ -59,12 +94,11 @@ class AppointmentService {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
     `;
-        console.log('[AppointmentService] Creating appointment:', JSON.stringify(appointment, null, 2));
 
         const values = [
             appointment.company_id,
             appointment.customer_id || null,
-            appointment.service_id,
+            primaryServiceId,
             appointment.staff_id || null,
             appointment.appointment_date,
             appointment.start_time,
@@ -77,19 +111,30 @@ class AppointmentService {
             appointment.device_id || null
         ];
 
+        const client = await pool.connect();
         try {
-            const result = await pool.query(query, values);
+            await client.query('BEGIN');
+            const result = await client.query(query, values);
             const newAppointment = result.rows[0];
-            console.log('[AppointmentService] Success! New ID:', newAppointment.id);
 
-            // SMS Notification
+            // Insert into appointment_services
+            for (const s of services) {
+                await client.query(
+                    'INSERT INTO appointment_services (appointment_id, service_id, price, duration_minutes) VALUES ($1, $2, $3, $4)',
+                    [newAppointment.id, s.id, s.price, s.duration_minutes]
+                );
+            }
+
+            await client.query('COMMIT');
+
+            // SMS Notification (Async)
             try {
-                if (newAppointment.customer_id) {
-                    const customerRes = await pool.query('SELECT phone, first_name FROM users WHERE id = $1', [newAppointment.customer_id]);
-                    const customer = customerRes.rows[0];
-                    if (customer && customer.phone) {
-                        const message = `Merhaba ${customer.first_name}, randevunuz alınmıştır. Tarih: ${newAppointment.appointment_date} Saat: ${newAppointment.start_time}. Bizi tercih ettiğiniz için teşekkür ederiz!`;
-                        await smsService.sendSms(newAppointment.company_id, customer.phone, message);
+                if (newAppointment.customer_id || newAppointment.customer_phone) {
+                    const phone = newAppointment.customer_phone;
+                    const name = newAppointment.customer_name || 'Değerli Müşterimiz';
+                    if (phone) {
+                        const message = `Merhaba ${name}, randevunuz alınmıştır. Tarih: ${newAppointment.appointment_date} Saat: ${newAppointment.start_time}. Bizi tercih ettiğiniz için teşekkür ederiz!`;
+                        await smsService.sendSms(newAppointment.company_id, phone, message);
                     }
                 }
             } catch (smsError) {
@@ -98,8 +143,11 @@ class AppointmentService {
 
             return newAppointment;
         } catch (dbError) {
-            console.error('[AppointmentService] Database Insert Error:', dbError);
+            await client.query('ROLLBACK');
+            console.error('[AppointmentService] Database Error:', dbError);
             throw dbError;
+        } finally {
+            client.release();
         }
     }
 
@@ -109,12 +157,14 @@ class AppointmentService {
         const query = `
             SELECT 
                 a.*, 
-                s.name as service_name, 
-                c.name as company_name
+                c.name as company_name,
+                COALESCE(json_agg(json_build_object('id', s.id, 'name', s.name, 'price', aps.price, 'duration', aps.duration_minutes)) FILTER (WHERE s.id IS NOT NULL), '[]') as services
             FROM appointments a
-            LEFT JOIN services s ON a.service_id = s.id
+            LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
+            LEFT JOIN services s ON aps.service_id = s.id
             LEFT JOIN companies c ON a.company_id = c.id
             WHERE a.id = ANY($1)
+            GROUP BY a.id, c.name
             ORDER BY a.appointment_date DESC, a.start_time DESC
         `;
 
@@ -137,11 +187,12 @@ class AppointmentService {
         let query = `
             SELECT 
                 a.*, 
-                s.name as service_name, 
                 c.name as company_name,
-                COALESCE(u.first_name || ' ' || u.last_name, a.notes) as customer_display_name
+                COALESCE(u.first_name || ' ' || u.last_name, a.notes) as customer_display_name,
+                COALESCE(json_agg(json_build_object('id', s.id, 'name', s.name, 'price', aps.price, 'duration', aps.duration_minutes)) FILTER (WHERE s.id IS NOT NULL), '[]') as services
             FROM appointments a
-            LEFT JOIN services s ON a.service_id = s.id
+            LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
+            LEFT JOIN services s ON aps.service_id = s.id
             LEFT JOIN companies c ON a.company_id = c.id
             LEFT JOIN users u ON a.customer_id = u.id
             WHERE (
@@ -157,7 +208,7 @@ class AppointmentService {
             values.push(companyId);
         }
 
-        query += ' ORDER BY a.appointment_date DESC, a.start_time DESC';
+        query += ' GROUP BY a.id, c.name, u.first_name, u.last_name ORDER BY a.appointment_date DESC, a.start_time DESC';
 
         try {
             const result = await pool.query(query, values);
@@ -171,10 +222,12 @@ class AppointmentService {
     async getAppointmentsByCompany(companyId: number, status?: string, staffId?: number, startDate?: string, endDate?: string): Promise<Appointment[]> {
         console.log(`[Service] getAppointmentsByCompany: ID=${companyId}, Status=${status}, Staff=${staffId}, StartDate=${startDate}, EndDate=${endDate}`);
         let query = `
-      SELECT a.*, s.name as service_name, c.name as company_name, 
-             u.first_name || ' ' || u.last_name as customer_name
+      SELECT a.*, c.name as company_name, 
+             u.first_name || ' ' || u.last_name as customer_name,
+             COALESCE(json_agg(json_build_object('id', s.id, 'name', s.name, 'price', aps.price, 'duration', aps.duration_minutes)) FILTER (WHERE s.id IS NOT NULL), '[]') as services
       FROM appointments a
-      LEFT JOIN services s ON a.service_id = s.id
+      LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
+      LEFT JOIN services s ON aps.service_id = s.id
       LEFT JOIN companies c ON a.company_id = c.id
       LEFT JOIN users u ON a.customer_id = u.id
       WHERE a.company_id = $1
@@ -204,7 +257,7 @@ class AppointmentService {
             paramIndex++;
         }
 
-        query += ' ORDER BY a.appointment_date DESC, a.start_time DESC';
+        query += ' GROUP BY a.id, c.name, u.first_name, u.last_name ORDER BY a.appointment_date DESC, a.start_time DESC';
 
         try {
             const result = await pool.query(query, values);
@@ -226,11 +279,12 @@ class AppointmentService {
 
             if (updatedAppointment && status === 'approved') {
                 try {
-                    const customerRes = await pool.query('SELECT phone, first_name FROM users WHERE id = $1', [updatedAppointment.customer_id]);
-                    const customer = customerRes.rows[0];
-                    if (customer && customer.phone) {
-                        const message = `Sayın ${customer.first_name}, randevunuz onaylanmıştır. Tarih: ${updatedAppointment.appointment_date} Saat: ${updatedAppointment.start_time}. Bekliyoruz!`;
-                        await smsService.sendSms(updatedAppointment.company_id, customer.phone, message);
+                    const phone = updatedAppointment.customer_phone;
+                    const name = updatedAppointment.customer_name || 'Değerli Müşterimiz';
+
+                    if (phone) {
+                        const message = `Sayın ${name}, randevunuz onaylanmıştır. Tarih: ${updatedAppointment.appointment_date} Saat: ${updatedAppointment.start_time}. Bekliyoruz!`;
+                        await smsService.sendSms(updatedAppointment.company_id, phone, message);
                     }
                 } catch (smsError) {
                     console.error('SMS notification failed during appointment approval:', smsError);
@@ -247,9 +301,11 @@ class AppointmentService {
     async getAppointmentsByDateRange(companyId: number, startDate: string, endDate: string, staffId?: number): Promise<Appointment[]> {
         console.log(`[Service] getByDateRange: ID=${companyId}, Valid=${startDate}-${endDate}, Staff=${staffId}`);
         let query = `
-      SELECT a.*, s.name as service_name, u.first_name || ' ' || u.last_name as customer_name
+      SELECT a.*, u.first_name || ' ' || u.last_name as customer_name,
+             COALESCE(json_agg(json_build_object('id', s.id, 'name', s.name, 'price', aps.price, 'duration', aps.duration_minutes)) FILTER (WHERE s.id IS NOT NULL), '[]') as services
       FROM appointments a
-      LEFT JOIN services s ON a.service_id = s.id
+      LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
+      LEFT JOIN services s ON aps.service_id = s.id
       LEFT JOIN users u ON a.customer_id = u.id
       WHERE a.company_id = $1 AND a.appointment_date BETWEEN $2 AND $3
     `;
@@ -262,7 +318,7 @@ class AppointmentService {
             paramIndex++;
         }
 
-        query += ' ORDER BY a.appointment_date, a.start_time';
+        query += ' GROUP BY a.id, u.first_name, u.last_name ORDER BY a.appointment_date, a.start_time';
         try {
             const result = await pool.query(query, values);
             console.log(`[Service] Range Found ${result.rowCount} rows`);
@@ -283,14 +339,15 @@ class AppointmentService {
         let query = `
             SELECT 
                 a.*, 
-                s.name as service_name, 
-                c.name as company_name
+                c.name as company_name,
+                COALESCE(json_agg(json_build_object('id', s.id, 'name', s.name, 'price', aps.price, 'duration', aps.duration_minutes)) FILTER (WHERE s.id IS NOT NULL), '[]') as services
             FROM appointments a
-            LEFT JOIN services s ON a.service_id = s.id
+            LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
+            LEFT JOIN services s ON aps.service_id = s.id
             LEFT JOIN companies c ON a.company_id = c.id
             WHERE a.device_id = $1
         `;
-        const values = [deviceId];
+        const values: any[] = [deviceId];
 
         if (phone) {
             const cleanPhone = phone.replace(/\D/g, '').replace(/^0/, '');
@@ -300,7 +357,7 @@ class AppointmentService {
             values.push(searchPattern);
         }
 
-        query += ' ORDER BY a.appointment_date DESC, a.start_time DESC';
+        query += ' GROUP BY a.id, c.name ORDER BY a.appointment_date DESC, a.start_time DESC';
 
         try {
             const result = await pool.query(query, values);

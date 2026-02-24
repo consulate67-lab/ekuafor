@@ -107,6 +107,7 @@ export interface Appointment {
     company_id: number;
     customer_id?: number;
     service_id: number;
+    service_ids?: number[];
     staff_id?: number;
     appointment_date: string;
     start_time: string;
@@ -121,4 +122,5 @@ export interface Appointment {
     service_name?: string;
     staff_name?: string;
     company_name?: string;
+    services?: any[];
 }

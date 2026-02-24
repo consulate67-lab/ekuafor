@@ -186,6 +186,20 @@ const runMigrations = async () => {
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS genders TEXT[]');
         // Initialize existing rows if they are NULL so the filter has something to work with
         await pool.query("UPDATE companies SET genders = '{\"Erkek\", \"Kadın\", \"Çocuk\"}' WHERE genders IS NULL");
+
+        // Multi-service support
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS appointment_services (
+                id SERIAL PRIMARY KEY,
+                appointment_id INTEGER REFERENCES appointments(id) ON DELETE CASCADE,
+                service_id INTEGER REFERENCES services(id) ON DELETE CASCADE,
+                price DECIMAL(10, 2), -- Snapshot of price at booking time
+                duration_minutes INTEGER, -- Snapshot of duration
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_appointment_services_appointment ON appointment_services(appointment_id)');
+
         console.log('✅ Auto-migrations completed.');
     } catch (err) {
         console.error('❌ Migration failed:', err);

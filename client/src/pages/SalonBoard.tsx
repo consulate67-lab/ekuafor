@@ -29,6 +29,7 @@ export default function SalonBoard() {
     const [fastForm, setFastForm] = useState({
         customerName: '',
         serviceId: '',
+        serviceIds: [] as number[],
         notes: '',
         staffId: '',
         appointmentDate: '',
@@ -215,9 +216,10 @@ export default function SalonBoard() {
                 return;
             }
 
-            const sId = fastForm.serviceId || (services[0]?.id || 1).toString();
-            const service = services.find(s => s.id === parseInt(sId));
-            const duration = service?.duration_minutes || company.slot_interval || 30;
+            const sIds = fastForm.serviceIds.length > 0 ? fastForm.serviceIds : [(services[0]?.id || 1)];
+            const selectedServices = services.filter(s => sIds.includes(s.id));
+            const duration = selectedServices.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+            const totalPrice = selectedServices.reduce((sum, s) => sum + Number(s.price), 0);
 
             const [sh, sm] = startTime.split(':').map(Number);
             const newStart = sh * 60 + sm;
@@ -251,17 +253,19 @@ export default function SalonBoard() {
             await api.post('/appointments', {
                 company_id: company.id,
                 staff_id: parseInt(staffId.toString()),
-                service_id: parseInt(sId),
+                service_id: sIds[0],
+                service_ids: sIds,
                 appointment_date: date,
                 start_time: startTime,
                 end_time: endTime,
                 customer_name: fastForm.customerName || 'Misafir Müşteri',
                 notes: fastForm.notes,
+                price: totalPrice,
                 status: 'approved'
             });
 
             setIsModalOpen(false);
-            setFastForm({ customerName: '', serviceId: '', notes: '', staffId: '', appointmentDate: '', startTime: '' });
+            setFastForm({ customerName: '', serviceId: '', serviceIds: [], notes: '', staffId: '', appointmentDate: '', startTime: '' });
             setSelectedCell(null);
             if (company.id) await fetchData(company.id);
             window.location.reload();
@@ -422,6 +426,7 @@ export default function SalonBoard() {
                                     setFastForm({
                                         customerName: '',
                                         serviceId: services[0]?.id?.toString() || '',
+                                        serviceIds: [] as number[],
                                         notes: '',
                                         staffId: staff[0]?.user_id || staff[0]?.id || '',
                                         appointmentDate: selectedDate,
@@ -576,6 +581,7 @@ export default function SalonBoard() {
                                                         setFastForm({
                                                             customerName: '',
                                                             serviceId: services[0]?.id?.toString() || '',
+                                                            serviceIds: [],
                                                             notes: '',
                                                             staffId: pId.toString(),
                                                             appointmentDate: selectedDate,
@@ -638,7 +644,11 @@ export default function SalonBoard() {
                                                             >
                                                                 <div>
                                                                     <p className="text-[10px] font-black text-slate-600 truncate">{overlapping.customer_name || 'Misafir'}</p>
-                                                                    <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest leading-none">devam ediyor</p>
+                                                                    <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+                                                                        {overlapping.services && overlapping.services.length > 0
+                                                                            ? overlapping.services.map((s: any) => s.name).join(', ')
+                                                                            : 'devam ediyor'}
+                                                                    </p>
                                                                 </div>
                                                             </div>
                                                         )}
@@ -685,16 +695,29 @@ export default function SalonBoard() {
                                         />
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Hizmet</label>
-                                        <select
-                                            value={fastForm.serviceId}
-                                            onChange={e => setFastForm(prev => ({ ...prev, serviceId: e.target.value }))}
-                                            className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-black text-xl text-slate-900 outline-none appearance-none cursor-pointer"
-                                        >
-                                            <option value="">Hizmet Seçin</option>
-                                            {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                        </select>
+                                    <div className="space-y-4 col-span-1 md:col-span-2">
+                                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Hizmet Seçimi (Birden Fazla Seçebilirsiniz)</label>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-48 overflow-y-auto p-4 bg-slate-50 rounded-[2.5rem]">
+                                            {services.map(s => {
+                                                const isSelected = fastForm.serviceIds.includes(s.id);
+                                                return (
+                                                    <button
+                                                        key={s.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newIds = isSelected
+                                                                ? fastForm.serviceIds.filter(id => id !== s.id)
+                                                                : [...fastForm.serviceIds, s.id];
+                                                            setFastForm({ ...fastForm, serviceIds: newIds });
+                                                        }}
+                                                        className={`p-3 rounded-2xl border-2 transition-all flex flex-col gap-1 text-center items-center justify-center ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-white border-transparent text-slate-600'}`}
+                                                    >
+                                                        <p className={`text-[9px] font-black uppercase leading-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{s.name}</p>
+                                                        <p className={`text-[8px] font-bold ${isSelected ? 'text-indigo-100' : 'text-slate-400'}`}>₺{s.price}</p>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
 
                                     <div className="space-y-2">

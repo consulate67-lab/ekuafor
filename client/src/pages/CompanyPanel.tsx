@@ -1051,8 +1051,8 @@ export default function CompanyPanel() {
                                 </div>
                             ) : reportData ? (
                                 <>
-                                    {/* Stats Cards */}
-                                    <div className="grid grid-cols-2 gap-4">
+                                    {/* Stats Cards - Stacked vertically for consistency */}
+                                    <div className="space-y-4">
                                         <div className="bg-white p-6 rounded-[2rem] shadow-xl shadow-slate-200/40 border border-slate-50">
                                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Toplam Randevu</p>
                                             <p className="text-3xl font-black text-slate-900">{reportData.staffStats.reduce((sum: number, s: any) => sum + s.count, 0)}</p>
@@ -1063,10 +1063,10 @@ export default function CompanyPanel() {
                                         </div>
                                     </div>
 
-                                    {/* Staff & Department Performance Section */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        {/* Staff Table */}
-                                        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40">
+                                    {/* Report Stack - All cards vertical for better readability */}
+                                    <div className="space-y-6">
+                                        {/* Staff Performance */}
+                                        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40 border border-slate-50">
                                             <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
                                                 <span>👤</span> Personel Performansı
                                             </h3>
@@ -1088,7 +1088,7 @@ export default function CompanyPanel() {
                                             </div>
                                         </div>
 
-                                        {/* Department Table */}
+                                        {/* Department Performance */}
                                         <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40 border border-indigo-50">
                                             <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
                                                 <span>🏢</span> Departman Performansı
@@ -1120,10 +1120,34 @@ export default function CompanyPanel() {
                                                 )}
                                             </div>
                                         </div>
-                                    </div>
 
-                                    {/* Hourly & Weekly Distribution */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                        {/* Weekly Performance */}
+                                        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40 border border-slate-50">
+                                            <h3 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
+                                                <span>📅</span> Haftanın Günleri (Ciro)
+                                            </h3>
+                                            <div className="space-y-4">
+                                                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
+                                                    const dayNames: any = { 'Monday': 'Pazartesi', 'Tuesday': 'Salı', 'Wednesday': 'Çarşamba', 'Thursday': 'Perşembe', 'Friday': 'Cuma', 'Saturday': 'Cumartesi', 'Sunday': 'Pazar' };
+                                                    const stat = reportData.weeklyStats.find((s: any) => s.day === day);
+                                                    const maxRevenue = Math.max(...reportData.weeklyStats.map((s: any) => s.revenue), 1);
+                                                    const widthScale = stat ? (stat.revenue / maxRevenue) * 100 : 2;
+                                                    return (
+                                                        <div key={day} className="space-y-1.5">
+                                                            <div className="flex justify-between items-center px-1">
+                                                                <span className="text-[10px] font-black text-slate-500 uppercase">{dayNames[day]}</span>
+                                                                <span className="text-[10px] font-black text-slate-900">
+                                                                    {stat ? stat.revenue.toLocaleString('tr-TR') : 0} ₺
+                                                                </span>
+                                                            </div>
+                                                            <div className="w-full h-2.5 bg-slate-50 rounded-full overflow-hidden border border-slate-100/50">
+                                                                <div className="h-full bg-emerald-500 rounded-full transition-all duration-700" style={{ width: `${widthScale}%` }}></div>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
                                         {/* Hourly Chart - Redesigned for Mobile (Vertical List) */}
                                         <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40 border border-slate-50">
                                             <h3 className="text-lg font-black text-slate-900 mb-6 flex items-center justify-between">
@@ -1165,48 +1189,32 @@ export default function CompanyPanel() {
                                             </div>
                                         </div>
 
-                                        {/* Weekly Performance */}
-                                        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40">
-                                            <h3 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
-                                                <span>📅</span> Günlük Ciro Performansı
-                                            </h3>
-                                            <div className="space-y-4">
-                                                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
-                                                    const dayNames: any = { 'Monday': 'Pzt', 'Tuesday': 'Sal', 'Wednesday': 'Çar', 'Thursday': 'Per', 'Friday': 'Cum', 'Saturday': 'Cmt', 'Sunday': 'Paz' };
-                                                    const stat = reportData.weeklyStats.find((s: any) => s.day === day);
-                                                    const maxRevenue = Math.max(...reportData.weeklyStats.map((s: any) => s.revenue), 1);
-                                                    const widthScale = stat ? (stat.revenue / maxRevenue) * 100 : 2;
-                                                    return (
-                                                        <div key={day} className="flex items-center gap-4">
-                                                            <span className="w-8 text-[10px] font-black text-slate-400 uppercase">{dayNames[day]}</span>
-                                                            <div className="flex-1 h-3 bg-slate-50 rounded-full overflow-hidden">
-                                                                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${widthScale}%` }}></div>
-                                                            </div>
-                                                            <span className="text-[10px] font-black text-slate-900 text-right min-w-[50px]">
-                                                                {stat ? stat.revenue.toLocaleString('tr-TR') : 0} ₺
-                                                            </span>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        </div>
-                                    </div>
 
-                                    {/* Monthly Distribution (Show only for Year period) */}
-                                    {reportPeriod === 'year' && (
-                                        <div className="bg-indigo-900 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-indigo-200">
-                                            <h3 className="text-lg font-black mb-6">🗓️ Aylık Performans (Ciro)</h3>
-                                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                                                {reportData.monthlyStats.map((m: any) => (
-                                                    <div key={m.month} className="bg-white/10 p-4 rounded-3xl backdrop-blur-sm border border-white/10">
-                                                        <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest truncate">{m.month}</p>
-                                                        <p className="text-lg font-black">{m.revenue.toLocaleString('tr-TR')} ₺</p>
-                                                        <p className="text-[10px] font-bold text-white/40">{m.count} Randevu</p>
-                                                    </div>
-                                                ))}
+                                        {/* Monthly Distribution - Vertical for Mobile */}
+                                        {reportPeriod === 'year' && (
+                                            <div className="bg-indigo-900 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-indigo-200">
+                                                <h3 className="text-lg font-black mb-6">🗓️ Ay Bazında Ciro Dağılımı</h3>
+                                                <div className="space-y-4">
+                                                    {reportData.monthlyStats.map((m: any) => {
+                                                        const maxMonthlyRevenue = Math.max(...reportData.monthlyStats.map((ms: any) => ms.revenue), 1);
+                                                        const monthWidth = (m.revenue / maxMonthlyRevenue) * 100;
+                                                        return (
+                                                            <div key={m.month} className="bg-white/10 p-5 rounded-[2rem] backdrop-blur-sm border border-white/10">
+                                                                <div className="flex justify-between items-center mb-2">
+                                                                    <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">{m.month}</p>
+                                                                    <p className="text-lg font-black">{m.revenue.toLocaleString('tr-TR')} ₺</p>
+                                                                </div>
+                                                                <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                                                    <div className="h-full bg-white rounded-full transition-all duration-1000" style={{ width: `${monthWidth}%` }}></div>
+                                                                </div>
+                                                                <p className="text-[9px] font-bold text-white/40 mt-1.5 uppercase tracking-widest">{m.count} Randevu</p>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
 
                                     <div className="text-center py-4">
                                         <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Raporlar her gece 23:00'da e-posta adresinize gönderilir.</p>

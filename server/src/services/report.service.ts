@@ -70,9 +70,14 @@ class ReportService {
                 COUNT(a.id) as count,
                 SUM(COALESCE(a.price, s.price, 0)) as revenue
             FROM users u
+            JOIN (
+                SELECT user_id FROM users WHERE company_id = $1
+                UNION
+                SELECT user_id FROM company_users WHERE company_id = $1
+            ) cu_all ON u.id = cu_all.user_id
             LEFT JOIN appointments a ON u.id = a.staff_id AND a.company_id = $1 AND a.status != 'cancelled' AND ${statsFilter}
             LEFT JOIN services s ON a.service_id = s.id
-            WHERE u.company_id = $1 AND u.role != 'customer'
+            WHERE u.role != 'customer'
             GROUP BY u.id, u.first_name, u.last_name
             ORDER BY count DESC
         `;
