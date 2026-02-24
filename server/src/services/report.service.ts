@@ -78,7 +78,6 @@ class ReportService {
         `;
 
         // 2. Hourly Distribution (Uses chartFilter)
-        // Use split_part for robust hour extraction from string HH:MM
         const hourlyQuery = `
             SELECT 
                 CAST(SPLIT_PART(start_time, ':', 1) AS INTEGER) as hour,
@@ -117,18 +116,35 @@ class ReportService {
             ORDER BY month_index
         `;
 
-        const [staffRes, hourlyRes, weeklyRes, monthlyRes] = await Promise.all([
+        // 5. Department Breakdown
+        const departmentQuery = `
+            SELECT 
+                d.id as department_id,
+                d.name as department_name,
+                COUNT(a.id) as count,
+                SUM(COALESCE(a.price, s.price, 0)) as revenue
+            FROM departments d
+            LEFT JOIN appointments a ON d.id = a.department_id AND a.company_id = $1 AND a.status != 'cancelled' AND ${statsFilter}
+            LEFT JOIN services s ON a.service_id = s.id
+            WHERE d.company_id = $1
+            GROUP BY d.id, d.name
+            ORDER BY revenue DESC
+        `;
+
+        const [staffRes, hourlyRes, weeklyRes, monthlyRes, deptRes] = await Promise.all([
             pool.query(staffQuery, [companyId]),
             pool.query(hourlyQuery, [companyId]),
             pool.query(weeklyQuery, [companyId]),
-            pool.query(monthlyQuery, [companyId])
+            pool.query(monthlyQuery, [companyId]),
+            pool.query(departmentQuery, [companyId])
         ]);
 
         return {
             staffStats: staffRes.rows.map(r => ({ ...r, count: parseInt(r.count), revenue: parseFloat(r.revenue || 0) })),
             hourlyStats: hourlyRes.rows.map(r => ({ hour: parseInt(r.hour), count: parseInt(r.count) })),
             weeklyStats: weeklyRes.rows.map(r => ({ day: r.day_name.trim(), count: parseInt(r.count), revenue: parseFloat(r.revenue || 0) })),
-            monthlyStats: monthlyRes.rows.map(r => ({ month: r.month_name.trim(), count: parseInt(r.count), revenue: parseFloat(r.revenue || 0) }))
+            monthlyStats: monthlyRes.rows.map(r => ({ month: r.month_name.trim(), count: parseInt(r.count), revenue: parseFloat(r.revenue || 0) })),
+            departmentStats: deptRes.rows.map(r => ({ ...r, count: parseInt(r.count), revenue: parseFloat(r.revenue || 0) }))
         };
     }
 }

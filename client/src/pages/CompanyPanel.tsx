@@ -1063,26 +1063,62 @@ export default function CompanyPanel() {
                                         </div>
                                     </div>
 
-                                    {/* Staff Table */}
-                                    <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40">
-                                        <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
-                                            <span>👤</span> Personel Performansı
-                                        </h3>
-                                        <div className="space-y-4">
-                                            {reportData.staffStats.map((s: any, i: number) => (
-                                                <div key={s.staff_id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl group hover:bg-indigo-50 transition-all">
-                                                    <div className="flex items-center gap-4">
-                                                        <span className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-xs font-black text-slate-400 border border-slate-100 group-hover:border-indigo-200 group-hover:text-indigo-600">
-                                                            #{i + 1}
-                                                        </span>
-                                                        <div>
-                                                            <p className="font-black text-slate-900">{s.staff_name}</p>
-                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.count} Randevu</p>
+                                    {/* Staff & Department Performance Section */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                        {/* Staff Table */}
+                                        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40">
+                                            <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
+                                                <span>👤</span> Personel Performansı
+                                            </h3>
+                                            <div className="space-y-4">
+                                                {reportData.staffStats.map((s: any, i: number) => (
+                                                    <div key={s.staff_id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl group hover:bg-indigo-50 transition-all">
+                                                        <div className="flex items-center gap-4">
+                                                            <span className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-xs font-black text-slate-400 border border-slate-100 group-hover:border-indigo-200 group-hover:text-indigo-600">
+                                                                #{i + 1}
+                                                            </span>
+                                                            <div>
+                                                                <p className="font-black text-slate-900">{s.staff_name}</p>
+                                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.count} Randevu</p>
+                                                            </div>
+                                                        </div>
+                                                        <p className="font-black text-indigo-600">{s.revenue.toLocaleString('tr-TR')} ₺</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Department Table */}
+                                        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40 border border-indigo-50">
+                                            <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-2">
+                                                <span>🏢</span> Departman Performansı
+                                            </h3>
+                                            <div className="space-y-4">
+                                                {reportData.departmentStats?.length > 0 ? reportData.departmentStats.map((d: any, i: number) => (
+                                                    <div key={d.department_id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl group hover:bg-emerald-50 transition-all border border-transparent hover:border-emerald-100">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-[10px] font-black text-slate-400 shadow-sm">
+                                                                {i + 1}
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-black text-slate-900">{d.department_name}</p>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{d.count} Randevu</span>
+                                                                    <div className="w-1 h-1 bg-slate-200 rounded-full"></div>
+                                                                    <span className="text-[10px] font-black text-emerald-500">{((d.revenue / (reportData.staffStats.reduce((sum: number, s: any) => sum + s.revenue, 0) || 1)) * 100).toFixed(0)}% Pay</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="font-black text-slate-900">{d.revenue.toLocaleString('tr-TR')} ₺</p>
                                                         </div>
                                                     </div>
-                                                    <p className="font-black text-indigo-600">{s.revenue.toLocaleString('tr-TR')} ₺</p>
-                                                </div>
-                                            ))}
+                                                )) : (
+                                                    <div className="text-center py-10">
+                                                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest italic">Henüz departman verisi yok</p>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
