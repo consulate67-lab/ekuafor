@@ -500,20 +500,20 @@ export default function AppointmentManagement() {
                             </div>
                         ) : (
                             appointments
-                                .filter(a => formatDateKey(a.appointment_date) === selectedDate && a.status === 'approved')
+                                .filter(a => formatDateKey(a.appointment_date) === selectedDate && (a.status === 'approved' || a.status === 'completed'))
                                 .sort((a, b) => a.start_time.localeCompare(b.start_time))
                                 .map(app => (
                                     <div
                                         key={app.id}
                                         onClick={() => setSelectedAppointment(app)}
-                                        className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3 active:scale-[0.98] transition-all"
+                                        className={`p-4 rounded-2xl border shadow-sm flex items-center gap-3 active:scale-[0.98] transition-all ${app.status === 'completed' ? 'bg-slate-50/50 border-slate-100 opacity-60' : 'bg-white border-slate-100'}`}
                                     >
-                                        <div className="w-14 h-14 bg-slate-50 rounded-2xl flex flex-col items-center justify-center border border-slate-100">
-                                            <span className="text-xs font-black text-slate-900 leading-none">{(app.start_time || '00:00').split(':')[0]}</span>
+                                        <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center border ${app.status === 'completed' ? 'bg-slate-100 border-slate-200' : 'bg-slate-50 border-slate-100'}`}>
+                                            <span className={`text-xs font-black leading-none ${app.status === 'completed' ? 'text-slate-400' : 'text-slate-900'}`}>{(app.start_time || '00:00').split(':')[0]}</span>
                                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">:{(app.start_time || '00:00').split(':')[1]}</span>
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <h4 className="font-black text-slate-900 text-sm truncate uppercase tracking-tight">
+                                            <h4 className={`font-black text-sm truncate uppercase tracking-tight ${app.status === 'completed' ? 'text-slate-400' : 'text-slate-900'}`}>
                                                 {(() => {
                                                     const nameMatch = app.notes?.match(/Müşteri:\s*([^|]+)/);
                                                     const extracted = nameMatch ? nameMatch[1].trim() : '';
@@ -523,8 +523,10 @@ export default function AppointmentManagement() {
                                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{app.service_name || 'Hizmet Bilgisi Yok'}</p>
                                         </div>
                                         <div className="text-right">
-                                            <span className="text-xs font-black text-pink-600 block">₺{app.price || '0'}</span>
-                                            <span className="text-[9px] font-bold text-emerald-500 uppercase">Onaylı</span>
+                                            <span className={`text-xs font-black block ${app.status === 'completed' ? 'text-slate-400' : 'text-pink-600'}`}>₺{app.price || '0'}</span>
+                                            <span className={`text-[9px] font-bold uppercase ${app.status === 'completed' ? 'text-slate-400' : 'text-emerald-500'}`}>
+                                                {app.status === 'completed' ? 'Tamamlandı' : 'Onaylı'}
+                                            </span>
                                         </div>
                                     </div>
                                 ))
@@ -719,34 +721,44 @@ export default function AppointmentManagement() {
                                 </div>
                             </div>
 
-                            <div className="flex flex-col gap-3">
-                                {selectedAppointment.status === 'approved' && (
+                            {selectedAppointment.status !== 'completed' && (
+                                <div className="flex flex-col gap-3">
+                                    {selectedAppointment.status === 'approved' && (
+                                        <button
+                                            onClick={() => {
+                                                handleStatusUpdate(selectedAppointment.id!, 'completed');
+                                                setSelectedAppointment(null);
+                                            }}
+                                            className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                                        >
+                                            Hizmeti Tamamla
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => handleWhatsAppNotify(selectedAppointment)}
+                                        className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-emerald-100 hover:bg-emerald-600 transition-all"
+                                    >
+                                        WhatsApp ile Bildir
+                                    </button>
                                     <button
                                         onClick={() => {
-                                            handleStatusUpdate(selectedAppointment.id!, 'completed');
+                                            handleStatusUpdate(selectedAppointment.id!, 'cancelled');
                                             setSelectedAppointment(null);
                                         }}
-                                        className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                                        className="w-full bg-slate-50 text-red-500 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-50 transition-all"
                                     >
-                                        Hizmeti Tamamla
+                                        Randevuyu İptal Et
                                     </button>
-                                )}
-                                <button
-                                    onClick={() => handleWhatsAppNotify(selectedAppointment)}
-                                    className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-emerald-100 hover:bg-emerald-600 transition-all"
-                                >
-                                    WhatsApp ile Bildir
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        handleStatusUpdate(selectedAppointment.id!, 'cancelled');
-                                        setSelectedAppointment(null);
-                                    }}
-                                    className="w-full bg-slate-50 text-red-500 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-50 transition-all"
-                                >
-                                    Randevuyu İptal Et
-                                </button>
-                            </div>
+                                </div>
+                            )}
+
+                            {selectedAppointment.status === 'completed' && (
+                                <div className="p-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-center">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                        Bu randevu tamamlanmıştır ve üzerinde işlem yapılamaz.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
