@@ -290,17 +290,25 @@ export default function CustomerHome() {
         }
 
         try {
-            // First check/request permission
-            const perm = await Camera.checkPermissions();
-            if (perm.camera !== 'granted') {
-                const req = await Camera.requestPermissions();
-                if (req.camera !== 'granted') {
-                    setCodeError('Kamera izni verilmedi. Barkod tarayıcı için kamera izni gerekiyor.');
-                    return;
+            // First check/request permission (Mobile/Capacitor context)
+            try {
+                const perm = await Camera.checkPermissions();
+                if (perm.camera !== 'granted') {
+                    await Camera.requestPermissions();
                 }
+            } catch (e) {
+                console.log('Capacitor camera check skipped (not on native)');
             }
 
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            // Web context camera request
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'environment',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            });
+
             setIsScanning(true);
             setCodeError('');
 
@@ -312,9 +320,15 @@ export default function CustomerHome() {
                 }
             }, 500);
 
-        } catch (err) {
+        } catch (err: any) {
             console.error('Camera error:', err);
-            setCodeError('Kameraya erişilemedi. Lütfen tarayıcı ayarlarından kamera izni verin.');
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                setCodeError('Kamera izni reddedildi. Lütfen tarayıcı adres çubuğundaki kilit simgesine tıklayarak kamera iznini aktif edin.');
+            } else if (err.name === 'NotFoundError') {
+                setCodeError('Kamera bulunamadı. Lütfen cihazınızda bir kamera olduğundan emin olun.');
+            } else {
+                setCodeError('Kameraya erişilemedi. Lütfen ayarlarınızı kontrol edin.');
+            }
         }
     };
 
