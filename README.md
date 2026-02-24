@@ -2,13 +2,13 @@
 
 Saloon, güzellik merkezleri ve kuaförler için geliştirilmiş, kapsamlı bir randevu ve yönetim sistemidir.
 
-[![Status](https://img.shields.io/badge/Status-Phase_1_Complete-green.svg)](https://github.com/consulate67-lab/ekuafor)
+[![Status](https://img.shields.io/badge/Status-Phase_2_Complete-blue.svg)](https://github.com/consulate67-lab/ekuafor)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.0.0-orange.svg)](https://github.com/consulate67-lab/ekuafor)
+[![Version](https://img.shields.io/badge/Version-2.0.0-green.svg)](https://github.com/consulate67-lab/ekuafor)
 
-## 🌟 Proje Özeti (Faz 1)
+## 🌟 Proje Özeti (Faz 2 Tamamlandı!)
 
-Bu aşamada projenin temel altyapısı, firma yönetim sistemi ve adres/harita entegrasyonu tamamlanmıştır.
+Bu aşamada projenin mobil dönüşümü (Capacitor), personel profil fotoğrafları, kamera entegrasyonu ve Salon Paneli (Board) geliştirmeleri tamamlanmıştır.
 
 ### 🚩 Tamamlanan Özellikler
 
@@ -27,13 +27,28 @@ Bu aşamada projenin temel altyapısı, firma yönetim sistemi ve adres/harita e
 #### 👥 Kullanıcı ve Rol Yönetimi
 - ✅ **Authentication**: JWT tabanlı güvenli giriş sistemi
 - ✅ **Roller**: Super Admin, Firma Sahibi (Company Admin), Müşteri
-- ✅ **Çalışan Yönetimi**: Firmaya benzersiz ID'si ile çalışan ekleme sistemi altyapısı hazırlandı.
+- ✅ **Çalışan Yönetimi**: Personel ekleme, departman yönetimi ve profil fotoğrafları.
+
+#### 📱 Mobil ve Kamera Entegrasyonu
+- ✅ **Capacitor**: Proje Android ve iOS uyumlu hale getirildi.
+- ✅ **Native Camera**: Mobil araçlarda doğrudan kamera veya galeriden fotoğraf seçimi.
+- ✅ **Görsel Optimizasyon**: Yüklenen görseller otomatik olarak 400x400 JPEG formatında küçültülür.
+
+#### 📟 Salon Paneli (Board)
+- ✅ **Gelişmiş Görsel Deneyim**: Personel fotoğrafları ve büyük kart yapısı.
+- ✅ **Real-time Takip**: Randevuların canlı senkronizasyonu.
 
 ## 🚀 Deployment
 
 ### Frontend (GitHub Pages)
 Frontend otomatik olarak GitHub Pages üzerinden yayınlanmaktadır. 
 [https://consulate67-lab.github.io/ekuafor/](https://consulate67-lab.github.io/ekuafor/)
+
+### 🤖 Android Uygulaması (APK)
+Her push işleminde GitHub Actions üzerinden otomatik APK oluşturulur:
+1. Depodaki **Actions** sekmesine gidin.
+2. **Build Android APK** akışına tıklayın.
+3. En son başarılı build'in altındaki **Artifacts** kısmından `saloon-app-debug` dosyasını indirebilirsiniz.
 
 ### Backend (Railway / Render)
 Backend'i canlıya almak için:
@@ -105,9 +120,9 @@ d:\Saloon/
 
 ## 🗺️ Yol Haritası (Faz 2)
 
-- [ ] Çalışan paneli ve profil yönetimi
-- [ ] Hizmet (Service) bazlı çalışma saatleri
-- [ ] Randevu (Appointment) oluşturma ve takvim
+- [x] Çalışan paneli ve profil yönetimi
+- [x] Hizmet (Service) bazlı çalışma saatleri
+- [x] Randevu (Appointment) oluşturma ve takvim (Board)
 - [ ] Müşteri bildirimleri (E-posta/SMS)
 - [ ] Ödeme sistemleri (iyzico Entegrasyonu)
 
