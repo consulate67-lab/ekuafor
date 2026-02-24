@@ -457,7 +457,7 @@ export default function SalonBoard() {
                     <table className="w-full border-separate border-spacing-0">
                         <thead>
                             <tr className="bg-slate-900">
-                                <th className="sticky left-0 z-[60] bg-slate-900 p-4 lg:p-5 text-left border-b border-white/5 min-w-[200px] shadow-[10px_0_30px_-15px_rgba(0,0,0,0.3)] rounded-tl-[1.5rem]">
+                                <th className="sticky left-0 z-[60] bg-slate-900 p-4 lg:p-5 text-left border-b border-white/5 min-w-[240px] lg:min-w-[280px] shadow-[10px_0_30px_-15px_rgba(0,0,0,0.3)] rounded-tl-[1.5rem]">
                                     <div className="flex flex-col">
                                         <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-0.5">Organizasyon</span>
                                         <span className="text-base font-black text-white tracking-tight">Uzmanlar</span>
@@ -499,7 +499,7 @@ export default function SalonBoard() {
                                         <td className="sticky left-0 z-[50] bg-white p-2 lg:p-3 border-r border-slate-100 font-bold text-slate-900 shadow-[10px_0_30px_-15px_rgba(0,0,0,0.1)] group-hover:bg-slate-50 transition-colors">
                                             <div className="flex items-center gap-2">
                                                 <div
-                                                    className="w-12 h-12 lg:w-14 lg:h-14 rounded-2xl text-white flex items-center justify-center font-black text-xs lg:text-base uppercase shadow-md shrink-0 overflow-hidden border-2 border-white"
+                                                    className="w-16 h-16 lg:w-20 lg:h-20 rounded-3xl text-white flex items-center justify-center font-black text-xl lg:text-3xl uppercase shadow-xl shrink-0 overflow-hidden border-4 border-white"
                                                     style={{ backgroundColor: person.photo ? 'transparent' : staffColor }}
                                                 >
                                                     {person.photo ? (
@@ -509,8 +509,11 @@ export default function SalonBoard() {
                                                     )}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className="text-[13px] font-black text-slate-800 leading-none tracking-tight group-hover:text-indigo-600 transition-colors truncate">
-                                                        {person.first_name} {person.last_name}
+                                                    <p className="text-base lg:text-xl font-black text-slate-800 leading-tight tracking-tight group-hover:text-indigo-600 transition-colors">
+                                                        {person.first_name}
+                                                    </p>
+                                                    <p className="text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-[0.2em]">
+                                                        {person.last_name}
                                                     </p>
                                                 </div>
                                             </div>
