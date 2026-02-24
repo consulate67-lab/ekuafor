@@ -6,6 +6,7 @@ import { Company } from '../types';
 import { Geolocation } from '@capacitor/geolocation';
 import { Camera } from '@capacitor/camera';
 
+// Saloon - V1.9.6 - QR Scanner Fix
 export default function CustomerHome() {
     const navigate = useNavigate();
     const [companies, setCompanies] = useState<Company[]>([]);
