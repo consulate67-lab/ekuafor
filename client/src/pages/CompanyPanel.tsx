@@ -1124,30 +1124,44 @@ export default function CompanyPanel() {
 
                                     {/* Hourly & Weekly Distribution */}
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        {/* Hourly Chart */}
-                                        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40">
-                                            <h3 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
-                                                <span>⏰</span> Yoğun Saatler
+                                        {/* Hourly Chart - Redesigned for Mobile (Vertical List) */}
+                                        <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40 border border-slate-50">
+                                            <h3 className="text-lg font-black text-slate-900 mb-6 flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span>⏰</span> Yoğun Saatler
+                                                </div>
+                                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Randevu Sayısı</span>
                                             </h3>
-                                            <div className="flex items-end gap-1 h-32 px-2">
+                                            <div className="space-y-3">
                                                 {[8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21].map(h => {
                                                     const stat = reportData.hourlyStats.find((s: any) => s.hour === h);
                                                     const maxCount = Math.max(...reportData.hourlyStats.map((s: any) => s.count), 1);
-                                                    const heightScale = stat ? (stat.count / maxCount) * 100 : 5;
+                                                    const percentage = stat ? (stat.count / maxCount) * 100 : 0;
+
+                                                    // Only show hours that have at least one appointment for a cleaner look
+                                                    if (!stat || stat.count === 0) return null;
+
                                                     return (
-                                                        <div key={h} className="flex-1 flex flex-col items-center gap-2">
-                                                            <div className="w-full bg-indigo-50 rounded-t-lg relative group overflow-hidden" style={{ height: `${heightScale}%` }}>
-                                                                <div className="absolute inset-0 bg-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                                                {stat && stat.count > 0 && (
-                                                                    <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[9px] font-black text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                        {stat.count}
-                                                                    </span>
-                                                                )}
+                                                        <div key={h} className="group transition-all">
+                                                            <div className="flex items-center justify-between mb-1.5 px-1">
+                                                                <span className="text-[10px] font-black text-slate-500 uppercase">{h}:00</span>
+                                                                <span className="text-[10px] font-black text-indigo-600">{stat.count} Randevu</span>
                                                             </div>
-                                                            <span className="text-[8px] font-black text-slate-400">{h}</span>
+                                                            <div className="w-full h-2 bg-slate-50 rounded-full overflow-hidden border border-slate-100/50">
+                                                                <div
+                                                                    className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 rounded-full transition-all duration-700 ease-out"
+                                                                    style={{ width: `${percentage}%` }}
+                                                                ></div>
+                                                            </div>
                                                         </div>
                                                     )
                                                 })}
+                                                {/* Fallback if no hourly data */}
+                                                {!reportData.hourlyStats.some((s: any) => s.count > 0) && (
+                                                    <div className="text-center py-4">
+                                                        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Henüz saatlik veri yok</p>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
