@@ -468,8 +468,8 @@ export default function SalonBoard() {
 
             {/* Matrix Container */}
             <div id="matrix-container" className="flex-1 overflow-auto p-4 lg:p-5 scroll-smooth bg-slate-50/50">
-                <div className="bg-white rounded-[1.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.04)] border border-slate-100 inline-block min-w-full">
-                    <table className="w-full border-separate border-spacing-0">
+                <div className="bg-white rounded-[1.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.04)] border border-slate-100 inline-block min-w-full overflow-hidden">
+                    <table className="border-separate border-spacing-0">
                         <thead>
                             <tr className="bg-slate-900">
                                 <th className="sticky top-0 left-0 z-[100] bg-slate-900 p-4 lg:p-5 text-left border-b border-white/5 min-w-[240px] lg:min-w-[280px] shadow-[10px_0_30px_-15px_rgba(0,0,0,0.3)] rounded-tl-[1.5rem]">
@@ -545,28 +545,21 @@ export default function SalonBoard() {
                                             const isSlotPast = (selectedDate < currentDate) || (selectedDate === currentDate && currentTotal >= nextSlotTotal);
                                             const todayDate = selectedDate;
 
-                                            // Find appointments that START at this slot
-                                            const startsHere = appointments.filter(a => {
-                                                const appDate = (a.appointment_date || '').substring(0, 10);
-                                                return Number(a.staff_id) === Number(pId) &&
-                                                    a.start_time.substring(0, 5) === hour &&
-                                                    a.status !== 'cancelled' &&
-                                                    appDate === todayDate;
-                                            });
-
-                                            // Find appointments that OVERLAP this slot (started earlier but still running)
-                                            const overlapping = appointments.find(a => {
+                                            // Find appointments that are active during this slot
+                                            const activeAtSlot = appointments.filter(a => {
                                                 const appDate = (a.appointment_date || '').substring(0, 10);
                                                 if (Number(a.staff_id) !== Number(pId) || a.status === 'cancelled' || appDate !== todayDate) return false;
+
                                                 const [asH, asM] = a.start_time.split(':').map(Number);
                                                 const [aeH, aeM] = a.end_time.split(':').map(Number);
                                                 const appStart = asH * 60 + asM;
                                                 const appEnd = aeH * 60 + aeM;
-                                                // Slot is within appointment range BUT appointment doesn't start here
-                                                return slotTotal >= appStart && slotTotal < appEnd && a.start_time.substring(0, 5) !== hour;
+
+                                                // Active if it covers any part of this slot [slotTotal, nextSlotTotal)
+                                                return slotTotal < appEnd && appStart < nextSlotTotal;
                                             });
 
-                                            const isOccupied = startsHere.length > 0 || !!overlapping;
+                                            const isOccupied = activeAtSlot.length > 0;
                                             const isSlotFree = !isOccupied;
 
                                             return (
@@ -598,60 +591,47 @@ export default function SalonBoard() {
                                                             </div>
                                                         )}
 
-                                                        {/* Randevu BURADA BAŞLIYOR - Detaylı kart */}
-                                                        {startsHere.map(app => (
-                                                            <div
-                                                                key={app.id}
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setSelectedAppointment(app);
-                                                                    setIsDetailModalOpen(true);
-                                                                }}
-                                                                className={`p-1.5 lg:p-2 rounded-xl border-l-[3px] shadow-md shadow-slate-200/40 transition-all hover:scale-[1.03] hover:shadow-xl active:scale-95 cursor-pointer ${isSlotPast ? 'grayscale-[0.6] opacity-60' : ''} ${app.status === 'approved' ? 'bg-white text-slate-900 group-hover:bg-slate-50' :
-                                                                    app.status === 'pending' ? 'bg-amber-50 border-amber-500 text-amber-900 animate-pulse' :
-                                                                        app.status === 'completed' ? 'bg-emerald-50 border-emerald-500 text-emerald-900 opacity-60' :
-                                                                            'bg-slate-50 border-slate-300 text-slate-500'
-                                                                    }`}
-                                                                style={app.status === 'approved' ? { borderLeftColor: staffColor } : {}}
-                                                            >
-                                                                <div className="flex justify-between items-start mb-1">
-                                                                    <div className="flex items-center gap-1">
-                                                                        <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{app.start_time}</span>
-                                                                        {isSlotCurrent && <span className="w-1 h-1 bg-indigo-500 rounded-full animate-ping"></span>}
+                                                        {/* Render all active appointments for this slot */}
+                                                        {activeAtSlot.map(app => {
+                                                            const startsHere = app.start_time.substring(0, 5) === hour;
+                                                            return (
+                                                                <div
+                                                                    key={app.id}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setSelectedAppointment(app);
+                                                                        setIsDetailModalOpen(true);
+                                                                    }}
+                                                                    className={`p-1.5 lg:p-2 rounded-xl border-l-[3px] shadow-md shadow-slate-200/40 transition-all hover:scale-[1.03] hover:shadow-xl active:scale-95 cursor-pointer w-full ${isSlotPast ? 'grayscale-[0.6] opacity-60' : ''} ${!startsHere ? 'opacity-70 border-dashed border-l-2' : ''} ${app.status === 'approved' ? 'bg-white text-slate-900' :
+                                                                        app.status === 'pending' ? 'bg-amber-50 border-amber-500 text-amber-900 animate-pulse' :
+                                                                            app.status === 'completed' ? 'bg-emerald-50 border-emerald-500 text-emerald-900 opacity-60' :
+                                                                                'bg-slate-50 border-slate-300 text-slate-500'
+                                                                        }`}
+                                                                    style={app.status === 'approved' ? { borderLeftColor: staffColor } : {}}
+                                                                >
+                                                                    <div className="flex justify-between items-start mb-1">
+                                                                        <div className="flex items-center gap-1">
+                                                                            <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+                                                                                {app.start_time.substring(0, 5)} {startsHere ? '' : '(devam)'}
+                                                                            </span>
+                                                                            {isSlotCurrent && startsHere && <span className="w-1 h-1 bg-indigo-500 rounded-full animate-ping"></span>}
+                                                                        </div>
+                                                                        <span className={`px-1 py-0.5 rounded-full text-[6px] font-black uppercase tracking-widest ${app.status === 'approved' ? 'bg-indigo-100 text-indigo-600' :
+                                                                            app.status === 'pending' ? 'bg-amber-100 text-amber-600' :
+                                                                                'bg-slate-100 text-slate-400'
+                                                                            }`}>
+                                                                            {app.status === 'approved' ? 'V' : app.status === 'pending' ? '!' : 'G'}
+                                                                        </span>
                                                                     </div>
-                                                                    <span className={`px-1 py-0.5 rounded-full text-[6px] font-black uppercase tracking-widest ${app.status === 'approved' ? 'bg-indigo-100 text-indigo-600' :
-                                                                        app.status === 'pending' ? 'bg-amber-100 text-amber-600' :
-                                                                            'bg-slate-100 text-slate-400'
-                                                                        }`}>
-                                                                        {app.status === 'approved' ? 'V' : app.status === 'pending' ? '!' : 'G'}
-                                                                    </span>
-                                                                </div>
-                                                                <p className="text-xs font-black truncate leading-none mb-0.5 tracking-tight">{app.customer_name || 'Misafir'}</p>
-                                                                <p className="text-[7px] font-bold text-slate-400 truncate uppercase tracking-widest">{app.service_name}</p>
-                                                            </div>
-                                                        ))}
-
-                                                        {/* Randevu DEVAM EDİYOR - Devam barı */}
-                                                        {overlapping && startsHere.length === 0 && (
-                                                            <div
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setSelectedAppointment(overlapping);
-                                                                    setIsDetailModalOpen(true);
-                                                                }}
-                                                                className="h-[72px] rounded-lg border-l-4 flex items-center px-2 cursor-pointer hover:scale-[1.02] transition-all opacity-60"
-                                                                style={{ borderLeftColor: staffColor, backgroundColor: `${staffColor}10` }}
-                                                            >
-                                                                <div>
-                                                                    <p className="text-[10px] font-black text-slate-600 truncate">{overlapping.customer_name || 'Misafir'}</p>
-                                                                    <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest leading-none">
-                                                                        {overlapping.services && overlapping.services.length > 0
-                                                                            ? overlapping.services.map((s: any) => s.name).join(', ')
-                                                                            : 'devam ediyor'}
+                                                                    <p className="text-xs font-black truncate leading-none mb-0.5 tracking-tight">{app.customer_name || 'Misafir'}</p>
+                                                                    <p className="text-[7px] font-bold text-slate-400 truncate uppercase tracking-widest leading-none">
+                                                                        {app.services && app.services.length > 0
+                                                                            ? app.services.map((s: any) => s.name).join(', ')
+                                                                            : (app.service_name || 'Hizmet')}
                                                                     </p>
                                                                 </div>
-                                                            </div>
-                                                        )}
+                                                            );
+                                                        })}
                                                     </div>
                                                 </td>
                                             );
