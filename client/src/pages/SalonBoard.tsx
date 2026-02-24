@@ -468,7 +468,7 @@ export default function SalonBoard() {
 
             {/* Matrix Container */}
             <div id="matrix-container" className="flex-1 overflow-auto p-4 lg:p-5 scroll-smooth bg-slate-50/50">
-                <div className="bg-white rounded-[1.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.04)] border border-slate-100 inline-block min-w-full overflow-hidden">
+                <div className="bg-white rounded-[1.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.04)] border border-slate-100 inline-block min-w-full">
                     <table className="border-separate border-spacing-0">
                         <thead>
                             <tr className="bg-slate-900">

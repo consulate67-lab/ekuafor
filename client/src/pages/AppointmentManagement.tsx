@@ -554,7 +554,7 @@ export default function AppointmentManagement() {
                         Sistemi Sıfırla
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments v1.9.1</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments v1.9.2</span>
                     </div>
                 </div>
             </div>

@@ -71,7 +71,7 @@ class ReportService {
                 SUM(COALESCE(a.price, s.price, 0)) as revenue
             FROM users u
             JOIN (
-                SELECT user_id FROM users WHERE company_id = $1
+                SELECT id as user_id FROM users WHERE company_id = $1
                 UNION
                 SELECT user_id FROM company_users WHERE company_id = $1
             ) cu_all ON u.id = cu_all.user_id

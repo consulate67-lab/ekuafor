@@ -87,7 +87,7 @@ export default function BookingPage() {
                 // ... fetch company details
                 const compRes = await api.get(`/companies/${id}`);
                 const companyData = compRes.data.data;
-                console.log('[BookingPage v1.9.1] Company data:', JSON.stringify({
+                console.log('[BookingPage v1.9.2] Company data:', JSON.stringify({
                     work_start_time: companyData.work_start_time,
                     work_end_time: companyData.work_end_time,
                     slot_interval: companyData.slot_interval
@@ -329,7 +329,7 @@ export default function BookingPage() {
                     Sistemi Sıfırla (Veri Sorunu Varsa)
                 </button>
             </div>
-            <p className="text-[10px] text-gray-300 mt-10 uppercase tracking-widest">ID: {id} | v1.9.1</p>
+            <p className="text-[10px] text-gray-300 mt-10 uppercase tracking-widest">ID: {id} | v1.9.2</p>
         </div>
     );
 
@@ -702,7 +702,7 @@ export default function BookingPage() {
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
                         <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse"></div>
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">ID: {id} | Staff: {staff.length} | Svc: {services.length} | v1.9.1</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">ID: {id} | Staff: {staff.length} | Svc: {services.length} | v1.9.2</span>
                     </div>
                 </div>
             </div>
