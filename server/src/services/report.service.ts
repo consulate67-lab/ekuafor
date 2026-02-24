@@ -22,15 +22,17 @@ class ReportService {
         const query = `
             SELECT 
                 COUNT(*) as total_appointments,
-                SUM(COALESCE(price, 0)) as total_revenue
-            FROM appointments
-            WHERE company_id = $1 
-            AND staff_id = $2
-            AND status != 'cancelled'
+                SUM(COALESCE(a.price, s.price, 0)) as total_revenue
+            FROM appointments a
+            LEFT JOIN services s ON a.service_id = s.id
+            WHERE a.company_id = $1 
+            ${staffId ? 'AND a.staff_id = $2' : ''}
+            AND a.status != 'cancelled'
             AND ${dateFilter}
         `;
 
-        const result = await pool.query(query, [companyId, staffId]);
+        const params = staffId ? [companyId, staffId] : [companyId];
+        const result = await pool.query(query, params);
         return {
             total_appointments: parseInt(result.rows[0].total_appointments) || 0,
             total_revenue: parseFloat(result.rows[0].total_revenue) || 0

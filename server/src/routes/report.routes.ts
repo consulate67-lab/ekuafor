@@ -11,14 +11,16 @@ const router = Router();
 router.get('/employee-stats', authMiddleware, async (req: Request, res: Response) => {
     try {
         const companyId = req.user?.companyId;
-        const staffId = req.user?.userId;
         const period = (req.query.period as 'today' | 'week' | 'month' | 'year') || 'today';
 
-        if (!companyId || !staffId) {
-            return res.status(403).json({ success: false, error: 'Firma/Kullanıcı bilgisi eksik' });
+        // If user is an admin, they see company total. If staff, they see their own.
+        const staffId = req.user?.role === 'company_admin' ? undefined : req.user?.userId;
+
+        if (!companyId) {
+            return res.status(403).json({ success: false, error: 'Firma bilgisi eksik' });
         }
 
-        const stats = await reportService.getEmployeeStats(companyId, staffId, period);
+        const stats = await reportService.getEmployeeStats(companyId, staffId as any, period);
 
         res.json({
             success: true,

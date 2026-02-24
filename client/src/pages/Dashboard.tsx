@@ -377,7 +377,7 @@ export default function Dashboard() {
                         />
                     ) : (
                         <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-500 to-indigo-600 flex items-center justify-center text-white font-black text-xl shadow-md border-2 border-white">
-                            {user?.first_name?.[0]}{user?.last_name?.[0]}
+                            {user?.first_name?.[0]}-{user?.last_name?.[0]}
                         </div>
                     )}
                     <div>
@@ -441,7 +441,24 @@ export default function Dashboard() {
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {/* Sesli Randevu (İşletme Sahibi ve Çalışan) - EN BAŞA ALINDI */}
+                    {/* 1. Randevu Yönetimi */}
+                    {(user?.role === 'company_admin' || user?.role === 'staff') && (
+                        <Link to="/appointments" className="card group hover:scale-[1.02] transition-all duration-300 border-pink-100">
+                            <div className="flex items-center gap-5">
+                                <div className="bg-pink-50 p-4 rounded-2xl group-hover:bg-pink-600 group-hover:text-white transition-colors duration-300">
+                                    <svg className="w-8 h-8 text-pink-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-gray-900 mb-1">Randevular</h3>
+                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Onay bekleyenler ve takvim planı.</p>
+                                </div>
+                            </div>
+                        </Link>
+                    )}
+
+                    {/* 2. Sesli Randevu */}
                     {(user?.role === 'company_admin' || user?.role === 'staff') && (
                         <button
                             onClick={startVoiceCommand}
@@ -461,24 +478,7 @@ export default function Dashboard() {
                         </button>
                     )}
 
-                    {/* Firma Tanıtımı (SADECE ADMIN) */}
-                    {user?.role === 'super_admin' && (
-                        <Link to="/companies" className="card group hover:scale-[1.02] transition-all duration-300 border-pink-100">
-                            <div className="flex items-center gap-5">
-                                <div className="bg-pink-50 p-4 rounded-2xl group-hover:bg-pink-600 group-hover:text-white transition-colors duration-300">
-                                    <svg className="w-8 h-8 text-pink-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-bold text-gray-900 mb-1">Firma Bilgileri</h3>
-                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Firma bilgilerini ve çalışma saatlerini düzenle.</p>
-                                </div>
-                            </div>
-                        </Link>
-                    )}
-
-                    {/* Hizmet Yönetimi (İşletme Sahibi) */}
+                    {/* 3. Hizmet Yönetimi */}
                     {user?.role === 'company_admin' && (
                         <Link to="/services" className="card group hover:scale-[1.02] transition-all duration-300 border-violet-100">
                             <div className="flex items-center gap-5">
@@ -495,24 +495,27 @@ export default function Dashboard() {
                         </Link>
                     )}
 
-                    {/* Randevu Yönetimi (İşletme Sahibi ve Çalışan) */}
+                    {/* 4. Çalışan Raporu */}
                     {(user?.role === 'company_admin' || user?.role === 'staff') && (
-                        <Link to="/appointments" className="card group hover:scale-[1.02] transition-all duration-300 border-pink-100">
+                        <button
+                            onClick={() => setShowReports(true)}
+                            className="card group hover:scale-[1.02] transition-all duration-300 border-amber-100 text-left"
+                        >
                             <div className="flex items-center gap-5">
-                                <div className="bg-pink-50 p-4 rounded-2xl group-hover:bg-pink-600 group-hover:text-white transition-colors duration-300">
-                                    <svg className="w-8 h-8 text-pink-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                <div className="bg-amber-50 p-4 rounded-2xl group-hover:bg-amber-600 group-hover:text-white transition-colors duration-300">
+                                    <svg className="w-8 h-8 text-amber-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                                     </svg>
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-bold text-gray-900 mb-1">Randevular</h3>
-                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Onay bekleyenler ve takvim planı.</p>
+                                    <h3 className="text-xl font-bold text-gray-900 mb-1">Çalışan Raporu</h3>
+                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Kazanç ve randevu istatistiklerini gör.</p>
                                 </div>
                             </div>
-                        </Link>
+                        </button>
                     )}
 
-                    {/* WhatsApp Paylaşım (Personel ve Yönetici) */}
+                    {/* 5. WhatsApp Davet */}
                     {(user?.role === 'staff' || user?.role === 'company_admin') && (
                         <a
                             href={`https://wa.me/?text=${encodeURIComponent(`Merhaba! 👋\n\nSize özel randevu sayfamdan kolayca randevu oluşturabilirsiniz:\n${window.location.origin}/ekuafor/book/${user.company_id || 1}?staff=${user.id}`)}`}
@@ -534,26 +537,22 @@ export default function Dashboard() {
                         </a>
                     )}
 
-                    {/* Çalışan Raporu Butonu */}
-                    {(user?.role === 'company_admin' || user?.role === 'staff') && (
-                        <button
-                            onClick={() => setShowReports(true)}
-                            className="card group hover:scale-[1.02] transition-all duration-300 border-amber-100 text-left"
-                        >
+                    {/* Firma Bilgileri (SADECE ADMIN) */}
+                    {user?.role === 'super_admin' && (
+                        <Link to="/companies" className="card group hover:scale-[1.02] transition-all duration-300 border-pink-100">
                             <div className="flex items-center gap-5">
-                                <div className="bg-amber-50 p-4 rounded-2xl group-hover:bg-amber-600 group-hover:text-white transition-colors duration-300">
-                                    <svg className="w-8 h-8 text-amber-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                <div className="bg-pink-50 p-4 rounded-2xl group-hover:bg-pink-600 group-hover:text-white transition-colors duration-300">
+                                    <svg className="w-8 h-8 text-pink-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                     </svg>
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-bold text-gray-900 mb-1">Çalışan Raporu</h3>
-                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Kazanç ve randevu istatistiklerini gör.</p>
+                                    <h3 className="text-xl font-bold text-gray-900 mb-1">Firma Bilgileri</h3>
+                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Firma bilgilerini ve çalışma saatlerini düzenle.</p>
                                 </div>
                             </div>
-                        </button>
+                        </Link>
                     )}
-
                 </div>
 
                 {/* İstatistikler */}
