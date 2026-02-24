@@ -322,12 +322,18 @@ export default function CustomerHome() {
 
         } catch (err: any) {
             console.error('Camera error:', err);
+            const isNative = window.location.protocol === 'capacitor:';
+
             if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                setCodeError('Kamera izni reddedildi. Lütfen tarayıcı adres çubuğundaki kilit simgesine tıklayarak kamera iznini aktif edin.');
+                if (isNative) {
+                    setCodeError('Kamera izni reddedildi. Lütfen uygulama ayarlarından Saloon uygulamasına kamera izni verin.');
+                } else {
+                    setCodeError('Kamera izni reddedildi. Lütfen tarayıcı adres çubuğundaki kilit simgesine tıklayarak kamera iznini aktif edin.');
+                }
             } else if (err.name === 'NotFoundError') {
                 setCodeError('Kamera bulunamadı. Lütfen cihazınızda bir kamera olduğundan emin olun.');
             } else {
-                setCodeError('Kameraya erişilemedi. Lütfen ayarlarınızı kontrol edin.');
+                setCodeError('Kameraya erişilemedi. Lütfen uygulama ayarlarınızı kontrol edin.');
             }
         }
     };
