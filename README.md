@@ -4,11 +4,11 @@ Saloon, güzellik merkezleri ve kuaförler için geliştirilmiş, kapsamlı bir 
 
 [![Status](https://img.shields.io/badge/Status-Phase_2_Complete-blue.svg)](https://github.com/consulate67-lab/ekuafor)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-2.0.0-green.svg)](https://github.com/consulate67-lab/ekuafor)
+[![Version](https://img.shields.io/badge/Version-2.1.0-green.svg)](https://github.com/consulate67-lab/ekuafor)
 
-## 🌟 Proje Özeti (Faz 2 Tamamlandı!)
+## 🌟 Proje Özeti (Faz 2 Geişletildi!)
 
-Bu aşamada projenin mobil dönüşümü (Capacitor), personel profil fotoğrafları, kamera entegrasyonu ve Salon Paneli (Board) geliştirmeleri tamamlanmıştır.
+Bu aşamada projenin mobil dönüşümü (Capacitor), personel profil fotoğrafları, kamera entegrasyonu, **Paket Özelleştirme** ve Salon Paneli (Board) geliştirmeleri tamamlanmıştır.
 
 ### 🚩 Tamamlanan Özellikler
 
@@ -37,6 +37,8 @@ Bu aşamada projenin mobil dönüşümü (Capacitor), personel profil fotoğrafl
 #### 📟 Salon Paneli (Board)
 - ✅ **Gelişmiş Görsel Deneyim**: Personel fotoğrafları ve büyük kart yapısı.
 - ✅ **Real-time Takip**: Randevuların canlı senkronizasyonu.
+- ✅ **Paket Özelleştirme**: Randevu anında pakete dahil hizmetlerin fiyat ve sürelerini manuel olarak değiştirme.
+- ✅ **Bekleyen Talepler**: Onay bekleyen randevuları liste halinde görme ve tek tıkla onaylama/düzenleme.
 
 ## 🚀 Deployment
 

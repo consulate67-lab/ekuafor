@@ -1,6 +1,6 @@
 # Saloon Projesi - Geliştirme Notları
 
-## Proje Durumu: Faz 1 Tamamlandı ✅
+## Proje Durumu: Faz 2 Tamamlandı ✅
 
 ### Tamamlanan Özellikler
 
@@ -40,52 +40,37 @@
 ### Sonraki Aşamalar (Faz 2)
 
 #### 1. Firma Çalışanları Yönetimi
-**ÖNEMLİ NOT**: `company_users` tablosu hazır ve her çalışan için benzersiz ID mevcut.
+- ✅ Çalışan ekleme/düzenleme/silme API endpoint'leri
+- ✅ Çalışan listesi sayfası
+- ✅ Çalışan formu
+- ✅ Çalışan rolü yönetmi (owner, manager, staff)
+- ✅ Çalışan profil fotoğrafı ve kamera entegrasyonu
 
-Yapılacaklar:
-- [ ] Çalışan ekleme/düzenleme/silme API endpoint'leri
-- [ ] Çalışan listesi sayfası
-- [ ] Çalışan formu
-- [ ] Çalışan rolü yönetimi (owner, manager, staff)
-- [ ] Çalışan profil fotoğrafı
+#### 2. Hizmet ve Paket Yönetimi
+- ✅ Hizmet tanımlama ve fiyatlandırma
+- ✅ **Paket Sistemi**: Çoklu hizmetleri tek pakette toplama
+- ✅ **Özelleştirilebilir Paketler**: Randevu anında hizmet bazlı fiyat ve süre override desteği
 
-Örnek API yapısı:
-```typescript
-POST   /api/companies/:companyId/employees
-GET    /api/companies/:companyId/employees
-GET    /api/companies/:companyId/employees/:employeeId
-PUT    /api/companies/:companyId/employees/:employeeId
-DELETE /api/companies/:companyId/employees/:employeeId
-```
+#### 3. Çalışma Saatleri ve Planlama
+- ✅ Firma çalışma saatleri
+- ✅ Çalışan bazlı çalışma saatleri
+- ✅ Randevu çakışma kontrolü
 
-#### 2. Hizmet Yönetimi
-- [ ] Hizmet tanımlama (kesim, boyama, manikür vb.)
-- [ ] Hizmet süresi ve fiyat belirleme
-- [ ] Hangi çalışanın hangi hizmeti verdiği
+#### 4. Randevu Sistemi (Salon Board)
+- ✅ Müşteri randevu oluşturma ve takvim görünümü
+- ✅ Randevu onaylama/iptal/tamamlama
+- ✅ Personel bazlı matris görünümü (Real-time)
+- ✅ Onay bekleyen randevuların merkezi yönetimi
 
-#### 3. Çalışma Saatleri
-- [ ] Firma çalışma saatleri
-- [ ] Çalışan bazlı çalışma saatleri
-- [ ] Tatil günleri yönetimi
-
-#### 4. Randevu Sistemi
-- [ ] Müşteri randevu oluşturma
-- [ ] Randevu takvimi görünümü
-- [ ] Randevu onaylama/iptal etme
-- [ ] SMS/Email bildirimleri
-- [ ] Randevu hatırlatıcıları
-
-#### 5. Ödeme Sistemi
+#### 5. Ödeme ve Finans (Devam Ediyor)
 - [ ] Online ödeme entegrasyonu (iyzico, PayTR vb.)
-- [ ] Komisyon hesaplama
+- [x] Banka ve IBAN yönetimi
+- [ ] Komisyon raporlama
 - [ ] Otomatik IBAN'a ödeme transferi
-- [ ] Ödeme geçmişi ve raporlama
 
 #### 6. Müşteri Paneli
-- [ ] Müşteri kayıt/giriş
-- [ ] Randevu alma
-- [ ] Randevu geçmişi
-- [ ] Favori firmalar
+- ✅ Müşteri randevu alma sayfası (Paket avantaj gösterimi ile)
+- ✅ Müşteri randevu geçmişi (Firma bazlı)
 - [ ] Değerlendirme/yorum sistemi
 
 ### Veritabanı Notları
@@ -192,6 +177,6 @@ Sorularınız için:
 
 ---
 
-**Son Güncelleme**: 2026-02-11
-**Versiyon**: 1.0.0 (Faz 1)
-**Geliştirici**: Saloon Team
+**Son Güncelleme**: 2026-02-25
+**Versiyon**: 2.1.0 (Faz 2 Tamamlandı)
+**Geliştirici**: Antigravity AI
