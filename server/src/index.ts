@@ -465,7 +465,36 @@ const runMigrations = async () => {
             // Drop any existing constraint and ensure it points to the right table (companies, not main_companies)
             await pool.query('ALTER TABLE companies DROP CONSTRAINT IF EXISTS companies_main_company_id_fkey');
 
-            // Cleanup invalid IDs that don't exist in companies table to prevent ADD CONSTRAINT from failing
+            // --- DATA UNIFICATION MIGRATION (One-time) ---
+            const mainCount = await pool.query('SELECT COUNT(*) FROM main_companies');
+            const unifiedCount = await pool.query('SELECT COUNT(*) FROM companies WHERE company_type = \'ÜST FİRMA\'');
+
+            if (parseInt(mainCount.rows[0].count) > 0 && parseInt(unifiedCount.rows[0].count) === 0) {
+                console.log('📦 Migrating legacy main_companies to companies table...');
+                await pool.query(`
+                    INSERT INTO companies (
+                        name, description, address_line, province_id, province_name, 
+                        company_type, is_active, created_at, admin_key
+                    )
+                    SELECT 
+                        name, description, address_line, province_id, province_name, 
+                        'ÜST FİRMA', is_active, created_at, admin_code
+                    FROM main_companies
+                `);
+
+                // Re-link branches using names
+                await pool.query(`
+                    UPDATE companies c
+                    SET main_company_id = m_new.id
+                    FROM main_companies m_old
+                    JOIN companies m_new ON m_new.name = m_old.name AND m_new.company_type = 'ÜST FİRMA'
+                    WHERE c.main_company_id = m_old.id
+                    AND c.company_type = 'ŞUBE'
+                `);
+                console.log('✅ Data migration and re-linking completed.');
+            }
+
+            // Cleanup invalid IDs that don't exist in companies table before adding FK
             await pool.query(`
                 UPDATE companies 
                 SET main_company_id = NULL 

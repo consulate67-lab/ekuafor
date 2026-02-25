@@ -25,17 +25,17 @@ class MainCompanyService {
     }
 
     async getAll(): Promise<MainCompany[]> {
-        const result = await pool.query('SELECT * FROM main_companies ORDER BY created_at DESC');
+        const result = await pool.query('SELECT id, name, description, address_line, province_id, province_name, admin_key as admin_code, is_active, created_at FROM companies WHERE company_type = \'ÜST FİRMA\' ORDER BY created_at DESC');
         return result.rows;
     }
 
     async getById(id: number): Promise<MainCompany | null> {
-        const result = await pool.query('SELECT * FROM main_companies WHERE id = $1', [id]);
+        const result = await pool.query('SELECT id, name, description, address_line, province_id, province_name, admin_key as admin_code, is_active, created_at FROM companies WHERE id = $1 AND company_type = \'ÜST FİRMA\'', [id]);
         return result.rows[0] || null;
     }
 
     async getByAdminCode(code: string): Promise<MainCompany | null> {
-        const result = await pool.query('SELECT * FROM main_companies WHERE admin_code = $1', [code]);
+        const result = await pool.query('SELECT id, name, description, address_line, province_id, province_name, admin_key as admin_code, is_active, created_at FROM companies WHERE admin_key = $1 AND company_type = \'ÜST FİRMA\'', [code]);
         return result.rows[0] || null;
     }
 
