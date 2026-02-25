@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS services (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Çalışma Saatleri
+-- Çalışma Saatleri (Eski)
 CREATE TABLE IF NOT EXISTS working_hours (
     id SERIAL PRIMARY KEY,
     company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
@@ -146,6 +146,31 @@ CREATE TABLE IF NOT EXISTS working_hours (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Paketler (Birden fazla hizmet içeren paketler)
+CREATE TABLE IF NOT EXISTS packages (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    duration_minutes INTEGER NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    staff_id INTEGER REFERENCES users(id),
+    department_id INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Paket Hizmetleri İlişkisi
+CREATE TABLE IF NOT EXISTS package_services (
+    id SERIAL PRIMARY KEY,
+    package_id INTEGER REFERENCES packages(id) ON DELETE CASCADE,
+    service_id INTEGER REFERENCES services(id) ON DELETE CASCADE,
+    staff_id INTEGER REFERENCES users(id),
+    department_id INTEGER,
+    order_index INTEGER DEFAULT 0
+);
+
 -- Randevular
 CREATE TABLE IF NOT EXISTS appointments (
     id SERIAL PRIMARY KEY,
@@ -153,6 +178,7 @@ CREATE TABLE IF NOT EXISTS appointments (
     customer_id INTEGER REFERENCES users(id),
     service_id INTEGER REFERENCES services(id),
     staff_id INTEGER REFERENCES users(id),
+    package_id INTEGER REFERENCES packages(id),
     
     appointment_date DATE NOT NULL,
     start_time TIME NOT NULL,
@@ -165,8 +191,28 @@ CREATE TABLE IF NOT EXISTS appointments (
     payment_status VARCHAR(50) DEFAULT 'unpaid',
     payment_method VARCHAR(50),
     
+    customer_phone VARCHAR(20),
+    customer_name VARCHAR(255),
+    device_id VARCHAR(255),
+    rating INTEGER CHECK (rating BETWEEN 1 AND 5),
+    comment TEXT,
+    
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Randevu Hizmetleri (Çoklu hizmet desteği için)
+CREATE TABLE IF NOT EXISTS appointment_services (
+    id SERIAL PRIMARY KEY,
+    appointment_id INTEGER REFERENCES appointments(id) ON DELETE CASCADE,
+    service_id INTEGER REFERENCES services(id) ON DELETE CASCADE,
+    price DECIMAL(10, 2),
+    duration_minutes INTEGER,
+    staff_id INTEGER REFERENCES users(id),
+    status VARCHAR(20) DEFAULT 'pending',
+    start_time VARCHAR(5),
+    end_time VARCHAR(5),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Ödemeler Tablosu
@@ -212,6 +258,14 @@ CREATE TABLE IF NOT EXISTS sms_logs (
     status VARCHAR(20) DEFAULT 'pending', -- 'sent', 'failed', 'pending'
     error_message TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Müşteri Cihazları (Bildirimler için)
+CREATE TABLE IF NOT EXISTS customer_devices (
+    id SERIAL PRIMARY KEY,
+    device_id VARCHAR(255) UNIQUE NOT NULL,
+    customer_phone VARCHAR(20) NOT NULL,
+    last_sync TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- İndeksler

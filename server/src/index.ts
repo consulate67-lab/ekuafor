@@ -70,12 +70,29 @@ const healthHandler = async (req: Request, res: Response) => {
         `);
         const tableList = tableCheck.rows.map(r => r.table_name);
 
+        // Check for specific constraints on companies table
+        const fkCheck = await pool.query(`
+            SELECT
+                tc.constraint_name, 
+                kcu.column_name, 
+                ccu.table_name AS foreign_table_name,
+                ccu.column_name AS foreign_column_name 
+            FROM 
+                information_schema.table_constraints AS tc 
+                JOIN information_schema.key_column_usage AS kcu
+                  ON tc.constraint_name = kcu.constraint_name
+                JOIN information_schema.constraint_column_usage AS ccu
+                  ON ccu.constraint_name = tc.constraint_name
+            WHERE tc.table_name='companies' AND kcu.column_name='main_company_id';
+        `);
+
         res.json({
             success: true,
             db: 'Connected',
             time: result.rows[0].now,
             connected_host: dbHost,
-            tables_found: tableList, // Verify if company_users is here
+            tables_found: tableList,
+            constraints: fkCheck.rows,
             env: process.env.NODE_ENV
         });
     } catch (error: any) {
@@ -175,7 +192,77 @@ const runMigrations = async () => {
     try {
         console.log('🔄 Running auto-migrations...');
 
+        // 0. Enum Types
+        await pool.query(`
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+                    CREATE TYPE user_role AS ENUM ('super_admin', 'company_admin', 'customer');
+                END IF;
+            END $$;
+        `);
+
         // 1. Core Tables First (Dependency order)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                role user_role NOT NULL DEFAULT 'customer',
+                first_name VARCHAR(100) NOT NULL,
+                last_name VARCHAR(100) NOT NULL,
+                phone VARCHAR(20),
+                company_id INTEGER,
+                board_code VARCHAR(20) UNIQUE,
+                gender VARCHAR(10),
+                department_id INTEGER,
+                photo TEXT,
+                is_active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS companies (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                description TEXT,
+                phone VARCHAR(20),
+                email VARCHAR(255),
+                website VARCHAR(255),
+                address_line TEXT,
+                province_id INTEGER,
+                province_name VARCHAR(100),
+                district_id INTEGER,
+                district_name VARCHAR(100),
+                neighborhood_id INTEGER,
+                neighborhood_name VARCHAR(100),
+                postal_code VARCHAR(10),
+                latitude DECIMAL(10, 8),
+                longitude DECIMAL(11, 8),
+                bank_name VARCHAR(255),
+                bank_branch VARCHAR(255),
+                iban VARCHAR(34),
+                account_holder_name VARCHAR(255),
+                work_start_time VARCHAR(10) DEFAULT '08:00',
+                work_end_time VARCHAR(10) DEFAULT '20:00',
+                slot_interval INTEGER DEFAULT 30,
+                genders TEXT[],
+                commission_rate DECIMAL(5, 2) DEFAULT 0.00,
+                payment_enabled BOOLEAN DEFAULT false,
+                is_active BOOLEAN DEFAULT true,
+                is_verified BOOLEAN DEFAULT false,
+                created_by INTEGER REFERENCES users(id),
+                admin_key VARCHAR(20) UNIQUE,
+                board_key VARCHAR(20) UNIQUE,
+                company_type VARCHAR(20) DEFAULT 'ASIL',
+                main_company_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
         await pool.query(`
             CREATE TABLE IF NOT EXISTS main_companies (
                 id SERIAL PRIMARY KEY,
@@ -191,11 +278,63 @@ const runMigrations = async () => {
         `);
 
         await pool.query(`
+            CREATE TABLE IF NOT EXISTS services (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+                name VARCHAR(255) NOT NULL,
+                description TEXT,
+                duration_minutes INTEGER NOT NULL,
+                price DECIMAL(10, 2) NOT NULL,
+                is_active BOOLEAN DEFAULT true,
+                department_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS departments (
                 id SERIAL PRIMARY KEY,
                 company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
                 name VARCHAR(100) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS working_hours (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+                day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
+                start_time TIME NOT NULL,
+                end_time TIME NOT NULL,
+                is_active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS appointments (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+                customer_id INTEGER REFERENCES users(id),
+                service_id INTEGER REFERENCES services(id),
+                staff_id INTEGER REFERENCES users(id),
+                appointment_date DATE NOT NULL,
+                start_time TIME NOT NULL,
+                end_time TIME NOT NULL,
+                status VARCHAR(50) DEFAULT 'pending',
+                notes TEXT,
+                price DECIMAL(10, 2),
+                payment_status VARCHAR(50) DEFAULT 'unpaid',
+                payment_method VARCHAR(50),
+                customer_phone VARCHAR(20),
+                customer_name VARCHAR(255),
+                device_id VARCHAR(255),
+                rating INTEGER CHECK (rating BETWEEN 1 AND 5),
+                comment TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
 
@@ -214,6 +353,8 @@ const runMigrations = async () => {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+
+        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS package_id INTEGER REFERENCES packages(id)');
 
         await pool.query(`
             CREATE TABLE IF NOT EXISTS package_services (
@@ -238,6 +379,23 @@ const runMigrations = async () => {
                 start_time VARCHAR(5),
                 end_time VARCHAR(5),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS payments (
+                id SERIAL PRIMARY KEY,
+                appointment_id INTEGER REFERENCES appointments(id),
+                company_id INTEGER REFERENCES companies(id),
+                amount DECIMAL(10, 2) NOT NULL,
+                commission_amount DECIMAL(10, 2) DEFAULT 0.00,
+                net_amount DECIMAL(10, 2) NOT NULL,
+                payment_method VARCHAR(50),
+                payment_status VARCHAR(50) DEFAULT 'pending',
+                transaction_id VARCHAR(255),
+                transaction_date TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
 
@@ -289,13 +447,12 @@ const runMigrations = async () => {
             )
         `);
 
-        // 2. Add Columns & References
+        // 2. Add Columns & References (Incremental updates for existing tables)
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(20)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS device_id VARCHAR(255)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS rating INTEGER CHECK (rating BETWEEN 1 AND 5)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS comment TEXT');
-        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS package_id INTEGER REFERENCES packages(id)');
 
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS photo TEXT');
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS department_id INTEGER');
@@ -327,12 +484,62 @@ const runMigrations = async () => {
         await pool.query('UPDATE services SET is_active = true WHERE is_active IS NULL');
         await pool.query('UPDATE packages SET is_active = true WHERE is_active IS NULL');
 
-        // 3. Indexes
+        // 3. Triggers & Functions
+        await pool.query(`
+            CREATE OR REPLACE FUNCTION update_updated_at_column()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                NEW.updated_at = CURRENT_TIMESTAMP;
+                RETURN NEW;
+            END;
+            $$ language 'plpgsql';
+        `);
+
+        const triggers = [
+            { table: 'users', name: 'update_users_updated_at' },
+            { table: 'companies', name: 'update_companies_updated_at' },
+            { table: 'services', name: 'update_services_updated_at' },
+            { table: 'appointments', name: 'update_appointments_updated_at' }
+        ];
+
+        for (const tg of triggers) {
+            await pool.query(`
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = '${tg.name}') THEN
+                        CREATE TRIGGER ${tg.name} BEFORE UPDATE ON ${tg.table} FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+                    END IF;
+                END $$;
+            `);
+        }
+
+        // 4. Seeding (Super Admin)
+        await pool.query(`
+            INSERT INTO users (email, password, role, first_name, last_name, phone, is_active)
+            VALUES (
+                'sarpyilmaz@saloon.com',
+                '$2a$10$Ba0KuHHWuOcEFC/OnP/6gu3CFAcF.Z.4iz2h.ira1C0.xH4vdy4a6',
+                'super_admin',
+                'sarp',
+                'yılmaz',
+                '5336660125',
+                true
+            )
+            ON CONFLICT (email) 
+            DO UPDATE SET
+                password  = EXCLUDED.password,
+                role      = 'super_admin',
+                is_active = true
+        `);
+
+        // 5. Indexes
         await pool.query('CREATE INDEX IF NOT EXISTS idx_customer_devices_id ON customer_devices(device_id)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_customer_devices_phone ON customer_devices(customer_phone)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_appointment_services_appointment ON appointment_services(appointment_id)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_appointments_company ON appointments(company_id)');
 
-        console.log('✅ Auto-migrations completed.');
+        console.log('✅ Auto-migrations and seeding completed.');
     } catch (err) {
         console.error('❌ Migration failed:', err);
     }
