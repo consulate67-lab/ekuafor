@@ -1174,7 +1174,7 @@ export default function SalonBoard() {
 
             {/* Version Indicator */}
             <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[300] bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full pointer-events-none border border-white/10">
-                <span className="text-[10px] font-black text-slate-400/80 tracking-widest uppercase">v1.69.5</span>
+                <span className="text-[10px] font-black text-slate-400/80 tracking-widest uppercase">v1.69.7</span>
             </div>
         </div>
     );
