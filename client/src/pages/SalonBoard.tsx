@@ -347,7 +347,8 @@ export default function SalonBoard() {
             await api.patch(`/appointments/${id}/status`, { status: newStatus });
             setIsDetailModalOpen(false);
             setIsPendingListModalOpen(false);
-            if (company?.id) fetchData(company.id);
+            if (company?.id) await fetchData(company.id);
+            window.location.reload();
         } catch (err: any) {
             alert(err.response?.data?.error || 'İşlem başarısız oldu');
         } finally {
@@ -1030,7 +1031,7 @@ export default function SalonBoard() {
 
             {/* Appointment Detail Modal */}
             {isDetailModalOpen && selectedAppointment && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+                <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
                     <div className="bg-white w-full max-w-lg rounded-[4rem] overflow-hidden shadow-2xl animate-scale-up">
                         <div className="p-12">
                             <div className="flex justify-between items-start mb-8">
@@ -1277,8 +1278,15 @@ export default function SalonBoard() {
                                         </div>
                                         <div className="flex flex-wrap gap-2 mb-6">
                                             {app.services?.map((s: any) => (
-                                                <span key={s.id} className="px-2 py-0.5 bg-amber-100/50 text-amber-700 rounded-lg text-[9px] font-bold uppercase">{s.name}</span>
+                                                <span key={s.id} className="px-2 py-0.5 bg-amber-100/50 text-amber-700 rounded-lg text-[9px] font-bold uppercase">
+                                                    {s.name} {s.service_staff_name ? `(${s.service_staff_name})` : ''}
+                                                </span>
                                             ))}
+                                            {!app.staff_id && app.services?.every((s: any) => !s.staff_id) && (
+                                                <span className="px-2 py-0.5 bg-red-100 text-red-600 rounded-lg text-[9px] font-black uppercase tracking-tighter animate-pulse">
+                                                    ⚠️ PERSONEL ATANMAMIŞ
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="flex gap-3">
                                             <button
