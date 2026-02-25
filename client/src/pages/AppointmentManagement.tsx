@@ -576,12 +576,12 @@ export default function AppointmentManagement() {
                                 }));
                             });
 
-                            // If staffMode is active, filter only for THIS staff's services
+                            // If staffMode is active, filter only for THIS staff's specifically assigned services
                             if (staffMode && userInfo) {
-                                flatList = flatList.filter((item: any) =>
-                                    Number(item.display_staff_id) === Number(userInfo.id) ||
-                                    Number(item.staff_id) === Number(userInfo.id)
-                                );
+                                flatList = flatList.filter((item: any) => {
+                                    const assignedId = item.is_subservice ? item.display_staff_id : item.staff_id;
+                                    return Number(assignedId) === Number(userInfo.id);
+                                });
                             }
 
                             const sorted = flatList.sort((a: any, b: any) => (a.display_start_time || '').localeCompare(b.display_start_time || ''));
