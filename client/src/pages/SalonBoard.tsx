@@ -600,6 +600,69 @@ export default function SalonBoard() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
+                            {/* Unassigned Appointments Row - Show at TOP if any exist */}
+                            {(() => {
+                                const unassignedApps = appointments.filter(a =>
+                                    a.status !== 'cancelled' &&
+                                    (a.appointment_date || '').substring(0, 10) === selectedDate &&
+                                    !a.staff_id &&
+                                    (!a.services || a.services.every((s: any) => !s.staff_id))
+                                );
+
+                                if (unassignedApps.length === 0) return null;
+
+                                return (
+                                    <tr className="bg-amber-50/40">
+                                        <td className="sticky left-0 z-[50] bg-amber-50/90 backdrop-blur-md p-4 lg:p-5 border-b border-amber-100/50 shadow-[10px_0_30px_-15px_rgba(0,0,0,0.1)]">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-amber-200 animate-pulse">?</div>
+                                                <div>
+                                                    <p className="text-sm lg:text-base font-black text-amber-900 leading-none">ATANMAMIŞ</p>
+                                                    <p className="text-[8px] lg:text-[9px] font-bold text-amber-600 uppercase tracking-widest mt-1">Personel Bekleyenler</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        {hours.map(hour => {
+                                            const [hh, mm] = hour.split(':').map(Number);
+                                            const slotTotal = hh * 60 + mm;
+
+                                            const appsAtSlot = unassignedApps.filter(a => {
+                                                const [asH, asM] = a.start_time.split(':').map(Number);
+                                                const [aeH, aeM] = a.end_time.split(':').map(Number);
+                                                const aStart = asH * 60 + asM;
+                                                const aEnd = aeH * 60 + aeM;
+                                                return slotTotal >= aStart && slotTotal < aEnd;
+                                            });
+
+                                            if (appsAtSlot.length === 0) return <td key={hour} className="border-r border-slate-50 border-b border-slate-100"></td>;
+
+                                            return (
+                                                <td key={hour} className="p-1 lg:p-1.5 border-r border-slate-50 border-b border-slate-100 align-top">
+                                                    {appsAtSlot.map(app => (
+                                                        <div
+                                                            key={app.id}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSelectedAppointment(app);
+                                                                setIsDetailModalOpen(true);
+                                                            }}
+                                                            className="p-2 rounded-xl bg-white border-l-[4px] border-amber-500 shadow-xl shadow-amber-100/50 text-amber-900 cursor-pointer hover:scale-[1.05] transition-all hover:z-10 relative"
+                                                        >
+                                                            <div className="flex justify-between items-start mb-1">
+                                                                <span className="text-[8px] font-black text-amber-500 uppercase">{app.start_time.substring(0, 5)}</span>
+                                                                <div className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></div>
+                                                            </div>
+                                                            <p className="text-[11px] font-black truncate leading-none mb-1">{app.customer_name || 'Misafir'}</p>
+                                                            <p className="text-[7px] font-bold text-amber-600/60 uppercase truncate">{app.services?.map((s: any) => s.name).join(', ')}</p>
+                                                        </div>
+                                                    ))}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                );
+                            })()}
+
                             {displayStaff.map(person => {
                                 const pId = person.user_id || person.id;
                                 const staffColor = getStaffColor(`${person.first_name} ${person.last_name}`);
@@ -1397,7 +1460,7 @@ export default function SalonBoard() {
             )}
 
             <div className="fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-slate-900/80 backdrop-blur-md rounded-full border border-white/10 shadow-2xl z-[150] pointer-events-none">
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap">Ekuafor Salon Board Edition <span className="text-white opacity-100 ml-1">v1.72.1</span></p>
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap">Ekuafor Salon Board Edition <span className="text-white opacity-100 ml-1">v1.73.0</span></p>
             </div>
         </div>
     );
