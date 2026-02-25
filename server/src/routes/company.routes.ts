@@ -11,45 +11,54 @@ const router = Router();
 // Nested routes
 router.use('/:companyId/employees', employeeRoutes);
 
-// Validation schema
+// Helper for optional/nullable string fields that might be empty strings
+const optionalString = z.preprocess(v => (v === "" || v === null) ? undefined : v, z.string().optional());
+const nullableString = z.preprocess(v => (v === "" || v === null) ? null : v, z.string().nullable().optional());
+const nullableNumber = z.preprocess(v => (v === "" || v === null) ? null : v, z.coerce.number().nullable().optional());
+
 const companySchema = z.object({
     name: z.string().min(2, 'Firma adı en az 2 karakter olmalıdır'),
-    description: z.string().optional(),
-    phone: z.string().optional(),
-    email: z.string().email('Geçerli bir email adresi giriniz').optional(),
-    website: z.string().url('Geçerli bir website adresi giriniz').optional(),
+    description: nullableString,
+    phone: nullableString,
+    email: z.preprocess(v => (v === "" || v === null) ? null : v, z.string().email('Geçerli bir email adresi giriniz').nullable().optional()),
+    website: z.preprocess(v => (v === "" || v === null) ? null : v, z.string().url('Geçerli bir website adresi giriniz').nullable().optional()),
 
-    address_line: z.string().optional(),
-    province_id: z.coerce.number().optional(),
-    province_name: z.string().optional(),
-    district_id: z.coerce.number().optional(),
-    district_name: z.string().optional(),
-    neighborhood_id: z.coerce.number().optional(),
-    neighborhood_name: z.string().optional(),
-    postal_code: z.string().optional(),
+    address_line: nullableString,
+    address_line2: nullableString,
+    province_id: nullableNumber,
+    province_name: nullableString,
+    district_id: nullableNumber,
+    district_name: nullableString,
+    neighborhood_id: nullableNumber,
+    neighborhood_name: nullableString,
+    postal_code: nullableString,
 
-    latitude: z.coerce.number().min(-90).max(90).optional(),
-    longitude: z.coerce.number().min(-180).max(180).optional(),
+    latitude: nullableNumber.refine(v => v === null || v === undefined || (v >= -90 && v <= 90), 'Geçerli bir enlem giriniz'),
+    longitude: nullableNumber.refine(v => v === null || v === undefined || (v >= -180 && v <= 180), 'Geçerli bir boylam giriniz'),
 
-    bank_name: z.string().optional(),
-    bank_branch: z.string().optional(),
-    iban: z.string().optional().transform(v => v ? v.replace(/[^A-Z0-9]/gi, '').toUpperCase() : v).refine(
+    bank_name: nullableString,
+    bank_branch: nullableString,
+    iban: z.preprocess(v => (v === "" || v === null) ? null : v, z.string().nullable().optional().transform(v => {
+        if (!v) return v;
+        return v.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+    }).refine(
         v => {
             if (!v) return true;
-            // Extremely lenient: allow any TR... between 15 and 34 chars
             return /^TR[A-Z0-9]{13,32}$/.test(v);
         },
         'Geçerli bir IBAN giriniz'
-    ),
-    account_holder_name: z.string().optional(),
+    )),
+    account_holder_name: nullableString,
 
-    commission_rate: z.coerce.number().min(0).max(100).optional(),
-    payment_enabled: z.boolean().optional(),
-    board_key: z.string().optional(),
-    work_start_time: z.string().optional(),
-    work_end_time: z.string().optional(),
-    slot_interval: z.coerce.number().min(5).max(480).optional(),
-    genders: z.array(z.string()).optional(),
+    commission_rate: nullableNumber.refine(v => v === null || v === undefined || (v >= 0 && v <= 100), 'Komisyon oranı 0-100 arasında olmalıdır'),
+    payment_enabled: z.preprocess(v => (v === "" || v === null) ? null : v, z.boolean().nullable().optional()),
+    board_key: nullableString,
+    work_start_time: nullableString,
+    work_end_time: nullableString,
+    slot_interval: nullableNumber.refine(v => v === null || v === undefined || (v >= 5 && v <= 480), 'Randevu aralığı 5-480 dakika arasında olmalıdır'),
+    genders: z.array(z.string()).nullable().optional(),
+    company_type: z.enum(['ÜST FİRMA', 'ASIL', 'ŞUBE']).nullable().optional(),
+    main_company_id: nullableNumber,
 });
 
 /**
@@ -100,6 +109,7 @@ router.get('/', async (req: Request, res: Response) => {
             lng: req.query.lng ? parseFloat(req.query.lng as string) : undefined,
             radius: req.query.radius ? parseFloat(req.query.radius as string) : undefined,
             gender: req.query.gender as string | undefined,
+            company_type: req.query.company_type as string | undefined,
             sort: req.query.sort as 'rating' | 'reviews' | 'newest' | undefined
         };
 

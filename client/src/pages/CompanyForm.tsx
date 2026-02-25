@@ -206,8 +206,17 @@ export default function CompanyForm() {
 
     const fetchMainCompanies = async () => {
         try {
-            const response = await api.get('/main-companies');
-            setMainCompanies(response.data.data || []);
+            const [mainRes, companiesRes] = await Promise.all([
+                api.get('/main-companies'),
+                api.get('/companies', { params: { company_type: 'ÜST FİRMA' } })
+            ]);
+
+            const mainArr = mainRes.data.data || [];
+            const companyArr = companiesRes.data.data || [];
+
+            // Link both, ensuring unique names/ids if possible
+            // For now, just combining them. If they share the same concept, they should be merged.
+            setMainCompanies([...mainArr, ...companyArr]);
         } catch (err) {
             console.error('Üst firmalar yüklenirken hata:', err);
         }

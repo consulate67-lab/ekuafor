@@ -85,7 +85,22 @@ CREATE TABLE IF NOT EXISTS companies (
     -- Admin İlişkisi
     created_by INTEGER REFERENCES users(id),
     admin_key VARCHAR(20) UNIQUE, -- Firma yönetim paneli anahtarı
-    board_key VARCHAR(20) UNIQUE -- Salon board anahtarı
+    board_key VARCHAR(20) UNIQUE, -- Salon board anahtarı
+    company_type VARCHAR(20) DEFAULT 'ASIL', -- 'ÜST FİRMA', 'ASIL', 'ŞUBE'
+    main_company_id INTEGER -- Üst firmaya (companies tablosundaki ÜST FİRMA) bağlılık
+);
+
+-- Üst Firmalar (Holding/Grup) Tablosu - ESKİ YAPI (Geriye dönük uyumluluk için)
+CREATE TABLE IF NOT EXISTS main_companies (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    address_line TEXT,
+    province_id INTEGER,
+    province_name VARCHAR(100),
+    admin_code VARCHAR(20) UNIQUE,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Departmanlar Tablosu

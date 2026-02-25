@@ -3,49 +3,49 @@ import pool from '../config/database';
 export interface Company {
     id?: number;
     name: string;
-    description?: string;
-    phone?: string;
-    email?: string;
-    website?: string;
+    description?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    website?: string | null;
 
     // Adres
-    address_line?: string;
-    province_id?: number;
-    province_name?: string;
-    district_id?: number;
-    district_name?: string;
-    neighborhood_id?: number;
-    neighborhood_name?: string;
-    postal_code?: string;
+    address_line?: string | null;
+    province_id?: number | null;
+    province_name?: string | null;
+    district_id?: number | null;
+    district_name?: string | null;
+    neighborhood_id?: number | null;
+    neighborhood_name?: string | null;
+    postal_code?: string | null;
 
     // Konum
-    latitude?: number;
-    longitude?: number;
+    latitude?: number | null;
+    longitude?: number | null;
 
     // Banka
-    bank_name?: string;
-    bank_branch?: string;
-    iban?: string;
-    account_holder_name?: string;
+    bank_name?: string | null;
+    bank_branch?: string | null;
+    iban?: string | null;
+    account_holder_name?: string | null;
 
     // Ödeme
-    commission_rate?: number;
-    payment_enabled?: boolean;
+    commission_rate?: number | null;
+    payment_enabled?: boolean | null;
 
     // Durum
-    is_active?: boolean;
-    is_verified?: boolean;
-    created_by?: number;
-    board_key?: string;
-    work_start_time?: string;
-    work_end_time?: string;
-    slot_interval?: number;
-    admin_key?: string;
-    genders?: string[];
-    rating_avg?: number;
-    review_count?: number;
-    company_type?: 'ASIL' | 'ŞUBE';
-    main_company_id?: number;
+    is_active?: boolean | null;
+    is_verified?: boolean | null;
+    created_by?: number | null;
+    board_key?: string | null;
+    work_start_time?: string | null;
+    work_end_time?: string | null;
+    slot_interval?: number | null;
+    admin_key?: string | null;
+    genders?: string[] | null;
+    rating_avg?: number | null;
+    review_count?: number | null;
+    company_type?: 'ÜST FİRMA' | 'ASIL' | 'ŞUBE' | null;
+    main_company_id?: number | null;
 }
 
 class CompanyService {
@@ -185,6 +185,7 @@ class CompanyService {
         lng?: number;
         radius?: number; // in km
         gender?: string;
+        company_type?: string;
         sort?: 'rating' | 'reviews' | 'newest';
     }): Promise<Company[]> {
         const values: any[] = [];
@@ -221,6 +222,12 @@ class CompanyService {
         if (filters?.gender) {
             whereClauses.push(`$${paramIndex} = ANY(c.genders)`);
             values.push(filters.gender);
+            paramIndex++;
+        }
+
+        if (filters?.company_type) {
+            whereClauses.push(`c.company_type = $${paramIndex}`);
+            values.push(filters.company_type);
             paramIndex++;
         }
 
