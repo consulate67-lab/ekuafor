@@ -70,7 +70,7 @@ const healthHandler = async (req: Request, res: Response) => {
         `);
         const tableList = tableCheck.rows.map(r => r.table_name);
 
-        // Check for specific constraints on companies table
+        // List ALL foreign keys on companies table
         const fkCheck = await pool.query(`
             SELECT
                 tc.constraint_name, 
@@ -83,7 +83,7 @@ const healthHandler = async (req: Request, res: Response) => {
                   ON tc.constraint_name = kcu.constraint_name
                 JOIN information_schema.constraint_column_usage AS ccu
                   ON ccu.constraint_name = tc.constraint_name
-            WHERE tc.table_name='companies' AND kcu.column_name='main_company_id';
+            WHERE tc.table_name='companies' AND tc.constraint_type = 'FOREIGN KEY';
         `);
 
         res.json({
