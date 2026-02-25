@@ -244,12 +244,19 @@ export default function SalonBoard() {
                 }
             } else {
                 const selectedServices = services.filter(s => sIds.includes(s.id));
-                totalDuration = selectedServices.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
-                totalPrice = selectedServices.reduce((sum, s) => sum + Number(s.price), 0);
-                if (sIds.length === 0 && services[0]) {
-                    sIds = [services[0].id];
-                    totalDuration = services[0].duration_minutes;
-                    totalPrice = Number(services[0].price);
+                const hasOverrides = Object.keys(fastForm.servicePriceOverrides).length > 0 || Object.keys(fastForm.serviceDurationOverrides).length > 0;
+
+                if (hasOverrides) {
+                    totalDuration = selectedServices.reduce((sum, s) => sum + ((fastForm.serviceDurationOverrides[s.id] !== undefined) ? fastForm.serviceDurationOverrides[s.id] : (s.duration_minutes || 0)), 0);
+                    totalPrice = selectedServices.reduce((sum, s) => sum + Number((fastForm.servicePriceOverrides[s.id] !== undefined) ? fastForm.servicePriceOverrides[s.id] : (s.price || 0)), 0);
+                } else {
+                    totalDuration = selectedServices.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+                    totalPrice = selectedServices.reduce((sum, s) => sum + Number(s.price), 0);
+                    if (sIds.length === 0 && services[0]) {
+                        sIds = [services[0].id];
+                        totalDuration = services[0].duration_minutes;
+                        totalPrice = Number(services[0].price);
+                    }
                 }
             }
 
@@ -295,9 +302,9 @@ export default function SalonBoard() {
                 }))
                 : selectedServices.map(s => ({
                     id: s.id,
-                    price: s.price,
-                    duration_minutes: s.duration_minutes,
-                    staff_id: Number(staffId)
+                    price: (fastForm.servicePriceOverrides[s.id] !== undefined) ? fastForm.servicePriceOverrides[s.id] : s.price,
+                    duration_minutes: (fastForm.serviceDurationOverrides[s.id] !== undefined) ? fastForm.serviceDurationOverrides[s.id] : s.duration_minutes,
+                    staff_id: fastForm.serviceStaffOverrides[s.id] || Number(staffId)
                 }));
 
             await api.post('/appointments', {
@@ -600,68 +607,10 @@ export default function SalonBoard() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {/* Unassigned Appointments Row - Show at TOP if any exist */}
-                            {(() => {
-                                const unassignedApps = appointments.filter(a =>
-                                    a.status !== 'cancelled' &&
-                                    (a.appointment_date || '').substring(0, 10) === selectedDate &&
-                                    !a.staff_id &&
-                                    (!a.services || a.services.every((s: any) => !s.staff_id))
-                                );
 
-                                if (unassignedApps.length === 0) return null;
 
-                                return (
-                                    <tr className="bg-amber-50/40">
-                                        <td className="sticky left-0 z-[50] bg-amber-50/90 backdrop-blur-md p-4 lg:p-5 border-b border-amber-100/50 shadow-[10px_0_30px_-15px_rgba(0,0,0,0.1)]">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-amber-200 animate-pulse">?</div>
-                                                <div>
-                                                    <p className="text-sm lg:text-base font-black text-amber-900 leading-none">ATANMAMIŞ</p>
-                                                    <p className="text-[8px] lg:text-[9px] font-bold text-amber-600 uppercase tracking-widest mt-1">Personel Bekleyenler</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        {hours.map(hour => {
-                                            const [hh, mm] = hour.split(':').map(Number);
-                                            const slotTotal = hh * 60 + mm;
 
-                                            const appsAtSlot = unassignedApps.filter(a => {
-                                                const [asH, asM] = a.start_time.split(':').map(Number);
-                                                const [aeH, aeM] = a.end_time.split(':').map(Number);
-                                                const aStart = asH * 60 + asM;
-                                                const aEnd = aeH * 60 + aeM;
-                                                return slotTotal >= aStart && slotTotal < aEnd;
-                                            });
 
-                                            if (appsAtSlot.length === 0) return <td key={hour} className="border-r border-slate-50 border-b border-slate-100"></td>;
-
-                                            return (
-                                                <td key={hour} className="p-1 lg:p-1.5 border-r border-slate-50 border-b border-slate-100 align-top">
-                                                    {appsAtSlot.map(app => (
-                                                        <div
-                                                            key={app.id}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setSelectedAppointment(app);
-                                                                setIsDetailModalOpen(true);
-                                                            }}
-                                                            className="p-2 rounded-xl bg-white border-l-[4px] border-amber-500 shadow-xl shadow-amber-100/50 text-amber-900 cursor-pointer hover:scale-[1.05] transition-all hover:z-10 relative"
-                                                        >
-                                                            <div className="flex justify-between items-start mb-1">
-                                                                <span className="text-[8px] font-black text-amber-500 uppercase">{app.start_time.substring(0, 5)}</span>
-                                                                <div className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></div>
-                                                            </div>
-                                                            <p className="text-[11px] font-black truncate leading-none mb-1">{app.customer_name || 'Misafir'}</p>
-                                                            <p className="text-[7px] font-bold text-amber-600/60 uppercase truncate">{app.services?.map((s: any) => s.name).join(', ')}</p>
-                                                        </div>
-                                                    ))}
-                                                </td>
-                                            );
-                                        })}
-                                    </tr>
-                                );
-                            })()}
 
                             {displayStaff.map(person => {
                                 const pId = person.user_id || person.id;
@@ -859,71 +808,6 @@ export default function SalonBoard() {
                                     </tr>
                                 );
                             })}
-                            {/* Unassigned Appointments Row */}
-                            {
-                                (() => {
-                                    const unassignedApps = appointments.filter(a =>
-                                        a.status !== 'cancelled' &&
-                                        (a.appointment_date || '').substring(0, 10) === selectedDate &&
-                                        !a.staff_id &&
-                                        (!a.services || a.services.every((s: any) => !s.staff_id))
-                                    );
-
-                                    if (unassignedApps.length === 0) return null;
-
-                                    return (
-                                        <tr className="bg-amber-50/20">
-                                            <td className="sticky left-0 z-[50] bg-amber-50/80 backdrop-blur-md p-4 lg:p-5 border-b border-amber-100 shadow-[10px_0_30px_-15px_rgba(0,0,0,0.1)]">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-2xl bg-amber-400 text-white flex items-center justify-center font-black text-xs shadow-lg shadow-amber-200 animate-pulse">?</div>
-                                                    <div>
-                                                        <p className="text-xs lg:text-sm font-black text-amber-900 leading-none">ATANMAMIŞ</p>
-                                                        <p className="text-[8px] lg:text-[9px] font-bold text-amber-600 uppercase tracking-widest mt-1">Hizmet Bekleyenler</p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            {hours.map(hour => {
-                                                const [hh, mm] = hour.split(':').map(Number);
-                                                const slotTotal = hh * 60 + mm;
-
-
-
-                                                const appsAtSlot = unassignedApps.filter(a => {
-                                                    const [asH, asM] = a.start_time.split(':').map(Number);
-                                                    const [aeH, aeM] = a.end_time.split(':').map(Number);
-                                                    const aStart = asH * 60 + asM;
-                                                    const aEnd = aeH * 60 + aeM;
-                                                    return slotTotal >= aStart && slotTotal < aEnd;
-                                                });
-
-                                                if (appsAtSlot.length === 0) return <td key={hour} className="border-r border-slate-50 border-b border-slate-100"></td>;
-
-                                                return (
-                                                    <td key={hour} className="p-1 lg:p-1.5 border-r border-slate-50 border-b border-slate-100 align-top">
-                                                        {appsAtSlot.map(app => (
-                                                            <div
-                                                                key={app.id}
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setSelectedAppointment(app);
-                                                                    setIsDetailModalOpen(true);
-                                                                }}
-                                                                className="p-1.5 rounded-xl bg-white border-l-[3px] border-amber-500 shadow-sm text-amber-900 cursor-pointer hover:scale-[1.03] transition-all"
-                                                            >
-                                                                <div className="flex justify-between items-start">
-                                                                    <span className="text-[7px] font-black text-amber-500 uppercase">{app.start_time.substring(0, 5)}</span>
-                                                                    <span className="px-1 py-0.5 bg-amber-100 text-amber-600 rounded-full text-[6px] font-black uppercase">!</span>
-                                                                </div>
-                                                                <p className="text-[10px] font-black truncate leading-none mt-1">{app.customer_name || 'Misafir'}</p>
-                                                            </div>
-                                                        ))}
-                                                    </td>
-                                                );
-                                            })}
-                                        </tr>
-                                    );
-                                })()
-                            }
                         </tbody>
                     </table>
                 </div>
@@ -931,537 +815,581 @@ export default function SalonBoard() {
 
 
             {/* New/Fast Appointment Modal */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-                    <div className="bg-white w-full max-w-2xl rounded-[4rem] overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] border border-slate-100 animate-scale-up">
-                        <div className="relative p-12 bg-gradient-to-br from-slate-50 to-white">
-                            <div className="flex justify-between items-start mb-10">
-                                <div>
-                                    <div className="inline-flex px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest mb-4">Rezarvasyon Formu</div>
-                                    <h2 className="text-4xl font-black text-slate-900 leading-none tracking-tighter">
-                                        {selectedCell ? 'Hızlı Randevu' : 'Yeni Randevu'}
-                                    </h2>
-                                </div>
-                                <button onClick={() => { setIsModalOpen(false); setSelectedCell(null); }} className="w-16 h-16 bg-white border border-slate-100 rounded-3xl flex items-center justify-center text-slate-400 hover:text-slate-900 hover:rotate-90 transition-all shadow-sm">
-                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
-                            </div>
-
-                            <form onSubmit={handleFastSubmit} className="space-y-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Müşteri İsmi</label>
-                                        <input
-                                            type="text"
-                                            value={fastForm.customerName}
-                                            onChange={e => setFastForm(prev => ({ ...prev, customerName: e.target.value }))}
-                                            placeholder="İsim veya Misafir"
-                                            className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-black text-xl text-slate-900 outline-none"
-                                        />
+            {
+                isModalOpen && (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+                        <div className="bg-white w-full max-w-2xl rounded-[4rem] overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] border border-slate-100 animate-scale-up">
+                            <div className="relative p-12 bg-gradient-to-br from-slate-50 to-white">
+                                <div className="flex justify-between items-start mb-10">
+                                    <div>
+                                        <div className="inline-flex px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest mb-4">Rezarvasyon Formu</div>
+                                        <h2 className="text-4xl font-black text-slate-900 leading-none tracking-tighter">
+                                            {selectedCell ? 'Hızlı Randevu' : 'Yeni Randevu'}
+                                        </h2>
                                     </div>
-
-                                    <div className="space-y-4 col-span-1 md:col-span-2">
-                                        <div className="flex gap-4 mb-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => setFastForm({ ...fastForm, packageId: '' })}
-                                                className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${!fastForm.packageId ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}
-                                            >
-                                                Hizmetler
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setFastForm({ ...fastForm, serviceIds: [], packageId: packages[0]?.id?.toString() || '' })}
-                                                className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${fastForm.packageId ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}
-                                            >
-                                                Paketler
-                                            </button>
-                                        </div>
-
-                                        {!fastForm.packageId ? (
-                                            <>
-                                                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Hizmet Seçimi (Birden Fazla Seçebilirsiniz)</label>
-                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-48 overflow-y-auto p-4 bg-slate-50 rounded-[2.5rem]">
-                                                    {services.map(s => {
-                                                        const isSelected = fastForm.serviceIds.includes(s.id);
-                                                        return (
-                                                            <button
-                                                                key={s.id}
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    const newIds = isSelected
-                                                                        ? fastForm.serviceIds.filter(id => id !== s.id)
-                                                                        : [...fastForm.serviceIds, s.id];
-                                                                    setFastForm({ ...fastForm, serviceIds: newIds });
-                                                                }}
-                                                                className={`p-3 rounded-2xl border-2 transition-all flex flex-col gap-1 text-center items-center justify-center ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-white border-transparent text-slate-600'}`}
-                                                            >
-                                                                <p className={`text-[9px] font-black uppercase leading-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{s.name}</p>
-                                                                <p className={`text-[8px] font-bold ${isSelected ? 'text-indigo-100' : 'text-slate-400'}`}>₺{s.price}</p>
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <div className="space-y-3 max-h-64 overflow-y-auto p-4 bg-slate-50 rounded-[2.5rem]">
-                                                    {packages.map(p => {
-                                                        const isSelected = parseInt(fastForm.packageId) === p.id;
-                                                        return (
-                                                            <div key={p.id} className="space-y-4">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setFastForm({ ...fastForm, packageId: p.id.toString(), serviceIds: [], serviceStaffOverrides: {} })}
-                                                                    className={`w-full p-4 rounded-2xl border-2 transition-all flex flex-col gap-1 text-left ${isSelected ? 'bg-amber-600 border-amber-600 text-white shadow-lg' : 'bg-white border-transparent text-slate-600'}`}
-                                                                >
-                                                                    <p className={`text-xs font-black uppercase leading-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{p.name}</p>
-                                                                    <p className={`text-[8px] font-bold ${isSelected ? 'text-amber-100' : 'text-slate-400'}`}>₺{p.price} | {p.duration_minutes} dk</p>
-                                                                </button>
-
-                                                                {isSelected && (
-                                                                    <div className="pl-6 space-y-3 animate-in slide-in-from-left duration-300 border-l-4 border-amber-200 ml-2">
-                                                                        <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest pl-2">🛠️ İşlem Dağılımı (Sıralı Yapılacak)</p>
-                                                                        <div className="space-y-2">
-                                                                            {p.services?.map((ps: any) => (
-                                                                                <div key={ps.id} className="flex items-center justify-between gap-4 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-amber-400">
-                                                                                    <div className="flex flex-col flex-1 min-w-0 pl-2">
-                                                                                        <span className="text-[10px] font-black text-slate-700 uppercase truncate">{ps.name}</span>
-                                                                                        <div className="flex gap-2 mt-1">
-                                                                                            <div className="flex-1">
-                                                                                                <label className="block text-[7px] font-bold text-slate-400 uppercase mb-0.5 ml-1">Süre (Dk)</label>
-                                                                                                <input
-                                                                                                    type="number"
-                                                                                                    value={fastForm.serviceDurationOverrides[ps.id] || ps.duration_minutes}
-                                                                                                    onChange={e => setFastForm(prev => ({
-                                                                                                        ...prev,
-                                                                                                        serviceDurationOverrides: { ...prev.serviceDurationOverrides, [ps.id]: parseInt(e.target.value) || 0 }
-                                                                                                    }))}
-                                                                                                    className="w-full p-1 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-900 outline-none"
-                                                                                                />
-                                                                                            </div>
-                                                                                            <div className="flex-1">
-                                                                                                <label className="block text-[7px] font-bold text-slate-400 uppercase mb-0.5 ml-1">Fiyat (₺)</label>
-                                                                                                <input
-                                                                                                    type="number"
-                                                                                                    value={fastForm.servicePriceOverrides[ps.id] || ps.price}
-                                                                                                    onChange={e => setFastForm(prev => ({
-                                                                                                        ...prev,
-                                                                                                        servicePriceOverrides: { ...prev.servicePriceOverrides, [ps.id]: parseFloat(e.target.value) || 0 }
-                                                                                                    }))}
-                                                                                                    className="w-full p-1 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-900 outline-none"
-                                                                                                />
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                    <div className="flex flex-col items-end gap-1">
-                                                                                        <span className="text-[8px] font-black text-slate-400 uppercase">Uzman</span>
-                                                                                        <select
-                                                                                            value={fastForm.serviceStaffOverrides[ps.id] || fastForm.staffId || selectedCell?.person.user_id || selectedCell?.person.id}
-                                                                                            onChange={(e) => {
-                                                                                                setFastForm(prev => ({
-                                                                                                    ...prev,
-                                                                                                    serviceStaffOverrides: {
-                                                                                                        ...prev.serviceStaffOverrides,
-                                                                                                        [ps.id]: Number(e.target.value)
-                                                                                                    }
-                                                                                                }));
-                                                                                            }}
-                                                                                            className="text-[10px] font-bold bg-amber-50 text-amber-900 border-none rounded-xl p-2 outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
-                                                                                        >
-                                                                                            {staff.map(s => (
-                                                                                                <option key={s.user_id || s.id} value={s.user_id || s.id}>
-                                                                                                    {s.first_name}
-                                                                                                </option>
-                                                                                            ))}
-                                                                                        </select>
-                                                                                    </div>
-                                                                                </div>
-                                                                            ))}
-                                                                        </div>
-                                                                        <div className="flex justify-between items-center bg-amber-50 p-4 rounded-2xl border-2 border-amber-200 shadow-inner mt-2">
-                                                                            <div className="flex flex-col">
-                                                                                <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">GÜNCEL TOPLAM SÜRE</span>
-                                                                                <span className="text-sm font-black text-amber-900">
-                                                                                    {p.services?.reduce((sum: number, ps: any) => sum + (fastForm.serviceDurationOverrides[ps.id] || ps.duration_minutes || 0), 0)} DK
-                                                                                </span>
-                                                                            </div>
-                                                                            <div className="flex flex-col items-end">
-                                                                                <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">GÜNCEL TOPLAM FİYAT</span>
-                                                                                <span className="text-lg font-black text-amber-900">
-                                                                                    ₺{p.services?.reduce((sum: number, ps: any) => sum + Number(fastForm.servicePriceOverrides[ps.id] || ps.price || 0), 0)}
-                                                                                </span>
-                                                                            </div>
-                                                                        </div>
-                                                                        <p className="text-[8px] font-bold text-slate-400 italic pl-2">* Hizmetler yukarıdan aşağıya sırayla atanacaktır.</p>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Uzman</label>
-                                        <select
-                                            disabled={!!selectedCell}
-                                            value={fastForm.staffId || selectedCell?.person.user_id || selectedCell?.person.id}
-                                            onChange={e => setFastForm(prev => ({ ...prev, staffId: e.target.value }))}
-                                            className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-black text-xl text-slate-900 outline-none appearance-none cursor-pointer disabled:bg-slate-50"
-                                        >
-                                            {staff.map(s => <option key={s.user_id || s.id} value={s.user_id || s.id}>{s.first_name} {s.last_name}</option>)}
-                                        </select>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Tarih</label>
-                                        <input
-                                            type="date"
-                                            disabled={!!selectedCell}
-                                            min={currentDate}
-                                            value={fastForm.appointmentDate}
-                                            onChange={e => setFastForm(prev => ({ ...prev, appointmentDate: e.target.value }))}
-                                            className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-black text-xl text-slate-900 outline-none disabled:bg-slate-50"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Başlangıç Saati</label>
-                                        <select
-                                            disabled={!!selectedCell}
-                                            value={fastForm.startTime || selectedCell?.hour}
-                                            onChange={e => setFastForm(prev => ({ ...prev, startTime: e.target.value }))}
-                                            className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-black text-xl text-slate-900 outline-none cursor-pointer disabled:bg-slate-50"
-                                        >
-                                            {hours.map(h => <option key={h} value={h}>{h}</option>)}
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Notlar</label>
-                                    <textarea
-                                        value={fastForm.notes}
-                                        onChange={e => setFastForm(prev => ({ ...prev, notes: e.target.value }))}
-                                        placeholder="Kısa notlar..."
-                                        rows={2}
-                                        className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-medium text-slate-600 outline-none resize-none"
-                                    />
-                                </div>
-
-                                <button
-                                    disabled={loading}
-                                    className="w-full bg-slate-900 text-white py-8 rounded-[2.5rem] font-black uppercase tracking-[0.3em] shadow-[0_24px_48px_-12px_rgba(15,23,42,0.4)] hover:bg-slate-800 hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 text-xl"
-                                >
-                                    {loading ? 'Kaydediliyor...' : 'Randevuyu Onayla'}
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Appointment Detail Modal */}
-            {isDetailModalOpen && selectedAppointment && (
-                <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-                    <div className="bg-white w-full max-w-lg rounded-[4rem] overflow-hidden shadow-2xl animate-scale-up">
-                        <div className="p-12">
-                            <div className="flex justify-between items-start mb-8">
-                                <div>
-                                    <div className={`inline-flex px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-4 ${selectedAppointment.status === 'approved' ? 'bg-indigo-50 text-indigo-600' :
-                                        selectedAppointment.status === 'pending' ? 'bg-amber-50 text-amber-600' :
-                                            'bg-slate-100 text-slate-500'
-                                        }`}>
-                                        {selectedAppointment.status === 'approved' ? 'ONAYLI RANDEVU' : 'BEKLEYEN RANDEVU'}
-                                    </div>
-                                    <h2 className="text-4xl font-black text-slate-900 tracking-tighter">{selectedAppointment.customer_name || 'Misafir'}</h2>
-                                </div>
-                                <button onClick={() => setIsDetailModalOpen(false)} className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 hover:text-slate-900 transition-all">
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
-                            </div>
-
-                            <div className="space-y-6">
-                                <div className="flex items-start gap-6 p-6 bg-slate-50 rounded-[2.5rem]">
-                                    <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center text-2xl shadow-sm shrink-0">✂️</div>
-                                    <div className="flex-1">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Hizmetler {selectedAppointment.package_name && <span className="text-indigo-600 ml-2">📦 {selectedAppointment.package_name}</span>}</p>
-                                        <div className="space-y-2">
-                                            {selectedAppointment.services && selectedAppointment.services.length > 0 ? (
-                                                (() => {
-                                                    const clickedStaffId = selectedCell?.person.user_id || selectedCell?.person.id;
-                                                    const clickedHour = selectedCell?.hour;
-
-                                                    // Find the primary service for this context
-                                                    let targetService = selectedAppointment.services?.find((s: any) => {
-                                                        if (Number(s.staff_id) !== Number(clickedStaffId)) return false;
-                                                        if (!s.start_time || !s.end_time || !clickedHour) return false;
-                                                        const [ssH, ssM] = s.start_time.split(':').map(Number);
-                                                        const [seH, seM] = s.end_time.split(':').map(Number);
-                                                        const [chH, chM] = clickedHour.split(':').map(Number);
-                                                        const sStart = ssH * 60 + ssM;
-                                                        const sEnd = seH * 60 + seM;
-                                                        const cTotal = chH * 60 + chM;
-                                                        return cTotal >= sStart && cTotal < sEnd;
-                                                    });
-
-                                                    if (!targetService && clickedStaffId) {
-                                                        targetService = selectedAppointment.services?.find((s: any) =>
-                                                            Number(s.staff_id) === Number(clickedStaffId)
-                                                        );
-                                                    }
-
-                                                    return selectedAppointment.services.map((item: any, idx: number) => {
-                                                        const isRelevantToMe = clickedStaffId && Number(item.staff_id) === Number(clickedStaffId);
-                                                        const isExactService = targetService && item.aps_id === targetService.aps_id;
-
-                                                        return (
-                                                            <div key={item.aps_id || idx} className={`flex flex-col gap-2 p-4 rounded-3xl border transition-all ${isExactService ? 'bg-indigo-600 border-indigo-600 shadow-xl shadow-indigo-100 ring-4 ring-indigo-50 color-pulse' : isRelevantToMe ? 'bg-indigo-50 border-indigo-200' : 'bg-white/50 border-slate-100'}`}>
-                                                                <div className="flex justify-between items-start">
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <div className="flex items-center gap-2 mb-1">
-                                                                            <span className={`text-xs font-black uppercase tracking-tight truncate ${isExactService ? 'text-white' : 'text-slate-800'}`}>{item.name}</span>
-                                                                            {isExactService ? (
-                                                                                <span className="px-2 py-0.5 bg-white/20 text-white text-[7px] font-black rounded-full">TIKLANAN İŞLEM</span>
-                                                                            ) : isRelevantToMe && (
-                                                                                <span className="px-2 py-0.5 bg-indigo-500 text-white text-[7px] font-black rounded-full">SİZİN GÖREVİNİZ</span>
-                                                                            )}
-                                                                        </div>
-                                                                        <div className={`flex items-center gap-3 ${isExactService ? 'text-indigo-100' : 'text-slate-500'}`}>
-                                                                            <div className="flex items-center gap-1">
-                                                                                <span className="text-[9px] font-bold">👤 {item.service_staff_name || 'Uzman belirtilmedi'}</span>
-                                                                            </div>
-                                                                            <div className="flex items-center gap-1">
-                                                                                <span className={`text-[9px] font-bold ${isExactService ? 'text-indigo-100' : 'text-slate-500'}`}>⏰ {item.start_time || '--:--'} - {item.end_time || '--:--'} ({item.duration || item.duration_minutes || '--'} dk)</span>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="flex flex-col items-end gap-2">
-                                                                        <span className={`text-[10px] font-black ${isExactService ? 'text-white' : 'text-indigo-600'}`}>₺{item.price}</span>
-                                                                        {item.status === 'approved' ? (
-                                                                            <div className={`flex items-center gap-1 ${isExactService ? 'text-white' : 'text-emerald-500'}`}>
-                                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                                                                <span className={`text-[8px] font-black uppercase tracking-widest ${isExactService ? 'text-white' : 'text-emerald-600'}`}>ONAYLI</span>
-                                                                            </div>
-                                                                        ) : (
-                                                                            staffMode && (Number(item.staff_id) === Number(staffInfo.id)) ? (
-                                                                                <button
-                                                                                    onClick={(e) => { e.stopPropagation(); handleUpdateServiceStatus(item.aps_id, 'approved'); }}
-                                                                                    className="px-4 py-1.5 bg-amber-500 text-white text-[8px] font-black uppercase rounded-xl shadow-md hover:bg-amber-600 transition-all animate-pulse"
-                                                                                >
-                                                                                    İŞLEMİMİ ONAYLA
-                                                                                </button>
-                                                                            ) : (
-                                                                                <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${isExactService ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-500'}`}>BEKLİYOR</span>
-                                                                            )
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    });
-                                                })()
-                                            ) : (
-                                                <p className="text-xl font-black text-slate-800 uppercase tracking-tight">{selectedAppointment.package_name || selectedAppointment.service_name || 'Hizmet Bilgisi Yok'}</p>
-                                            )}
-                                        </div>
-                                        {selectedAppointment.services && selectedAppointment.services.length > 0 && (
-                                            <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center">
-                                                <span className="text-[9px] font-black text-slate-400 uppercase">Toplam</span>
-                                                <span className="text-base font-black text-indigo-600">₺{selectedAppointment.price}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    {(() => {
-                                        const clickedStaffId = selectedCell?.person.user_id || selectedCell?.person.id;
-                                        const clickedHour = selectedCell?.hour;
-
-                                        // 1. Try strict match (Staff + Hour)
-                                        let targetService = selectedAppointment.services?.find((s: any) => {
-                                            if (Number(s.staff_id) !== Number(clickedStaffId)) return false;
-                                            if (!s.start_time || !s.end_time || !clickedHour) return false;
-                                            const [ssH, ssM] = s.start_time.split(':').map(Number);
-                                            const [seH, seM] = s.end_time.split(':').map(Number);
-                                            const [chH, chM] = clickedHour.split(':').map(Number);
-                                            const sStart = ssH * 60 + ssM;
-                                            const sEnd = seH * 60 + seM;
-                                            const cTotal = chH * 60 + chM;
-                                            return cTotal >= sStart && cTotal < sEnd;
-                                        });
-
-                                        // 2. Fallback (Any service for this Staff in this appointment)
-                                        if (!targetService && clickedStaffId) {
-                                            targetService = selectedAppointment.services?.find((s: any) =>
-                                                Number(s.staff_id) === Number(clickedStaffId)
-                                            );
-                                        }
-
-                                        const displayTime = targetService?.start_time || selectedAppointment.start_time;
-                                        const displayStaffName = targetService?.service_staff_name || selectedAppointment.staff_name || 'Belirsiz';
-                                        const hasContext = !!targetService;
-
-                                        return (
-                                            <>
-                                                <div className={`p-6 rounded-[2.5rem] transition-all duration-500 ${hasContext ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 ring-2 ring-white/20' : 'bg-slate-50 text-slate-800'}`}>
-                                                    <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${hasContext ? 'text-indigo-200' : 'text-slate-400'}`}>Saat</p>
-                                                    <p className="text-xl font-black">{displayTime}</p>
-                                                </div>
-                                                <div className={`p-6 rounded-[2.5rem] transition-all duration-500 ${hasContext ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 ring-2 ring-white/20' : 'bg-slate-50 text-slate-800'}`}>
-                                                    <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${hasContext ? 'text-indigo-200' : 'text-slate-400'}`}>Uzman</p>
-                                                    <p className="text-lg font-black truncate">{displayStaffName}</p>
-                                                </div>
-                                            </>
-                                        );
-                                    })()}
-                                </div>
-
-                                {selectedAppointment.notes && (
-                                    <div className="p-8 bg-indigo-50/50 border border-indigo-100/50 rounded-[2.5rem]">
-                                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">Müşteri Notu</p>
-                                        <p className="text-slate-700 font-bold leading-relaxed">{selectedAppointment.notes}</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="flex flex-col gap-3 mt-8">
-                                <div className="flex gap-4">
-                                    {selectedAppointment.status === 'pending' && (
-                                        <button
-                                            onClick={() => handleUpdateStatus(selectedAppointment.id!, 'approved')}
-                                            disabled={loading}
-                                            className="flex-1 bg-emerald-500 text-white py-6 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-emerald-200 hover:bg-emerald-600 transition-all disabled:opacity-50"
-                                        >
-                                            Onayla
-                                        </button>
-                                    )}
-
-                                    {selectedAppointment.status === 'approved' && (
-                                        <button
-                                            onClick={() => handleUpdateStatus(selectedAppointment.id!, 'completed')}
-                                            disabled={loading}
-                                            className="flex-1 bg-indigo-600 text-white py-6 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all disabled:opacity-50"
-                                        >
-                                            Tamamla
-                                        </button>
-                                    )}
-                                </div>
-
-                                <div className="flex gap-4">
-                                    {selectedAppointment.status !== 'cancelled' && selectedAppointment.status !== 'completed' && (
-                                        <button
-                                            onClick={() => handleUpdateStatus(selectedAppointment.id!, 'cancelled')}
-                                            disabled={loading}
-                                            className="flex-1 bg-red-50 text-red-600 py-6 rounded-[2rem] font-black uppercase tracking-widest hover:bg-red-100 transition-all disabled:opacity-50"
-                                        >
-                                            İptal Et
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => setIsDetailModalOpen(false)}
-                                        className="flex-1 bg-slate-900 text-white py-6 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all"
-                                    >
-                                        Kapat
+                                    <button onClick={() => { setIsModalOpen(false); setSelectedCell(null); }} className="w-16 h-16 bg-white border border-slate-100 rounded-3xl flex items-center justify-center text-slate-400 hover:text-slate-900 hover:rotate-90 transition-all shadow-sm">
+                                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                                     </button>
                                 </div>
+
+                                <form onSubmit={handleFastSubmit} className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Müşteri İsmi</label>
+                                            <input
+                                                type="text"
+                                                value={fastForm.customerName}
+                                                onChange={e => setFastForm(prev => ({ ...prev, customerName: e.target.value }))}
+                                                placeholder="İsim veya Misafir"
+                                                className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-black text-xl text-slate-900 outline-none"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-4 col-span-1 md:col-span-2">
+                                            <div className="flex gap-4 mb-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFastForm({ ...fastForm, packageId: '' })}
+                                                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${!fastForm.packageId ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}
+                                                >
+                                                    Hizmetler
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFastForm({ ...fastForm, serviceIds: [], packageId: packages[0]?.id?.toString() || '' })}
+                                                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${fastForm.packageId ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}
+                                                >
+                                                    Paketler
+                                                </button>
+                                            </div>
+
+                                            {!fastForm.packageId ? (
+                                                <>
+                                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Hizmet Seçimi (Birden Fazla Seçebilirsiniz)</label>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-48 overflow-y-auto p-4 bg-slate-50 rounded-[2.5rem]">
+                                                        {services.map(s => {
+                                                            const isSelected = fastForm.serviceIds.includes(s.id);
+                                                            return (
+                                                                <button
+                                                                    key={s.id}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const newIds = isSelected
+                                                                            ? fastForm.serviceIds.filter(id => id !== s.id)
+                                                                            : [...fastForm.serviceIds, s.id];
+                                                                        setFastForm({ ...fastForm, serviceIds: newIds });
+                                                                    }}
+                                                                    className={`p-3 rounded-2xl border-2 transition-all flex flex-col gap-1 text-center items-center justify-center ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-white border-transparent text-slate-600'}`}
+                                                                >
+                                                                    <p className={`text-[9px] font-black uppercase leading-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{s.name}</p>
+                                                                    <p className={`text-[8px] font-bold ${isSelected ? 'text-indigo-100' : 'text-slate-400'}`}>₺{s.price}</p>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="space-y-3 max-h-64 overflow-y-auto p-4 bg-slate-50 rounded-[2.5rem]">
+                                                        {packages.map(p => {
+                                                            const isSelected = parseInt(fastForm.packageId) === p.id;
+                                                            return (
+                                                                <div key={p.id} className="space-y-4">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setFastForm({ ...fastForm, packageId: p.id.toString(), serviceIds: [], serviceStaffOverrides: {} })}
+                                                                        className={`w-full p-4 rounded-2xl border-2 transition-all flex flex-col gap-1 text-left ${isSelected ? 'bg-amber-600 border-amber-600 text-white shadow-lg' : 'bg-white border-transparent text-slate-600'}`}
+                                                                    >
+                                                                        <p className={`text-xs font-black uppercase leading-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{p.name}</p>
+                                                                        <p className={`text-[8px] font-bold ${isSelected ? 'text-amber-100' : 'text-slate-400'}`}>₺{p.price} | {p.duration_minutes} dk</p>
+                                                                    </button>
+
+                                                                    {isSelected && (
+                                                                        <div className="pl-6 space-y-3 animate-in slide-in-from-left duration-300 border-l-4 border-amber-200 ml-2">
+                                                                            <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest pl-2">🛠️ İşlem Dağılımı (Sıralı Yapılacak)</p>
+                                                                            <div className="space-y-2">
+                                                                                {p.services?.map((ps: any) => (
+                                                                                    <div key={ps.id} className="flex items-center justify-between gap-4 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-amber-400">
+                                                                                        <div className="flex flex-col flex-1 min-w-0 pl-2">
+                                                                                            <span className="text-[10px] font-black text-slate-700 uppercase truncate">{ps.name}</span>
+                                                                                            <div className="flex gap-2 mt-1">
+                                                                                                <div className="flex-1">
+                                                                                                    <label className="block text-[7px] font-bold text-slate-400 uppercase mb-0.5 ml-1">Süre (Dk)</label>
+                                                                                                    <input
+                                                                                                        type="number"
+                                                                                                        value={fastForm.serviceDurationOverrides[ps.id] || ps.duration_minutes}
+                                                                                                        onChange={e => setFastForm(prev => ({
+                                                                                                            ...prev,
+                                                                                                            serviceDurationOverrides: { ...prev.serviceDurationOverrides, [ps.id]: parseInt(e.target.value) || 0 }
+                                                                                                        }))}
+                                                                                                        className="w-full p-1 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-900 outline-none"
+                                                                                                    />
+                                                                                                </div>
+                                                                                                <div className="flex-1">
+                                                                                                    <label className="block text-[7px] font-bold text-slate-400 uppercase mb-0.5 ml-1">Fiyat (₺)</label>
+                                                                                                    <input
+                                                                                                        type="number"
+                                                                                                        value={fastForm.servicePriceOverrides[ps.id] || ps.price}
+                                                                                                        onChange={e => setFastForm(prev => ({
+                                                                                                            ...prev,
+                                                                                                            servicePriceOverrides: { ...prev.servicePriceOverrides, [ps.id]: parseFloat(e.target.value) || 0 }
+                                                                                                        }))}
+                                                                                                        className="w-full p-1 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-900 outline-none"
+                                                                                                    />
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <div className="flex flex-col items-end gap-1">
+                                                                                            <span className="text-[8px] font-black text-slate-400 uppercase">Uzman</span>
+                                                                                            <select
+                                                                                                value={fastForm.serviceStaffOverrides[ps.id] || fastForm.staffId || selectedCell?.person.user_id || selectedCell?.person.id}
+                                                                                                onChange={(e) => {
+                                                                                                    setFastForm(prev => ({
+                                                                                                        ...prev,
+                                                                                                        serviceStaffOverrides: {
+                                                                                                            ...prev.serviceStaffOverrides,
+                                                                                                            [ps.id]: Number(e.target.value)
+                                                                                                        }
+                                                                                                    }));
+                                                                                                }}
+                                                                                                className="text-[10px] font-bold bg-amber-50 text-amber-900 border-none rounded-xl p-2 outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                                                                                            >
+                                                                                                {staff.map(s => (
+                                                                                                    <option key={s.user_id || s.id} value={s.user_id || s.id}>
+                                                                                                        {s.first_name}
+                                                                                                    </option>
+                                                                                                ))}
+                                                                                            </select>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                            <div className="flex justify-between items-center bg-amber-50 p-4 rounded-2xl border-2 border-amber-200 shadow-inner mt-2">
+                                                                                <div className="flex flex-col">
+                                                                                    <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">GÜNCEL TOPLAM SÜRE</span>
+                                                                                    <span className="text-sm font-black text-amber-900">
+                                                                                        {(() => {
+                                                                                            const hasOverrides = Object.keys(fastForm.serviceDurationOverrides).length > 0;
+                                                                                            if (hasOverrides) {
+                                                                                                return p.services?.reduce((sum: number, ps: any) => sum + (fastForm.serviceDurationOverrides[ps.id] !== undefined ? fastForm.serviceDurationOverrides[ps.id] : (ps.duration_minutes || 0)), 0);
+                                                                                            }
+                                                                                            return p.duration_minutes || 0;
+                                                                                        })()} DK
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className="flex flex-col items-end">
+                                                                                    <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">GÜNCEL TOPLAM FİYAT</span>
+                                                                                    <span className="text-lg font-black text-amber-900">
+                                                                                        ₺{(() => {
+                                                                                            const hasOverrides = Object.keys(fastForm.servicePriceOverrides).length > 0;
+                                                                                            if (hasOverrides) {
+                                                                                                return p.services?.reduce((sum: number, ps: any) => sum + Number(fastForm.servicePriceOverrides[ps.id] !== undefined ? fastForm.servicePriceOverrides[ps.id] : (ps.price || 0)), 0);
+                                                                                            }
+                                                                                            return p.price || 0;
+                                                                                        })()}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                            <p className="text-[8px] font-bold text-slate-400 italic pl-2">* Hizmetler yukarıdan aşağıya sırayla atanacaktır.</p>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Uzman</label>
+                                            <select
+                                                disabled={!!selectedCell}
+                                                value={fastForm.staffId || selectedCell?.person.user_id || selectedCell?.person.id}
+                                                onChange={e => setFastForm(prev => ({ ...prev, staffId: e.target.value }))}
+                                                className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-black text-xl text-slate-900 outline-none appearance-none cursor-pointer disabled:bg-slate-50"
+                                            >
+                                                {staff.map(s => <option key={s.user_id || s.id} value={s.user_id || s.id}>{s.first_name} {s.last_name}</option>)}
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Tarih</label>
+                                            <input
+                                                type="date"
+                                                disabled={!!selectedCell}
+                                                min={currentDate}
+                                                value={fastForm.appointmentDate}
+                                                onChange={e => setFastForm(prev => ({ ...prev, appointmentDate: e.target.value }))}
+                                                className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-black text-xl text-slate-900 outline-none disabled:bg-slate-50"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Başlangıç Saati</label>
+                                            <select
+                                                disabled={!!selectedCell}
+                                                value={fastForm.startTime || selectedCell?.hour}
+                                                onChange={e => setFastForm(prev => ({ ...prev, startTime: e.target.value }))}
+                                                className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-black text-xl text-slate-900 outline-none cursor-pointer disabled:bg-slate-50"
+                                            >
+                                                {hours.map(h => <option key={h} value={h}>{h}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Notlar</label>
+                                        <textarea
+                                            value={fastForm.notes}
+                                            onChange={e => setFastForm(prev => ({ ...prev, notes: e.target.value }))}
+                                            placeholder="Kısa notlar..."
+                                            rows={2}
+                                            className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-medium text-slate-600 outline-none resize-none"
+                                        />
+                                    </div>
+
+                                    <button
+                                        disabled={loading}
+                                        className="w-full bg-slate-900 text-white py-8 rounded-[2.5rem] font-black uppercase tracking-[0.3em] shadow-[0_24px_48px_-12px_rgba(15,23,42,0.4)] hover:bg-slate-800 hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 text-xl"
+                                    >
+                                        {loading ? 'Kaydediliyor...' : 'Randevuyu Onayla'}
+                                    </button>
+                                </form>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
+
+            {/* Appointment Detail Modal */}
+            {
+                isDetailModalOpen && selectedAppointment && (
+                    <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+                        <div className="bg-white w-full max-w-lg rounded-[4rem] overflow-hidden shadow-2xl animate-scale-up">
+                            <div className="p-12">
+                                <div className="flex justify-between items-start mb-8">
+                                    <div>
+                                        <div className={`inline-flex px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-4 ${selectedAppointment.status === 'approved' ? 'bg-indigo-50 text-indigo-600' :
+                                            selectedAppointment.status === 'pending' ? 'bg-amber-50 text-amber-600' :
+                                                'bg-slate-100 text-slate-500'
+                                            }`}>
+                                            {selectedAppointment.status === 'approved' ? 'ONAYLI RANDEVU' : 'BEKLEYEN RANDEVU'}
+                                        </div>
+                                        <h2 className="text-4xl font-black text-slate-900 tracking-tighter">{selectedAppointment.customer_name || 'Misafir'}</h2>
+                                    </div>
+                                    <button onClick={() => setIsDetailModalOpen(false)} className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 hover:text-slate-900 transition-all">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                </div>
+
+                                <div className="space-y-6">
+                                    <div className="flex items-start gap-6 p-6 bg-slate-50 rounded-[2.5rem]">
+                                        <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center text-2xl shadow-sm shrink-0">✂️</div>
+                                        <div className="flex-1">
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Hizmetler {selectedAppointment.package_name && <span className="text-indigo-600 ml-2">📦 {selectedAppointment.package_name}</span>}</p>
+                                            <div className="space-y-2">
+                                                {selectedAppointment.services && selectedAppointment.services.length > 0 ? (
+                                                    (() => {
+                                                        const clickedStaffId = selectedCell?.person.user_id || selectedCell?.person.id;
+                                                        const clickedHour = selectedCell?.hour;
+
+                                                        // Find the primary service for this context
+                                                        let targetService = selectedAppointment.services?.find((s: any) => {
+                                                            if (Number(s.staff_id) !== Number(clickedStaffId)) return false;
+                                                            if (!s.start_time || !s.end_time || !clickedHour) return false;
+                                                            const [ssH, ssM] = s.start_time.split(':').map(Number);
+                                                            const [seH, seM] = s.end_time.split(':').map(Number);
+                                                            const [chH, chM] = clickedHour.split(':').map(Number);
+                                                            const sStart = ssH * 60 + ssM;
+                                                            const sEnd = seH * 60 + seM;
+                                                            const cTotal = chH * 60 + chM;
+                                                            return cTotal >= sStart && cTotal < sEnd;
+                                                        });
+
+                                                        if (!targetService && clickedStaffId) {
+                                                            targetService = selectedAppointment.services?.find((s: any) =>
+                                                                Number(s.staff_id) === Number(clickedStaffId)
+                                                            );
+                                                        }
+
+                                                        return selectedAppointment.services.map((item: any, idx: number) => {
+                                                            const isRelevantToMe = clickedStaffId && Number(item.staff_id) === Number(clickedStaffId);
+                                                            const isExactService = targetService && item.aps_id === targetService.aps_id;
+
+                                                            return (
+                                                                <div key={item.aps_id || idx} className={`flex flex-col gap-2 p-4 rounded-3xl border transition-all ${isExactService ? 'bg-indigo-600 border-indigo-600 shadow-xl shadow-indigo-100 ring-4 ring-indigo-50 color-pulse' : isRelevantToMe ? 'bg-indigo-50 border-indigo-200' : 'bg-white/50 border-slate-100'}`}>
+                                                                    <div className="flex justify-between items-start">
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="flex items-center gap-2 mb-1">
+                                                                                <span className={`text-xs font-black uppercase tracking-tight truncate ${isExactService ? 'text-white' : 'text-slate-800'}`}>{item.name}</span>
+                                                                                {isExactService ? (
+                                                                                    <span className="px-2 py-0.5 bg-white/20 text-white text-[7px] font-black rounded-full">TIKLANAN İŞLEM</span>
+                                                                                ) : isRelevantToMe && (
+                                                                                    <span className="px-2 py-0.5 bg-indigo-500 text-white text-[7px] font-black rounded-full">SİZİN GÖREVİNİZ</span>
+                                                                                )}
+                                                                            </div>
+                                                                            <div className={`flex items-center gap-3 ${isExactService ? 'text-indigo-100' : 'text-slate-500'}`}>
+                                                                                <div className="flex items-center gap-1">
+                                                                                    <span className="text-[9px] font-bold">👤 {item.service_staff_name || 'Uzman belirtilmedi'}</span>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-1">
+                                                                                    <span className={`text-[9px] font-bold ${isExactService ? 'text-indigo-100' : 'text-slate-500'}`}>⏰ {item.start_time || '--:--'} - {item.end_time || '--:--'} ({item.duration || item.duration_minutes || '--'} dk)</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="flex flex-col items-end gap-2">
+                                                                            <span className={`text-[10px] font-black ${isExactService ? 'text-white' : 'text-indigo-600'}`}>₺{item.price}</span>
+
+                                                                            <select
+                                                                                value={item.staff_id || ''}
+                                                                                onChange={async (e) => {
+                                                                                    const newStaffId = e.target.value ? Number(e.target.value) : null;
+                                                                                    try {
+                                                                                        setLoading(true);
+                                                                                        await api.patch(`/appointments/service/${item.aps_id}`, { staff_id: newStaffId });
+                                                                                        if (company?.id) fetchData(company.id);
+                                                                                        // Update current modal state
+                                                                                        if (selectedAppointment?.id) {
+                                                                                            const res = await api.get('/appointments', { params: { ids: selectedAppointment.id.toString() } });
+                                                                                            if (res.data?.data?.[0]) setSelectedAppointment(res.data.data[0]);
+                                                                                        }
+                                                                                    } catch (err) {
+                                                                                        alert('Personel güncellenemedi');
+                                                                                    } finally {
+                                                                                        setLoading(false);
+                                                                                    }
+                                                                                }}
+                                                                                className={`text-[8px] font-black uppercase rounded-lg px-2 py-1 outline-none cursor-pointer ${isExactService ? 'bg-white/20 text-white' : 'bg-slate-50 text-slate-600 border border-slate-200'}`}
+                                                                            >
+                                                                                <option value="">Uzman Seçin</option>
+                                                                                {staff.map(s => <option key={s.user_id || s.id} value={s.user_id || s.id}>{s.first_name}</option>)}
+                                                                            </select>
+
+                                                                            {item.status === 'approved' ? (
+                                                                                <div className={`flex items-center gap-1 ${isExactService ? 'text-white' : 'text-emerald-500'}`}>
+                                                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                                                                    <span className={`text-[8px] font-black uppercase tracking-widest ${isExactService ? 'text-white' : 'text-emerald-600'}`}>ONAYLI</span>
+                                                                                </div>
+                                                                            ) : (
+                                                                                staffMode && (Number(item.staff_id) === Number(staffInfo.id)) ? (
+                                                                                    <button
+                                                                                        onClick={(e) => { e.stopPropagation(); handleUpdateServiceStatus(item.aps_id, 'approved'); }}
+                                                                                        className="px-4 py-1.5 bg-amber-500 text-white text-[8px] font-black uppercase rounded-xl shadow-md hover:bg-amber-600 transition-all animate-pulse"
+                                                                                    >
+                                                                                        İŞLEMİMİ ONAYLA
+                                                                                    </button>
+                                                                                ) : (
+                                                                                    <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${isExactService ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-500'}`}>BEKLİYOR</span>
+                                                                                )
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        });
+                                                    })()
+                                                ) : (
+                                                    <p className="text-xl font-black text-slate-800 uppercase tracking-tight">{selectedAppointment.package_name || selectedAppointment.service_name || 'Hizmet Bilgisi Yok'}</p>
+                                                )}
+                                            </div>
+                                            {selectedAppointment.services && selectedAppointment.services.length > 0 && (
+                                                <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center">
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase">Toplam</span>
+                                                    <span className="text-base font-black text-indigo-600">₺{selectedAppointment.price}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {(() => {
+                                            const clickedStaffId = selectedCell?.person.user_id || selectedCell?.person.id;
+                                            const clickedHour = selectedCell?.hour;
+
+                                            // 1. Try strict match (Staff + Hour)
+                                            let targetService = selectedAppointment.services?.find((s: any) => {
+                                                if (Number(s.staff_id) !== Number(clickedStaffId)) return false;
+                                                if (!s.start_time || !s.end_time || !clickedHour) return false;
+                                                const [ssH, ssM] = s.start_time.split(':').map(Number);
+                                                const [seH, seM] = s.end_time.split(':').map(Number);
+                                                const [chH, chM] = clickedHour.split(':').map(Number);
+                                                const sStart = ssH * 60 + ssM;
+                                                const sEnd = seH * 60 + seM;
+                                                const cTotal = chH * 60 + chM;
+                                                return cTotal >= sStart && cTotal < sEnd;
+                                            });
+
+                                            // 2. Fallback (Any service for this Staff in this appointment)
+                                            if (!targetService && clickedStaffId) {
+                                                targetService = selectedAppointment.services?.find((s: any) =>
+                                                    Number(s.staff_id) === Number(clickedStaffId)
+                                                );
+                                            }
+
+                                            const displayTime = targetService?.start_time || selectedAppointment.start_time;
+                                            const displayStaffName = targetService?.service_staff_name || selectedAppointment.staff_name || 'Belirsiz';
+                                            const hasContext = !!targetService;
+
+                                            return (
+                                                <>
+                                                    <div className={`p-6 rounded-[2.5rem] transition-all duration-500 ${hasContext ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 ring-2 ring-white/20' : 'bg-slate-50 text-slate-800'}`}>
+                                                        <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${hasContext ? 'text-indigo-200' : 'text-slate-400'}`}>Saat</p>
+                                                        <p className="text-xl font-black">{displayTime}</p>
+                                                    </div>
+                                                    <div className={`p-6 rounded-[2.5rem] transition-all duration-500 ${hasContext ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 ring-2 ring-white/20' : 'bg-slate-50 text-slate-800'}`}>
+                                                        <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${hasContext ? 'text-indigo-200' : 'text-slate-400'}`}>Uzman</p>
+                                                        <p className="text-lg font-black truncate">{displayStaffName}</p>
+                                                    </div>
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+
+                                    {selectedAppointment.notes && (
+                                        <div className="p-8 bg-indigo-50/50 border border-indigo-100/50 rounded-[2.5rem]">
+                                            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">Müşteri Notu</p>
+                                            <p className="text-slate-700 font-bold leading-relaxed">{selectedAppointment.notes}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex flex-col gap-3 mt-8">
+                                    <div className="flex gap-4">
+                                        {selectedAppointment.status === 'pending' && (
+                                            <button
+                                                onClick={() => handleUpdateStatus(selectedAppointment.id!, 'approved')}
+                                                disabled={loading}
+                                                className="flex-1 bg-emerald-500 text-white py-6 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-emerald-200 hover:bg-emerald-600 transition-all disabled:opacity-50"
+                                            >
+                                                Onayla
+                                            </button>
+                                        )}
+
+                                        {selectedAppointment.status === 'approved' && (
+                                            <button
+                                                onClick={() => handleUpdateStatus(selectedAppointment.id!, 'completed')}
+                                                disabled={loading}
+                                                className="flex-1 bg-indigo-600 text-white py-6 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all disabled:opacity-50"
+                                            >
+                                                Tamamla
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <div className="flex gap-4">
+                                        {selectedAppointment.status !== 'cancelled' && selectedAppointment.status !== 'completed' && (
+                                            <button
+                                                onClick={() => handleUpdateStatus(selectedAppointment.id!, 'cancelled')}
+                                                disabled={loading}
+                                                className="flex-1 bg-red-50 text-red-600 py-6 rounded-[2rem] font-black uppercase tracking-widest hover:bg-red-100 transition-all disabled:opacity-50"
+                                            >
+                                                İptal Et
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => setIsDetailModalOpen(false)}
+                                            className="flex-1 bg-slate-900 text-white py-6 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all"
+                                        >
+                                            Kapat
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
 
             {/* Version Indicator */}
             {/* Pending List Modal */}
-            {isPendingListModalOpen && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4 lg:p-10" onClick={() => setIsPendingListModalOpen(false)}>
-                    <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
-                        <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-amber-50/30">
-                            <div>
-                                <h2 className="text-2xl font-black text-slate-900 tracking-tight">Onay Bekleyen Talepler</h2>
-                                <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mt-1">{appointments.filter(a => a.status === 'pending').length} Yeni Randevu İsteği</p>
+            {
+                isPendingListModalOpen && (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4 lg:p-10" onClick={() => setIsPendingListModalOpen(false)}>
+                        <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
+                            <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-amber-50/30">
+                                <div>
+                                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">Onay Bekleyen Talepler</h2>
+                                    <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mt-1">{appointments.filter(a => a.status === 'pending').length} Yeni Randevu İsteği</p>
+                                </div>
+                                <button onClick={() => setIsPendingListModalOpen(false)} className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all shadow-sm">
+                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6" /></svg>
+                                </button>
                             </div>
-                            <button onClick={() => setIsPendingListModalOpen(false)} className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all shadow-sm">
-                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6" /></svg>
-                            </button>
-                        </div>
 
-                        <div className="p-8 max-h-[70vh] overflow-y-auto space-y-4">
-                            {appointments.filter(a => a.status === 'pending').sort((a, b) => (a.appointment_date || '').localeCompare(b.appointment_date || '')).length > 0 ? (
-                                appointments.filter(a => a.status === 'pending').sort((a, b) => (a.appointment_date || '').localeCompare(b.appointment_date || '')).map(app => (
-                                    <div key={app.id} className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 hover:border-amber-200 transition-all group">
-                                        <div className="flex items-start justify-between gap-4 mb-4">
-                                            <div className="flex-1">
-                                                <h3 className="font-black text-slate-900 text-lg uppercase tracking-tight mb-1">{app.customer_name || 'Misafir'}</h3>
-                                                <div className="flex flex-wrap gap-2 items-center">
-                                                    <span className="px-3 py-1 bg-white rounded-full text-[10px] font-black text-slate-500 border border-slate-100 uppercase tracking-wider">
-                                                        📅 {app.appointment_date?.substring(0, 10)}
-                                                    </span>
-                                                    <span className="px-3 py-1 bg-white rounded-full text-[10px] font-black text-slate-500 border border-slate-100 uppercase tracking-wider">
-                                                        ⏰ {app.start_time} - {app.end_time}
-                                                    </span>
+                            <div className="p-8 max-h-[70vh] overflow-y-auto space-y-4">
+                                {appointments.filter(a => a.status === 'pending').sort((a, b) => (a.appointment_date || '').localeCompare(b.appointment_date || '')).length > 0 ? (
+                                    appointments.filter(a => a.status === 'pending').sort((a, b) => (a.appointment_date || '').localeCompare(b.appointment_date || '')).map(app => (
+                                        <div key={app.id} className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 hover:border-amber-200 transition-all group">
+                                            <div className="flex items-start justify-between gap-4 mb-4">
+                                                <div className="flex-1">
+                                                    <h3 className="font-black text-slate-900 text-lg uppercase tracking-tight mb-1">{app.customer_name || 'Misafir'}</h3>
+                                                    <div className="flex flex-wrap gap-2 items-center">
+                                                        <span className="px-3 py-1 bg-white rounded-full text-[10px] font-black text-slate-500 border border-slate-100 uppercase tracking-wider">
+                                                            📅 {app.appointment_date?.substring(0, 10)}
+                                                        </span>
+                                                        <span className="px-3 py-1 bg-white rounded-full text-[10px] font-black text-slate-500 border border-slate-100 uppercase tracking-wider">
+                                                            ⏰ {app.start_time} - {app.end_time}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-lg font-black text-indigo-600 leading-none">₺{app.price}</p>
+                                                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mt-1">Hizmet Bedeli</p>
                                                 </div>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="text-lg font-black text-indigo-600 leading-none">₺{app.price}</p>
-                                                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mt-1">Hizmet Bedeli</p>
+                                            <div className="flex flex-wrap gap-2 mb-6">
+                                                {app.services?.map((s: any) => (
+                                                    <span key={s.id} className="px-2 py-0.5 bg-amber-100/50 text-amber-700 rounded-lg text-[9px] font-bold uppercase">
+                                                        {s.name} {s.service_staff_name ? `(${s.service_staff_name})` : ''}
+                                                    </span>
+                                                ))}
+                                                {!app.staff_id && app.services?.every((s: any) => !s.staff_id) && (
+                                                    <span className="px-2 py-0.5 bg-red-100 text-red-600 rounded-lg text-[9px] font-black uppercase tracking-tighter animate-pulse">
+                                                        ⚠️ PERSONEL ATANMAMIŞ
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex gap-3">
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedAppointment(app);
+                                                        setIsDetailModalOpen(true);
+                                                    }}
+                                                    className="flex-1 py-4 bg-white border-2 border-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:border-indigo-200 hover:text-indigo-600 transition-all"
+                                                >
+                                                    Detaylar
+                                                </button>
+                                                <button
+                                                    onClick={() => handleUpdateStatus(app.id!, 'approved')}
+                                                    className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition-all"
+                                                >
+                                                    Hemen Onayla
+                                                </button>
+                                                <button
+                                                    onClick={() => handleUpdateStatus(app.id!, 'cancelled')}
+                                                    className="w-14 py-4 bg-rose-50 text-rose-500 rounded-2xl font-black flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all"
+                                                >
+                                                    ✕
+                                                </button>
                                             </div>
                                         </div>
-                                        <div className="flex flex-wrap gap-2 mb-6">
-                                            {app.services?.map((s: any) => (
-                                                <span key={s.id} className="px-2 py-0.5 bg-amber-100/50 text-amber-700 rounded-lg text-[9px] font-bold uppercase">
-                                                    {s.name} {s.service_staff_name ? `(${s.service_staff_name})` : ''}
-                                                </span>
-                                            ))}
-                                            {!app.staff_id && app.services?.every((s: any) => !s.staff_id) && (
-                                                <span className="px-2 py-0.5 bg-red-100 text-red-600 rounded-lg text-[9px] font-black uppercase tracking-tighter animate-pulse">
-                                                    ⚠️ PERSONEL ATANMAMIŞ
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="flex gap-3">
-                                            <button
-                                                onClick={() => {
-                                                    setSelectedAppointment(app);
-                                                    setIsDetailModalOpen(true);
-                                                }}
-                                                className="flex-1 py-4 bg-white border-2 border-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:border-indigo-200 hover:text-indigo-600 transition-all"
-                                            >
-                                                Detaylar
-                                            </button>
-                                            <button
-                                                onClick={() => handleUpdateStatus(app.id!, 'approved')}
-                                                className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition-all"
-                                            >
-                                                Hemen Onayla
-                                            </button>
-                                            <button
-                                                onClick={() => handleUpdateStatus(app.id!, 'cancelled')}
-                                                className="w-14 py-4 bg-rose-50 text-rose-500 rounded-2xl font-black flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all"
-                                            >
-                                                ✕
-                                            </button>
-                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="py-20 text-center">
+                                        <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">📭</div>
+                                        <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Onay bekleyen talep yok</p>
                                     </div>
-                                ))
-                            ) : (
-                                <div className="py-20 text-center">
-                                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">📭</div>
-                                    <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Onay bekleyen talep yok</p>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             <div className="fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-slate-900/80 backdrop-blur-md rounded-full border border-white/10 shadow-2xl z-[150] pointer-events-none">
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap">Ekuafor Salon Board Edition <span className="text-white opacity-100 ml-1">v1.73.0</span></p>
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap">Ekuafor Salon Board Edition <span className="text-white opacity-100 ml-1">v1.76.0</span></p>
             </div>
-        </div>
+        </div >
     );
 }
