@@ -1,0 +1,111 @@
+import pool from '../config/database';
+
+export interface MainCompany {
+    id?: number;
+    name: string;
+    description?: string;
+    address_line?: string;
+    province_id?: number;
+    province_name?: string;
+    admin_code: string;
+    is_active?: boolean;
+    created_at?: Date;
+}
+
+class MainCompanyService {
+    async create(data: MainCompany): Promise<MainCompany> {
+        const query = `
+            INSERT INTO main_companies (name, description, address_line, province_id, province_name, admin_code)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING *
+        `;
+        const values = [data.name, data.description, data.address_line, data.province_id, data.province_name, data.admin_code];
+        const result = await pool.query(query, values);
+        return result.rows[0];
+    }
+
+    async getAll(): Promise<MainCompany[]> {
+        const result = await pool.query('SELECT * FROM main_companies ORDER BY created_at DESC');
+        return result.rows;
+    }
+
+    async getById(id: number): Promise<MainCompany | null> {
+        const result = await pool.query('SELECT * FROM main_companies WHERE id = $1', [id]);
+        return result.rows[0] || null;
+    }
+
+    async getByAdminCode(code: string): Promise<MainCompany | null> {
+        const result = await pool.query('SELECT * FROM main_companies WHERE admin_code = $1', [code]);
+        return result.rows[0] || null;
+    }
+
+    async update(id: number, data: Partial<MainCompany>): Promise<MainCompany | null> {
+        const fields: string[] = [];
+        const values: any[] = [];
+        let i = 1;
+
+        Object.entries(data).forEach(([key, value]) => {
+            if (value !== undefined && key !== 'id') {
+                fields.push(`${key} = $${i}`);
+                values.push(value);
+                i++;
+            }
+        });
+
+        if (fields.length === 0) return null;
+
+        values.push(id);
+        const query = `UPDATE main_companies SET ${fields.join(', ')} WHERE id = $${i} RETURNING *`;
+        const result = await pool.query(query, values);
+        return result.rows[0] || null;
+    }
+
+    async getBranches(mainCompanyId: number): Promise<any[]> {
+        const query = `
+            SELECT id, name, province_name, district_name, latitude, longitude, is_active
+            FROM companies
+            WHERE main_company_id = $1
+            ORDER BY name ASC
+        `;
+        const result = await pool.query(query, [mainCompanyId]);
+        return result.rows;
+    }
+
+    async getStats(mainCompanyId: number): Promise<any> {
+        // Aggregated stats for all branches
+        const query = `
+            SELECT 
+                COUNT(a.id) as total_appointments,
+                SUM(a.price) as total_revenue,
+                (SELECT COUNT(*) FROM companies WHERE main_company_id = $1) as branch_count,
+                COUNT(DISTINCT a.customer_phone) as unique_customers
+            FROM appointments a
+            JOIN companies c ON a.company_id = c.id
+            WHERE c.main_company_id = $1 AND a.status = 'completed'
+        `;
+        const result = await pool.query(query, [mainCompanyId]);
+        return result.rows[0];
+    }
+
+    async getBranchPerformance(mainCompanyId: number): Promise<any[]> {
+        const query = `
+            SELECT 
+                c.id as branch_id,
+                c.name as branch_name,
+                c.province_name,
+                c.latitude,
+                c.longitude,
+                COUNT(a.id) as appointment_count,
+                COALESCE(SUM(a.price), 0) as revenue
+            FROM companies c
+            LEFT JOIN appointments a ON a.company_id = c.id AND a.status = 'completed'
+            WHERE c.main_company_id = $1
+            GROUP BY c.id, c.name, c.province_name, c.latitude, c.longitude
+            ORDER BY revenue DESC
+        `;
+        const result = await pool.query(query, [mainCompanyId]);
+        return result.rows;
+    }
+}
+
+export default new MainCompanyService();

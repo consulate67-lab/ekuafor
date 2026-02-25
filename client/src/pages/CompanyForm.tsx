@@ -67,7 +67,11 @@ export default function CompanyForm() {
         payment_enabled: false,
         board_key: '',
         genders: [],
+        company_type: 'ASIL',
+        main_company_id: null,
     });
+
+    const [mainCompanies, setMainCompanies] = useState<any[]>([]);
 
     // Address data
     const [provinces, setProvinces] = useState<Province[]>([]);
@@ -166,6 +170,7 @@ export default function CompanyForm() {
 
     useEffect(() => {
         fetchProvinces();
+        fetchMainCompanies();
         if (isEdit) {
             fetchCompany();
         } else {
@@ -198,6 +203,15 @@ export default function CompanyForm() {
             fetchNeighborhoods(selectedProvince, selectedDistrict);
         }
     }, [selectedDistrict]);
+
+    const fetchMainCompanies = async () => {
+        try {
+            const response = await api.get('/main-companies');
+            setMainCompanies(response.data.data || []);
+        } catch (err) {
+            console.error('Üst firmalar yüklenirken hata:', err);
+        }
+    };
 
     const fetchProvinces = async () => {
         try {
@@ -431,6 +445,54 @@ export default function CompanyForm() {
                                     required
                                 />
                             </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Firma Türü
+                                </label>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({ ...formData, company_type: 'ASIL', main_company_id: null })}
+                                        className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all border-2 ${formData.company_type === 'ASIL'
+                                            ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-200'
+                                            : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-100'
+                                            }`}
+                                    >
+                                        ASIL
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({ ...formData, company_type: 'ŞUBE' })}
+                                        className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all border-2 ${formData.company_type === 'ŞUBE'
+                                            ? 'bg-amber-600 border-amber-600 text-white shadow-lg shadow-amber-200'
+                                            : 'bg-white border-gray-100 text-gray-400 hover:border-amber-100'
+                                            }`}
+                                    >
+                                        ŞUBE
+                                    </button>
+                                </div>
+                            </div>
+
+                            {formData.company_type === 'ŞUBE' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Bağlı Olduğu Üst Firma
+                                    </label>
+                                    <select
+                                        name="main_company_id"
+                                        value={formData.main_company_id || ''}
+                                        onChange={(e) => setFormData({ ...formData, main_company_id: parseInt(e.target.value) || null })}
+                                        className="input-field"
+                                        required
+                                    >
+                                        <option value="">Üst Firma Seçiniz</option>
+                                        {mainCompanies.map(mc => (
+                                            <option key={mc.id} value={mc.id}>{mc.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-medium text-gray-700 mb-2">

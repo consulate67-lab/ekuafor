@@ -44,6 +44,8 @@ export interface Company {
     genders?: string[];
     rating_avg?: number;
     review_count?: number;
+    company_type?: 'ASIL' | 'ŞUBE';
+    main_company_id?: number;
 }
 
 class CompanyService {
@@ -64,8 +66,8 @@ class CompanyService {
           commission_rate, payment_enabled,
           is_active, is_verified, created_by, board_key, 
           work_start_time, work_end_time, slot_interval, admin_key,
-          genders
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30)
+          genders, company_type, main_company_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)
         RETURNING *
       `;
 
@@ -99,7 +101,9 @@ class CompanyService {
                 company.work_end_time || '20:00',
                 company.slot_interval || 30,
                 company.admin_key || `ADM-${company.name.substring(0, 3).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
-                company.genders || []
+                company.genders || [],
+                company.company_type || 'ASIL',
+                company.main_company_id || null
             ];
 
             const result = await client.query(query, values);

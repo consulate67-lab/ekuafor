@@ -58,6 +58,8 @@ export interface Company {
 
     created_at?: string;
     updated_at?: string;
+    company_type?: 'ASIL' | 'ŞUBE';
+    main_company_id?: number | null;
 }
 
 export interface Province {

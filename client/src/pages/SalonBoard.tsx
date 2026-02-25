@@ -817,9 +817,9 @@ export default function SalonBoard() {
             {/* New/Fast Appointment Modal */}
             {
                 isModalOpen && (
-                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-                        <div className="bg-white w-full max-w-2xl rounded-[4rem] overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] border border-slate-100 animate-scale-up">
-                            <div className="relative p-12 bg-gradient-to-br from-slate-50 to-white">
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 lg:p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+                        <div className="bg-white w-full max-w-2xl max-h-[95vh] rounded-[2.5rem] lg:rounded-[4rem] overflow-y-auto shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] border border-slate-100 animate-scale-up">
+                            <div className="relative p-6 lg:p-12 bg-gradient-to-br from-slate-50 to-white">
                                 <div className="flex justify-between items-start mb-10">
                                     <div>
                                         <div className="inline-flex px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest mb-4">Rezarvasyon Formu</div>
@@ -901,7 +901,16 @@ export default function SalonBoard() {
                                                                         className={`w-full p-4 rounded-2xl border-2 transition-all flex flex-col gap-1 text-left ${isSelected ? 'bg-amber-600 border-amber-600 text-white shadow-lg' : 'bg-white border-transparent text-slate-600'}`}
                                                                     >
                                                                         <p className={`text-xs font-black uppercase leading-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{p.name}</p>
-                                                                        <p className={`text-[8px] font-bold ${isSelected ? 'text-amber-100' : 'text-slate-400'}`}>₺{p.price} | {p.duration_minutes} dk</p>
+                                                                        <div className="flex items-center gap-2">
+                                                                            {p.services && p.services.length > 0 && (() => {
+                                                                                const originalSum = p.services.reduce((sum: number, ps: any) => sum + (ps.price || 0), 0);
+                                                                                if (originalSum > (p.price || 0)) {
+                                                                                    return <span className={`text-[8px] font-bold line-through opacity-60 ${isSelected ? 'text-white' : 'text-slate-400'}`}>₺{originalSum}</span>;
+                                                                                }
+                                                                                return null;
+                                                                            })()}
+                                                                            <p className={`text-[8px] font-bold ${isSelected ? 'text-amber-100' : 'text-slate-400'}`}>₺{p.price} | {p.duration_minutes} dk</p>
+                                                                        </div>
                                                                     </button>
 
                                                                     {isSelected && (
@@ -979,15 +988,28 @@ export default function SalonBoard() {
                                                                                 </div>
                                                                                 <div className="flex flex-col items-end">
                                                                                     <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">GÜNCEL TOPLAM FİYAT</span>
-                                                                                    <span className="text-lg font-black text-amber-900">
-                                                                                        ₺{(() => {
-                                                                                            const hasOverrides = Object.keys(fastForm.servicePriceOverrides).length > 0;
-                                                                                            if (hasOverrides) {
-                                                                                                return p.services?.reduce((sum: number, ps: any) => sum + Number(fastForm.servicePriceOverrides[ps.id] !== undefined ? fastForm.servicePriceOverrides[ps.id] : (ps.price || 0)), 0);
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        {(() => {
+                                                                                            const standardTotal = p.services?.reduce((sum: number, ps: any) => sum + (ps.price || 0), 0) || 0;
+                                                                                            const currentTotal = Object.keys(fastForm.servicePriceOverrides).length > 0
+                                                                                                ? p.services?.reduce((sum: number, ps: any) => sum + Number(fastForm.servicePriceOverrides[ps.id] !== undefined ? fastForm.servicePriceOverrides[ps.id] : (ps.price || 0)), 0)
+                                                                                                : (p.price || 0);
+
+                                                                                            if (standardTotal > currentTotal) {
+                                                                                                return <span className="text-[10px] font-black line-through text-amber-600/50">₺{standardTotal}</span>;
                                                                                             }
-                                                                                            return p.price || 0;
+                                                                                            return null;
                                                                                         })()}
-                                                                                    </span>
+                                                                                        <span className="text-lg font-black text-amber-900">
+                                                                                            ₺{(() => {
+                                                                                                const hasOverrides = Object.keys(fastForm.servicePriceOverrides).length > 0;
+                                                                                                if (hasOverrides) {
+                                                                                                    return p.services?.reduce((sum: number, ps: any) => sum + Number(fastForm.servicePriceOverrides[ps.id] !== undefined ? fastForm.servicePriceOverrides[ps.id] : (ps.price || 0)), 0);
+                                                                                                }
+                                                                                                return p.price || 0;
+                                                                                            })()}
+                                                                                        </span>
+                                                                                    </div>
                                                                                 </div>
                                                                             </div>
                                                                             <p className="text-[8px] font-bold text-slate-400 italic pl-2">* Hizmetler yukarıdan aşağıya sırayla atanacaktır.</p>
@@ -1065,9 +1087,9 @@ export default function SalonBoard() {
             {/* Appointment Detail Modal */}
             {
                 isDetailModalOpen && selectedAppointment && (
-                    <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-                        <div className="bg-white w-full max-w-lg rounded-[4rem] overflow-hidden shadow-2xl animate-scale-up">
-                            <div className="p-12">
+                    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 lg:p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+                        <div className="bg-white w-full max-w-lg max-h-[95vh] rounded-[2.5rem] lg:rounded-[4rem] overflow-y-auto shadow-2xl animate-scale-up">
+                            <div className="p-6 lg:p-12">
                                 <div className="flex justify-between items-start mb-8">
                                     <div>
                                         <div className={`inline-flex px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-4 ${selectedAppointment.status === 'approved' ? 'bg-indigo-50 text-indigo-600' :
@@ -1139,7 +1161,14 @@ export default function SalonBoard() {
                                                                             </div>
                                                                         </div>
                                                                         <div className="flex flex-col items-end gap-2">
-                                                                            <span className={`text-[10px] font-black ${isExactService ? 'text-white' : 'text-indigo-600'}`}>₺{item.price}</span>
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                {item.original_price && Number(item.original_price) !== Number(item.price) && (
+                                                                                    <span className={`text-[8px] font-bold line-through opacity-50 ${isExactService ? 'text-white' : 'text-slate-400'}`}>
+                                                                                        ₺{item.original_price}
+                                                                                    </span>
+                                                                                )}
+                                                                                <span className={`text-[10px] font-black ${isExactService ? 'text-white' : 'text-indigo-600'}`}>₺{item.price}</span>
+                                                                            </div>
 
                                                                             <select
                                                                                 value={item.staff_id || ''}
@@ -1196,7 +1225,16 @@ export default function SalonBoard() {
                                             {selectedAppointment.services && selectedAppointment.services.length > 0 && (
                                                 <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center">
                                                     <span className="text-[9px] font-black text-slate-400 uppercase">Toplam</span>
-                                                    <span className="text-base font-black text-indigo-600">₺{selectedAppointment.price}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        {(() => {
+                                                            const originalTotal = selectedAppointment.services?.reduce((sum: number, s: any) => sum + (Number(s.original_price) || 0), 0);
+                                                            if (originalTotal > Number(selectedAppointment.price)) {
+                                                                return <span className="text-[10px] font-bold line-through text-slate-400">₺{originalTotal}</span>;
+                                                            }
+                                                            return null;
+                                                        })()}
+                                                        <span className="text-base font-black text-indigo-600">₺{selectedAppointment.price}</span>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -1388,7 +1426,7 @@ export default function SalonBoard() {
             }
 
             <div className="fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-slate-900/80 backdrop-blur-md rounded-full border border-white/10 shadow-2xl z-[150] pointer-events-none">
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap">Ekuafor Salon Board Edition <span className="text-white opacity-100 ml-1">v1.76.0</span></p>
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap">Ekuafor Salon Board Edition <span className="text-white opacity-100 ml-1">v1.80.0</span></p>
             </div>
         </div >
     );

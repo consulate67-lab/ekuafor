@@ -16,6 +16,8 @@ import SmsSettings from './pages/SmsSettings';
 import SalonBoard from './pages/SalonBoard';
 import CompanyPanel from './pages/CompanyPanel';
 import MyAppointments from './pages/MyAppointments';
+import MainCompanyPanel from './pages/MainCompanyPanel';
+import MainCompanyReports from './pages/MainCompanyReports';
 import { useAppointmentSync } from './hooks/useAppointmentSync';
 
 
@@ -78,6 +80,8 @@ function App() {
                     <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />} />
                     <Route path="/board" element={<SalonBoard />} />
                     <Route path="/company-panel" element={<CompanyPanel />} />
+                    <Route path="/main-management" element={<MainCompanyPanel />} />
+                    <Route path="/main-reports/:code" element={<MainCompanyReports />} />
 
 
                     {/* Protected Routes */}

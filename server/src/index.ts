@@ -14,6 +14,7 @@ import smsRoutes from './routes/sms.routes';
 import mapsRoutes from './routes/maps.routes';
 import departmentRoutes from './routes/department.routes';
 import reportRoutes from './routes/report.routes';
+import mainCompanyRoutes from './routes/mainCompany.routes';
 import cronService from './services/cron.service';
 
 
@@ -127,6 +128,9 @@ app.use('/api/departments', departmentRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/ekuafor/api/reports', reportRoutes);
 
+app.use('/api/main-companies', mainCompanyRoutes);
+app.use('/ekuafor/api/main-companies', mainCompanyRoutes);
+
 
 // Setup Route (For DB Init)
 import setupRoutes from './routes/setup.routes';
@@ -170,46 +174,31 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 const runMigrations = async () => {
     try {
         console.log('🔄 Running auto-migrations...');
-        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(20)');
-        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255)');
-        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS device_id VARCHAR(255)');
-        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS rating INTEGER CHECK (rating BETWEEN 1 AND 5)');
-        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS comment TEXT');
-        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS photo TEXT');
+
+        // 1. Core Tables First (Dependency order)
         await pool.query(`
-            CREATE TABLE IF NOT EXISTS customer_devices (
+            CREATE TABLE IF NOT EXISTS main_companies (
                 id SERIAL PRIMARY KEY,
-                device_id VARCHAR(255) UNIQUE NOT NULL,
-                customer_phone VARCHAR(20) NOT NULL,
-                last_sync TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                name VARCHAR(255) NOT NULL,
+                description TEXT,
+                address_line TEXT,
+                province_id INTEGER,
+                province_name VARCHAR(100),
+                admin_code VARCHAR(50) UNIQUE NOT NULL,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )
         `);
-        await pool.query('CREATE INDEX IF NOT EXISTS idx_customer_devices_id ON customer_devices(device_id)');
-        await pool.query('CREATE INDEX IF NOT EXISTS idx_customer_devices_phone ON customer_devices(customer_phone)');
 
-        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS genders TEXT[]');
-        // Initialize existing rows if they are NULL so the filter has something to work with
-        await pool.query("UPDATE companies SET genders = '{\"Erkek\", \"Kadın\", \"Çocuk\"}' WHERE genders IS NULL");
-
-        // Multi-service support
         await pool.query(`
-            CREATE TABLE IF NOT EXISTS appointment_services (
+            CREATE TABLE IF NOT EXISTS departments (
                 id SERIAL PRIMARY KEY,
-                appointment_id INTEGER REFERENCES appointments(id) ON DELETE CASCADE,
-                service_id INTEGER REFERENCES services(id) ON DELETE CASCADE,
-                price DECIMAL(10, 2), -- Snapshot of price at booking time
-                duration_minutes INTEGER, -- Snapshot of duration
-                staff_id INTEGER REFERENCES users(id), -- Specific staff for this service
+                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+                name VARCHAR(100) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
-        await pool.query('ALTER TABLE appointment_services ADD COLUMN IF NOT EXISTS staff_id INTEGER REFERENCES users(id)');
-        await pool.query('ALTER TABLE appointment_services ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT \'pending\'');
-        await pool.query('ALTER TABLE appointment_services ADD COLUMN IF NOT EXISTS start_time VARCHAR(5)');
-        await pool.query('ALTER TABLE appointment_services ADD COLUMN IF NOT EXISTS end_time VARCHAR(5)');
-        await pool.query('CREATE INDEX IF NOT EXISTS idx_appointment_services_appointment ON appointment_services(appointment_id)');
 
-        // Package support
         await pool.query(`
             CREATE TABLE IF NOT EXISTS packages (
                 id SERIAL PRIMARY KEY,
@@ -225,10 +214,6 @@ const runMigrations = async () => {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
-        await pool.query('ALTER TABLE packages ADD COLUMN IF NOT EXISTS staff_id INTEGER REFERENCES users(id)');
-        await pool.query('ALTER TABLE packages ADD COLUMN IF NOT EXISTS department_id INTEGER');
-
-        await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS department_id INTEGER');
 
         await pool.query(`
             CREATE TABLE IF NOT EXISTS package_services (
@@ -236,17 +221,98 @@ const runMigrations = async () => {
                 package_id INTEGER REFERENCES packages(id) ON DELETE CASCADE,
                 service_id INTEGER REFERENCES services(id) ON DELETE CASCADE,
                 staff_id INTEGER REFERENCES users(id),
+                department_id INTEGER,
                 order_index INTEGER DEFAULT 0
             )
         `);
-        await pool.query('ALTER TABLE package_services ADD COLUMN IF NOT EXISTS staff_id INTEGER REFERENCES users(id)');
-        await pool.query('ALTER TABLE package_services ADD COLUMN IF NOT EXISTS department_id INTEGER');
 
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS appointment_services (
+                id SERIAL PRIMARY KEY,
+                appointment_id INTEGER REFERENCES appointments(id) ON DELETE CASCADE,
+                service_id INTEGER REFERENCES services(id) ON DELETE CASCADE,
+                price DECIMAL(10, 2),
+                duration_minutes INTEGER,
+                staff_id INTEGER REFERENCES users(id),
+                status VARCHAR(20) DEFAULT 'pending',
+                start_time VARCHAR(5),
+                end_time VARCHAR(5),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS sms_settings (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+                provider VARCHAR(50) DEFAULT 'local_gateway',
+                api_url TEXT NOT NULL,
+                api_key TEXT,
+                sender_id VARCHAR(50),
+                is_active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(company_id)
+            )
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS customer_devices (
+                id SERIAL PRIMARY KEY,
+                device_id VARCHAR(255) UNIQUE NOT NULL,
+                customer_phone VARCHAR(20) NOT NULL,
+                last_sync TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS company_users (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                role VARCHAR(50) DEFAULT 'staff',
+                is_active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(company_id, user_id)
+            )
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS sms_logs (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+                phone_number VARCHAR(20) NOT NULL,
+                message TEXT NOT NULL,
+                status VARCHAR(20) DEFAULT 'pending',
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // 2. Add Columns & References
+        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(20)');
+        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255)');
+        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS device_id VARCHAR(255)');
+        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS rating INTEGER CHECK (rating BETWEEN 1 AND 5)');
+        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS comment TEXT');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS package_id INTEGER REFERENCES packages(id)');
 
-        // Ensure is_active is true for existing rows if it was NULL (to fix visibility issues)
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS photo TEXT');
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS department_id INTEGER');
+
+        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS genders TEXT[]');
+        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_type VARCHAR(20) DEFAULT \'ASIL\'');
+        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS main_company_id INTEGER REFERENCES main_companies(id)');
+        await pool.query("UPDATE companies SET genders = '{\"Erkek\", \"Kadın\", \"Çocuk\"}' WHERE genders IS NULL");
+
+        await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS department_id INTEGER');
         await pool.query('UPDATE services SET is_active = true WHERE is_active IS NULL');
         await pool.query('UPDATE packages SET is_active = true WHERE is_active IS NULL');
+
+        // 3. Indexes
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_customer_devices_id ON customer_devices(device_id)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_customer_devices_phone ON customer_devices(customer_phone)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_appointment_services_appointment ON appointment_services(appointment_id)');
 
         console.log('✅ Auto-migrations completed.');
     } catch (err) {

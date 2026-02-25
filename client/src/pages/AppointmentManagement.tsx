@@ -51,6 +51,8 @@ export default function AppointmentManagement() {
     const [isListening, setIsListening] = useState(false);
     const [voiceTranscript, setVoiceTranscript] = useState('');
     const [company, setCompany] = useState<Company | null>(null);
+    const [userInfo, setUserInfo] = useState<any>(null);
+    const [staffMode, setStaffMode] = useState(false);
     const [voiceStep, setVoiceStep] = useState<'IDLE' | 'NAME' | 'DATE' | 'TIME' | 'SERVICE' | 'CONFIRM'>('IDLE');
     const [guidedData, setGuidedData] = useState<any>({
         customerName: '',
@@ -70,6 +72,10 @@ export default function AppointmentManagement() {
                 const meRes = await api.get('/auth/me');
                 if (meRes.data?.data?.company_id) {
                     companyId = meRes.data.data.company_id;
+                    setUserInfo(meRes.data.data);
+                    if (meRes.data.data.role === 'staff') {
+                        setStaffMode(true);
+                    }
                     const companyRes = await api.get(`/companies/${companyId}`);
                     setCompany(companyRes.data?.data || null);
                 }
@@ -542,54 +548,102 @@ export default function AppointmentManagement() {
                     </div>
 
                     <div className="space-y-3">
-                        {appointments
-                            .filter(a => formatDateKey(a.appointment_date) === selectedDate && a.status === 'approved')
-                            .sort((a, b) => a.start_time.localeCompare(b.start_time))
-                            .length === 0 ? (
-                            <div className="py-20 text-center bg-white rounded-[2.5rem] border border-slate-100 border-dashed">
-                                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-200 text-2xl">📅</div>
-                                <p className="text-slate-400 font-bold text-sm">Randevu bulunmuyor.</p>
-                            </div>
-                        ) : (
-                            appointments
-                                .filter(a => formatDateKey(a.appointment_date) === selectedDate && (a.status === 'approved' || a.status === 'completed'))
-                                .sort((a, b) => a.start_time.localeCompare(b.start_time))
-                                .map(app => (
+                        {(() => {
+                            const filtered = appointments.filter(a => formatDateKey(a.appointment_date) === selectedDate && (a.status === 'approved' || a.status === 'completed'));
+
+                            // Explode appointments into individual services (Distribution)
+                            let flatList = filtered.flatMap(app => {
+                                if (!app.services || app.services.length === 0) {
+                                    return [{
+                                        ...app,
+                                        display_id: app.id,
+                                        display_start_time: app.start_time,
+                                        display_service_name: app.service_name || 'Hizmet',
+                                        display_price: app.price,
+                                        display_staff_name: app.staff_name,
+                                        is_subservice: false
+                                    }];
+                                }
+                                return app.services.map((s: any) => ({
+                                    ...app,
+                                    display_id: `${app.id}-${s.aps_id}`,
+                                    display_start_time: s.start_time || app.start_time,
+                                    display_service_name: s.name,
+                                    display_price: s.price,
+                                    display_staff_name: s.service_staff_name,
+                                    display_staff_id: s.staff_id,
+                                    is_subservice: true
+                                }));
+                            });
+
+                            // If staffMode is active, filter only for THIS staff's services
+                            if (staffMode && userInfo) {
+                                flatList = flatList.filter(item =>
+                                    Number(item.display_staff_id) === Number(userInfo.id) ||
+                                    Number(item.staff_id) === Number(userInfo.id)
+                                );
+                            }
+
+                            const sorted = flatList.sort((a, b) => (a.display_start_time || '').localeCompare(b.display_start_time || ''));
+
+                            if (sorted.length === 0) {
+                                return (
+                                    <div className="py-20 text-center bg-white rounded-[2.5rem] border border-slate-100 border-dashed">
+                                        <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-200 text-2xl">📅</div>
+                                        <p className="text-slate-400 font-bold text-sm">
+                                            {staffMode ? 'Sizin için bugün randevu bulunmuyor.' : 'Randevu bulunmuyor.'}
+                                        </p>
+                                    </div>
+                                );
+                            }
+
+                            return sorted.map(item => {
+                                const startTime = item.display_start_time || '00:00';
+                                return (
                                     <div
-                                        key={app.id}
-                                        onClick={() => setSelectedAppointment(app)}
-                                        className={`p-4 rounded-2xl border shadow-sm flex items-center gap-3 active:scale-[0.98] transition-all ${app.status === 'completed' ? 'bg-slate-50/50 border-slate-100 opacity-60' : 'bg-white border-slate-100'}`}
+                                        key={item.display_id}
+                                        onClick={() => setSelectedAppointment(item)}
+                                        className={`p-4 rounded-2xl border shadow-sm flex items-center gap-3 active:scale-[0.98] transition-all ${item.status === 'completed' ? 'bg-slate-50/50 border-slate-100 opacity-60' : 'bg-white border-slate-100'}`}
                                     >
-                                        <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center border ${app.status === 'completed' ? 'bg-slate-100 border-slate-200' : 'bg-slate-50 border-slate-100'}`}>
-                                            <span className={`text-xs font-black leading-none ${app.status === 'completed' ? 'text-slate-400' : 'text-slate-900'}`}>{(app.start_time || '00:00').split(':')[0]}</span>
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">:{(app.start_time || '00:00').split(':')[1]}</span>
+                                        <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center border ${item.status === 'completed' ? 'bg-slate-100 border-slate-200' : 'bg-slate-50 border-slate-100'}`}>
+                                            <span className={`text-xs font-black leading-none ${item.status === 'completed' ? 'text-slate-400' : 'text-slate-900'}`}>{startTime.split(':')[0]}</span>
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">:{startTime.split(':')[1]}</span>
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <h4 className={`font-black text-sm truncate uppercase tracking-tight ${app.status === 'completed' ? 'text-slate-400' : 'text-slate-900'}`}>
-                                                {(() => {
-                                                    const nameMatch = app.notes?.match(/Müşteri:\s*([^|]+)/);
-                                                    const extracted = nameMatch ? nameMatch[1].trim() : '';
-                                                    return extracted || app.customer_name || 'Misafir';
-                                                })()}
-                                            </h4>
+                                            <div className="flex items-center gap-2">
+                                                <h4 className={`font-black text-sm truncate uppercase tracking-tight ${item.status === 'completed' ? 'text-slate-400' : 'text-slate-900'}`}>
+                                                    {(() => {
+                                                        const nameMatch = item.notes?.match(/Müşteri:\s*([^|]+)/);
+                                                        const extracted = nameMatch ? nameMatch[1].trim() : '';
+                                                        return extracted || item.customer_name || 'Misafir';
+                                                    })()}
+                                                </h4>
+                                                {item.is_subservice && (
+                                                    <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-500 text-[7px] font-black rounded uppercase">Alt İşlem</span>
+                                                )}
+                                            </div>
                                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">
-                                                {app.package_name ? (
-                                                    <span className="text-amber-600">[{app.package_name}] </span>
-                                                ) : null}
-                                                {app.services && app.services.length > 0
-                                                    ? app.services.map((s: any) => s.name).join(', ')
-                                                    : (app.service_name || 'Hizmet Bilgisi Yok')}
+                                                {item.package_name && !item.is_subservice && (
+                                                    <span className="text-amber-600">[{item.package_name}] </span>
+                                                )}
+                                                <span className={item.is_subservice ? 'text-emerald-600 font-black' : ''}>
+                                                    {item.is_subservice ? `✂️ ${item.display_service_name}` : (item.service_name || 'Hizmet Bilgisi Yok')}
+                                                </span>
+                                                {!staffMode && item.display_staff_name && (
+                                                    <span className="text-slate-400 ml-1"> | Uzman: {item.display_staff_name}</span>
+                                                )}
                                             </p>
                                         </div>
                                         <div className="text-right">
-                                            <span className={`text-xs font-black block ${app.status === 'completed' ? 'text-slate-400' : 'text-pink-600'}`}>₺{app.price || '0'}</span>
-                                            <span className={`text-[9px] font-bold uppercase ${app.status === 'completed' ? 'text-slate-400' : 'text-emerald-500'}`}>
-                                                {app.status === 'completed' ? 'Tamamlandı' : 'Onaylı'}
+                                            <span className={`text-xs font-black block ${item.status === 'completed' ? 'text-slate-400' : 'text-pink-600'}`}>₺{item.display_price || item.price || '0'}</span>
+                                            <span className={`text-[9px] font-bold uppercase ${item.status === 'completed' ? 'text-slate-400' : 'text-emerald-500'}`}>
+                                                {item.status === 'completed' ? 'Tamamlandı' : 'Onaylı'}
                                             </span>
                                         </div>
                                     </div>
-                                ))
-                        )}
+                                );
+                            });
+                        })()}
                     </div>
                 </div>
 
@@ -614,7 +668,7 @@ export default function AppointmentManagement() {
             {/* Manual Appointment Modal */}
             {showAddForm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-white p-8 rounded-[3rem] w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-300">
+                    <div className="bg-white p-8 rounded-[3rem] w-full max-w-lg max-h-[95vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 duration-300">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Manuel Randevu</h3>
                             <button onClick={() => { setShowAddForm(false); setFormError(''); setError(''); }} className="text-slate-400 hover:text-slate-600">
@@ -725,7 +779,16 @@ export default function AppointmentManagement() {
                                                         >
                                                             <div className="flex justify-between items-center w-full mb-1">
                                                                 <p className={`text-xs font-black ${isSelected ? 'text-slate-900' : 'text-slate-500'}`}>{p.name}</p>
-                                                                <span className="text-xs font-black text-pink-600">₺{p.price}</span>
+                                                                <div className="flex items-center gap-1.5">
+                                                                    {p.services && p.services.length > 0 && (() => {
+                                                                        const originalSum = p.services.reduce((sum: number, ps: any) => sum + (ps.price || 0), 0);
+                                                                        if (originalSum > (p.price || 0)) {
+                                                                            return <span className={`text-[8px] font-bold line-through opacity-60 ${isSelected ? 'text-slate-900' : 'text-slate-400'}`}>₺{originalSum}</span>;
+                                                                        }
+                                                                        return null;
+                                                                    })()}
+                                                                    <span className="text-xs font-black text-pink-600">₺{p.price}</span>
+                                                                </div>
                                                             </div>
                                                             <p className="text-[9px] font-bold text-slate-400">{p.duration_minutes} Dakika | {p.services?.length || 0} Hizmet</p>
                                                         </button>
@@ -893,7 +956,7 @@ export default function AppointmentManagement() {
             {/* Appointment Details Modal */}
             {selectedAppointment && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-white p-8 rounded-[3rem] w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-300 relative">
+                    <div className="bg-white p-8 rounded-[3rem] w-full max-w-md max-h-[95vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 duration-300 relative">
                         <div className="flex justify-between items-start mb-6">
                             <div>
                                 <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Randevu Detayı</h3>
@@ -929,7 +992,7 @@ export default function AppointmentManagement() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-slate-50 p-4 rounded-2xl">
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Zaman</p>
-                                    <p className="font-black text-slate-900 text-sm">{selectedAppointment.start_time}</p>
+                                    <p className="font-black text-slate-900 text-sm">{(selectedAppointment as any).display_start_time || selectedAppointment.start_time}</p>
                                 </div>
                                 <div className="bg-slate-50 p-4 rounded-2xl">
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tarih</p>
@@ -941,12 +1004,26 @@ export default function AppointmentManagement() {
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Hizmetler</p>
                                 <div className="space-y-2">
                                     {selectedAppointment.services && selectedAppointment.services.length > 0 ? (
-                                        selectedAppointment.services.map((s: any, idx: number) => (
-                                            <div key={idx} className="flex justify-between items-center bg-white/50 p-2 rounded-lg border border-slate-100">
-                                                <span className="font-black text-slate-800 text-xs uppercase tracking-tight">{s.name}</span>
-                                                <span className="font-black text-slate-400 text-[10px]">₺{s.price}</span>
-                                            </div>
-                                        ))
+                                        selectedAppointment.services.map((s: any, idx: number) => {
+                                            const isThisSub = (selectedAppointment as any).is_subservice && (selectedAppointment as any).aps_id === s.aps_id;
+                                            return (
+                                                <div key={idx} className={`flex justify-between items-center p-2 rounded-xl border transition-all ${isThisSub ? 'bg-indigo-50 border-indigo-200 shadow-sm ring-1 ring-indigo-100' : 'bg-white/50 border-slate-100'}`}>
+                                                    <div className="flex flex-col min-w-0 pr-2">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className={`font-black text-xs uppercase tracking-tight truncate ${isThisSub ? 'text-indigo-900' : 'text-slate-800'}`}>{s.name}</span>
+                                                            {isThisSub && <span className="w-1 h-1 bg-indigo-500 rounded-full animate-pulse"></span>}
+                                                        </div>
+                                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{s.start_time} - {s.end_time} | {s.service_staff_name}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        {s.original_price && Number(s.original_price) !== Number(s.price) && (
+                                                            <span className="text-[8px] font-bold line-through text-slate-400">₺{s.original_price}</span>
+                                                        )}
+                                                        <span className={`font-black text-[10px] ${isThisSub ? 'text-indigo-600' : 'text-slate-800'}`}>₺{s.price}</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
                                     ) : (
                                         <div className="flex justify-between items-center">
                                             <span className="font-black text-slate-900">{selectedAppointment.package_name || selectedAppointment.service_name || 'Hizmet Bilgisi Yok'}</span>
@@ -957,7 +1034,16 @@ export default function AppointmentManagement() {
                                 {selectedAppointment.services && selectedAppointment.services.length > 0 && (
                                     <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center px-1">
                                         <span className="text-[9px] font-black text-slate-400 uppercase">Toplam</span>
-                                        <span className="text-sm font-black text-indigo-600">₺{selectedAppointment.price}</span>
+                                        <div className="flex items-center gap-2">
+                                            {(() => {
+                                                const originalTotal = selectedAppointment.services?.reduce((sum: number, s: any) => sum + (Number(s.original_price) || 0), 0);
+                                                if (originalTotal > Number(selectedAppointment.price)) {
+                                                    return <span className="text-[10px] font-bold line-through text-slate-400">₺{originalTotal}</span>;
+                                                }
+                                                return null;
+                                            })()}
+                                            <span className="text-sm font-black text-indigo-600">₺{selectedAppointment.price}</span>
+                                        </div>
                                     </div>
                                 )}
                             </div>
