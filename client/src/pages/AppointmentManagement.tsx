@@ -444,7 +444,16 @@ export default function AppointmentManagement() {
         }
     };
 
-    const pendingAppointments = appointments.filter(a => a.status === 'pending');
+    const pendingAppointments = appointments.filter(a => {
+        if (a.status !== 'pending') return false;
+        if (showAllStaff || !userInfo) return true;
+
+        const isMainStaff = Number(a.staff_id) === Number(userInfo.id);
+        const isSubStaff = a.services?.some(s => Number(s.staff_id) === Number(userInfo.id));
+        const isUnassigned = !a.staff_id && (!a.services || a.services.every(s => !s.staff_id));
+
+        return isMainStaff || isSubStaff || isUnassigned;
+    });
 
     if (loading && appointments.length === 0) return <div className="p-8 text-center font-bold text-gray-400 animate-pulse">Veriler Hazırlanıyor...</div>;
 
@@ -574,6 +583,7 @@ export default function AppointmentManagement() {
                                         display_service_name: app.service_name || 'Hizmet',
                                         display_price: app.price,
                                         display_staff_name: app.staff_name,
+                                        display_staff_id: app.staff_id,
                                         is_subservice: false
                                     }];
                                 }
@@ -591,9 +601,10 @@ export default function AppointmentManagement() {
 
                             // Filter based on showAllStaff preference
                             if (!showAllStaff && userInfo) {
+                                const myId = Number(userInfo.id);
                                 flatList = flatList.filter((item: any) => {
-                                    const assignedId = item.is_subservice ? item.display_staff_id : item.staff_id;
-                                    return Number(assignedId) === Number(userInfo.id);
+                                    const assignedId = item.display_staff_id || item.staff_id;
+                                    return Number(assignedId) === myId || !assignedId;
                                 });
                             }
 
@@ -673,7 +684,7 @@ export default function AppointmentManagement() {
                         Sistemi Sıfırla
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments Edition v1.80.0</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments Edition v1.81.0</span>
                     </div>
                 </div>
             </div>
