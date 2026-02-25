@@ -45,7 +45,7 @@ app.use((req, res, next) => {
 
 // Root Route
 app.get('/', (req, res) => {
-    res.send('<h1>Saloon Backend is Live (v1.69.2)!</h1>');
+    res.send('<h1>Saloon Backend is Live!</h1>');
 });
 
 // Health Checks (Explicit)
@@ -117,7 +117,7 @@ app.get('/api/health', healthHandler);
 
 // API Info
 app.get('/api', (req, res) => {
-    res.json({ message: 'Saloon API v1.69.2-deploy-test', status: 'running' });
+    res.json({ message: 'Saloon API v1.69.2', status: 'running' });
 });
 
 // API Routes (Explicit Definition)
