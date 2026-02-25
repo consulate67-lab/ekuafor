@@ -282,8 +282,8 @@ export default function SalonBoard() {
             const sSelections = selectedPackage
                 ? selectedPackage.services.map((s: any) => ({
                     id: s.id,
-                    price: s.price,
-                    duration_minutes: s.duration_minutes,
+                    price: fastForm.servicePriceOverrides[s.id] || s.price,
+                    duration_minutes: fastForm.serviceDurationOverrides[s.id] || s.duration_minutes,
                     staff_id: fastForm.serviceStaffOverrides[s.id] || Number(staffId)
                 }))
                 : selectedServices.map(s => ({
