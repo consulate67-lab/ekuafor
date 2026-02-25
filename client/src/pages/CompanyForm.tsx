@@ -453,6 +453,16 @@ export default function CompanyForm() {
                                 <div className="flex gap-2">
                                     <button
                                         type="button"
+                                        onClick={() => setFormData({ ...formData, company_type: 'ÜST FİRMA', main_company_id: null })}
+                                        className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all border-2 ${formData.company_type === 'ÜST FİRMA'
+                                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200'
+                                            : 'bg-white border-gray-100 text-gray-400 hover:border-indigo-100'
+                                            }`}
+                                    >
+                                        ÜST FİRMA
+                                    </button>
+                                    <button
+                                        type="button"
                                         onClick={() => setFormData({ ...formData, company_type: 'ASIL', main_company_id: null })}
                                         className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all border-2 ${formData.company_type === 'ASIL'
                                             ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-200'
@@ -954,6 +964,6 @@ export default function CompanyForm() {
                     </div>
                 </form>
             </main>
-        </div>
+        </div >
     );
 }

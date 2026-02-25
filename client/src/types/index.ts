@@ -58,7 +58,7 @@ export interface Company {
 
     created_at?: string;
     updated_at?: string;
-    company_type?: 'ASIL' | 'ŞUBE';
+    company_type?: 'ÜST FİRMA' | 'ASIL' | 'ŞUBE';
     main_company_id?: number | null;
 }
 
