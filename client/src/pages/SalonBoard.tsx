@@ -517,7 +517,9 @@ export default function SalonBoard() {
                                             const hNum = parseInt(h.split(':')[0]);
                                             return hNum >= currentHour;
                                         }) || '09:00',
-                                        serviceStaffOverrides: {}
+                                        serviceStaffOverrides: {},
+                                        servicePriceOverrides: {},
+                                        serviceDurationOverrides: {}
                                     });
                                     setIsModalOpen(true);
                                 }}
@@ -690,7 +692,9 @@ export default function SalonBoard() {
                                                             staffId: pId.toString(),
                                                             appointmentDate: selectedDate,
                                                             startTime: hour,
-                                                            serviceStaffOverrides: {}
+                                                            serviceStaffOverrides: {},
+                                                            servicePriceOverrides: {},
+                                                            serviceDurationOverrides: {}
                                                         });
                                                         setIsModalOpen(true);
                                                     }}
