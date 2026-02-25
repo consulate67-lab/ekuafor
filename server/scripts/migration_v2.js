@@ -35,6 +35,13 @@ async function runMigration() {
                 END IF;
                 -- Ensure we drop the incorrect FK if it exists
                 ALTER TABLE companies DROP CONSTRAINT IF EXISTS companies_main_company_id_fkey;
+                
+                -- Cleanup any IDs that would violate the new constraint
+                UPDATE companies 
+                SET main_company_id = NULL 
+                WHERE main_company_id IS NOT NULL 
+                AND main_company_id NOT IN (SELECT id FROM companies);
+
                 -- Re-add it referencing companies(id) as intended in schema.sql
                 ALTER TABLE companies ADD CONSTRAINT companies_main_company_id_fkey FOREIGN KEY (main_company_id) REFERENCES companies(id);
             END $$;

@@ -300,11 +300,27 @@ const runMigrations = async () => {
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS photo TEXT');
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS department_id INTEGER');
 
-        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS genders TEXT[]');
-        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_type VARCHAR(20) DEFAULT \'ASIL\'');
-        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS main_company_id INTEGER');
-        await pool.query('ALTER TABLE companies DROP CONSTRAINT IF EXISTS companies_main_company_id_fkey');
-        await pool.query('ALTER TABLE companies ADD CONSTRAINT companies_main_company_id_fkey FOREIGN KEY (main_company_id) REFERENCES companies(id)');
+        try {
+            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS genders TEXT[]');
+            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_type VARCHAR(20) DEFAULT \'ASIL\'');
+            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS main_company_id INTEGER');
+
+            // Drop any existing constraint and ensure it points to the right table (companies, not main_companies)
+            await pool.query('ALTER TABLE companies DROP CONSTRAINT IF EXISTS companies_main_company_id_fkey');
+
+            // Cleanup invalid IDs that don't exist in companies table to prevent ADD CONSTRAINT from failing
+            await pool.query(`
+                UPDATE companies 
+                SET main_company_id = NULL 
+                WHERE main_company_id IS NOT NULL 
+                AND main_company_id NOT IN (SELECT id FROM companies)
+            `);
+
+            await pool.query('ALTER TABLE companies ADD CONSTRAINT companies_main_company_id_fkey FOREIGN KEY (main_company_id) REFERENCES companies(id)');
+            console.log('✅ Company hierarchy hierarchy migration completed.');
+        } catch (fkErr: any) {
+            console.warn('⚠️ Company FK Migration warning (non-fatal):', fkErr.message);
+        }
         await pool.query("UPDATE companies SET genders = '{\"Erkek\", \"Kadın\", \"Çocuk\"}' WHERE genders IS NULL");
 
         await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS department_id INTEGER');
