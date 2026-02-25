@@ -117,7 +117,7 @@ app.get('/api/health', healthHandler);
 
 // API Info
 app.get('/api', (req, res) => {
-    res.json({ message: 'Saloon API v1.1.0', status: 'running' });
+    res.json({ message: 'Saloon API v1.69.2-deploy-test', status: 'running' });
 });
 
 // API Routes (Explicit Definition)
