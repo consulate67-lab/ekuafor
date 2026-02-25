@@ -25,6 +25,7 @@ export default function SalonBoard() {
     // Modal States
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [isPendingListModalOpen, setIsPendingListModalOpen] = useState(false);
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
     const [selectedCell, setSelectedCell] = useState<{ person: any, hour: string } | null>(null);
     const [fastForm, setFastForm] = useState({
@@ -36,7 +37,9 @@ export default function SalonBoard() {
         staffId: '' as string | number,
         appointmentDate: '',
         startTime: '',
-        serviceStaffOverrides: {} as Record<number, number> // {serviceId: staffId}
+        serviceStaffOverrides: {} as Record<number, number>, // {serviceId: staffId}
+        servicePriceOverrides: {} as Record<number, number>, // {serviceId: price}
+        serviceDurationOverrides: {} as Record<number, number> // {serviceId: duration}
     });
 
     // Helper to generate consistent color for staff
@@ -228,9 +231,9 @@ export default function SalonBoard() {
             if (fastForm.packageId) {
                 const pkg = packages.find(p => p.id === parseInt(fastForm.packageId));
                 if (pkg) {
-                    totalDuration = pkg.duration_minutes;
-                    totalPrice = Number(pkg.price);
                     sIds = pkg.services?.map((s: any) => s.id) || [];
+                    totalDuration = sIds.reduce((sum, sid) => sum + (fastForm.serviceDurationOverrides[sid] || pkg.services.find((ps: any) => ps.id === sid)?.duration_minutes || 0), 0);
+                    totalPrice = sIds.reduce((sum, sid) => sum + Number(fastForm.servicePriceOverrides[sid] || pkg.services.find((ps: any) => ps.id === sid)?.price || 0), 0);
                 }
             } else {
                 const selectedServices = services.filter(s => sIds.includes(s.id));
@@ -307,7 +310,19 @@ export default function SalonBoard() {
             });
 
             setIsModalOpen(false);
-            setFastForm({ customerName: '', serviceId: '', serviceIds: [], packageId: '', notes: '', staffId: '', appointmentDate: '', startTime: '', serviceStaffOverrides: {} });
+            setFastForm({
+                customerName: '',
+                serviceId: '',
+                serviceIds: [],
+                packageId: '',
+                notes: '',
+                staffId: '',
+                appointmentDate: '',
+                startTime: '',
+                serviceStaffOverrides: {},
+                servicePriceOverrides: {},
+                serviceDurationOverrides: {}
+            });
             setSelectedCell(null);
             if (company.id) await fetchData(company.id);
             window.location.reload();
@@ -331,6 +346,7 @@ export default function SalonBoard() {
             setLoading(true);
             await api.patch(`/appointments/${id}/status`, { status: newStatus });
             setIsDetailModalOpen(false);
+            setIsPendingListModalOpen(false);
             if (company?.id) fetchData(company.id);
         } catch (err: any) {
             alert(err.response?.data?.error || 'İşlem başarısız oldu');
@@ -476,13 +492,16 @@ export default function SalonBoard() {
 
                         <div className="flex items-center gap-3">
                             {pendingCount > 0 && (
-                                <div className="relative group">
+                                <button
+                                    onClick={() => setIsPendingListModalOpen(true)}
+                                    className="relative group focus:outline-none"
+                                >
                                     <div className="absolute -inset-1 bg-amber-500 rounded-xl blur opacity-25 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
-                                    <div className="relative flex items-center bg-amber-500 text-white px-4 py-2.5 rounded-xl gap-2 font-black shadow-lg shadow-amber-200 animate-bounce">
+                                    <div className="relative flex items-center bg-amber-500 text-white px-4 py-2.5 rounded-xl gap-2 font-black shadow-lg shadow-amber-200 animate-bounce active:scale-95 transition-all">
                                         <span className="text-sm">{pendingCount}</span>
                                         <span className="text-[10px] uppercase tracking-widest hidden sm:inline">Talep</span>
                                     </div>
-                                </div>
+                                </button>
                             )}
                             <button
                                 onClick={() => {
@@ -620,10 +639,15 @@ export default function SalonBoard() {
                                                     // Check if THIS staff member has a service in this slot
                                                     return a.services.some((s: any) => {
                                                         if (Number(s.staff_id) !== Number(pId)) return false;
-                                                        if (!s.start_time || !s.end_time) return false;
 
-                                                        const [ssH, ssM] = s.start_time.split(':').map(Number);
-                                                        const [seH, seM] = s.end_time.split(':').map(Number);
+                                                        // Fallback to appointment-level timing if service-level is missing
+                                                        const sStartStr = s.start_time || a.start_time;
+                                                        const sEndStr = s.end_time || a.end_time;
+
+                                                        if (!sStartStr || !sEndStr) return false;
+
+                                                        const [ssH, ssM] = sStartStr.split(':').map(Number);
+                                                        const [seH, seM] = sEndStr.split(':').map(Number);
                                                         const sStart = ssH * 60 + ssM;
                                                         const sEnd = seH * 60 + seM;
 
@@ -863,10 +887,35 @@ export default function SalonBoard() {
                                                                                 <div key={ps.id} className="flex items-center justify-between gap-4 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-amber-400">
                                                                                     <div className="flex flex-col flex-1 min-w-0 pl-2">
                                                                                         <span className="text-[10px] font-black text-slate-700 uppercase truncate">{ps.name}</span>
-                                                                                        <span className="text-[8px] font-bold text-slate-400">{ps.duration_minutes} dk</span>
+                                                                                        <div className="flex gap-2 mt-1">
+                                                                                            <div className="flex-1">
+                                                                                                <label className="block text-[7px] font-bold text-slate-400 uppercase mb-0.5 ml-1">Süre (Dk)</label>
+                                                                                                <input
+                                                                                                    type="number"
+                                                                                                    value={fastForm.serviceDurationOverrides[ps.id] || ps.duration_minutes}
+                                                                                                    onChange={e => setFastForm(prev => ({
+                                                                                                        ...prev,
+                                                                                                        serviceDurationOverrides: { ...prev.serviceDurationOverrides, [ps.id]: parseInt(e.target.value) || 0 }
+                                                                                                    }))}
+                                                                                                    className="w-full p-1 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-900 outline-none"
+                                                                                                />
+                                                                                            </div>
+                                                                                            <div className="flex-1">
+                                                                                                <label className="block text-[7px] font-bold text-slate-400 uppercase mb-0.5 ml-1">Fiyat (₺)</label>
+                                                                                                <input
+                                                                                                    type="number"
+                                                                                                    value={fastForm.servicePriceOverrides[ps.id] || ps.price}
+                                                                                                    onChange={e => setFastForm(prev => ({
+                                                                                                        ...prev,
+                                                                                                        servicePriceOverrides: { ...prev.servicePriceOverrides, [ps.id]: parseFloat(e.target.value) || 0 }
+                                                                                                    }))}
+                                                                                                    className="w-full p-1 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-900 outline-none"
+                                                                                                />
+                                                                                            </div>
+                                                                                        </div>
                                                                                     </div>
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <span className="text-[8px] font-black text-slate-400 uppercase">Uygulayan:</span>
+                                                                                    <div className="flex flex-col items-end gap-1">
+                                                                                        <span className="text-[8px] font-black text-slate-400 uppercase">Uzman</span>
                                                                                         <select
                                                                                             value={fastForm.serviceStaffOverrides[ps.id] || fastForm.staffId || selectedCell?.person.user_id || selectedCell?.person.id}
                                                                                             onChange={(e) => {
@@ -889,6 +938,20 @@ export default function SalonBoard() {
                                                                                     </div>
                                                                                 </div>
                                                                             ))}
+                                                                        </div>
+                                                                        <div className="flex justify-between items-center bg-amber-50 p-4 rounded-2xl border-2 border-amber-200 shadow-inner mt-2">
+                                                                            <div className="flex flex-col">
+                                                                                <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">GÜNCEL TOPLAM SÜRE</span>
+                                                                                <span className="text-sm font-black text-amber-900">
+                                                                                    {p.services?.reduce((sum: number, ps: any) => sum + (fastForm.serviceDurationOverrides[ps.id] || ps.duration_minutes || 0), 0)} DK
+                                                                                </span>
+                                                                            </div>
+                                                                            <div className="flex flex-col items-end">
+                                                                                <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">GÜNCEL TOPLAM FİYAT</span>
+                                                                                <span className="text-lg font-black text-amber-900">
+                                                                                    ₺{p.services?.reduce((sum: number, ps: any) => sum + Number(fastForm.servicePriceOverrides[ps.id] || ps.price || 0), 0)}
+                                                                                </span>
+                                                                            </div>
                                                                         </div>
                                                                         <p className="text-[8px] font-bold text-slate-400 italic pl-2">* Hizmetler yukarıdan aşağıya sırayla atanacaktır.</p>
                                                                     </div>
@@ -1173,8 +1236,84 @@ export default function SalonBoard() {
             )}
 
             {/* Version Indicator */}
-            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[300] bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full pointer-events-none border border-white/10">
-                <span className="text-[10px] font-black text-slate-400/80 tracking-widest uppercase">v1.69.7</span>
+            {/* Pending List Modal */}
+            {isPendingListModalOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4 lg:p-10" onClick={() => setIsPendingListModalOpen(false)}>
+                    <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
+                        <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-amber-50/30">
+                            <div>
+                                <h2 className="text-2xl font-black text-slate-900 tracking-tight">Onay Bekleyen Talepler</h2>
+                                <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mt-1">{appointments.filter(a => a.status === 'pending').length} Yeni Randevu İsteği</p>
+                            </div>
+                            <button onClick={() => setIsPendingListModalOpen(false)} className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all shadow-sm">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6" /></svg>
+                            </button>
+                        </div>
+
+                        <div className="p-8 max-h-[70vh] overflow-y-auto space-y-4">
+                            {appointments.filter(a => a.status === 'pending').sort((a, b) => (a.appointment_date || '').localeCompare(b.appointment_date || '')).length > 0 ? (
+                                appointments.filter(a => a.status === 'pending').sort((a, b) => (a.appointment_date || '').localeCompare(b.appointment_date || '')).map(app => (
+                                    <div key={app.id} className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 hover:border-amber-200 transition-all group">
+                                        <div className="flex items-start justify-between gap-4 mb-4">
+                                            <div className="flex-1">
+                                                <h3 className="font-black text-slate-900 text-lg uppercase tracking-tight mb-1">{app.customer_name || 'Misafir'}</h3>
+                                                <div className="flex flex-wrap gap-2 items-center">
+                                                    <span className="px-3 py-1 bg-white rounded-full text-[10px] font-black text-slate-500 border border-slate-100 uppercase tracking-wider">
+                                                        📅 {app.appointment_date?.substring(0, 10)}
+                                                    </span>
+                                                    <span className="px-3 py-1 bg-white rounded-full text-[10px] font-black text-slate-500 border border-slate-100 uppercase tracking-wider">
+                                                        ⏰ {app.start_time} - {app.end_time}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-lg font-black text-indigo-600 leading-none">₺{app.price}</p>
+                                                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mt-1">Hizmet Bedeli</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 mb-6">
+                                            {app.services?.map((s: any) => (
+                                                <span key={s.id} className="px-2 py-0.5 bg-amber-100/50 text-amber-700 rounded-lg text-[9px] font-bold uppercase">{s.name}</span>
+                                            ))}
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedAppointment(app);
+                                                    setIsDetailModalOpen(true);
+                                                }}
+                                                className="flex-1 py-4 bg-white border-2 border-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:border-indigo-200 hover:text-indigo-600 transition-all"
+                                            >
+                                                Detaylar
+                                            </button>
+                                            <button
+                                                onClick={() => handleUpdateStatus(app.id!, 'approved')}
+                                                className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition-all"
+                                            >
+                                                Hemen Onayla
+                                            </button>
+                                            <button
+                                                onClick={() => handleUpdateStatus(app.id!, 'cancelled')}
+                                                className="w-14 py-4 bg-rose-50 text-rose-500 rounded-2xl font-black flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="py-20 text-center">
+                                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">📭</div>
+                                    <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Onay bekleyen talep yok</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-slate-900/80 backdrop-blur-md rounded-full border border-white/10 shadow-2xl z-[150] pointer-events-none">
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap">Ekuafor Salon Board Edition <span className="text-white opacity-100 ml-1">v1.70.0</span></p>
             </div>
         </div>
     );

@@ -77,7 +77,7 @@ export default function CompanyPanel() {
         description: '',
         duration_minutes: 0,
         price: 0,
-        items: [] as { service_id: number, staff_id: number | null, department_id: number | null }[],
+        items: [] as { service_id: number, staff_id: number | null, department_id: number | null, price: number, duration_minutes: number }[],
         department_id: null as number | null,
         staff_id: null as number | null
     });
@@ -436,14 +436,15 @@ export default function CompanyPanel() {
             currentItems.push({
                 service_id: serviceId,
                 staff_id: null,
-                department_id: svc?.department_id || null
+                department_id: svc?.department_id || null,
+                price: svc?.price || 0,
+                duration_minutes: svc?.duration_minutes || 0
             });
         }
 
-        // Calculate total duration and price from selected services
-        const selectedServices = companyServices.filter(s => currentItems.some(i => i.service_id === s.id));
-        const totalDuration = selectedServices.reduce((sum, s) => sum + s.duration_minutes, 0);
-        const totalPrice = selectedServices.reduce((sum, s) => sum + Number(s.price), 0);
+        // Calculate total duration and price from selected services (using overrides)
+        const totalDuration = currentItems.reduce((sum, i) => sum + (i.duration_minutes || 0), 0);
+        const totalPrice = currentItems.reduce((sum, i) => sum + Number(i.price || 0), 0);
 
         setPackageForm({
             ...packageForm,
@@ -451,6 +452,22 @@ export default function CompanyPanel() {
             duration_minutes: totalDuration,
             price: totalPrice
         });
+    };
+
+    const handleUpdateServicePrice = (serviceId: number, price: number) => {
+        const currentItems = packageForm.items.map(item =>
+            item.service_id === serviceId ? { ...item, price } : item
+        );
+        const totalPrice = currentItems.reduce((sum, i) => sum + Number(i.price || 0), 0);
+        setPackageForm({ ...packageForm, items: currentItems, price: totalPrice });
+    };
+
+    const handleUpdateServiceDuration = (serviceId: number, duration: number) => {
+        const currentItems = packageForm.items.map(item =>
+            item.service_id === serviceId ? { ...item, duration_minutes: duration } : item
+        );
+        const totalDuration = currentItems.reduce((sum, i) => sum + (i.duration_minutes || 0), 0);
+        setPackageForm({ ...packageForm, items: currentItems, duration_minutes: totalDuration });
     };
 
     const handleUpdateServiceStaff = (serviceId: number, staffId: number | null) => {
@@ -1250,7 +1267,9 @@ export default function CompanyPanel() {
                                                                         items: pkg.services?.filter((s: any) => s.id !== null).map((s: any) => ({
                                                                             service_id: s.id,
                                                                             staff_id: s.staff_id || null,
-                                                                            department_id: s.department_id || null
+                                                                            department_id: s.department_id || null,
+                                                                            price: s.price || 0,
+                                                                            duration_minutes: s.duration_minutes || 0
                                                                         })) || [],
                                                                         department_id: pkg.department_id || null,
                                                                         staff_id: pkg.staff_id || null
@@ -1860,6 +1879,26 @@ export default function CompanyPanel() {
                                                     <div className="flex items-center justify-between gap-2">
                                                         <p className="text-[11px] font-black text-slate-700 truncate">{svc.name}</p>
                                                         <span className="text-[9px] text-slate-400 font-bold px-2 py-0.5 bg-slate-50 rounded-full">{svc.duration_minutes} dk</span>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <div className="flex-1">
+                                                            <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 ml-1">Süre (Dk)</label>
+                                                            <input
+                                                                type="number"
+                                                                value={item.duration_minutes}
+                                                                onChange={e => handleUpdateServiceDuration(item.service_id, parseInt(e.target.value) || 0)}
+                                                                className="w-full p-2 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-900 outline-none"
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 ml-1">Fiyat (₺)</label>
+                                                            <input
+                                                                type="number"
+                                                                value={item.price}
+                                                                onChange={e => handleUpdateServicePrice(item.service_id, parseFloat(e.target.value) || 0)}
+                                                                className="w-full p-2 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-900 outline-none"
+                                                            />
+                                                        </div>
                                                     </div>
                                                     <div className="flex gap-2">
                                                         <div className="flex-1">

@@ -543,7 +543,21 @@ export default function BookingPage() {
                                                     <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
                                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{p.services?.length || 0} HİZMET</span>
                                                 </div>
-                                                <div className="text-xl font-black text-amber-600">₺{p.price}</div>
+                                                <div className="flex flex-col items-end">
+                                                    {(() => {
+                                                        const standardTotal = p.services?.reduce((sum: number, ps: any) => {
+                                                            const globalSvc = services.find(s => s.id === ps.id);
+                                                            return sum + Number(globalSvc?.price || ps.price || 0);
+                                                        }, 0) || 0;
+                                                        if (standardTotal > Number(p.price)) {
+                                                            return (
+                                                                <span className="text-[10px] font-bold text-slate-400 line-through mb-0.5">₺{standardTotal}</span>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    })()}
+                                                    <div className="text-xl font-black text-amber-600">₺{p.price}</div>
+                                                </div>
                                             </div>
                                         </button>
                                     );

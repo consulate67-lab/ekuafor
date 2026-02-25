@@ -43,7 +43,9 @@ export default function AppointmentManagement() {
         package_id: 0,
         notes: '',
         price: 0,
-        serviceStaffOverrides: {} as Record<number, number>
+        serviceStaffOverrides: {} as Record<number, number>,
+        servicePriceOverrides: {} as Record<number, number>,
+        serviceDurationOverrides: {} as Record<number, number>
     });
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
     const [isListening, setIsListening] = useState(false);
@@ -370,8 +372,8 @@ export default function AppointmentManagement() {
             const sSelections = selectedPackage
                 ? selectedPackage.services.map((s: any) => ({
                     id: s.id,
-                    price: s.price,
-                    duration_minutes: s.duration_minutes,
+                    price: newAppointment.servicePriceOverrides[s.id] || s.price,
+                    duration_minutes: newAppointment.serviceDurationOverrides[s.id] || s.duration_minutes,
                     staff_id: newAppointment.serviceStaffOverrides[s.id] || newAppointment.staff_id || undefined
                 }))
                 : selectedServices.map(s => ({
@@ -381,11 +383,23 @@ export default function AppointmentManagement() {
                     staff_id: newAppointment.staff_id || undefined
                 }));
 
+            const totalPr = sSelections.reduce((sum: number, s: any) => sum + Number(s.price), 0);
+            const totalDur = sSelections.reduce((sum: number, s: any) => sum + Number(s.duration_minutes), 0);
+
+            // Re-calculate end time for safety
+            const [sh, sm] = newAppointment.start_time.split(':').map(Number);
+            const totalMin = sh * 60 + sm + totalDur;
+            const endH = Math.floor(totalMin / 60);
+            const endM = totalMin % 60;
+            const finalEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
             await api.post('/appointments', {
                 ...newAppointment,
-                service_id: newAppointment.service_ids[0], // First one as primary for compatibility
+                service_id: newAppointment.service_ids[0],
                 service_ids: newAppointment.service_ids,
                 services: sSelections,
+                price: totalPr,
+                end_time: finalEndTime,
                 package_id: newAppointment.package_id === 0 ? undefined : newAppointment.package_id,
                 staff_id: newAppointment.staff_id === 0 ? undefined : newAppointment.staff_id,
                 company_id: company?.id,
@@ -405,7 +419,9 @@ export default function AppointmentManagement() {
                 package_id: 0,
                 notes: '',
                 price: 0,
-                serviceStaffOverrides: {}
+                serviceStaffOverrides: {},
+                servicePriceOverrides: {},
+                serviceDurationOverrides: {}
             });
             setShowAddForm(false);
             alert('Randevu başarıyla ONAYLI olarak oluşturuldu.');
@@ -589,7 +605,7 @@ export default function AppointmentManagement() {
                         Sistemi Sıfırla
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments v1.9.6</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments Edition v1.70.0</span>
                     </div>
                 </div>
             </div>
@@ -714,33 +730,81 @@ export default function AppointmentManagement() {
                                                         </button>
 
                                                         {isSelected && (
-                                                            <div className="pl-4 space-y-3">
-                                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hizmet Personel Atamaları</p>
+                                                            <div className="pl-4 space-y-4">
+                                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hizmet Özelleştirme & Uzman Atama</p>
                                                                 {p.services?.map((ps: any) => (
-                                                                    <div key={ps.id} className="flex items-center justify-between gap-4 bg-white p-3 rounded-xl border border-slate-100">
-                                                                        <span className="text-[10px] font-black text-slate-700 uppercase truncate flex-1">{ps.name}</span>
-                                                                        <select
-                                                                            value={newAppointment.serviceStaffOverrides[ps.id] || newAppointment.staff_id || ''}
-                                                                            onChange={(e) => {
-                                                                                setNewAppointment(prev => ({
-                                                                                    ...prev,
-                                                                                    serviceStaffOverrides: {
-                                                                                        ...prev.serviceStaffOverrides,
-                                                                                        [ps.id]: Number(e.target.value)
-                                                                                    }
-                                                                                }));
-                                                                            }}
-                                                                            className="text-[10px] font-bold bg-slate-50 border-none rounded-lg p-1.5 outline-none"
-                                                                        >
-                                                                            <option value="">Uzman Seçin</option>
-                                                                            {staff.map(s => (
-                                                                                <option key={s.user_id || s.id} value={s.user_id || s.id}>
-                                                                                    {s.first_name} {s.last_name}
-                                                                                </option>
-                                                                            ))}
-                                                                        </select>
+                                                                    <div key={ps.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3">
+                                                                        <div className="flex justify-between items-center">
+                                                                            <span className="text-[10px] font-black text-slate-700 uppercase truncate">{ps.name}</span>
+                                                                            <select
+                                                                                value={newAppointment.serviceStaffOverrides[ps.id] || newAppointment.staff_id || ''}
+                                                                                onChange={(e) => {
+                                                                                    setNewAppointment(prev => ({
+                                                                                        ...prev,
+                                                                                        serviceStaffOverrides: { ...prev.serviceStaffOverrides, [ps.id]: Number(e.target.value) }
+                                                                                    }));
+                                                                                }}
+                                                                                className="text-[10px] font-bold bg-white border border-slate-200 rounded-lg p-1.5 outline-none"
+                                                                            >
+                                                                                <option value="">Uzman Seçin</option>
+                                                                                {staff.map(s => (
+                                                                                    <option key={s.user_id || s.id} value={s.user_id || s.id}>
+                                                                                        {s.first_name}
+                                                                                    </option>
+                                                                                ))}
+                                                                            </select>
+                                                                        </div>
+                                                                        <div className="grid grid-cols-2 gap-3">
+                                                                            <div>
+                                                                                <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 ml-1">Süre (Dk)</label>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    value={newAppointment.serviceDurationOverrides[ps.id] || ps.duration_minutes}
+                                                                                    onChange={e => {
+                                                                                        const val = parseInt(e.target.value) || 0;
+                                                                                        const newOverrides = { ...newAppointment.serviceDurationOverrides, [ps.id]: val };
+                                                                                        setNewAppointment(prev => ({
+                                                                                            ...prev,
+                                                                                            serviceDurationOverrides: newOverrides
+                                                                                        }));
+                                                                                    }}
+                                                                                    className="w-full p-2 bg-white rounded-lg border border-slate-200 text-[10px] font-bold text-slate-900 outline-none"
+                                                                                />
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 ml-1">Fiyat (₺)</label>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    value={newAppointment.servicePriceOverrides[ps.id] || ps.price}
+                                                                                    onChange={e => {
+                                                                                        const val = parseFloat(e.target.value) || 0;
+                                                                                        const newOverrides = { ...newAppointment.servicePriceOverrides, [ps.id]: val };
+                                                                                        setNewAppointment(prev => ({
+                                                                                            ...prev,
+                                                                                            servicePriceOverrides: newOverrides,
+                                                                                            price: p.services.reduce((sum: number, s: any) => sum + (newOverrides[s.id] || s.price || 0), 0)
+                                                                                        }));
+                                                                                    }}
+                                                                                    className="w-full p-2 bg-white rounded-lg border border-slate-200 text-[10px] font-bold text-slate-900 outline-none"
+                                                                                />
+                                                                            </div>
+                                                                        </div>
                                                                     </div>
                                                                 ))}
+                                                                <div className="flex justify-between items-center bg-pink-50 p-4 rounded-2xl border border-pink-100">
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-[8px] font-black text-pink-400 uppercase tracking-widest">TOPLAM SÜRE</span>
+                                                                        <span className="text-xs font-black text-pink-600">
+                                                                            {p.services?.reduce((sum: number, ps: any) => sum + (newAppointment.serviceDurationOverrides[ps.id] || ps.duration_minutes || 0), 0)} DK
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex flex-col items-end">
+                                                                        <span className="text-[8px] font-black text-pink-400 uppercase tracking-widest">TOPLAM FİYAT</span>
+                                                                        <span className="text-base font-black text-pink-600">
+                                                                            ₺{p.services?.reduce((sum: number, ps: any) => sum + Number(newAppointment.servicePriceOverrides[ps.id] || ps.price || 0), 0)}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         )}
                                                     </div>
@@ -775,7 +839,10 @@ export default function AppointmentManagement() {
                                             let duration = 30;
                                             if (newAppointment.package_id) {
                                                 const pkg = packages.find(p => p.id === newAppointment.package_id);
-                                                if (pkg) duration = pkg.duration_minutes;
+                                                if (pkg) {
+                                                    duration = pkg.services?.reduce((sum: number, ps: any) =>
+                                                        sum + (newAppointment.serviceDurationOverrides[ps.id] || ps.duration_minutes || 0), 0) || pkg.duration_minutes;
+                                                }
                                             } else if (newAppointment.service_ids.length > 0) {
                                                 const selectedServices = services.filter(sv => newAppointment.service_ids.includes(sv.id!));
                                                 duration = selectedServices.reduce((sum, sv) => sum + (sv.duration_minutes || 0), 0);
