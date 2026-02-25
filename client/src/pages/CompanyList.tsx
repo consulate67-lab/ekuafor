@@ -2,11 +2,14 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import { Company } from '../types';
+import { useSearchParams } from 'react-router-dom';
 
 export default function CompanyList() {
     const [companies, setCompanies] = useState<Company[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [searchParams] = useSearchParams();
+    const mainId = searchParams.get('main_id');
 
     useEffect(() => {
         fetchCompanies();
@@ -14,7 +17,9 @@ export default function CompanyList() {
 
     const fetchCompanies = async () => {
         try {
-            const response = await api.get('/companies');
+            const params: any = {};
+            if (mainId) params.main_company_id = mainId;
+            const response = await api.get('/companies', { params });
             setCompanies(response.data.data);
         } catch (err: any) {
             setError(err.response?.data?.error || 'Firmalar yüklenirken hata oluştu');
@@ -64,7 +69,7 @@ export default function CompanyList() {
                             <Link to="/" className="text-pink-600 hover:text-pink-700 text-xs font-bold uppercase tracking-widest mb-1 inline-block">
                                 ← Dashboard
                             </Link>
-                            <h1 className="text-2xl font-bold heading-serif">Firmalar</h1>
+                            <h1 className="text-2xl font-bold heading-serif">{mainId ? 'Üst Firma Şubeleri' : 'Firmalar'}</h1>
                         </div>
                         <Link to="/companies/new" className="btn-primary py-2 px-5 text-sm flex items-center gap-2">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>

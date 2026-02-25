@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import api from '../lib/api';
 
 export default function MainCompanyPanel() {
@@ -90,7 +90,10 @@ export default function MainCompanyPanel() {
         <div className="min-h-screen bg-slate-50 p-6">
             <header className="max-w-6xl mx-auto flex justify-between items-center mb-12">
                 <div>
-                    <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tighter italic">Üst Firmalar</h1>
+                    <Link to="/dashboard" className="text-emerald-600 hover:text-emerald-700 text-xs font-bold uppercase tracking-widest mb-1 inline-block">
+                        ← Dashboard
+                    </Link>
+                    <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tighter italic">Üst Yönetim</h1>
                     <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest mt-1">Grup Şubeleri ve Raporlama Yönetimi</p>
                 </div>
                 <button
@@ -119,7 +122,8 @@ export default function MainCompanyPanel() {
                                     Raporlar
                                 </button>
                                 <button
-                                    className="flex-1 bg-slate-50 text-slate-400 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
+                                    onClick={() => navigate(`/companies?main_id=${mc.id}`)}
+                                    className="flex-1 bg-slate-50 text-slate-400 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all"
                                 >
                                     Şubeler
                                 </button>

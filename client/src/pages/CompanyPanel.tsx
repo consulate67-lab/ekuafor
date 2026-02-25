@@ -19,12 +19,13 @@ interface StaffBoard {
     photo: string | null;
 }
 
-type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'ai' | 'reports';
+type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'ai' | 'reports' | 'profile';
 
 const menuItems: { key: TabKey; icon: string; label: string }[] = [
     { key: 'home', icon: '🏠', label: 'Ana Sayfa' },
     { key: 'reports', icon: '📊', label: 'Raporlar' },
     { key: 'services', icon: '✂️', label: 'Hizmetler' },
+    { key: 'profile', icon: '🏢', label: 'Firma Tanıtımı' },
     { key: 'booking', icon: '📅', label: 'Müşteri QR' },
     { key: 'ai', icon: '🤖', label: 'Yapay Zeka' },
     { key: 'qr', icon: '🔑', label: 'Yönetim Kodu' },
@@ -604,6 +605,19 @@ export default function CompanyPanel() {
         );
     }
 
+    const handleUpdateCompany = async () => {
+        if (!company) return;
+        setLoading(true);
+        try {
+            await api.put(`/companies/${company.id}`, company);
+            alert('Firma bilgileri başarıyla güncellendi.');
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Güncelleme sırasında hata oluştu');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // MAIN PANEL
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 flex" >
@@ -768,6 +782,97 @@ export default function CompanyPanel() {
                                         )}
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* PROFILE TAB - Firma Tanıtımı */}
+                    {activeTab === 'profile' && company && (
+                        <div className="space-y-6">
+                            <div className="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/40">
+                                <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-6">Firma Tanıtım Bilgileri</h2>
+
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">İşletme Adı</label>
+                                        <input
+                                            type="text"
+                                            className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                            value={company.name || ''}
+                                            onChange={e => setCompany({ ...company, name: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Tanıtım Yazısı (Hakkımızda)</label>
+                                        <textarea
+                                            rows={4}
+                                            className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                            value={company.description || ''}
+                                            onChange={e => setCompany({ ...company, description: e.target.value })}
+                                            placeholder="İşletmenizi müşterilerinize tanıtın..."
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Telefon</label>
+                                            <input
+                                                type="tel"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.phone || ''}
+                                                onChange={e => setCompany({ ...company, phone: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">E-Posta</label>
+                                            <input
+                                                type="email"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.email || ''}
+                                                onChange={e => setCompany({ ...company, email: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Açık Adres</label>
+                                        <textarea
+                                            rows={2}
+                                            className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                            value={company.address_line || ''}
+                                            onChange={e => setCompany({ ...company, address_line: e.target.value })}
+                                        />
+                                    </div>
+
+                                    <div className="pt-6">
+                                        <button
+                                            onClick={handleUpdateCompany}
+                                            disabled={loading}
+                                            className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-slate-300 hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            {loading ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-indigo-900 rounded-3xl p-8 text-white relative overflow-hidden shadow-2xl">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
+                                <h3 className="text-lg font-black mb-2 italic">Önizleme</h3>
+                                <p className="text-indigo-200 text-xs font-bold leading-relaxed mb-6">Müşterileriniz haritada veya listede sizi bu bilgilerle görecekler.</p>
+                                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-xl">🏢</div>
+                                        <div>
+                                            <p className="font-black text-sm">{company.name}</p>
+                                            <p className="text-[10px] text-indigo-300 font-bold uppercase">{company.district_name || 'Şehir Belirtilmemiş'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => window.open(`${window.location.origin}${import.meta.env.BASE_URL}book/${company.id}`, '_blank')}
+                                    className="mt-6 w-full py-4 bg-white text-indigo-900 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-indigo-50 transition-all"
+                                >
+                                    Müşteri Sayfasını Görüntüle
+                                </button>
                             </div>
                         </div>
                     )}
