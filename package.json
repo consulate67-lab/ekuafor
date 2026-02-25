@@ -1,6 +1,6 @@
 {
     "name": "saloon-project",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "private": true,
     "workspaces": [
         "server",
@@ -13,6 +13,7 @@
         "deploy": "npm run deploy --workspace=client",
         "migrate": "node server/scripts/migration_v2.js",
         "deploy:all": "npm run deploy --workspace=client && git push",
-        "install:all": "npm install && npm install --workspaces"
+        "install:all": "npm install && npm install --workspaces",
+        "start": "npm start --workspace=server"
     }
 }
