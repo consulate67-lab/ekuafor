@@ -27,6 +27,27 @@ export interface Appointment {
 
 class AppointmentService {
     async createAppointment(appointment: Appointment): Promise<Appointment> {
+        // Fetch package details if provided to get correct defaults
+        let pkg: any = null;
+        if (appointment.package_id) {
+            const pkgRes = await pool.query(`
+                SELECT p.*, 
+                       json_agg(json_build_object(
+                           'id', s.id, 
+                           'name', s.name, 
+                           'duration_minutes', s.duration_minutes, 
+                           'price', s.price,
+                           'staff_id', ps.staff_id
+                       ) ORDER BY ps.order_index) as package_services
+                FROM packages p
+                LEFT JOIN package_services ps ON p.id = ps.package_id
+                LEFT JOIN services s ON ps.service_id = s.id
+                WHERE p.id = $1
+                GROUP BY p.id
+            `, [appointment.package_id]);
+            pkg = pkgRes.rows[0];
+        }
+
         // 0. Determine service selections with correct ordering and staff mapping
         let serviceRecords: any[] = [];
         if (appointment.services && appointment.services.length > 0) {
@@ -36,14 +57,24 @@ class AppointmentService {
 
             serviceRecords = appointment.services.map((s: any) => {
                 const dbS = dbServices.find(ds => ds.id === s.id);
+                const pkgS = pkg?.package_services?.find((ps: any) => ps.id === s.id);
                 return {
                     id: s.id,
-                    price: s.price || dbS?.price || 0,
-                    duration_minutes: s.duration_minutes || dbS?.duration_minutes || 30,
-                    name: dbS?.name || 'Hizmet',
-                    staff_id: s.staff_id || appointment.staff_id
+                    price: (s.price !== undefined && s.price !== null) ? s.price : (pkgS?.price || dbS?.price || 0),
+                    duration_minutes: (s.duration_minutes !== undefined && s.duration_minutes !== null) ? s.duration_minutes : (pkgS?.duration_minutes || dbS?.duration_minutes || 30),
+                    name: dbS?.name || pkgS?.name || 'Hizmet',
+                    staff_id: s.staff_id || appointment.staff_id || pkgS?.staff_id
                 };
             });
+        } else if (pkg) {
+            // Use services from the package if no explicit services provided
+            serviceRecords = (pkg.package_services || []).map((ps: any) => ({
+                id: ps.id,
+                price: ps.price || 0,
+                duration_minutes: ps.duration_minutes || 30,
+                name: ps.name || 'Hizmet',
+                staff_id: appointment.staff_id || ps.staff_id
+            }));
         } else {
             // Fallback for legacy calls using service_id or service_ids
             const serviceIds = appointment.service_ids || (appointment.service_id ? [appointment.service_id] : []);
@@ -65,8 +96,8 @@ class AppointmentService {
             }).filter(s => !!s);
         }
 
-        const totalDuration = appointment.duration_minutes || serviceRecords.reduce((sum, s) => sum + s.duration_minutes, 0);
-        const totalPrice = appointment.price || serviceRecords.reduce((sum, s) => sum + Number(s.price), 0);
+        const totalDuration = (appointment.duration_minutes !== undefined && appointment.duration_minutes !== null) ? appointment.duration_minutes : (pkg?.duration_minutes || serviceRecords.reduce((sum, s) => sum + s.duration_minutes, 0));
+        const totalPrice = (appointment.price !== undefined && appointment.price !== null) ? appointment.price : (pkg?.price || serviceRecords.reduce((sum, s) => sum + Number(s.price), 0));
 
         // Calculate a.end_time based on start_time and total duration
         if (appointment.start_time && !appointment.end_time) {

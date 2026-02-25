@@ -383,8 +383,9 @@ export default function AppointmentManagement() {
                     staff_id: newAppointment.staff_id || undefined
                 }));
 
-            const totalPr = sSelections.reduce((sum: number, s: any) => sum + Number(s.price), 0);
-            const totalDur = sSelections.reduce((sum: number, s: any) => sum + Number(s.duration_minutes), 0);
+            const hasOverrides = Object.keys(newAppointment.servicePriceOverrides).length > 0 || Object.keys(newAppointment.serviceDurationOverrides).length > 0;
+            const totalPr = (selectedPackage && !hasOverrides) ? Number(selectedPackage.price) : sSelections.reduce((sum: number, s: any) => sum + Number(s.price), 0);
+            const totalDur = (selectedPackage && !hasOverrides) ? Number(selectedPackage.duration_minutes) : sSelections.reduce((sum: number, s: any) => sum + Number(s.duration_minutes), 0);
 
             // Re-calculate end time for safety
             const [sh, sm] = newAppointment.start_time.split(':').map(Number);
@@ -605,7 +606,7 @@ export default function AppointmentManagement() {
                         Sistemi Sıfırla
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments Edition v1.71.0</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments Edition v1.72.1</span>
                     </div>
                 </div>
             </div>

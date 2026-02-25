@@ -232,8 +232,15 @@ export default function SalonBoard() {
                 const pkg = packages.find(p => p.id === parseInt(fastForm.packageId));
                 if (pkg) {
                     sIds = pkg.services?.map((s: any) => s.id) || [];
-                    totalDuration = sIds.reduce((sum, sid) => sum + ((fastForm.serviceDurationOverrides[sid] !== undefined) ? fastForm.serviceDurationOverrides[sid] : (pkg.services.find((ps: any) => ps.id === sid)?.duration_minutes || 0)), 0);
-                    totalPrice = sIds.reduce((sum, sid) => sum + Number((fastForm.servicePriceOverrides[sid] !== undefined) ? fastForm.servicePriceOverrides[sid] : (pkg.services.find((ps: any) => ps.id === sid)?.price || 0)), 0);
+                    const hasOverrides = Object.keys(fastForm.servicePriceOverrides).length > 0 || Object.keys(fastForm.serviceDurationOverrides).length > 0;
+
+                    if (hasOverrides) {
+                        totalDuration = sIds.reduce((sum, sid) => sum + ((fastForm.serviceDurationOverrides[sid] !== undefined) ? fastForm.serviceDurationOverrides[sid] : (pkg.services.find((ps: any) => ps.id === sid)?.duration_minutes || 0)), 0);
+                        totalPrice = sIds.reduce((sum, sid) => sum + Number((fastForm.servicePriceOverrides[sid] !== undefined) ? fastForm.servicePriceOverrides[sid] : (pkg.services.find((ps: any) => ps.id === sid)?.price || 0)), 0);
+                    } else {
+                        totalDuration = pkg.duration_minutes || 0;
+                        totalPrice = Number(pkg.price || 0);
+                    }
                 }
             } else {
                 const selectedServices = services.filter(s => sIds.includes(s.id));
@@ -789,6 +796,71 @@ export default function SalonBoard() {
                                     </tr>
                                 );
                             })}
+                            {/* Unassigned Appointments Row */}
+                            {
+                                (() => {
+                                    const unassignedApps = appointments.filter(a =>
+                                        a.status !== 'cancelled' &&
+                                        (a.appointment_date || '').substring(0, 10) === selectedDate &&
+                                        !a.staff_id &&
+                                        (!a.services || a.services.every((s: any) => !s.staff_id))
+                                    );
+
+                                    if (unassignedApps.length === 0) return null;
+
+                                    return (
+                                        <tr className="bg-amber-50/20">
+                                            <td className="sticky left-0 z-[50] bg-amber-50/80 backdrop-blur-md p-4 lg:p-5 border-b border-amber-100 shadow-[10px_0_30px_-15px_rgba(0,0,0,0.1)]">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-2xl bg-amber-400 text-white flex items-center justify-center font-black text-xs shadow-lg shadow-amber-200 animate-pulse">?</div>
+                                                    <div>
+                                                        <p className="text-xs lg:text-sm font-black text-amber-900 leading-none">ATANMAMIŞ</p>
+                                                        <p className="text-[8px] lg:text-[9px] font-bold text-amber-600 uppercase tracking-widest mt-1">Hizmet Bekleyenler</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            {hours.map(hour => {
+                                                const [hh, mm] = hour.split(':').map(Number);
+                                                const slotTotal = hh * 60 + mm;
+
+
+
+                                                const appsAtSlot = unassignedApps.filter(a => {
+                                                    const [asH, asM] = a.start_time.split(':').map(Number);
+                                                    const [aeH, aeM] = a.end_time.split(':').map(Number);
+                                                    const aStart = asH * 60 + asM;
+                                                    const aEnd = aeH * 60 + aeM;
+                                                    return slotTotal >= aStart && slotTotal < aEnd;
+                                                });
+
+                                                if (appsAtSlot.length === 0) return <td key={hour} className="border-r border-slate-50 border-b border-slate-100"></td>;
+
+                                                return (
+                                                    <td key={hour} className="p-1 lg:p-1.5 border-r border-slate-50 border-b border-slate-100 align-top">
+                                                        {appsAtSlot.map(app => (
+                                                            <div
+                                                                key={app.id}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedAppointment(app);
+                                                                    setIsDetailModalOpen(true);
+                                                                }}
+                                                                className="p-1.5 rounded-xl bg-white border-l-[3px] border-amber-500 shadow-sm text-amber-900 cursor-pointer hover:scale-[1.03] transition-all"
+                                                            >
+                                                                <div className="flex justify-between items-start">
+                                                                    <span className="text-[7px] font-black text-amber-500 uppercase">{app.start_time.substring(0, 5)}</span>
+                                                                    <span className="px-1 py-0.5 bg-amber-100 text-amber-600 rounded-full text-[6px] font-black uppercase">!</span>
+                                                                </div>
+                                                                <p className="text-[10px] font-black truncate leading-none mt-1">{app.customer_name || 'Misafir'}</p>
+                                                            </div>
+                                                        ))}
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    );
+                                })()
+                            }
                         </tbody>
                     </table>
                 </div>
@@ -1325,7 +1397,7 @@ export default function SalonBoard() {
             )}
 
             <div className="fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-slate-900/80 backdrop-blur-md rounded-full border border-white/10 shadow-2xl z-[150] pointer-events-none">
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap">Ekuafor Salon Board Edition <span className="text-white opacity-100 ml-1">v1.71.0</span></p>
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap">Ekuafor Salon Board Edition <span className="text-white opacity-100 ml-1">v1.72.1</span></p>
             </div>
         </div>
     );
