@@ -10,6 +10,8 @@ const router = Router();
 const appointmentSchema = z.object({
     service_id: z.union([z.number(), z.string().transform(v => parseInt(v, 10))]).optional(),
     service_ids: z.array(z.number()).optional(),
+    services: z.array(z.any()).optional(), // Add services array for staff overrides
+    package_id: z.union([z.number(), z.string().transform(v => parseInt(v, 10))]).optional().nullable(),
     staff_id: z.union([z.number(), z.string().transform(v => parseInt(v, 10))]).optional().nullable(),
     appointment_date: z.string(),
     start_time: z.string(),
@@ -276,6 +278,25 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
         res.status(500).json({
             success: false,
             error: error instanceof Error ? error.message : 'Randevu durumu güncellenirken hata oluştu'
+        });
+    }
+});
+
+// Hizmet bazlı onay (Paket randevuları için)
+router.patch('/service/:apsId/status', async (req: Request, res: Response) => {
+    try {
+        const apsId = parseInt(req.params.apsId);
+        const { status } = req.body;
+        const service = await appointmentService.updateAppointmentServiceStatus(apsId, status);
+        if (!service) {
+            return res.status(404).json({ success: false, error: 'Hizmet kaydı bulunamadı' });
+        }
+        res.json({ success: true, data: service });
+    } catch (error) {
+        console.error('Update Service Status Error:', error);
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Hizmet durumu güncellenirken hata oluştu'
         });
     }
 });

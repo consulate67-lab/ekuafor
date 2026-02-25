@@ -7,7 +7,7 @@ export interface Appointment {
     customer_id?: number;
     service_id?: number; // Kept for DB compatibility, but optional
     service_ids?: number[]; // For multi-service selection
-    staff_id?: number;
+    staff_id?: number | null;
     appointment_date: string;
     start_time: string;
     end_time: string;
@@ -15,7 +15,7 @@ export interface Appointment {
     notes?: string;
     price?: number;
     duration_minutes?: number; // Total duration (can be overridden)
-    package_id?: number;
+    package_id?: number | null;
     customer_name?: string;
     customer_phone?: string;
     device_id?: string;
@@ -27,39 +27,55 @@ export interface Appointment {
 
 class AppointmentService {
     async createAppointment(appointment: Appointment): Promise<Appointment> {
-        const serviceIds = appointment.service_ids || (appointment.service_id ? [appointment.service_id] : []);
+        // 0. Determine service selections with correct ordering and staff mapping
+        let serviceRecords: any[] = [];
+        if (appointment.services && appointment.services.length > 0) {
+            // Use the provided services array as it has the correct order and staff overrides
+            const dbServicesRes = await pool.query('SELECT id, duration_minutes, price, name FROM services WHERE id = ANY($1)', [appointment.services.map((s: any) => s.id)]);
+            const dbServices = dbServicesRes.rows;
 
-        if (serviceIds.length === 0) {
-            throw new Error('En az bir hizmet seçilmelidir.');
+            serviceRecords = appointment.services.map((s: any) => {
+                const dbS = dbServices.find(ds => ds.id === s.id);
+                return {
+                    id: s.id,
+                    price: s.price || dbS?.price || 0,
+                    duration_minutes: s.duration_minutes || dbS?.duration_minutes || 30,
+                    name: dbS?.name || 'Hizmet',
+                    staff_id: s.staff_id || appointment.staff_id
+                };
+            });
+        } else {
+            // Fallback for legacy calls using service_id or service_ids
+            const serviceIds = appointment.service_ids || (appointment.service_id ? [appointment.service_id] : []);
+            if (serviceIds.length === 0) throw new Error('En az bir hizmet seçilmelidir.');
+
+            const dbServicesRes = await pool.query('SELECT id, duration_minutes, price, name FROM services WHERE id = ANY($1)', [serviceIds]);
+            const dbServices = dbServicesRes.rows;
+
+            // Maintain input order if possible
+            serviceRecords = serviceIds.map(id => {
+                const dbS = dbServices.find(ds => ds.id === id);
+                return {
+                    id,
+                    price: dbS?.price || 0,
+                    duration_minutes: dbS?.duration_minutes || 30,
+                    name: dbS?.name || 'Hizmet',
+                    staff_id: appointment.staff_id
+                };
+            }).filter(s => !!s);
         }
 
-        // Fetch services to calculate total duration and price
-        const servicesRes = await pool.query('SELECT id, duration_minutes, price, name FROM services WHERE id = ANY($1)', [serviceIds]);
-        const services = servicesRes.rows;
+        const totalDuration = appointment.duration_minutes || serviceRecords.reduce((sum, s) => sum + s.duration_minutes, 0);
+        const totalPrice = appointment.price || serviceRecords.reduce((sum, s) => sum + Number(s.price), 0);
 
-        if (services.length === 0) {
-            throw new Error('Seçilen hizmetler bulunamadı.');
-        }
-
-        // Map service selection to include requested staff
-        const serviceSelections = services.map(s => {
-            const reqService = appointment.services?.find(rs => rs.id === s.id || rs.service_id === s.id);
-            return {
-                ...s,
-                staff_id: reqService?.staff_id || appointment.staff_id
-            };
-        });
-
-        const totalDuration = appointment.duration_minutes || services.reduce((sum, s) => sum + s.duration_minutes, 0);
-        const totalPrice = services.reduce((sum, s) => sum + Number(s.price), 0);
-
-        // Calculate end_time based on start_time and total duration
+        // Calculate a.end_time based on start_time and total duration
         if (appointment.start_time && !appointment.end_time) {
             const [h, m] = appointment.start_time.split(':').map(Number);
-            const dummyDate = new Date();
-            dummyDate.setHours(h, m, 0, 0);
-            const endDate = new Date(dummyDate.getTime() + totalDuration * 60000);
-            appointment.end_time = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
+            const totalStartMinutes = h * 60 + m;
+            const totalEndMinutes = totalStartMinutes + totalDuration;
+            const eh = Math.floor(totalEndMinutes / 60);
+            const em = totalEndMinutes % 60;
+            appointment.end_time = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
         }
 
         if (!appointment.price) {
@@ -67,37 +83,27 @@ class AppointmentService {
         }
 
         // 1. Check for overlapping appointments (Conflict Prevention)
-        // Check conflicts for each staff member involved
-        const uniqueStaffIds = Array.from(new Set(serviceSelections.map(s => s.staff_id).filter(id => !!id)));
+        // For multi-staff, we check each involved staff member
+        const uniqueStaffIds = Array.from(new Set(serviceRecords.map(s => s.staff_id).filter(id => !!id)));
 
-        for (const staffId of uniqueStaffIds) {
+        for (const sId of uniqueStaffIds) {
             const conflictQuery = `
                 SELECT id FROM appointments 
                 WHERE company_id = $1 
                 AND appointment_date = $2 
                 AND status != 'cancelled'
-                AND (
-                    (start_time < $4 AND end_time > $3)
-                )
+                AND (start_time < $4 AND end_time > $3)
                 AND (staff_id = $5 OR id IN (SELECT appointment_id FROM appointment_services WHERE staff_id = $5))
                 LIMIT 1
             `;
-
-            const conflictResult = await pool.query(conflictQuery, [
-                appointment.company_id,
-                appointment.appointment_date,
-                appointment.start_time,
-                appointment.end_time,
-                staffId
-            ]);
-
+            const conflictResult = await pool.query(conflictQuery, [appointment.company_id, appointment.appointment_date, appointment.start_time, appointment.end_time, sId]);
             if (conflictResult.rowCount && conflictResult.rowCount > 0) {
-                throw new Error(`Seçilen çalışanın (${staffId}) bu saat diliminde başka bir randevusu bulunuyor.`);
+                throw new Error(`Seçilen çalışanın (${sId}) bu saat diliminde başka bir randevusu bulunuyor.`);
             }
         }
 
-        // Use the first service_id as the primary for legacy support
-        const primaryServiceId = serviceIds[0];
+        const primaryServiceId = serviceRecords[0]?.id || appointment.service_id;
+        const mainStaffId = appointment.staff_id || serviceRecords[0]?.staff_id || null;
 
         const query = `
       INSERT INTO appointments (
@@ -113,7 +119,7 @@ class AppointmentService {
             appointment.company_id,
             appointment.customer_id || null,
             primaryServiceId,
-            appointment.staff_id || null,
+            mainStaffId,
             appointment.appointment_date,
             appointment.start_time,
             appointment.end_time,
@@ -132,12 +138,27 @@ class AppointmentService {
             const result = await client.query(query, values);
             const newAppointment = result.rows[0];
 
-            // Insert into appointment_services
-            for (const s of serviceSelections) {
+            // Insert into appointment_services with sequential timing
+            let currentOffset = 0;
+            const [baseH, baseM] = newAppointment.start_time.split(':').map(Number);
+
+            for (const s of serviceRecords) {
+                const startTotal = baseH * 60 + baseM + currentOffset;
+                const endTotal = startTotal + s.duration_minutes;
+
+                const sH = Math.floor(startTotal / 60);
+                const sM = startTotal % 60;
+                const eH = Math.floor(endTotal / 60);
+                const eM = endTotal % 60;
+
+                const sTime = `${String(sH).padStart(2, '0')}:${String(sM).padStart(2, '0')}`;
+                const eTime = `${String(eH).padStart(2, '0')}:${String(eM).padStart(2, '0')}`;
+
                 await client.query(
-                    'INSERT INTO appointment_services (appointment_id, service_id, price, duration_minutes, staff_id) VALUES ($1, $2, $3, $4, $5)',
-                    [newAppointment.id, s.id, s.price, s.duration_minutes, s.staff_id || null]
+                    'INSERT INTO appointment_services (appointment_id, service_id, price, duration_minutes, staff_id, status, start_time, end_time) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                    [newAppointment.id, s.id, s.price, s.duration_minutes, s.staff_id || null, newAppointment.status, sTime, eTime]
                 );
+                currentOffset += s.duration_minutes;
             }
 
             await client.query('COMMIT');
@@ -179,9 +200,13 @@ class AppointmentService {
                 COALESCE(u.first_name || ' ' || u.last_name, a.customer_name) as customer_name,
                 COALESCE(json_agg(json_build_object(
                     'id', s.id, 
+                    'aps_id', aps.id,
                     'name', s.name, 
                     'price', aps.price, 
                     'duration', aps.duration_minutes,
+                    'status', aps.status,
+                    'start_time', aps.start_time,
+                    'end_time', aps.end_time,
                     'staff_id', aps.staff_id,
                     'staff_name', ast.first_name || ' ' || ast.last_name
                 )) FILTER (WHERE s.id IS NOT NULL), '[]') as services
@@ -226,9 +251,13 @@ class AppointmentService {
                 COALESCE(u.first_name || ' ' || u.last_name, a.notes) as customer_display_name,
                 COALESCE(json_agg(json_build_object(
                     'id', s.id, 
+                    'aps_id', aps.id,
                     'name', s.name, 
                     'price', aps.price, 
                     'duration', aps.duration_minutes,
+                    'status', aps.status,
+                    'start_time', aps.start_time,
+                    'end_time', aps.end_time,
                     'staff_id', aps.staff_id,
                     'staff_name', ast.first_name || ' ' || ast.last_name
                 )) FILTER (WHERE s.id IS NOT NULL), '[]') as services
@@ -275,9 +304,13 @@ class AppointmentService {
              COALESCE(u.first_name || ' ' || u.last_name, a.customer_name) as customer_name,
              COALESCE(json_agg(json_build_object(
                  'id', s.id, 
+                 'aps_id', aps.id,
                  'name', s.name, 
                  'price', aps.price, 
                  'duration', aps.duration_minutes,
+                 'status', aps.status,
+                 'start_time', aps.start_time,
+                 'end_time', aps.end_time,
                  'staff_id', aps.staff_id,
                  'staff_name', ast.first_name || ' ' || ast.last_name
              )) FILTER (WHERE s.id IS NOT NULL), '[]') as services
@@ -358,6 +391,31 @@ class AppointmentService {
         }
     }
 
+    async updateAppointmentServiceStatus(apsId: number, status: string): Promise<any> {
+        try {
+            const result = await pool.query(
+                'UPDATE appointment_services SET status = $1 WHERE id = $2 RETURNING *',
+                [status, apsId]
+            );
+            const updatedService = result.rows[0];
+
+            if (updatedService && status === 'approved') {
+                const appId = updatedService.appointment_id;
+                const allServicesRes = await pool.query('SELECT status FROM appointment_services WHERE appointment_id = $1', [appId]);
+                const allApproved = allServicesRes.rows.every(s => s.status === 'approved');
+
+                if (allApproved) {
+                    await this.updateAppointmentStatus(appId, 'approved');
+                }
+            }
+
+            return updatedService || null;
+        } catch (err) {
+            console.error('[Service] Update Service Status Error:', err);
+            throw err;
+        }
+    }
+
     async getAppointmentsByDateRange(companyId: number, startDate: string, endDate: string, staffId?: number): Promise<Appointment[]> {
         console.log(`[Service] getByDateRange: ID=${companyId}, Valid=${startDate}-${endDate}, Staff=${staffId}`);
         let query = `
@@ -365,9 +423,13 @@ class AppointmentService {
              pkg.name as package_name,
              COALESCE(json_agg(json_build_object(
                  'id', s.id, 
+                 'aps_id', aps.id,
                  'name', s.name, 
                  'price', aps.price, 
                  'duration', aps.duration_minutes,
+                 'status', aps.status,
+                 'start_time', aps.start_time,
+                 'end_time', aps.end_time,
                  'staff_id', aps.staff_id,
                  'staff_name', ast.first_name || ' ' || ast.last_name
              )) FILTER (WHERE s.id IS NOT NULL), '[]') as services
@@ -413,9 +475,13 @@ class AppointmentService {
                 pkg.name as package_name,
                 COALESCE(json_agg(json_build_object(
                     'id', s.id, 
+                    'aps_id', aps.id,
                     'name', s.name, 
                     'price', aps.price, 
                     'duration', aps.duration_minutes,
+                    'status', aps.status,
+                    'start_time', aps.start_time,
+                    'end_time', aps.end_time,
                     'staff_id', aps.staff_id,
                     'staff_name', ast.first_name || ' ' || ast.last_name
                 )) FILTER (WHERE s.id IS NOT NULL), '[]') as services

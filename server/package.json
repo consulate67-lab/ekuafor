@@ -1,6 +1,6 @@
 {
   "name": "saloon-backend",
-  "version": "1.0.0",
+  "version": "1.69.0",
   "description": "Güzellik Merkezi Randevu Sistemi - Backend",
   "main": "dist/index.js",
   "scripts": {

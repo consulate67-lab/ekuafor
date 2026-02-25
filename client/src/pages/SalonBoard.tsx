@@ -339,6 +339,27 @@ export default function SalonBoard() {
         }
     };
 
+    const handleUpdateServiceStatus = async (apsId: number, newStatus: string) => {
+        try {
+            setLoading(true);
+            await api.patch(`/appointments/service/${apsId}/status`, { status: newStatus });
+            if (company?.id) await fetchData(company.id);
+
+            // Refetch current appointment to update modal state
+            if (selectedAppointment?.id) {
+                const res = await api.get('/appointments', { params: { ids: selectedAppointment.id.toString() } });
+                if (res.data?.data?.[0]) {
+                    setSelectedAppointment(res.data.data[0]);
+                }
+            }
+        } catch (err: any) {
+            console.error('Service update failed:', err);
+            alert(err.response?.data?.error || 'Hizmet onaylanırken hata oluştu');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     if (!boardKey) {
         return (
             <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-6 bg-mesh-gradient">
@@ -592,15 +613,36 @@ export default function SalonBoard() {
                                             // Find appointments that are active during this slot
                                             const activeAtSlot = appointments.filter(a => {
                                                 const appDate = (a.appointment_date || '').substring(0, 10);
-                                                if (Number(a.staff_id) !== Number(pId) || a.status === 'cancelled' || appDate !== todayDate) return false;
+                                                if (a.status === 'cancelled' || appDate !== todayDate) return false;
+
+                                                // If we have detailed services with times
+                                                if (a.services && a.services.length > 0 && a.services.some((s: any) => s.start_time && s.end_time)) {
+                                                    // Check if THIS staff member has a service in this slot
+                                                    return a.services.some((s: any) => {
+                                                        if (Number(s.staff_id) !== Number(pId)) return false;
+                                                        if (!s.start_time || !s.end_time) return false;
+
+                                                        const [ssH, ssM] = s.start_time.split(':').map(Number);
+                                                        const [seH, seM] = s.end_time.split(':').map(Number);
+                                                        const sStart = ssH * 60 + ssM;
+                                                        const sEnd = seH * 60 + seM;
+
+                                                        return slotTotal >= sStart && slotTotal < sEnd;
+                                                    });
+                                                }
+
+                                                // Check if this staff member is involved in this appointment (legacy fallback)
+                                                const isInvolved = Number(a.staff_id) === Number(pId) ||
+                                                    (a.services && a.services.some((s: any) => Number(s.staff_id) === Number(pId)));
+
+                                                if (!isInvolved) return false;
 
                                                 const [asH, asM] = a.start_time.split(':').map(Number);
                                                 const [aeH, aeM] = a.end_time.split(':').map(Number);
-                                                const appStart = asH * 60 + asM;
-                                                const appEnd = aeH * 60 + aeM;
+                                                const aStart = asH * 60 + asM;
+                                                const aEnd = aeH * 60 + aeM;
 
-                                                // Active if it covers any part of this slot [slotTotal, nextSlotTotal)
-                                                return slotTotal < appEnd && appStart < nextSlotTotal;
+                                                return slotTotal >= aStart && slotTotal < aEnd;
                                             });
 
                                             const isOccupied = activeAtSlot.length > 0;
@@ -633,7 +675,7 @@ export default function SalonBoard() {
                                                         {/* Boş slot - sadece gelecekteyse Müsait göster */}
                                                         {isSlotFree && !isSlotPast && (
                                                             <div className="opacity-0 group-hover:opacity-100 flex items-center justify-center h-[72px] border-2 border-dashed border-slate-200 rounded-lg text-[8px] text-slate-400 font-black uppercase tracking-widest transition-all bg-white shadow-sm">
-                                                                +
+                                                                MÜSAİT
                                                             </div>
                                                         )}
 
@@ -671,9 +713,26 @@ export default function SalonBoard() {
                                                                     </div>
                                                                     <p className="text-xs font-black truncate leading-none mb-0.5 tracking-tight">{app.customer_name || 'Misafir'}</p>
                                                                     <p className="text-[7px] font-bold text-slate-400 truncate uppercase tracking-widest leading-none">
-                                                                        {app.services && app.services.length > 0
-                                                                            ? app.services.map((s: any) => s.name).join(', ')
-                                                                            : (app.service_name || 'Hizmet')}
+                                                                        {(() => {
+                                                                            // Find the specific service that covers THIS slot for THIS staff
+                                                                            const myService = app.services?.find((s: any) => {
+                                                                                if (Number(s.staff_id) !== Number(pId)) return false;
+                                                                                if (!s.start_time || !s.end_time) return false;
+                                                                                const [ssH, ssM] = s.start_time.split(':').map(Number);
+                                                                                const [seH, seM] = s.end_time.split(':').map(Number);
+                                                                                const sStart = ssH * 60 + ssM;
+                                                                                const sEnd = seH * 60 + seM;
+                                                                                return slotTotal >= sStart && slotTotal < sEnd;
+                                                                            });
+
+                                                                            if (myService) return <span className="text-emerald-600 font-extrabold">✂️ {myService.name}</span>;
+
+                                                                            if (app.package_name) return <span className="text-indigo-600 font-extrabold">📦 {app.package_name}</span>;
+
+                                                                            return app.services && app.services.length > 0
+                                                                                ? app.services.map((s: any) => s.name).join(', ')
+                                                                                : (app.service_name || 'Hizmet');
+                                                                        })()}
                                                                     </p>
                                                                 </div>
                                                             );
@@ -781,32 +840,41 @@ export default function SalonBoard() {
                                                                 </button>
 
                                                                 {isSelected && (
-                                                                    <div className="pl-6 space-y-3 animate-in slide-in-from-left duration-300">
-                                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hizmet Personel Atamaları</p>
-                                                                        {p.services?.map((ps: any) => (
-                                                                            <div key={ps.id} className="flex items-center justify-between gap-4 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
-                                                                                <span className="text-[10px] font-black text-slate-700 uppercase truncate flex-1">{ps.name}</span>
-                                                                                <select
-                                                                                    value={fastForm.serviceStaffOverrides[ps.id] || fastForm.staffId || selectedCell?.person.user_id || selectedCell?.person.id}
-                                                                                    onChange={(e) => {
-                                                                                        setFastForm(prev => ({
-                                                                                            ...prev,
-                                                                                            serviceStaffOverrides: {
-                                                                                                ...prev.serviceStaffOverrides,
-                                                                                                [ps.id]: Number(e.target.value)
-                                                                                            }
-                                                                                        }));
-                                                                                    }}
-                                                                                    className="text-[10px] font-bold bg-slate-50 border-none rounded-lg p-1.5 outline-none focus:ring-2 focus:ring-indigo-500"
-                                                                                >
-                                                                                    {staff.map(s => (
-                                                                                        <option key={s.user_id || s.id} value={s.user_id || s.id}>
-                                                                                            {s.first_name} {s.last_name}
-                                                                                        </option>
-                                                                                    ))}
-                                                                                </select>
-                                                                            </div>
-                                                                        ))}
+                                                                    <div className="pl-6 space-y-3 animate-in slide-in-from-left duration-300 border-l-4 border-amber-200 ml-2">
+                                                                        <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest pl-2">🛠️ İşlem Dağılımı (Sıralı Yapılacak)</p>
+                                                                        <div className="space-y-2">
+                                                                            {p.services?.map((ps: any) => (
+                                                                                <div key={ps.id} className="flex items-center justify-between gap-4 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-amber-400">
+                                                                                    <div className="flex flex-col flex-1 min-w-0 pl-2">
+                                                                                        <span className="text-[10px] font-black text-slate-700 uppercase truncate">{ps.name}</span>
+                                                                                        <span className="text-[8px] font-bold text-slate-400">{ps.duration_minutes} dk</span>
+                                                                                    </div>
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <span className="text-[8px] font-black text-slate-400 uppercase">Uygulayan:</span>
+                                                                                        <select
+                                                                                            value={fastForm.serviceStaffOverrides[ps.id] || fastForm.staffId || selectedCell?.person.user_id || selectedCell?.person.id}
+                                                                                            onChange={(e) => {
+                                                                                                setFastForm(prev => ({
+                                                                                                    ...prev,
+                                                                                                    serviceStaffOverrides: {
+                                                                                                        ...prev.serviceStaffOverrides,
+                                                                                                        [ps.id]: Number(e.target.value)
+                                                                                                    }
+                                                                                                }));
+                                                                                            }}
+                                                                                            className="text-[10px] font-bold bg-amber-50 text-amber-900 border-none rounded-xl p-2 outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                                                                                        >
+                                                                                            {staff.map(s => (
+                                                                                                <option key={s.user_id || s.id} value={s.user_id || s.id}>
+                                                                                                    {s.first_name}
+                                                                                                </option>
+                                                                                            ))}
+                                                                                        </select>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                        <p className="text-[8px] font-bold text-slate-400 italic pl-2">* Hizmetler yukarıdan aşağıya sırayla atanacaktır.</p>
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -901,13 +969,35 @@ export default function SalonBoard() {
                                 <div className="flex items-start gap-6 p-6 bg-slate-50 rounded-[2.5rem]">
                                     <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center text-2xl shadow-sm shrink-0">✂️</div>
                                     <div className="flex-1">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Hizmetler</p>
-                                        <div className="space-y-1">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Hizmetler {selectedAppointment.package_name && <span className="text-indigo-600 ml-2">📦 {selectedAppointment.package_name}</span>}</p>
+                                        <div className="space-y-2">
                                             {selectedAppointment.services && selectedAppointment.services.length > 0 ? (
                                                 selectedAppointment.services.map((item: any, idx: number) => (
-                                                    <div key={idx} className="flex justify-between items-center group">
-                                                        <p className="text-sm font-black text-slate-800 uppercase tracking-tight">{item.name}</p>
-                                                        <span className="text-[10px] font-black text-slate-400">₺{item.price}</span>
+                                                    <div key={idx} className="flex justify-between items-center group bg-white/50 p-2 rounded-xl border border-slate-100 shadow-sm">
+                                                        <div className="flex flex-col">
+                                                            <p className="text-[10px] font-black text-slate-800 uppercase tracking-tight leading-none mb-1">{item.name}</p>
+                                                            <p className="text-[8px] font-bold text-slate-400 uppercase leading-none">👤 {item.staff_name || 'Uzman belirtilmedi'}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="text-[10px] font-black text-slate-400 mr-2">₺{item.price}</span>
+                                                            {item.status === 'approved' ? (
+                                                                <div className="flex items-center gap-1 text-emerald-500">
+                                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                                                    <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600">ONAYLI</span>
+                                                                </div>
+                                                            ) : (
+                                                                staffMode && (item.staff_id === staffInfo.id) ? (
+                                                                    <button
+                                                                        onClick={() => handleUpdateServiceStatus(item.aps_id, 'approved')}
+                                                                        className="px-3 py-1 bg-amber-500 text-white text-[8px] font-black uppercase rounded-lg shadow-md hover:bg-amber-600 transition-all animate-pulse"
+                                                                    >
+                                                                        PARÇAMI ONAYLA
+                                                                    </button>
+                                                                ) : (
+                                                                    <span className="text-[8px] font-black text-amber-500 uppercase tracking-widest">BEKLİYOR</span>
+                                                                )
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 ))
                                             ) : (

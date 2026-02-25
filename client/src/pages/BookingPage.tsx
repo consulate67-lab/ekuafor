@@ -161,14 +161,10 @@ export default function BookingPage() {
 
     const handleNext = () => {
         if (step === 1) {
-            // If package selected and it has a fixed staff, skip step 2
+            // If package selected, skip staff selection step (Step 2)
             if (selection.packageId) {
-                const pkg = packages.find(p => p.id === selection.packageId);
-                if (pkg?.staff_id) {
-                    setSelection(prev => ({ ...prev, staffId: pkg.staff_id }));
-                    setStep(3); // Go to Date
-                    return;
-                }
+                setStep(3); // Go directly to Date
+                return;
             }
             // If initialStaffId was provided via URL, skip staff selection
             if (initialStaffId) {
@@ -181,8 +177,8 @@ export default function BookingPage() {
     };
 
     const handleBack = () => {
-        if (step === 3 && (initialStaffId || (selection.packageId && packages.find(p => p.id === selection.packageId)?.staff_id))) {
-            setStep(1); // Go back to services if staff was skipped
+        if (step === 3 && (initialStaffId || selection.packageId)) {
+            setStep(1); // Go back to services if staff selection was skipped
             return;
         }
         setStep(prev => prev - 1);
@@ -190,68 +186,99 @@ export default function BookingPage() {
 
     const generateTimeSlots = () => {
         if (!company || !selection.date) return [];
-        let duration = 0;
-        if (selection.packageId) {
-            const pkg = packages.find(p => p.id === selection.packageId);
-            duration = pkg?.duration_minutes || 0;
-        } else {
-            const selectedServices = services.filter(s => selection.serviceIds.includes(s.id!));
-            duration = selectedServices.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
-        }
-
-        if (duration === 0) return [];
-
-        const [startH, startM] = (company.work_start_time || '09:00').split(':').map(Number);
-        const [endH, endM] = (company.work_end_time || '20:00').split(':').map(Number);
-
-        const workBegin = startH * 60 + startM;
-        const workEnd = endH * 60 + endM;
 
         const now = new Date();
         const todayStr = now.toLocaleDateString('en-CA');
         const isToday = selection.date === todayStr;
         const currentMin = now.getHours() * 60 + now.getMinutes();
 
+        const [startH, startM] = (company.work_start_time || '09:00').split(':').map(Number);
+        const [endH, endM] = (company.work_end_time || '20:00').split(':').map(Number);
+        const workBegin = startH * 60 + startM;
+        const workEnd = endH * 60 + endM;
         const slotInterval = company.slot_interval || 30;
 
-        // Get all appointments for this staff on this date
-        // Normalize: appointment_date from DB may be ISO "2026-02-19T00:00:00.000Z"
-        const selectedDate = selection.date; // "2026-02-19"
-        const staffApps = appointments.filter(a => {
-            const appDate = (a.appointment_date || '').substring(0, 10); // "2026-02-19"
-            const staffMatch = (Number(a.staff_id) === Number(selection.staffId)) || !a.staff_id;
-            const companyMatch = Number(a.company_id) === Number(id);
-            const notCancelled = a.status !== 'cancelled';
-            const dateMatch = appDate === selectedDate;
-            return staffMatch && companyMatch && notCancelled && dateMatch;
-        });
+        const pkg = selection.packageId ? packages.find(p => p.id === selection.packageId) : null;
+        const selectedServices = pkg
+            ? pkg.services || []
+            : services.filter(s => selection.serviceIds.includes(s.id!));
 
-        console.log(`[v1.7.3] generateTimeSlots: date=${selectedDate}, staffId=${selection.staffId}, found ${staffApps.length} appointments`, staffApps.map(a => ({ start: a.start_time, end: a.end_time, date: a.appointment_date, staff: a.staff_id, status: a.status })));
+        const totalDuration = pkg
+            ? pkg.duration_minutes
+            : selectedServices.reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
+
+        if (totalDuration === 0) return [];
 
         const slots: { time: string; isAvailable: boolean }[] = [];
 
+        // Pre-parse all appointments for the day to avoid repeated parsing
+        const dayApps = appointments.filter(a => (a.appointment_date || '').substring(0, 10) === selection.date && a.status !== 'cancelled');
+
         for (let time = workBegin; time < workEnd; time += slotInterval) {
-            const h = Math.floor(time / 60);
-            const m = time % 60;
-            const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-            const slotEnd = time + duration;
+            const timeStr = `${String(Math.floor(time / 60)).padStart(2, '0')}:${String(time % 60).padStart(2, '0')}`;
 
-            // 1. Check if it's in the past (Bugün için 5dk buffer)
-            const isPast = isToday && (time < currentMin + 5);
+            // 1. Past check
+            if (isToday && (time < currentMin + 5)) {
+                slots.push({ time: timeStr, isAvailable: false });
+                continue;
+            }
 
-            // 2. Check if it's busy (Approved or Pending)
-            const isBusy = staffApps.some(app => {
-                const [asH, asM] = app.start_time.split(':').map(Number);
-                const [aeH, aeM] = app.end_time.split(':').map(Number);
-                const appStart = asH * 60 + asM;
-                const appEnd = aeH * 60 + aeM;
-                return (time < appEnd && slotEnd > appStart);
-            });
+            // 2. Work end check
+            if (time + totalDuration > workEnd) {
+                slots.push({ time: timeStr, isAvailable: false });
+                continue;
+            }
 
-            slots.push({
-                time: timeStr,
-                isAvailable: !isPast && !isBusy
-            });
+            let canApplySlot = true;
+            let currentOffset = 0;
+
+            if (pkg) {
+                // Multi-service sequential staff check
+                for (const svc of selectedServices) {
+                    const svcStart = time + currentOffset;
+                    const svcEnd = svcStart + svc.duration_minutes;
+
+                    // Find available staff for this specific service
+                    const availableStaff = staff.filter(s => {
+                        // Department filter
+                        if (svc.department_id && s.department_id !== svc.department_id) return false;
+
+                        // Check busy
+                        const isBusy = dayApps.some(app => {
+                            if (Number(app.staff_id) !== Number(s.id)) return false;
+                            const [asH, asM] = app.start_time.split(':').map(Number);
+                            const [aeH, aeM] = app.end_time.split(':').map(Number);
+                            const appStart = asH * 60 + asM;
+                            const appEnd = aeH * 60 + aeM;
+                            return (svcStart < appEnd && svcEnd > appStart);
+                        });
+                        return !isBusy;
+                    });
+
+                    if (availableStaff.length === 0) {
+                        canApplySlot = false;
+                        break;
+                    }
+
+                    currentOffset += svc.duration_minutes;
+                }
+            } else {
+                // Single staff check (Normal flow or single-staff selection)
+                if (!selection.staffId) {
+                    canApplySlot = false;
+                } else {
+                    const slotEnd = time + totalDuration;
+                    const isBusy = dayApps.some(app => {
+                        if (Number(app.staff_id) !== Number(selection.staffId)) return false;
+                        const [asH, asM] = app.start_time.split(':').map(Number);
+                        const [aeH, aeM] = app.end_time.split(':').map(Number);
+                        return (time < (aeH * 60 + aeM) && slotEnd > (asH * 60 + asM));
+                    });
+                    if (isBusy) canApplySlot = false;
+                }
+            }
+
+            slots.push({ time: timeStr, isAvailable: canApplySlot });
         }
         return slots;
     };
@@ -261,53 +288,70 @@ export default function BookingPage() {
         try {
             let duration = 0;
             let totalPrice = 0;
-            let serviceIds = [...selection.serviceIds];
+            let finalServices: any[] = [];
+            const pkg = selection.packageId ? packages.find(p => p.id === selection.packageId) : null;
+            const [h, m] = (selection.time || '00:00').split(':').map(Number);
+            const startTimeMins = h * 60 + m;
 
-            if (selection.packageId) {
-                const pkg = packages.find(p => p.id === selection.packageId);
-                if (pkg) {
-                    duration = pkg.duration_minutes;
-                    totalPrice = Number(pkg.price);
-                    serviceIds = pkg.services?.map((s: any) => s.id) || [];
+            // Pre-parse today's appointments for conflict checking
+            const dayApps = appointments.filter(a => (a.appointment_date || '').substring(0, 10) === selection.date && a.status !== 'cancelled');
+
+            if (pkg) {
+                duration = pkg.duration_minutes;
+                totalPrice = Number(pkg.price);
+                let currentOffset = 0;
+
+                for (const svc of (pkg.services || [])) {
+                    const svcStart = startTimeMins + currentOffset;
+                    const svcEnd = svcStart + svc.duration_minutes;
+
+                    // 1. Identify candidates: First the assigned staff, then others in the same department
+                    const candidates = staff.filter(s => !svc.department_id || s.department_id === svc.department_id);
+                    // Sort to prioritize svc.staff_id if it exists
+                    candidates.sort((a, b) => {
+                        if (a.id === svc.staff_id) return -1;
+                        if (b.id === svc.staff_id) return 1;
+                        return 0;
+                    });
+
+                    // 2. Find first available candidate
+                    let bestStaffId = svc.staff_id || selection.staffId; // Fallback to provided staff or selection
+                    for (const candidate of candidates) {
+                        const isBusy = dayApps.some(app => {
+                            if (Number(app.staff_id) !== Number(candidate.id)) return false;
+                            const [asH, asM] = app.start_time.split(':').map(Number);
+                            const [aeH, aeM] = app.end_time.split(':').map(Number);
+                            const appStart = asH * 60 + asM;
+                            const appEnd = aeH * 60 + aeM;
+                            return (svcStart < appEnd && svcEnd > appStart);
+                        });
+                        if (!isBusy) {
+                            bestStaffId = candidate.id;
+                            break;
+                        }
+                    }
+
+                    finalServices.push({
+                        service_id: svc.id,
+                        staff_id: bestStaffId
+                    });
+                    currentOffset += svc.duration_minutes;
                 }
             } else {
                 const selectedServices = services.filter(s => selection.serviceIds.includes(s.id!));
                 duration = selectedServices.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
                 totalPrice = selectedServices.reduce((sum, s) => sum + Number(s.price), 0);
+                finalServices = selection.serviceIds.map(sid => ({
+                    service_id: sid,
+                    staff_id: selection.staffId
+                }));
             }
 
-            const [h, m] = (selection.time || '00:00').split(':').map(Number);
-            const newStart = h * 60 + m;
-            const newEnd = newStart + duration;
-            const endH = Math.floor(newEnd / 60);
-            const endM = newEnd % 60;
-            const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-            const serviceNames = selection.packageId
-                ? packages.find(p => p.id === selection.packageId)?.name
+            const newEnd = startTimeMins + duration;
+            const endTime = `${String(Math.floor(newEnd / 60)).padStart(2, '0')}:${String(newEnd % 60).padStart(2, '0')}`;
+            const serviceNames = pkg
+                ? pkg.name
                 : services.filter(s => selection.serviceIds.includes(s.id!)).map(s => s.name).join(', ');
-
-            // Çakışma kontrolü - son güvenlik katmanı
-            const staffApps = appointments.filter(a => {
-                const appDate = (a.appointment_date || '').substring(0, 10);
-                return (Number(a.staff_id) === Number(selection.staffId) || !a.staff_id) &&
-                    Number(a.company_id) === Number(id) &&
-                    a.status !== 'cancelled' &&
-                    appDate === selection.date;
-            });
-
-            const conflict = staffApps.find(app => {
-                const [asH, asM] = app.start_time.split(':').map(Number);
-                const [aeH, aeM] = app.end_time.split(':').map(Number);
-                const appStart = asH * 60 + asM;
-                const appEnd = aeH * 60 + aeM;
-                return (newStart < appEnd && newEnd > appStart);
-            });
-
-            if (conflict) {
-                alert(`⚠️ Bu saat aralığı dolu!\n\nSeçtiğiniz: ${selection.time} - ${endTime} (${duration} dk)\nMevcut randevu: ${conflict.start_time} - ${conflict.end_time}\n\nLütfen başka bir saat seçin.`);
-                setStep(4); // Saat seçim ekranına geri dön
-                return;
-            }
 
             // Get Device ID
             let deviceId = undefined;
@@ -318,9 +362,9 @@ export default function BookingPage() {
 
             const res = await api.post('/appointments', {
                 company_id: Number(id),
-                staff_id: selection.staffId,
-                service_id: serviceIds[0],
-                service_ids: serviceIds,
+                staff_id: finalServices[0]?.staff_id || selection.staffId, // Principal staff
+                service_id: finalServices[0]?.service_id,
+                service_ids: finalServices.map(s => s.service_id),
                 package_id: selection.packageId,
                 appointment_date: selection.date,
                 start_time: selection.time,
@@ -331,13 +375,7 @@ export default function BookingPage() {
                 price: totalPrice,
                 device_id: deviceId,
                 status: 'pending',
-                services: selection.packageId ? packages.find(p => p.id === selection.packageId)?.services?.map((s: any) => ({
-                    service_id: s.id,
-                    staff_id: s.staff_id || selection.staffId
-                })) : serviceIds.map(sid => ({
-                    service_id: sid,
-                    staff_id: selection.staffId
-                }))
+                services: finalServices
             });
             const newApp = res.data?.data;
             if (newApp && newApp.id) {
@@ -393,7 +431,7 @@ export default function BookingPage() {
                     Sistemi Sıfırla (Veri Sorunu Varsa)
                 </button>
             </div>
-            <p className="text-[10px] text-gray-300 mt-10 uppercase tracking-widest">ID: {id} | v1.9.3</p>
+            <p className="text-[10px] text-gray-300 mt-10 uppercase tracking-widest">ID: {id} | v1.69</p>
         </div>
     );
 

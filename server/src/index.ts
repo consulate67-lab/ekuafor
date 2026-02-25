@@ -204,6 +204,9 @@ const runMigrations = async () => {
             )
         `);
         await pool.query('ALTER TABLE appointment_services ADD COLUMN IF NOT EXISTS staff_id INTEGER REFERENCES users(id)');
+        await pool.query('ALTER TABLE appointment_services ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT \'pending\'');
+        await pool.query('ALTER TABLE appointment_services ADD COLUMN IF NOT EXISTS start_time VARCHAR(5)');
+        await pool.query('ALTER TABLE appointment_services ADD COLUMN IF NOT EXISTS end_time VARCHAR(5)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_appointment_services_appointment ON appointment_services(appointment_id)');
 
         // Package support
