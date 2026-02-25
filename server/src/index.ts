@@ -45,7 +45,7 @@ app.use((req, res, next) => {
 
 // Root Route
 app.get('/', (req, res) => {
-    res.send('<h1>Saloon Backend is Live!</h1>');
+    res.send('<h1>Saloon Backend is Live (v1.69.2)!</h1>');
 });
 
 // Health Checks (Explicit)
