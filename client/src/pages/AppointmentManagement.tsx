@@ -448,11 +448,20 @@ export default function AppointmentManagement() {
         if (a.status !== 'pending') return false;
         if (showAllStaff || !userInfo) return true;
 
-        const isMainStaff = Number(a.staff_id) === Number(userInfo.id);
-        const isSubStaff = a.services?.some(s => Number(s.staff_id) === Number(userInfo.id));
-        const isUnassigned = !a.staff_id && (!a.services || a.services.every(s => !s.staff_id));
+        const myId = Number(userInfo?.id);
+        const hasServices = a.services && a.services.length > 0;
 
-        return isMainStaff || isSubStaff || isUnassigned;
+        if (hasServices) {
+            const assignedToMe = a.services?.some((s: any) => Number(s.staff_id) === myId);
+            if (assignedToMe) return true;
+
+            const anyoneAssigned = a.services?.some((s: any) => s.staff_id);
+            if (!anyoneAssigned && (Number(a.staff_id) === myId || !a.staff_id)) return true;
+
+            return false;
+        }
+
+        return Number(a.staff_id) === myId || !a.staff_id;
     });
 
     if (loading && appointments.length === 0) return <div className="p-8 text-center font-bold text-gray-400 animate-pulse">Veriler Hazırlanıyor...</div>;
@@ -599,12 +608,20 @@ export default function AppointmentManagement() {
                                 }));
                             });
 
-                            // Filter based on showAllStaff preference
+                            // Filter based on showAllStaff preference (Expert Mode)
                             if (!showAllStaff && userInfo) {
-                                const myId = Number(userInfo.id);
+                                const myId = Number(userInfo?.id);
                                 flatList = flatList.filter((item: any) => {
-                                    const assignedId = item.display_staff_id || item.staff_id;
-                                    return Number(assignedId) === myId || !assignedId;
+                                    // If a specific assignment exists for this service, it MUST be mine
+                                    if (item.display_staff_id !== undefined && item.display_staff_id !== null) {
+                                        return Number(item.display_staff_id) === myId;
+                                    }
+                                    // If no specific assignment, root assignment must be mine or unassigned
+                                    if (item.staff_id) {
+                                        return Number(item.staff_id) === myId;
+                                    }
+                                    // Completely unassigned items show for everyone
+                                    return true;
                                 });
                             }
 
@@ -684,7 +701,7 @@ export default function AppointmentManagement() {
                         Sistemi Sıfırla
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments Edition v1.81.0</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments Edition v1.83.0</span>
                     </div>
                 </div>
             </div>

@@ -423,7 +423,22 @@ export default function SalonBoard() {
         );
     }
 
-    const pendingCount = appointments.filter(a => a.status === 'pending').length;
+    const filteredPending = appointments.filter(a => {
+        if (a.status !== 'pending') return false;
+        if (!staffMode || !staffInfo) return true;
+        const myId = Number(staffInfo?.id);
+        const hasServices = a.services && a.services.length > 0;
+        if (hasServices) {
+            const assignedToMe = a.services?.some((s: any) => Number(s.staff_id) === myId);
+            if (assignedToMe) return true;
+            const anyoneAssigned = a.services?.some((s: any) => s.staff_id);
+            if (!anyoneAssigned && (Number(a.staff_id) === myId || !a.staff_id)) return true;
+            return false;
+        }
+        return Number(a.staff_id) === myId || !a.staff_id;
+    });
+
+    const pendingCount = filteredPending.length;
 
     const getSpecialDay = (dateStr: string) => {
         const d = new Date(dateStr);
@@ -1348,7 +1363,7 @@ export default function SalonBoard() {
                             <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-amber-50/30">
                                 <div>
                                     <h2 className="text-2xl font-black text-slate-900 tracking-tight">Onay Bekleyen Talepler</h2>
-                                    <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mt-1">{appointments.filter(a => a.status === 'pending').length} Yeni Randevu İsteği</p>
+                                    <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mt-1">{pendingCount} Yeni Randevu İsteği</p>
                                 </div>
                                 <button onClick={() => setIsPendingListModalOpen(false)} className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all shadow-sm">
                                     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6" /></svg>
@@ -1356,8 +1371,8 @@ export default function SalonBoard() {
                             </div>
 
                             <div className="p-8 max-h-[70vh] overflow-y-auto space-y-4">
-                                {appointments.filter(a => a.status === 'pending').sort((a, b) => (a.appointment_date || '').localeCompare(b.appointment_date || '')).length > 0 ? (
-                                    appointments.filter(a => a.status === 'pending').sort((a, b) => (a.appointment_date || '').localeCompare(b.appointment_date || '')).map(app => (
+                                {filteredPending.sort((a, b) => (a.appointment_date || '').localeCompare(b.appointment_date || '')).length > 0 ? (
+                                    filteredPending.sort((a, b) => (a.appointment_date || '').localeCompare(b.appointment_date || '')).map(app => (
                                         <div key={app.id} className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 hover:border-amber-200 transition-all group">
                                             <div className="flex items-start justify-between gap-4 mb-4">
                                                 <div className="flex-1">
