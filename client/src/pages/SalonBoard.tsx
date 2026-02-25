@@ -1016,7 +1016,7 @@ export default function SalonBoard() {
                                                         const isExactService = targetService && item.aps_id === targetService.aps_id;
 
                                                         return (
-                                                            <div key={idx} className={`flex flex-col gap-2 p-4 rounded-3xl border transition-all ${isExactService ? 'bg-indigo-600 border-indigo-600 shadow-xl shadow-indigo-100 ring-4 ring-indigo-50 color-pulse' : isRelevantToMe ? 'bg-indigo-50 border-indigo-200' : 'bg-white/50 border-slate-100'}`}>
+                                                            <div key={item.aps_id || idx} className={`flex flex-col gap-2 p-4 rounded-3xl border transition-all ${isExactService ? 'bg-indigo-600 border-indigo-600 shadow-xl shadow-indigo-100 ring-4 ring-indigo-50 color-pulse' : isRelevantToMe ? 'bg-indigo-50 border-indigo-200' : 'bg-white/50 border-slate-100'}`}>
                                                                 <div className="flex justify-between items-start">
                                                                     <div className="flex-1 min-w-0">
                                                                         <div className="flex items-center gap-2 mb-1">
@@ -1032,7 +1032,7 @@ export default function SalonBoard() {
                                                                                 <span className="text-[9px] font-bold">👤 {item.service_staff_name || 'Uzman belirtilmedi'}</span>
                                                                             </div>
                                                                             <div className="flex items-center gap-1">
-                                                                                <span className="text-[9px] font-bold">⏰ {item.start_time || '--:--'} - {item.end_time || '--:--'}</span>
+                                                                                <span className={`text-[9px] font-bold ${isExactService ? 'text-indigo-100' : 'text-slate-500'}`}>⏰ {item.start_time || '--:--'} - {item.end_time || '--:--'}</span>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -1058,7 +1058,8 @@ export default function SalonBoard() {
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        });
+                                                        );
+                                                    });
                                                 })()
                                             ) : (
                                                 <p className="text-xl font-black text-slate-800 uppercase tracking-tight">{selectedAppointment.package_name || selectedAppointment.service_name || 'Hizmet Bilgisi Yok'}</p>
