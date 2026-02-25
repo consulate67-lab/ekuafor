@@ -78,8 +78,8 @@ export default function AppointmentManagement() {
                         setStaffMode(true);
                         setShowAllStaff(false);
                     } else if (meRes.data.data.role === 'company_admin') {
-                        // Admins see all by default but can toggle
-                        setShowAllStaff(true);
+                        // Default to self-view as per user request
+                        setShowAllStaff(false);
                     }
                     const companyRes = await api.get(`/companies/${companyId}`);
                     setCompany(companyRes.data?.data || null);
@@ -568,14 +568,7 @@ export default function AppointmentManagement() {
                         <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">
                             {new Date(selectedDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} Randevuları
                         </h3>
-                        {userInfo?.role === 'company_admin' && (
-                            <button
-                                onClick={() => setShowAllStaff(!showAllStaff)}
-                                className={`text-[9px] font-black px-3 py-1.5 rounded-full border transition-all uppercase tracking-widest ${showAllStaff ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-200'}`}
-                            >
-                                {showAllStaff ? 'Tüm Uzmanlar' : 'Sadece Benim'}
-                            </button>
-                        )}
+                        {/* Show all staff toggle removed as per user request */}
                     </div>
 
                     <div className="space-y-3">
@@ -701,7 +694,7 @@ export default function AppointmentManagement() {
                         Sistemi Sıfırla
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments Edition v1.83.0</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments Edition v1.84.0</span>
                     </div>
                 </div>
             </div>
