@@ -56,6 +56,20 @@ class CompanyService {
         const client = await pool.connect();
 
         try {
+            if (company.main_company_id) {
+                const check = await client.query('SELECT id FROM companies WHERE id = $1', [company.main_company_id]);
+                if ((check.rowCount || 0) === 0) {
+                    // Try to find it in legacy table and map back to unified
+                    const legacy = await client.query('SELECT name FROM main_companies WHERE id = $1', [company.main_company_id]);
+                    if ((legacy.rowCount || 0) > 0) {
+                        const unified = await client.query('SELECT id FROM companies WHERE name = $1 AND company_type = \'ÜST FİRMA\'', [legacy.rows[0].name]);
+                        if ((unified.rowCount || 0) > 0) {
+                            company.main_company_id = unified.rows[0].id;
+                        }
+                    }
+                }
+            }
+
             const query = `
         INSERT INTO companies (
           name, description, phone, email, website,
@@ -120,6 +134,20 @@ class CompanyService {
         const client = await pool.connect();
 
         try {
+            // Self-healing for updates too
+            if (company.main_company_id) {
+                const check = await client.query('SELECT id FROM companies WHERE id = $1', [company.main_company_id]);
+                if ((check.rowCount || 0) === 0) {
+                    const legacy = await client.query('SELECT name FROM main_companies WHERE id = $1', [company.main_company_id]);
+                    if ((legacy.rowCount || 0) > 0) {
+                        const unified = await client.query('SELECT id FROM companies WHERE name = $1 AND company_type = \'ÜST FİRMA\'', [legacy.rows[0].name]);
+                        if ((unified.rowCount || 0) > 0) {
+                            company.main_company_id = unified.rows[0].id;
+                        }
+                    }
+                }
+            }
+
             const fields: string[] = [];
             const values: any[] = [];
             let paramIndex = 1;
