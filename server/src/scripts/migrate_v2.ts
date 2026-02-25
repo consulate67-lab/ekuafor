@@ -26,7 +26,13 @@ async function migrate() {
             ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_type VARCHAR(20) DEFAULT 'ASIL'
         `);
         await client.query(`
-            ALTER TABLE companies ADD COLUMN IF NOT EXISTS main_company_id INTEGER REFERENCES main_companies(id)
+            ALTER TABLE companies ADD COLUMN IF NOT EXISTS main_company_id INTEGER
+        `);
+        await client.query(`
+            ALTER TABLE companies DROP CONSTRAINT IF EXISTS companies_main_company_id_fkey
+        `);
+        await client.query(`
+            ALTER TABLE companies ADD CONSTRAINT companies_main_company_id_fkey FOREIGN KEY (main_company_id) REFERENCES companies(id)
         `);
         console.log('✅ columns added to companies table');
 

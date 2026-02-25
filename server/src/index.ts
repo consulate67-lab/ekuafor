@@ -302,7 +302,9 @@ const runMigrations = async () => {
 
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS genders TEXT[]');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_type VARCHAR(20) DEFAULT \'ASIL\'');
-        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS main_company_id INTEGER REFERENCES main_companies(id)');
+        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS main_company_id INTEGER');
+        await pool.query('ALTER TABLE companies DROP CONSTRAINT IF EXISTS companies_main_company_id_fkey');
+        await pool.query('ALTER TABLE companies ADD CONSTRAINT companies_main_company_id_fkey FOREIGN KEY (main_company_id) REFERENCES companies(id)');
         await pool.query("UPDATE companies SET genders = '{\"Erkek\", \"Kadın\", \"Çocuk\"}' WHERE genders IS NULL");
 
         await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS department_id INTEGER');

@@ -3,7 +3,12 @@ require('dotenv').config();
 
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    host: process.env.DATABASE_URL ? undefined : (process.env.DB_HOST || 'localhost'),
+    port: process.env.DATABASE_URL ? undefined : parseInt(process.env.DB_PORT || '5432'),
+    database: process.env.DATABASE_URL ? undefined : (process.env.DB_NAME || 'saloon_db'),
+    user: process.env.DATABASE_URL ? undefined : (process.env.DB_USER || 'postgres'),
+    password: process.env.DATABASE_URL ? undefined : process.env.DB_PASSWORD,
+    ssl: process.env.DATABASE_URL || process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });
 
 async function runMigration() {
@@ -21,13 +26,17 @@ async function runMigration() {
             END $$;
         `);
 
-        // 2. Add main_company_id to companies if missing
+        // 2. Add main_company_id to companies if missing (+ Fix FK)
         await client.query(`
             DO $$ 
             BEGIN 
                 IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='companies' AND column_name='main_company_id') THEN
                     ALTER TABLE companies ADD COLUMN main_company_id INTEGER;
                 END IF;
+                -- Ensure we drop the incorrect FK if it exists
+                ALTER TABLE companies DROP CONSTRAINT IF EXISTS companies_main_company_id_fkey;
+                -- Re-add it referencing companies(id) as intended in schema.sql
+                ALTER TABLE companies ADD CONSTRAINT companies_main_company_id_fkey FOREIGN KEY (main_company_id) REFERENCES companies(id);
             END $$;
         `);
 
