@@ -86,12 +86,16 @@ const healthHandler = async (req: Request, res: Response) => {
             WHERE tc.table_name='companies' AND tc.constraint_type = 'FOREIGN KEY';
         `);
 
+        const companyTypes = await pool.query('SELECT company_type, COUNT(*) FROM companies GROUP BY company_type');
+
         res.json({
             success: true,
+            version: '1.69.2-unified',
             db: 'Connected',
             time: result.rows[0].now,
             connected_host: dbHost,
             tables_found: tableList,
+            company_stats: companyTypes.rows,
             constraints: fkCheck.rows,
             env: process.env.NODE_ENV
         });
@@ -462,8 +466,18 @@ const runMigrations = async () => {
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_type VARCHAR(20) DEFAULT \'ASIL\'');
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS main_company_id INTEGER');
 
-            // Drop any existing constraint and ensure it points to the right table (companies, not main_companies)
-            await pool.query('ALTER TABLE companies DROP CONSTRAINT IF EXISTS companies_main_company_id_fkey');
+            // Drop ANY and ALL existing constraints on main_company_id column
+            await pool.query(`
+                DO $$ 
+                DECLARE r RECORD;
+                BEGIN
+                    FOR r IN (SELECT constraint_name FROM information_schema.key_column_usage 
+                              WHERE table_name = 'companies' AND column_name = 'main_company_id') 
+                    LOOP
+                        EXECUTE 'ALTER TABLE companies DROP CONSTRAINT ' || quote_ident(r.constraint_name) || ' CASCADE';
+                    END LOOP;
+                END $$;
+            `);
 
             // --- DATA UNIFICATION MIGRATION (One-time) ---
             const mainCount = await pool.query('SELECT COUNT(*) FROM main_companies');
