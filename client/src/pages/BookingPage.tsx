@@ -27,10 +27,9 @@ export default function BookingPage() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Form Steps: 1-Staff, 2-Service, 3-Date, 4-Time, 5-CustomerInfo
-    // If staff param exists, start at step 2
+    // Form Steps: 1-Service, 2-Staff, 3-Date, 4-Time, 5-CustomerInfo
     const initialStaffId = searchParams.get('staff') ? Number(searchParams.get('staff')) : null;
-    const [step, setStep] = useState(initialStaffId ? 2 : 1);
+    const [step, setStep] = useState(1); // Always start with services/packages as requested
 
     // Android Hardware Back Button Support
     useEffect(() => {
@@ -160,8 +159,34 @@ export default function BookingPage() {
         fetchCompanyData();
     }, [id, searchParams]);
 
-    const handleNext = () => setStep(prev => prev + 1);
-    const handleBack = () => setStep(prev => prev - 1);
+    const handleNext = () => {
+        if (step === 1) {
+            // If package selected and it has a fixed staff, skip step 2
+            if (selection.packageId) {
+                const pkg = packages.find(p => p.id === selection.packageId);
+                if (pkg?.staff_id) {
+                    setSelection(prev => ({ ...prev, staffId: pkg.staff_id }));
+                    setStep(3); // Go to Date
+                    return;
+                }
+            }
+            // If initialStaffId was provided via URL, skip staff selection
+            if (initialStaffId) {
+                setSelection(prev => ({ ...prev, staffId: initialStaffId }));
+                setStep(3);
+                return;
+            }
+        }
+        setStep(prev => prev + 1);
+    };
+
+    const handleBack = () => {
+        if (step === 3 && (initialStaffId || (selection.packageId && packages.find(p => p.id === selection.packageId)?.staff_id))) {
+            setStep(1); // Go back to services if staff was skipped
+            return;
+        }
+        setStep(prev => prev - 1);
+    };
 
     const generateTimeSlots = () => {
         if (!company || !selection.date) return [];
@@ -305,7 +330,14 @@ export default function BookingPage() {
                 notes: `Müşteri: ${selection.customerName} | Tel: ${selection.customerPhone} | ${serviceNames}`,
                 price: totalPrice,
                 device_id: deviceId,
-                status: 'pending'
+                status: 'pending',
+                services: selection.packageId ? packages.find(p => p.id === selection.packageId)?.services?.map((s: any) => ({
+                    service_id: s.id,
+                    staff_id: s.staff_id || selection.staffId
+                })) : serviceIds.map(sid => ({
+                    service_id: sid,
+                    staff_id: selection.staffId
+                }))
             });
             const newApp = res.data?.data;
             if (newApp && newApp.id) {
@@ -394,64 +426,9 @@ export default function BookingPage() {
                     ))}
                 </div>
 
-                {/* Step 1: Staff Selection */}
+                {/* Step 1: Service/Package Selection */}
                 {step === 1 && (
-                    <div className="animate-in slide-in-from-right duration-300 fade-in">
-                        <h2 className="text-2xl font-black text-gray-900 mb-6">Personel Seçimi</h2>
-                        <div className="space-y-3">
-                            {staff.map(u => (
-                                <button
-                                    key={u.id || (u as any).user_id}
-                                    onClick={() => {
-                                        setSelection({ ...selection, staffId: u.id || (u as any).user_id });
-                                        handleNext();
-                                    }}
-                                    className="w-full bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-indigo-100 transition-all flex items-center gap-5 text-left group active:scale-[0.98]"
-                                >
-                                    <div className="w-16 h-16 bg-slate-50 text-[#1e1b4b] rounded-2xl flex items-center justify-center font-black text-xl group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner overflow-hidden">
-                                        {u.photo ? (
-                                            <img src={u.photo} alt={u.first_name} className="w-full h-full object-cover" />
-                                        ) : (
-                                            u.first_name[0]
-                                        )}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="font-black text-slate-900 text-lg group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{u.first_name} {u.last_name}</h3>
-                                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-2">{u.role === 'company_admin' ? 'Baş Uzman' : 'Uzman'}</p>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {/* Dummy skills for now, in real case this would come from API */}
-                                            {['Saç Tasarım', 'Sakal Tıraşı', 'Cilt Bakımı'].map(skill => (
-                                                <span key={skill} className="px-2 py-0.5 bg-slate-50 text-slate-500 rounded-md text-[8px] font-bold border border-slate-100 uppercase">{skill}</span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="w-8 h-8 rounded-full bg-slate-50 text-slate-300 flex items-center justify-center group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all">
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
-                                    </div>
-                                </button>
-                            ))}
-                            {staff.length === 0 && (
-                                <div className="text-center py-12 bg-white rounded-3xl border-2 border-dashed border-gray-100">
-                                    <p className="text-gray-400 font-bold mb-4">Henüz personel bulunamadı.</p>
-                                    <button
-                                        onClick={() => {
-                                            localStorage.clear();
-                                            window.location.reload();
-                                        }}
-                                        className="bg-pink-600 text-white px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest shadow-lg active:scale-95 transition-transform"
-                                    >
-                                        Verileri Yenile
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* Step 2: Service/Package Selection */}
-                {step === 2 && (
                     <div className="animate-in slide-in-from-right duration-300 fade-in pb-32">
-                        <button onClick={handleBack} className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 hover:text-gray-600">← Geri</button>
                         <h2 className="text-2xl font-black text-gray-900 mb-2">Hizmet Seçimi</h2>
 
                         <div className="flex gap-4 mb-6">
@@ -490,7 +467,7 @@ export default function BookingPage() {
                                             </div>
                                             <div className="flex-1">
                                                 <h3 className={`font-black text-sm uppercase tracking-tight ${isSelected ? 'text-indigo-900' : 'text-slate-900'}`}>{s.name}</h3>
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.duration_minutes} dakika</p>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.duration_minutes} dakika {s.department_name ? `• ${s.department_name}` : ''}</p>
                                             </div>
                                             <div className={`font-black text-base ${isSelected ? 'text-indigo-600' : 'text-slate-900'}`}>₺{s.price}</div>
                                         </button>
@@ -512,13 +489,16 @@ export default function BookingPage() {
                                                 <div className="absolute top-0 right-0 bg-amber-500 text-white px-4 py-1 rounded-bl-2xl text-[8px] font-black uppercase tracking-widest shadow-lg">SEÇİLDİ</div>
                                             )}
                                             <h3 className={`font-black text-lg uppercase tracking-tight mb-1 ${isSelected ? 'text-amber-900' : 'text-slate-900'}`}>{p.name}</h3>
-                                            <div className="flex flex-wrap gap-1.5 mb-4">
+                                            <div className="flex flex-wrap gap-1.5 mb-2">
                                                 {p.services?.map((ps: any) => (
                                                     <span key={ps.id} className={`px-2 py-0.5 rounded-lg text-[8px] font-bold uppercase ${isSelected ? 'bg-amber-200/50 text-amber-700' : 'bg-slate-50 text-slate-400'}`}>
                                                         {ps.name}
                                                     </span>
                                                 ))}
                                             </div>
+                                            {p.staff_first_name && (
+                                                <p className="text-[9px] font-bold text-slate-400 mb-3 uppercase tracking-widest">👤 Personel: {p.staff_first_name} {p.staff_last_name}</p>
+                                            )}
                                             <div className="flex items-center justify-between mt-auto">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{p.duration_minutes} DK</span>
@@ -542,6 +522,55 @@ export default function BookingPage() {
                             >
                                 Devam Et {selection.packageId ? '(Paket Seçildi)' : selection.serviceIds.length > 0 ? `(${selection.serviceIds.length} Hizmet)` : ''}
                             </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Step 2: Staff Selection */}
+                {step === 2 && (
+                    <div className="animate-in slide-in-from-right duration-300 fade-in">
+                        <button onClick={handleBack} className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 hover:text-gray-600">← Geri</button>
+                        <h2 className="text-2xl font-black text-gray-900 mb-6">Personel Seçimi</h2>
+                        <div className="space-y-3">
+                            {staff.filter(u => {
+                                // Filter by department if a single service is selected or a package has a department
+                                if (selection.packageId) {
+                                    const pkg = packages.find(p => p.id === selection.packageId);
+                                    if (pkg?.department_id) {
+                                        return u.department_id === pkg.department_id;
+                                    }
+                                } else if (selection.serviceIds.length === 1) {
+                                    const svc = services.find(s => s.id === selection.serviceIds[0]);
+                                    if (svc?.department_id) {
+                                        return u.department_id === svc.department_id;
+                                    }
+                                }
+                                return true;
+                            }).map(u => (
+                                <button
+                                    key={u.id || (u as any).user_id}
+                                    onClick={() => {
+                                        setSelection({ ...selection, staffId: u.id || (u as any).user_id });
+                                        handleNext();
+                                    }}
+                                    className="w-full bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-indigo-100 transition-all flex items-center gap-5 text-left group active:scale-[0.98]"
+                                >
+                                    <div className="w-16 h-16 bg-slate-50 text-[#1e1b4b] rounded-2xl flex items-center justify-center font-black text-xl group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner overflow-hidden">
+                                        {u.photo ? (
+                                            <img src={u.photo} alt={u.first_name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            u.first_name[0]
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-black text-slate-900 text-lg group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{u.first_name} {u.last_name}</h3>
+                                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-2">{u.department_name || (u.role === 'company_admin' ? 'Baş Uzman' : 'Uzman')}</p>
+                                    </div>
+                                    <div className="w-8 h-8 rounded-full bg-slate-50 text-slate-300 flex items-center justify-center group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
+                                    </div>
+                                </button>
+                            ))}
                         </div>
                     </div>
                 )}

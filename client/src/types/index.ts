@@ -7,6 +7,8 @@ export interface User {
     role: 'super_admin' | 'company_admin' | 'staff' | 'customer';
     company_id?: number;
     photo?: string | null;
+    department_id?: number | null;
+    department_name?: string | null;
     created_at: string;
 }
 
@@ -100,6 +102,8 @@ export interface Service {
     duration_minutes: number;
     price: number;
     is_active?: boolean;
+    department_id?: number | null;
+    department_name?: string | null;
 }
 
 export interface Package {
@@ -110,7 +114,18 @@ export interface Package {
     duration_minutes: number;
     price: number;
     is_active?: boolean;
-    services?: Service[];
+    staff_id?: number | null;
+    staff_first_name?: string | null;
+    staff_last_name?: string | null;
+    department_id?: number | null;
+    department_name?: string | null;
+    services?: (Service & { staff_id?: number | null; staff_name?: string })[];
+}
+
+export interface PackageServiceItem {
+    service_id: number;
+    staff_id?: number | null;
+    department_id?: number | null;
 }
 
 export interface Appointment {

@@ -216,19 +216,28 @@ const runMigrations = async () => {
                 duration_minutes INTEGER NOT NULL,
                 price DECIMAL(10, 2) NOT NULL,
                 is_active BOOLEAN DEFAULT true,
+                staff_id INTEGER REFERENCES users(id),
+                department_id INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+        await pool.query('ALTER TABLE packages ADD COLUMN IF NOT EXISTS staff_id INTEGER REFERENCES users(id)');
+        await pool.query('ALTER TABLE packages ADD COLUMN IF NOT EXISTS department_id INTEGER');
+
+        await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS department_id INTEGER');
 
         await pool.query(`
             CREATE TABLE IF NOT EXISTS package_services (
                 id SERIAL PRIMARY KEY,
                 package_id INTEGER REFERENCES packages(id) ON DELETE CASCADE,
                 service_id INTEGER REFERENCES services(id) ON DELETE CASCADE,
+                staff_id INTEGER REFERENCES users(id),
                 order_index INTEGER DEFAULT 0
             )
         `);
+        await pool.query('ALTER TABLE package_services ADD COLUMN IF NOT EXISTS staff_id INTEGER REFERENCES users(id)');
+        await pool.query('ALTER TABLE package_services ADD COLUMN IF NOT EXISTS department_id INTEGER');
 
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS package_id INTEGER REFERENCES packages(id)');
 

@@ -7,59 +7,54 @@ const router = Router();
 
 const packageSchema = z.object({
     name: z.string().min(2, 'Paket adı en az 2 karakter olmalıdır'),
-    description: z.string().optional(),
-    duration_minutes: z.number().min(1, 'Süre en az 1 dakika olmalıdır'),
-    price: z.number().min(0, 'Ücret 0 veya daha fazla olmalıdır'),
-    service_ids: z.array(z.number()).min(1, 'En az bir hizmet seçilmelidir')
+    description: z.string().nullable().optional(),
+    duration_minutes: z.preprocess((val) => Number(val), z.number().min(1, 'Süre en az 1 dakika olmalıdır')),
+    price: z.preprocess((val) => Number(val), z.number().min(0, 'Ücret 0 veya daha fazla olmalıdır')),
+    items: z.array(z.object({
+        service_id: z.number(),
+        staff_id: z.number().nullable().optional(),
+        department_id: z.number().nullable().optional()
+    })).min(1, 'En az bir hizmet seçilmelidir'),
+    staff_id: z.number().nullable().optional(),
+    department_id: z.number().nullable().optional(),
+    company_id: z.number().optional(),
+    id: z.number().nullable().optional()
 });
 
-// Tüm paketleri listele (Firma bazlı)
-const publicPackageHandler = async (req: Request, res: Response, next: any) => {
-    const { company_id } = req.query;
-    if (company_id) {
-        try {
-            const companyId = parseInt(company_id as string);
-            console.log(`[GET /packages] Public Access Attempt: Company=${companyId}`);
-            if (isNaN(companyId)) {
-                console.log(`[GET /packages] Invalid Company ID: ${company_id}`);
-                return res.status(400).json({ success: false, error: 'Geçersiz firma ID' });
-            }
-            const packages = await packageService.getPackagesByCompany(companyId);
-            console.log(`[GET /packages] Found ${packages.length} packages for Company=${companyId}`);
-            return res.json({ success: true, data: packages });
-        } catch (error) {
-            console.error('[GET /packages] Public Error:', error);
-            return next(error);
-        }
-    }
-    next();
-};
-
-const privatePackageHandler = async (req: Request, res: Response, next: any) => {
+// GET /api/packages
+router.get('/', async (req: Request, res: Response) => {
     try {
-        const companyId = req.user?.companyId;
-        if (!companyId) {
-            return res.status(403).json({ success: false, error: 'Firma ID bulunamadı' });
+        const company_id = req.query.company_id || (req as any).user?.companyId;
+        if (!company_id) {
+            return res.status(400).json({ success: false, error: 'company_id gereklidir' });
         }
-        const packages = await packageService.getPackagesByCompany(companyId);
-        res.json({ success: true, data: packages });
-    } catch (error) {
-        next(error);
+        const data = await packageService.getPackagesByCompany(Number(company_id));
+        res.json({ success: true, data });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message });
     }
-};
+});
 
-router.get(['/', ''], publicPackageHandler, authMiddleware, privatePackageHandler);
-
-// Yeni paket ekle
+// POST /api/packages
 router.post('/', authMiddleware, async (req: Request, res: Response) => {
     try {
         const companyId = req.user?.companyId;
-        if (!companyId) {
-            return res.status(403).json({ success: false, error: 'Firma ID bulunamadı' });
-        }
+        if (!companyId) return res.status(403).json({ success: false, error: 'Firma ID bulunamadı' });
 
-        const { service_ids, ...pkgData } = packageSchema.parse(req.body);
-        const pkg = await packageService.createPackage({ ...pkgData, company_id: companyId }, service_ids);
+        const validation = packageSchema.safeParse(req.body);
+        if (!validation.success) {
+            return res.status(400).json({
+                success: false,
+                error: 'Validasyon hatası',
+                details: validation.error.errors.map(e => ({ path: e.path, message: e.message }))
+            });
+        }
+        const { items, ...pkgData } = validation.data;
+
+        const pkg = await packageService.createPackage(
+            { ...pkgData, company_id: companyId },
+            items
+        );
         res.status(201).json({ success: true, data: pkg });
     } catch (error: any) {
         if (error instanceof z.ZodError) {
@@ -69,22 +64,37 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
     }
 });
 
-// Paket güncelle
+// PUT /api/packages/:id
 router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
-        const { service_ids, ...pkgData } = packageSchema.partial().parse(req.body);
-        const pkg = await packageService.updatePackage(id, pkgData, service_ids);
+        const companyId = req.user?.companyId;
+        if (!companyId) return res.status(403).json({ success: false, error: 'Firma ID bulunamadı' });
+
+        const validation = packageSchema.safeParse(req.body);
+        if (!validation.success) {
+            return res.status(400).json({
+                success: false,
+                error: 'Validasyon hatası',
+                details: validation.error.errors.map(e => ({ path: e.path, message: e.message }))
+            });
+        }
+        const { items, ...pkgData } = validation.data;
+
+        const pkg = await packageService.updatePackage(id, pkgData, items);
         if (!pkg) {
             return res.status(404).json({ success: false, error: 'Paket bulunamadı' });
         }
         res.json({ success: true, data: pkg });
-    } catch (error) {
-        res.status(500).json({ success: false, error: 'Paket güncellenirken hata oluştu' });
+    } catch (error: any) {
+        if (error instanceof z.ZodError) {
+            return res.status(400).json({ success: false, error: 'Validasyon hatası', details: error.errors });
+        }
+        res.status(500).json({ success: false, error: error.message || 'Paket güncellenirken hata oluştu' });
     }
 });
 
-// Paket sil
+// DELETE /api/packages/:id
 router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);

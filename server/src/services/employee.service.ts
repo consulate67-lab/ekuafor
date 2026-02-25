@@ -12,6 +12,8 @@ export interface Employee {
     last_name?: string;
     email?: string;
     phone?: string;
+    department_id?: number | null;
+    department_name?: string | null;
 }
 
 class EmployeeService {
@@ -36,18 +38,21 @@ class EmployeeService {
         // company_users tablosu oluşturulmamışsa bile çalışır.
         const query = `
             SELECT 
-                id as user_id,
-                company_id,
-                first_name,
-                last_name,
-                email,
-                phone,
-                role,
-                photo,
+                u.id as user_id,
+                u.company_id,
+                u.first_name,
+                u.last_name,
+                u.email,
+                u.phone,
+                u.role,
+                u.photo,
+                u.department_id,
+                d.name as department_name,
                 true as is_active
-            FROM users
-            WHERE company_id = $1
-            ORDER BY first_name ASC
+            FROM users u
+            LEFT JOIN departments d ON u.department_id = d.id
+            WHERE u.company_id = $1
+            ORDER BY u.first_name ASC
         `;
         const result = await pool.query(query, [companyId]);
         return result.rows;

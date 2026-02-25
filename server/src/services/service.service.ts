@@ -8,13 +8,14 @@ export interface Service {
     duration_minutes: number;
     price: number;
     is_active?: boolean;
+    department_id?: number | null;
 }
 
 class ServiceService {
     async createService(service: Service): Promise<Service> {
         const query = `
-      INSERT INTO services (company_id, name, description, duration_minutes, price)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO services (company_id, name, description, duration_minutes, price, department_id)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `;
         const values = [
@@ -22,7 +23,8 @@ class ServiceService {
             service.name,
             service.description,
             service.duration_minutes,
-            service.price
+            service.price,
+            service.department_id || null
         ];
         const result = await pool.query(query, values);
         return result.rows[0];
@@ -30,7 +32,11 @@ class ServiceService {
 
     async getServicesByCompany(companyId: number): Promise<Service[]> {
         const result = await pool.query(
-            'SELECT * FROM services WHERE company_id = $1 AND is_active = true ORDER BY name',
+            `SELECT s.*, d.name as department_name 
+             FROM services s 
+             LEFT JOIN departments d ON s.department_id = d.id
+             WHERE s.company_id = $1 AND s.is_active = true 
+             ORDER BY s.name`,
             [companyId]
         );
         return result.rows;
