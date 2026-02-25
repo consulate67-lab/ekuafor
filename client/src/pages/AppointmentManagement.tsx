@@ -372,8 +372,8 @@ export default function AppointmentManagement() {
             const sSelections = selectedPackage
                 ? selectedPackage.services.map((s: any) => ({
                     id: s.id,
-                    price: newAppointment.servicePriceOverrides[s.id] || s.price,
-                    duration_minutes: newAppointment.serviceDurationOverrides[s.id] || s.duration_minutes,
+                    price: (newAppointment.servicePriceOverrides[s.id] !== undefined) ? newAppointment.servicePriceOverrides[s.id] : s.price,
+                    duration_minutes: (newAppointment.serviceDurationOverrides[s.id] !== undefined) ? newAppointment.serviceDurationOverrides[s.id] : s.duration_minutes,
                     staff_id: newAppointment.serviceStaffOverrides[s.id] || newAppointment.staff_id || undefined
                 }))
                 : selectedServices.map(s => ({
@@ -605,7 +605,7 @@ export default function AppointmentManagement() {
                         Sistemi Sıfırla
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments Edition v1.70.0</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments Edition v1.71.0</span>
                     </div>
                 </div>
             </div>

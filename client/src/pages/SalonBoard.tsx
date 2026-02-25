@@ -232,8 +232,8 @@ export default function SalonBoard() {
                 const pkg = packages.find(p => p.id === parseInt(fastForm.packageId));
                 if (pkg) {
                     sIds = pkg.services?.map((s: any) => s.id) || [];
-                    totalDuration = sIds.reduce((sum, sid) => sum + (fastForm.serviceDurationOverrides[sid] || pkg.services.find((ps: any) => ps.id === sid)?.duration_minutes || 0), 0);
-                    totalPrice = sIds.reduce((sum, sid) => sum + Number(fastForm.servicePriceOverrides[sid] || pkg.services.find((ps: any) => ps.id === sid)?.price || 0), 0);
+                    totalDuration = sIds.reduce((sum, sid) => sum + ((fastForm.serviceDurationOverrides[sid] !== undefined) ? fastForm.serviceDurationOverrides[sid] : (pkg.services.find((ps: any) => ps.id === sid)?.duration_minutes || 0)), 0);
+                    totalPrice = sIds.reduce((sum, sid) => sum + Number((fastForm.servicePriceOverrides[sid] !== undefined) ? fastForm.servicePriceOverrides[sid] : (pkg.services.find((ps: any) => ps.id === sid)?.price || 0)), 0);
                 }
             } else {
                 const selectedServices = services.filter(s => sIds.includes(s.id));
@@ -282,8 +282,8 @@ export default function SalonBoard() {
             const sSelections = selectedPackage
                 ? selectedPackage.services.map((s: any) => ({
                     id: s.id,
-                    price: fastForm.servicePriceOverrides[s.id] || s.price,
-                    duration_minutes: fastForm.serviceDurationOverrides[s.id] || s.duration_minutes,
+                    price: (fastForm.servicePriceOverrides[s.id] !== undefined) ? fastForm.servicePriceOverrides[s.id] : s.price,
+                    duration_minutes: (fastForm.serviceDurationOverrides[s.id] !== undefined) ? fastForm.serviceDurationOverrides[s.id] : s.duration_minutes,
                     staff_id: fastForm.serviceStaffOverrides[s.id] || Number(staffId)
                 }))
                 : selectedServices.map(s => ({
@@ -1100,7 +1100,7 @@ export default function SalonBoard() {
                                                                                 <span className="text-[9px] font-bold">👤 {item.service_staff_name || 'Uzman belirtilmedi'}</span>
                                                                             </div>
                                                                             <div className="flex items-center gap-1">
-                                                                                <span className={`text-[9px] font-bold ${isExactService ? 'text-indigo-100' : 'text-slate-500'}`}>⏰ {item.start_time || '--:--'} - {item.end_time || '--:--'}</span>
+                                                                                <span className={`text-[9px] font-bold ${isExactService ? 'text-indigo-100' : 'text-slate-500'}`}>⏰ {item.start_time || '--:--'} - {item.end_time || '--:--'} ({item.duration || item.duration_minutes || '--'} dk)</span>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -1325,7 +1325,7 @@ export default function SalonBoard() {
             )}
 
             <div className="fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-slate-900/80 backdrop-blur-md rounded-full border border-white/10 shadow-2xl z-[150] pointer-events-none">
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap">Ekuafor Salon Board Edition <span className="text-white opacity-100 ml-1">v1.70.0</span></p>
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap">Ekuafor Salon Board Edition <span className="text-white opacity-100 ml-1">v1.71.0</span></p>
             </div>
         </div>
     );
