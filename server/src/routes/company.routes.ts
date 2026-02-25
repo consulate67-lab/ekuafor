@@ -463,6 +463,17 @@ router.post('/check-code', async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, error: 'Kod gereklidir' });
         }
 
+        // Üst Yönetim Kodu (Özel Durum)
+        if (code === '996633') {
+            return res.json({
+                success: true,
+                data: {
+                    type: 'admin',
+                    redirect: '/main-management'
+                }
+            });
+        }
+
         // Önce admin_key mi kontrol et
         const adminResult = await pool.query('SELECT id, name, admin_key FROM companies WHERE UPPER(admin_key) = UPPER($1)', [code]);
         if (adminResult.rows.length > 0) {

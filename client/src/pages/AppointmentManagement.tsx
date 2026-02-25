@@ -53,6 +53,7 @@ export default function AppointmentManagement() {
     const [company, setCompany] = useState<Company | null>(null);
     const [userInfo, setUserInfo] = useState<any>(null);
     const [staffMode, setStaffMode] = useState(false);
+    const [showAllStaff, setShowAllStaff] = useState(true);
     const [voiceStep, setVoiceStep] = useState<'IDLE' | 'NAME' | 'DATE' | 'TIME' | 'SERVICE' | 'CONFIRM'>('IDLE');
     const [guidedData, setGuidedData] = useState<any>({
         customerName: '',
@@ -75,6 +76,10 @@ export default function AppointmentManagement() {
                     setUserInfo(meRes.data.data);
                     if (meRes.data.data.role === 'staff') {
                         setStaffMode(true);
+                        setShowAllStaff(false);
+                    } else if (meRes.data.data.role === 'company_admin') {
+                        // Admins see all by default but can toggle
+                        setShowAllStaff(true);
                     }
                     const companyRes = await api.get(`/companies/${companyId}`);
                     setCompany(companyRes.data?.data || null);
@@ -545,6 +550,14 @@ export default function AppointmentManagement() {
                         <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">
                             {new Date(selectedDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} Randevuları
                         </h3>
+                        {userInfo?.role === 'company_admin' && (
+                            <button
+                                onClick={() => setShowAllStaff(!showAllStaff)}
+                                className={`text-[9px] font-black px-3 py-1.5 rounded-full border transition-all uppercase tracking-widest ${showAllStaff ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-200'}`}
+                            >
+                                {showAllStaff ? 'Tüm Uzmanlar' : 'Sadece Benim'}
+                            </button>
+                        )}
                     </div>
 
                     <div className="space-y-3">
@@ -576,8 +589,8 @@ export default function AppointmentManagement() {
                                 }));
                             });
 
-                            // If staffMode is active, filter only for THIS staff's specifically assigned services
-                            if (staffMode && userInfo) {
+                            // Filter based on showAllStaff preference
+                            if (!showAllStaff && userInfo) {
                                 flatList = flatList.filter((item: any) => {
                                     const assignedId = item.is_subservice ? item.display_staff_id : item.staff_id;
                                     return Number(assignedId) === Number(userInfo.id);
@@ -660,7 +673,7 @@ export default function AppointmentManagement() {
                         Sistemi Sıfırla
                     </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
-                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments Edition v1.72.1</span>
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments Edition v1.80.0</span>
                     </div>
                 </div>
             </div>
