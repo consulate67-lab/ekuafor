@@ -208,7 +208,7 @@ class AppointmentService {
                     'start_time', aps.start_time,
                     'end_time', aps.end_time,
                     'staff_id', aps.staff_id,
-                    'staff_name', ast.first_name || ' ' || ast.last_name
+                    'service_staff_name', ast.first_name || ' ' || ast.last_name
                 )) FILTER (WHERE s.id IS NOT NULL), '[]') as services
             FROM appointments a
             LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
@@ -259,7 +259,7 @@ class AppointmentService {
                     'start_time', aps.start_time,
                     'end_time', aps.end_time,
                     'staff_id', aps.staff_id,
-                    'staff_name', ast.first_name || ' ' || ast.last_name
+                    'service_staff_name', ast.first_name || ' ' || ast.last_name
                 )) FILTER (WHERE s.id IS NOT NULL), '[]') as services
             FROM appointments a
             LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
@@ -312,7 +312,7 @@ class AppointmentService {
                  'start_time', aps.start_time,
                  'end_time', aps.end_time,
                  'staff_id', aps.staff_id,
-                 'staff_name', ast.first_name || ' ' || ast.last_name
+                 'service_staff_name', ast.first_name || ' ' || ast.last_name
              )) FILTER (WHERE s.id IS NOT NULL), '[]') as services
       FROM appointments a
       LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
@@ -335,7 +335,7 @@ class AppointmentService {
         }
 
         if (staffId) {
-            query += ` AND (a.staff_id = $${paramIndex} OR a.staff_id IS NULL)`;
+            query += ` AND (a.staff_id = $${paramIndex} OR a.staff_id IS NULL OR EXISTS (SELECT 1 FROM appointment_services WHERE appointment_id = a.id AND staff_id = $${paramIndex}))`;
             values.push(staffId);
             paramIndex++;
         }
@@ -431,7 +431,7 @@ class AppointmentService {
                  'start_time', aps.start_time,
                  'end_time', aps.end_time,
                  'staff_id', aps.staff_id,
-                 'staff_name', ast.first_name || ' ' || ast.last_name
+                 'service_staff_name', ast.first_name || ' ' || ast.last_name
              )) FILTER (WHERE s.id IS NOT NULL), '[]') as services
       FROM appointments a
       LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
@@ -445,7 +445,7 @@ class AppointmentService {
         let paramIndex = 4;
 
         if (staffId) {
-            query += ` AND (a.staff_id = $${paramIndex} OR a.staff_id IS NULL)`;
+            query += ` AND (a.staff_id = $${paramIndex} OR a.staff_id IS NULL OR EXISTS (SELECT 1 FROM appointment_services WHERE appointment_id = a.id AND staff_id = $${paramIndex}))`;
             values.push(staffId);
             paramIndex++;
         }
@@ -483,7 +483,7 @@ class AppointmentService {
                     'start_time', aps.start_time,
                     'end_time', aps.end_time,
                     'staff_id', aps.staff_id,
-                    'staff_name', ast.first_name || ' ' || ast.last_name
+                    'service_staff_name', ast.first_name || ' ' || ast.last_name
                 )) FILTER (WHERE s.id IS NOT NULL), '[]') as services
             FROM appointments a
             LEFT JOIN appointment_services aps ON a.id = aps.appointment_id

@@ -153,11 +153,15 @@ export interface Appointment {
     company_name?: string;
     services?: Array<{
         id: number;
+        aps_id?: number;
         service_id?: number;
         name?: string;
         price: number;
         duration_minutes: number;
+        status: string;
+        start_time?: string;
+        end_time?: string;
         staff_id?: number;
-        staff_name?: string;
+        service_staff_name?: string;
     }>;
 }
