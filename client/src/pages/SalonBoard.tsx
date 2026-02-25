@@ -988,18 +988,33 @@ export default function SalonBoard() {
                                         <div className="space-y-2">
                                             {selectedAppointment.services && selectedAppointment.services.length > 0 ? (
                                                 selectedAppointment.services.map((item: any, idx: number) => {
-                                                    // Check if this service belongs to the currently selected staff member (if opened from a specific cell)
-                                                    const isRelevantToMe = selectedCell && Number(item.staff_id) === Number(selectedCell.person.user_id || selectedCell.person.id);
+                                                    const clickedStaffId = selectedCell?.person.user_id || selectedCell?.person.id;
+                                                    const clickedHour = selectedCell?.hour;
+
+                                                    const isRelevantToMe = clickedStaffId && Number(item.staff_id) === Number(clickedStaffId);
+
+                                                    // Highlight the EXACT service that was clicked
+                                                    let isExactService = false;
+                                                    if (isRelevantToMe && clickedHour && item.start_time && item.end_time) {
+                                                        const [ssH, ssM] = item.start_time.split(':').map(Number);
+                                                        const [seH, seM] = item.end_time.split(':').map(Number);
+                                                        const [chH, chM] = clickedHour.split(':').map(Number);
+                                                        isExactService = (chH * 60 + chM) >= (ssH * 60 + ssM) && (chH * 60 + chM) < (seH * 60 + seM);
+                                                    }
 
                                                     return (
-                                                        <div key={idx} className={`flex flex-col gap-2 p-4 rounded-3xl border transition-all ${isRelevantToMe ? 'bg-indigo-50 border-indigo-200 ring-2 ring-indigo-500/20' : 'bg-white/50 border-slate-100'}`}>
+                                                        <div key={idx} className={`flex flex-col gap-2 p-4 rounded-3xl border transition-all ${isExactService ? 'bg-indigo-600 border-indigo-600 shadow-xl shadow-indigo-100 ring-4 ring-indigo-50 color-pulse' : isRelevantToMe ? 'bg-indigo-50 border-indigo-200' : 'bg-white/50 border-slate-100'}`}>
                                                             <div className="flex justify-between items-start">
                                                                 <div className="flex-1 min-w-0">
                                                                     <div className="flex items-center gap-2 mb-1">
-                                                                        <span className="text-xs font-black text-slate-800 uppercase tracking-tight truncate">{item.name}</span>
-                                                                        {isRelevantToMe && <span className="px-2 py-0.5 bg-indigo-500 text-white text-[7px] font-black rounded-full">SİZİN GÖREVİNİZ</span>}
+                                                                        <span className={`text-xs font-black uppercase tracking-tight truncate ${isExactService ? 'text-white' : 'text-slate-800'}`}>{item.name}</span>
+                                                                        {isExactService ? (
+                                                                            <span className="px-2 py-0.5 bg-white/20 text-white text-[7px] font-black rounded-full">TIKLANAN İŞLEM</span>
+                                                                        ) : isRelevantToMe && (
+                                                                            <span className="px-2 py-0.5 bg-indigo-500 text-white text-[7px] font-black rounded-full">SİZİN GÖREVİNİZ</span>
+                                                                        )}
                                                                     </div>
-                                                                    <div className="flex items-center gap-3 text-slate-500">
+                                                                    <div className={`flex items-center gap-3 ${isExactService ? 'text-indigo-100' : 'text-slate-500'}`}>
                                                                         <div className="flex items-center gap-1">
                                                                             <span className="text-[9px] font-bold">👤 {item.service_staff_name || 'Uzman belirtilmedi'}</span>
                                                                         </div>
@@ -1009,22 +1024,22 @@ export default function SalonBoard() {
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex flex-col items-end gap-2">
-                                                                    <span className="text-[10px] font-black text-indigo-600">₺{item.price}</span>
+                                                                    <span className={`text-[10px] font-black ${isExactService ? 'text-white' : 'text-indigo-600'}`}>₺{item.price}</span>
                                                                     {item.status === 'approved' ? (
-                                                                        <div className="flex items-center gap-1 text-emerald-500">
+                                                                        <div className={`flex items-center gap-1 ${isExactService ? 'text-white' : 'text-emerald-500'}`}>
                                                                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                                                            <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600">ONAYLI</span>
+                                                                            <span className={`text-[8px] font-black uppercase tracking-widest ${isExactService ? 'text-white' : 'text-emerald-600'}`}>ONAYLI</span>
                                                                         </div>
                                                                     ) : (
                                                                         staffMode && (Number(item.staff_id) === Number(staffInfo.id)) ? (
                                                                             <button
-                                                                                onClick={() => handleUpdateServiceStatus(item.aps_id, 'approved')}
+                                                                                onClick={(e) => { e.stopPropagation(); handleUpdateServiceStatus(item.aps_id, 'approved'); }}
                                                                                 className="px-4 py-1.5 bg-amber-500 text-white text-[8px] font-black uppercase rounded-xl shadow-md hover:bg-amber-600 transition-all animate-pulse"
                                                                             >
                                                                                 İŞLEMİMİ ONAYLA
                                                                             </button>
                                                                         ) : (
-                                                                            <span className="text-[8px] font-black text-amber-500 uppercase tracking-widest bg-amber-50 px-2 py-1 rounded-lg">BEKLİYOR</span>
+                                                                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${isExactService ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-500'}`}>BEKLİYOR</span>
                                                                         )
                                                                     )}
                                                                 </div>
@@ -1046,14 +1061,34 @@ export default function SalonBoard() {
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="p-6 bg-slate-50 rounded-[2.5rem]">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Saat</p>
-                                        <p className="text-xl font-black text-slate-800">{selectedAppointment.start_time}</p>
-                                    </div>
-                                    <div className="p-6 bg-slate-50 rounded-[2.5rem]">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Uzman</p>
-                                        <p className="text-lg font-black text-slate-800 truncate">{selectedAppointment.staff_name || 'Belirsiz'}</p>
-                                    </div>
+                                    {(() => {
+                                        const clickedStaffId = selectedCell?.person.user_id || selectedCell?.person.id;
+                                        const clickedHour = selectedCell?.hour;
+                                        const targetService = selectedAppointment.services?.find((s: any) => {
+                                            if (Number(s.staff_id) !== Number(clickedStaffId)) return false;
+                                            if (!s.start_time || !s.end_time || !clickedHour) return false;
+                                            const [ssH, ssM] = s.start_time.split(':').map(Number);
+                                            const [seH, seM] = s.end_time.split(':').map(Number);
+                                            const [chH, chM] = clickedHour.split(':').map(Number);
+                                            return (chH * 60 + chM) >= (ssH * 60 + ssM) && (chH * 60 + chM) < (seH * 60 + seM);
+                                        });
+
+                                        const displayTime = targetService?.start_time || selectedAppointment.start_time;
+                                        const displayStaffName = targetService?.service_staff_name || selectedAppointment.staff_name || 'Belirsiz';
+
+                                        return (
+                                            <>
+                                                <div className={`p-6 rounded-[2.5rem] transition-all ${targetService ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-slate-50 text-slate-800'}`}>
+                                                    <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${targetService ? 'text-indigo-200' : 'text-slate-400'}`}>Saat</p>
+                                                    <p className="text-xl font-black">{displayTime}</p>
+                                                </div>
+                                                <div className={`p-6 rounded-[2.5rem] transition-all ${targetService ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-slate-50 text-slate-800'}`}>
+                                                    <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${targetService ? 'text-indigo-200' : 'text-slate-400'}`}>Uzman</p>
+                                                    <p className="text-lg font-black truncate">{displayStaffName}</p>
+                                                </div>
+                                            </>
+                                        );
+                                    })()}
                                 </div>
 
                                 {selectedAppointment.notes && (
