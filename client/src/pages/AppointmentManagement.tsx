@@ -552,7 +552,7 @@ export default function AppointmentManagement() {
                             const filtered = appointments.filter(a => formatDateKey(a.appointment_date) === selectedDate && (a.status === 'approved' || a.status === 'completed'));
 
                             // Explode appointments into individual services (Distribution)
-                            let flatList = filtered.flatMap(app => {
+                            let flatList = filtered.flatMap((app: any) => {
                                 if (!app.services || app.services.length === 0) {
                                     return [{
                                         ...app,
@@ -578,13 +578,13 @@ export default function AppointmentManagement() {
 
                             // If staffMode is active, filter only for THIS staff's services
                             if (staffMode && userInfo) {
-                                flatList = flatList.filter(item =>
+                                flatList = flatList.filter((item: any) =>
                                     Number(item.display_staff_id) === Number(userInfo.id) ||
                                     Number(item.staff_id) === Number(userInfo.id)
                                 );
                             }
 
-                            const sorted = flatList.sort((a, b) => (a.display_start_time || '').localeCompare(b.display_start_time || ''));
+                            const sorted = flatList.sort((a: any, b: any) => (a.display_start_time || '').localeCompare(b.display_start_time || ''));
 
                             if (sorted.length === 0) {
                                 return (
@@ -597,7 +597,7 @@ export default function AppointmentManagement() {
                                 );
                             }
 
-                            return sorted.map(item => {
+                            return sorted.map((item: any) => {
                                 const startTime = item.display_start_time || '00:00';
                                 return (
                                     <div

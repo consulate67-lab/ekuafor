@@ -1,17 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import api from '../lib/api';
 import 'leaflet/dist/leaflet.css';
 
 // Fix Leaflet icons
-const icon = L.icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', // Blue location pin
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-});
-
 const branchIcon = (revenue: number) => {
     // Dynamic color based on revenue?
     const color = revenue > 10000 ? '#10b981' : revenue > 5000 ? '#f59e0b' : '#3b82f6';
@@ -112,7 +106,7 @@ export default function MainCompanyReports() {
                                     url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
                                 />
-                                {branches.map(br => (
+                                {branches.map((br: any) => (
                                     br.latitude && br.longitude && (
                                         <Marker
                                             key={br.branch_id}
@@ -146,7 +140,7 @@ export default function MainCompanyReports() {
                         <div className="bg-white/5 backdrop-blur-md border border-white/10 p-10 rounded-[3rem] h-full flex flex-col">
                             <h3 className="text-xl font-black uppercase tracking-tighter italic mb-8 border-b border-white/5 pb-6">Şube Performans Listesi</h3>
                             <div className="space-y-4 overflow-y-auto max-h-[500px] flex-1 pr-2 no-scrollbar">
-                                {branches.map((br, index) => (
+                                {branches.map((br: any, index: number) => (
                                     <div key={br.branch_id} className="bg-white/5 border border-white/5 p-5 rounded-[2rem] hover:bg-white/10 transition-all flex items-center justify-between group">
                                         <div className="flex items-center gap-4">
                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs ${index === 0 ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>
