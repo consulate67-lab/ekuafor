@@ -8,18 +8,19 @@ export interface MainCompany {
     province_id?: number;
     province_name?: string;
     admin_code: string;
+    board_key?: string;
     is_active?: boolean;
     created_at?: Date;
 }
 
 class MainCompanyService {
-    async create(data: MainCompany): Promise<MainCompany> {
+    async create(data: any): Promise<MainCompany> {
         const query = `
-            INSERT INTO main_companies (name, description, address_line, province_id, province_name, admin_code)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING *
+            INSERT INTO companies (name, description, address_line, province_id, province_name, admin_key, board_key, company_type)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, 'ÜST FİRMA')
+            RETURNING id, name, description, address_line, province_id, province_name, admin_key as admin_code, board_key, is_active, created_at
         `;
-        const values = [data.name, data.description, data.address_line, data.province_id, data.province_name, data.admin_code];
+        const values = [data.name, data.description, data.address_line, data.province_id, data.province_name, data.admin_key || data.admin_code, data.board_key];
         const result = await pool.query(query, values);
         return result.rows[0];
     }
@@ -44,7 +45,14 @@ class MainCompanyService {
         const values: any[] = [];
         let i = 1;
 
-        Object.entries(data).forEach(([key, value]) => {
+        // Map admin_code back to admin_key if present
+        const dbData: any = { ...data };
+        if (dbData.admin_code) {
+            dbData.admin_key = dbData.admin_code;
+            delete dbData.admin_code;
+        }
+
+        Object.entries(dbData).forEach(([key, value]) => {
             if (value !== undefined && key !== 'id') {
                 fields.push(`${key} = $${i}`);
                 values.push(value);
@@ -55,7 +63,7 @@ class MainCompanyService {
         if (fields.length === 0) return null;
 
         values.push(id);
-        const query = `UPDATE main_companies SET ${fields.join(', ')} WHERE id = $${i} RETURNING *`;
+        const query = `UPDATE companies SET ${fields.join(', ')} WHERE id = $${i} AND company_type = 'ÜST FİRMA' RETURNING id, name, description, address_line, province_id, province_name, admin_key as admin_code, board_key, is_active, created_at`;
         const result = await pool.query(query, values);
         return result.rows[0] || null;
     }
@@ -85,6 +93,11 @@ class MainCompanyService {
         `;
         const result = await pool.query(query, [mainCompanyId]);
         return result.rows[0];
+    }
+
+    async getByBoardKey(key: string): Promise<MainCompany | null> {
+        const result = await pool.query('SELECT id, name, description, address_line, province_id, province_name, admin_key as admin_code, board_key, is_active, created_at FROM companies WHERE board_key = $1 AND company_type = \'ÜST FİRMA\'', [key]);
+        return result.rows[0] || null;
     }
 
     async getBranchPerformance(mainCompanyId: number): Promise<any[]> {

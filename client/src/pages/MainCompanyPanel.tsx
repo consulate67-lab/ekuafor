@@ -13,6 +13,7 @@ export default function MainCompanyPanel() {
         description: '',
         address_line: '',
         admin_code: '',
+        board_key: '',
     });
 
     const [authCode, setAuthCode] = useState('');
@@ -55,9 +56,12 @@ export default function MainCompanyPanel() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await api.post('/main-companies', formData);
+            await api.post('/main-companies', {
+                ...formData,
+                admin_key: formData.admin_code // Map back to DB field
+            });
             setShowForm(false);
-            setFormData({ name: '', description: '', address_line: '', admin_code: '' });
+            setFormData({ name: '', description: '', address_line: '', admin_code: '', board_key: '' });
             fetchMainCompanies();
         } catch (err: any) {
             setError('Firma oluşturulurken hata oluştu');
@@ -116,7 +120,7 @@ export default function MainCompanyPanel() {
 
                             <div className="flex gap-3 mt-auto">
                                 <button
-                                    onClick={() => navigate(`/main-reports/${mc.admin_code}`)}
+                                    onClick={() => navigate(`/main-reports/${mc.name.replace(/\s+/g, '-').toLowerCase()}`)}
                                     className="flex-1 bg-emerald-50 text-emerald-600 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
                                 >
                                     Raporlar
@@ -166,14 +170,27 @@ export default function MainCompanyPanel() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Dashboard Erişim Kodu (Örn: ARDEM-MAP)</label>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Dashboard Kodu (Public ID)</label>
                                 <input
                                     type="text"
-                                    className="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 font-bold text-emerald-600 uppercase"
+                                    className="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 font-bold text-slate-900 uppercase"
                                     value={formData.admin_code}
+                                    placeholder="RNK-GRUP"
                                     onChange={(e) => setFormData({ ...formData, admin_code: e.target.value.toUpperCase() })}
                                     required
                                 />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Rapor Erişim Şifresi (Board Key)</label>
+                                <input
+                                    type="text"
+                                    className="w-full bg-slate-50 border-none rounded-2xl py-4 px-6 font-bold text-emerald-600 uppercase"
+                                    value={formData.board_key}
+                                    placeholder="SECRET-KEY"
+                                    onChange={(e) => setFormData({ ...formData, board_key: e.target.value.toUpperCase() })}
+                                    required
+                                />
+                                <p className="text-[10px] font-bold text-slate-400 mt-2 ml-1 italic">* Bu şifre rapor ekranına girişte sorulacaktır.</p>
                             </div>
                             <div className="flex gap-4 pt-6">
                                 <button type="button" onClick={() => setShowForm(false)} className="flex-1 bg-slate-100 text-slate-400 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest">İptal</button>

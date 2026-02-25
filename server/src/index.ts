@@ -516,6 +516,14 @@ const runMigrations = async () => {
                 AND main_company_id NOT IN (SELECT id FROM companies)
             `);
 
+            // Set default board_key for existing ÜST FİRMA entries if missing
+            await pool.query(`
+        UPDATE companies 
+        SET board_key = admin_key 
+        WHERE company_type = 'ÜST FİRMA' 
+        AND (board_key IS NULL OR board_key = '')
+    `);
+
             await pool.query('ALTER TABLE companies ADD CONSTRAINT companies_main_company_id_fkey FOREIGN KEY (main_company_id) REFERENCES companies(id)');
             console.log('✅ Company hierarchy hierarchy migration completed.');
         } catch (fkErr: any) {

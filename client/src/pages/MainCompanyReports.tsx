@@ -21,23 +21,31 @@ const branchIcon = (revenue: number) => {
 
 export default function MainCompanyReports() {
     const { code } = useParams();
+    const [reportKey, setReportKey] = useState<string | null>(localStorage.getItem('main_reports_key'));
+    const [inputKey, setInputKey] = useState(code || '');
     const [mainCompany, setMainCompany] = useState<any>(null);
     const [stats, setStats] = useState<any>(null);
     const [branches, setBranches] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
     useEffect(() => {
-        fetchData();
-    }, [code]);
+        if (reportKey) {
+            handleLogin(reportKey);
+        }
+    }, [reportKey]);
 
-    const fetchData = async () => {
+    const handleLogin = async (keyToUse: string) => {
         try {
             setLoading(true);
-            // 1. Get company by code
-            const mcRes = await api.get(`/main-companies/code/${code}`);
-            const mc = mcRes.data.data;
+            setError('');
+
+            // 1. Login with key
+            const loginRes = await api.post('/main-companies/reports-login', { key: keyToUse });
+            const mc = loginRes.data.data;
             setMainCompany(mc);
+            localStorage.setItem('main_reports_key', keyToUse);
+            setReportKey(keyToUse);
 
             // 2. Get reports
             const reportRes = await api.get(`/main-companies/${mc.id}/reports`);
@@ -45,11 +53,52 @@ export default function MainCompanyReports() {
             setBranches(reportRes.data.data.branches);
 
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Veriler yüklenemedi. Kod geçerli mi?');
+            setError(err.response?.data?.error || 'Geçersiz rapor anahtarı veya veri hatası');
+            setReportKey(null);
+            localStorage.removeItem('main_reports_key');
         } finally {
             setLoading(false);
         }
     };
+
+    const onLoginSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        handleLogin(inputKey);
+    };
+
+    if (loading && !mainCompany) return <div className="p-20 text-center font-black animate-pulse text-white bg-slate-950 min-h-screen">VERİLER ANALİZ EDİLİYOR...</div>;
+
+    if (!reportKey || !mainCompany) {
+        return (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 bg-mesh-gradient">
+                <div className="max-w-md w-full bg-white/10 backdrop-blur-2xl rounded-[3rem] p-12 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] border border-white/10 text-center animate-fade-in">
+                    <div className="w-24 h-24 bg-gradient-to-tr from-emerald-400 to-teal-500 text-white rounded-[2rem] flex items-center justify-center mx-auto mb-8 text-4xl shadow-2xl shadow-emerald-500/20 rotate-3">
+                        📊
+                    </div>
+                    <h1 className="text-4xl font-black text-white mb-3 tracking-tight">Grup Raporları</h1>
+                    <p className="text-slate-400 mb-10 font-medium italic">Şube performans verilerine erişmek için anahtarı girin.</p>
+
+                    <form onSubmit={onLoginSubmit} className="space-y-6">
+                        <input
+                            type="text"
+                            value={inputKey}
+                            onChange={e => setInputKey(e.target.value)}
+                            placeholder="RAPOR ANAHTARI"
+                            className="w-full p-6 bg-white/5 rounded-2xl border-2 border-white/10 font-mono text-center text-xl tracking-[0.2em] text-emerald-400 focus:border-emerald-500 focus:bg-white/10 transition-all outline-none uppercase"
+                            required
+                        />
+                        {error && <p className="text-red-400 text-sm font-bold bg-red-400/10 py-3 rounded-xl">{error}</p>}
+                        <button
+                            disabled={loading}
+                            className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-900 py-6 rounded-2xl font-black uppercase tracking-widest shadow-[0_20px_40px_-10px_rgba(16,185,129,0.3)] active:scale-95 transition-all disabled:opacity-50"
+                        >
+                            {loading ? 'ANALİZ EDİLİYOR...' : 'RAPORLARI GÖRÜNTÜLE'}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        );
+    }
 
     if (loading) return <div className="p-20 text-center font-black animate-pulse">VERİLER ANALİZ EDİLİYOR...</div>;
     if (error) return (

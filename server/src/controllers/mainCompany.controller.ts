@@ -71,6 +71,20 @@ class MainCompanyController {
             res.status(500).json({ success: false, error: error.message });
         }
     }
+
+    async reportsLogin(req: Request, res: Response) {
+        try {
+            const { key } = req.body;
+            if (!key) return res.status(400).json({ success: false, error: 'Key is required' });
+
+            const mainCompany = await (MainCompanyService as any).getByBoardKey(key);
+            if (!mainCompany) return res.status(401).json({ success: false, error: 'Geçersiz rapor anahtarı' });
+
+            res.json({ success: true, data: mainCompany });
+        } catch (error: any) {
+            res.status(500).json({ success: false, error: error.message });
+        }
+    }
 }
 
 export default new MainCompanyController();
