@@ -59,6 +59,7 @@ const companySchema = z.object({
     genders: z.array(z.string()).nullable().optional(),
     company_type: z.enum(['ÜST FİRMA', 'ASIL', 'ŞUBE']).nullable().optional(),
     main_company_id: nullableNumber,
+    booking_flow: z.enum(['SHP', 'SDP']).nullable().optional(),
 });
 
 /**
@@ -110,6 +111,7 @@ router.get('/', async (req: Request, res: Response) => {
             radius: req.query.radius ? parseFloat(req.query.radius as string) : undefined,
             gender: req.query.gender as string | undefined,
             company_type: req.query.company_type as string | undefined,
+            exclude_parent: req.query.exclude_parent === 'true' ? true : undefined,
             sort: req.query.sort as 'rating' | 'reviews' | 'newest' | undefined
         };
 

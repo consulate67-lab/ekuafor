@@ -46,6 +46,7 @@ export interface Company {
     review_count?: number | null;
     company_type?: 'ÜST FİRMA' | 'ASIL' | 'ŞUBE' | null;
     main_company_id?: number | null;
+    booking_flow?: 'SHP' | 'SDP' | null;
 }
 
 class CompanyService {
@@ -214,6 +215,7 @@ class CompanyService {
         radius?: number; // in km
         gender?: string;
         company_type?: string;
+        exclude_parent?: boolean;
         sort?: 'rating' | 'reviews' | 'newest';
     }): Promise<Company[]> {
         const values: any[] = [];
@@ -257,8 +259,10 @@ class CompanyService {
             whereClauses.push(`c.company_type = $${paramIndex}`);
             values.push(filters.company_type);
             paramIndex++;
-        } else {
-            // Varsayılan: Üst firmaları son kullanıcı listesinden hariç tut
+        }
+
+        // Üst firmaları hariç tut (sadece istendiğinde)
+        if (filters?.exclude_parent) {
             whereClauses.push(`(c.company_type IS NULL OR c.company_type != 'ÜST FİRMA')`);
         }
 

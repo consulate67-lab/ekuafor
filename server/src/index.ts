@@ -532,6 +532,7 @@ const runMigrations = async () => {
         await pool.query("UPDATE companies SET genders = '{\"Erkek\", \"Kadın\", \"Çocuk\"}' WHERE genders IS NULL");
 
         await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS department_id INTEGER');
+        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS booking_flow VARCHAR(10) DEFAULT \'SHP\'');
         await pool.query('UPDATE services SET is_active = true WHERE is_active IS NULL');
         await pool.query('UPDATE packages SET is_active = true WHERE is_active IS NULL');
 

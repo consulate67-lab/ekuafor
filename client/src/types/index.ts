@@ -60,6 +60,7 @@ export interface Company {
     updated_at?: string;
     company_type?: 'ÜST FİRMA' | 'ASIL' | 'ŞUBE';
     main_company_id?: number | null;
+    booking_flow?: 'SHP' | 'SDP';
 }
 
 export interface Province {

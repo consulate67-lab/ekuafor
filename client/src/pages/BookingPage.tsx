@@ -27,9 +27,24 @@ export default function BookingPage() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Form Steps: 1-Service, 2-Staff, 3-Date, 4-Time, 5-CustomerInfo
+    // Form Steps: Dynamic based on company.booking_flow
+    // SHP (default): 1-Service, 2-Staff, 3-Date, 4-Time, 5-CustomerInfo
+    // SDP:           1-Service, 2-Date, 3-Staff, 4-Time, 5-CustomerInfo
     const initialStaffId = searchParams.get('staff') ? Number(searchParams.get('staff')) : null;
-    const [step, setStep] = useState(1); // Always start with services/packages as requested
+    const [step, setStep] = useState(1);
+
+    // Step content mapping based on booking_flow
+    const getStepContent = (stepNum: number): 'service' | 'staff' | 'date' | 'time' | 'confirm' => {
+        const flow = company?.booking_flow || 'SHP';
+        if (flow === 'SDP') {
+            // Service → Date → Staff → Time → Confirm
+            const map: Record<number, 'service' | 'staff' | 'date' | 'time' | 'confirm'> = { 1: 'service', 2: 'date', 3: 'staff', 4: 'time', 5: 'confirm' };
+            return map[stepNum] || 'service';
+        }
+        // SHP (default): Service → Staff → Date → Time → Confirm
+        const map: Record<number, 'service' | 'staff' | 'date' | 'time' | 'confirm'> = { 1: 'service', 2: 'staff', 3: 'date', 4: 'time', 5: 'confirm' };
+        return map[stepNum] || 'service';
+    };
 
     // Android Hardware Back Button Support
     useEffect(() => {
@@ -160,16 +175,20 @@ export default function BookingPage() {
     }, [id, searchParams]);
 
     const handleNext = () => {
-        if (step === 1) {
-            // If package selected, skip staff selection step (Step 2)
-            if (selection.packageId) {
-                setStep(3); // Go directly to Date
-                return;
-            }
-            // If initialStaffId was provided via URL, skip staff selection
-            if (initialStaffId) {
-                setSelection(prev => ({ ...prev, staffId: initialStaffId }));
-                setStep(3);
+        const currentContent = getStepContent(step);
+        if (currentContent === 'service') {
+            // After service selection, check if staff step should be skipped
+            if (selection.packageId || initialStaffId) {
+                if (initialStaffId) {
+                    setSelection(prev => ({ ...prev, staffId: initialStaffId }));
+                }
+                // Skip staff step - find the step AFTER staff
+                const flow = company?.booking_flow || 'SHP';
+                if (flow === 'SDP') {
+                    setStep(2); // SDP: next is date (step 2)
+                } else {
+                    setStep(3); // SHP: skip staff (step 2), go to date (step 3)
+                }
                 return;
             }
         }
@@ -177,8 +196,17 @@ export default function BookingPage() {
     };
 
     const handleBack = () => {
-        if (step === 3 && (initialStaffId || selection.packageId)) {
-            setStep(1); // Go back to services if staff selection was skipped
+        const currentContent = getStepContent(step);
+        const flow = company?.booking_flow || 'SHP';
+
+        // If going back from date and staff was skipped, go back to service
+        if (currentContent === 'date' && (initialStaffId || selection.packageId)) {
+            setStep(1);
+            return;
+        }
+        // SDP: If going back from staff (step 3) and staff was skipped, go to date (step 2) then service (step 1)
+        if (flow === 'SDP' && currentContent === 'time' && (initialStaffId || selection.packageId)) {
+            setStep(2); // Go back to date
             return;
         }
         setStep(prev => prev - 1);
@@ -265,7 +293,30 @@ export default function BookingPage() {
             } else {
                 // Single staff check (Normal flow or single-staff selection)
                 if (!selection.staffId) {
-                    canApplySlot = false;
+                    // SDP mode: staff not yet selected, check if ANY staff is available
+                    const flow = company?.booking_flow || 'SHP';
+                    if (flow === 'SDP') {
+                        const slotEnd = time + totalDuration;
+                        // Filter staff by selected service department
+                        const relevantStaff = staff.filter(s => {
+                            if (selectedServices.length === 1 && selectedServices[0].department_id) {
+                                return s.department_id === selectedServices[0].department_id;
+                            }
+                            return true;
+                        });
+                        const anyAvailable = relevantStaff.some(s => {
+                            const isBusy = dayApps.some(app => {
+                                if (Number(app.staff_id) !== Number(s.id)) return false;
+                                const [asH, asM] = app.start_time.split(':').map(Number);
+                                const [aeH, aeM] = app.end_time.split(':').map(Number);
+                                return (time < (aeH * 60 + aeM) && slotEnd > (asH * 60 + asM));
+                            });
+                            return !isBusy;
+                        });
+                        if (!anyAvailable) canApplySlot = false;
+                    } else {
+                        canApplySlot = false;
+                    }
                 } else {
                     const slotEnd = time + totalDuration;
                     const isBusy = dayApps.some(app => {
@@ -462,10 +513,14 @@ export default function BookingPage() {
                     {[1, 2, 3, 4, 5].map(s => (
                         <div key={s} className={`h-1 flex-1 rounded-full transition-colors duration-300 ${s <= step ? 'bg-[#b45309]' : 'bg-gray-200'}`}></div>
                     ))}
+                    {/* Flow indicator */}
+                    {company?.booking_flow === 'SDP' && step <= 4 && (
+                        <span className="text-[7px] font-black text-amber-500 uppercase tracking-widest ml-1 self-center whitespace-nowrap">📅 Önce Tarih</span>
+                    )}
                 </div>
 
                 {/* Step 1: Service/Package Selection */}
-                {step === 1 && (
+                {getStepContent(step) === 'service' && (
                     <div className="animate-in slide-in-from-right duration-300 fade-in pb-32">
                         <h2 className="text-2xl font-black text-gray-900 mb-2">Hizmet Seçimi</h2>
 
@@ -579,7 +634,7 @@ export default function BookingPage() {
                 )}
 
                 {/* Step 2: Staff Selection */}
-                {step === 2 && (
+                {getStepContent(step) === 'staff' && (
                     <div className="animate-in slide-in-from-right duration-300 fade-in">
                         <button onClick={handleBack} className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 hover:text-gray-600">← Geri</button>
                         <h2 className="text-2xl font-black text-gray-900 mb-6">Personel Seçimi</h2>
@@ -628,7 +683,7 @@ export default function BookingPage() {
                 )}
 
                 {/* Step 3: Date Selection */}
-                {step === 3 && (
+                {getStepContent(step) === 'date' && (
                     <div className="animate-in slide-in-from-right duration-300 fade-in">
                         <button onClick={handleBack} className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 hover:text-gray-600">← Geri</button>
                         <h2 className="text-2xl font-black text-gray-900 mb-6">Tarih Seçimi</h2>
@@ -729,7 +784,7 @@ export default function BookingPage() {
                 )}
 
                 {/* Step 4: Time Selection */}
-                {step === 4 && (
+                {getStepContent(step) === 'time' && (
                     <div className="animate-in slide-in-from-right duration-300 fade-in">
                         <button onClick={handleBack} className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 hover:text-gray-600">← Geri</button>
                         <h2 className="text-2xl font-black text-gray-900 mb-6">Saat Seçimi</h2>
@@ -773,7 +828,7 @@ export default function BookingPage() {
                 )}
 
                 {/* Step 5: Confirmation */}
-                {step === 5 && (
+                {getStepContent(step) === 'confirm' && (
                     <div className="animate-in slide-in-from-right duration-300 fade-in text-center">
                         <header className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md px-6 py-4 flex items-center justify-between z-50 border-b border-slate-50">
                             <button onClick={handleBack} className="flex items-center gap-1 text-slate-400 font-bold text-sm">
