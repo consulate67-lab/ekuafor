@@ -10,7 +10,9 @@ const serviceSchema = z.object({
     description: z.string().optional(),
     duration_minutes: z.number().min(1, 'Süre en az 1 dakika olmalıdır'),
     price: z.number().min(0, 'Ücret 0 veya daha fazla olmalıdır'),
-    department_id: z.number().nullable().optional()
+    department_id: z.number().nullable().optional(),
+    quantity: z.number().nullable().optional(),
+    unit: z.string().max(30).nullable().optional()
 });
 
 // Debug middleware for this router

@@ -530,7 +530,7 @@ export default function BookingPage() {
                 {/* Step 1: Service/Package Selection */}
                 {getStepContent(step) === 'service' && (
                     <div className="animate-in slide-in-from-right duration-300 fade-in pb-32">
-                        <h2 className="text-2xl font-black text-gray-900 mb-2">Hizmet Seçimi</h2>
+                        <h2 className="text-2xl font-black text-gray-900 mb-2">{company?.service_label || 'Hizmet'} Seçimi</h2>
 
                         <div className="flex gap-4 mb-6">
                             <button
@@ -645,7 +645,7 @@ export default function BookingPage() {
                 {getStepContent(step) === 'staff' && (
                     <div className="animate-in slide-in-from-right duration-300 fade-in">
                         <button onClick={handleBack} className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 hover:text-gray-600">← Geri</button>
-                        <h2 className="text-2xl font-black text-gray-900 mb-6">Personel Seçimi</h2>
+                        <h2 className="text-2xl font-black text-gray-900 mb-6">{company?.staff_label || 'Personel'} Seçimi</h2>
                         <div className="space-y-3">
                             {staff.filter(u => {
                                 // Filter by department if a single service is selected or a package has a department

@@ -17,7 +17,9 @@ export default function ServiceManagement() {
         name: '',
         description: '',
         duration_minutes: 30,
-        price: 0
+        price: 0,
+        quantity: null,
+        unit: null
     });
 
     // Package Form State
@@ -84,7 +86,7 @@ export default function ServiceManagement() {
     };
 
     const resetForms = () => {
-        setFormData({ name: '', description: '', duration_minutes: 30, price: 0 });
+        setFormData({ name: '', description: '', duration_minutes: 30, price: 0, quantity: null, unit: null });
         setPackageFormData({ name: '', description: '', duration_minutes: 0, price: 0, service_ids: [] });
     };
 
@@ -289,6 +291,36 @@ export default function ServiceManagement() {
                                             onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
                                         />
                                     </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest ml-1">Miktar</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            className="w-full bg-slate-50 border-none rounded-2xl py-4 px-4 font-bold text-slate-900 placeholder:text-slate-300"
+                                            placeholder="Opsiyonel"
+                                            value={formData.quantity ?? ''}
+                                            onChange={(e) => setFormData({ ...formData, quantity: e.target.value ? parseFloat(e.target.value) : null })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest ml-1">Birim</label>
+                                        <select
+                                            className="w-full bg-slate-50 border-none rounded-2xl py-4 px-4 font-bold text-slate-900"
+                                            value={formData.unit || ''}
+                                            onChange={(e) => setFormData({ ...formData, unit: e.target.value || null })}
+                                        >
+                                            <option value="">Seçiniz</option>
+                                            <option value="adet">Adet</option>
+                                            <option value="seans">Seans</option>
+                                            <option value="ml">ml</option>
+                                            <option value="lt">Litre</option>
+                                            <option value="gr">Gram</option>
+                                            <option value="kg">Kilogram</option>
+                                            <option value="paket">Paket</option>
+                                            <option value="kişi">Kişi</option>
+                                            <option value="m²">m²</option>
+                                        </select>
+                                    </div>
                                     <div className="md:col-span-2">
                                         <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest ml-1">Açıklama</label>
                                         <textarea
@@ -408,9 +440,14 @@ export default function ServiceManagement() {
                                     <h3 className="text-xl font-black text-slate-900 mb-2 uppercase tracking-tight">{service.name}</h3>
                                     <p className="text-xs font-bold text-slate-400 line-clamp-2 mb-6 h-8">{service.description || 'Hizmet açıklaması eklenmemiş.'}</p>
                                     <div className="flex items-center justify-between pt-6 border-t border-slate-50">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{service.duration_minutes} Dakika</span>
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{service.duration_minutes} dk</span>
+                                            </div>
+                                            {service.quantity && service.unit && (
+                                                <span className="text-[10px] font-bold text-violet-400 bg-violet-50 px-2 py-0.5 rounded-lg">{service.quantity} {service.unit}</span>
+                                            )}
                                         </div>
                                         <span className="text-xl font-black text-violet-600">₺{service.price}</span>
                                     </div>

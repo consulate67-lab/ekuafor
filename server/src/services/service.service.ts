@@ -9,13 +9,15 @@ export interface Service {
     price: number;
     is_active?: boolean;
     department_id?: number | null;
+    quantity?: number | null;
+    unit?: string | null;
 }
 
 class ServiceService {
     async createService(service: Service): Promise<Service> {
         const query = `
-      INSERT INTO services (company_id, name, description, duration_minutes, price, department_id)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO services (company_id, name, description, duration_minutes, price, department_id, quantity, unit)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `;
         const values = [
@@ -24,7 +26,9 @@ class ServiceService {
             service.description,
             service.duration_minutes,
             service.price,
-            service.department_id || null
+            service.department_id || null,
+            service.quantity || null,
+            service.unit || null
         ];
         const result = await pool.query(query, values);
         return result.rows[0];

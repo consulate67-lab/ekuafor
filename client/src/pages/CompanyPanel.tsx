@@ -52,7 +52,9 @@ export default function CompanyPanel() {
         last_name: '',
         gender: 'erkek',
         department_id: '',
-        photo: '' as string | null
+        photo: '' as string | null,
+        quantity: '' as string | number,
+        unit: ''
     });
     const [copiedField, setCopiedField] = useState('');
     const [isCreating, setIsCreating] = useState(false);
@@ -211,9 +213,11 @@ export default function CompanyPanel() {
                 last_name: staffForm.last_name.trim(),
                 gender: staffForm.gender,
                 department_id: staffForm.department_id || null,
-                photo: staffForm.photo
+                photo: staffForm.photo,
+                quantity: staffForm.quantity ? Number(staffForm.quantity) : null,
+                unit: staffForm.unit || null
             });
-            setStaffForm({ first_name: '', last_name: '', gender: 'erkek', department_id: '', photo: null });
+            setStaffForm({ first_name: '', last_name: '', gender: 'erkek', department_id: '', photo: null, quantity: '', unit: '' });
             setShowStaffModal(false);
             fetchData(company.id);
         } catch (err: any) {
@@ -842,6 +846,36 @@ export default function CompanyPanel() {
                                         />
                                     </div>
 
+                                    {/* Terminoloji Ayarları */}
+                                    <div className="pt-4 border-t border-slate-100">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Terminoloji</label>
+                                        <p className="text-xs text-slate-400 mb-4 ml-1">İşletmenize uygun adlandırma yapın. Bu isimler müşterilerinize gösterilecektir.</p>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Personel Adı</label>
+                                                <input
+                                                    type="text"
+                                                    className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900 text-sm"
+                                                    placeholder="Personel"
+                                                    value={company.staff_label || ''}
+                                                    onChange={e => setCompany({ ...company, staff_label: e.target.value })}
+                                                />
+                                                <p className="text-[8px] text-slate-300 mt-1 ml-1">Örn: Kuaför, Doktor, Teknisyen, Usta</p>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Hizmet Adı</label>
+                                                <input
+                                                    type="text"
+                                                    className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900 text-sm"
+                                                    placeholder="Hizmet"
+                                                    value={company.service_label || ''}
+                                                    onChange={e => setCompany({ ...company, service_label: e.target.value })}
+                                                />
+                                                <p className="text-[8px] text-slate-300 mt-1 ml-1">Örn: Tedavi, Yıkama, İşlem, Kurs</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     {/* Randevu Akış Sırası Ayarı */}
                                     <div className="pt-4 border-t border-slate-100">
                                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Randevu Akış Sırası</label>
@@ -868,8 +902,8 @@ export default function CompanyPanel() {
                                             }
 
                                             const stepLabels: Record<string, { icon: string; label: string; color: string }> = {
-                                                service: { icon: '✂️', label: 'Hizmet Seçimi', color: 'border-rose-200 bg-rose-50' },
-                                                staff: { icon: '👤', label: 'Personel Seçimi', color: 'border-violet-200 bg-violet-50' },
+                                                service: { icon: '✂️', label: (company.service_label || 'Hizmet') + ' Seçimi', color: 'border-rose-200 bg-rose-50' },
+                                                staff: { icon: '👤', label: (company.staff_label || 'Personel') + ' Seçimi', color: 'border-violet-200 bg-violet-50' },
                                                 date: { icon: '📅', label: 'Tarih Seçimi', color: 'border-emerald-200 bg-emerald-50' },
                                                 time: { icon: '🕐', label: 'Saat Seçimi', color: 'border-amber-200 bg-amber-50' },
                                             };
@@ -1837,6 +1871,34 @@ export default function CompanyPanel() {
                                             <option key={d.id} value={d.id}>{d.name}</option>
                                         ))}
                                     </select>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Miktar</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={staffForm.quantity}
+                                            onChange={e => setStaffForm(p => ({ ...p, quantity: e.target.value }))}
+                                            placeholder="Opsiyonel"
+                                            className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 text-base font-bold text-slate-900 outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Birim</label>
+                                        <select
+                                            value={staffForm.unit}
+                                            onChange={e => setStaffForm(p => ({ ...p, unit: e.target.value }))}
+                                            className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 text-base font-bold text-slate-900 outline-none appearance-none"
+                                        >
+                                            <option value="">Seçiniz</option>
+                                            <option value="kişi">Kişi</option>
+                                            <option value="seans">Seans</option>
+                                            <option value="saat">Saat</option>
+                                            <option value="adet">Adet</option>
+                                            <option value="müşteri">Müşteri</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
 

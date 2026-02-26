@@ -9,6 +9,8 @@ export interface User {
     photo?: string | null;
     department_id?: number | null;
     department_name?: string | null;
+    quantity?: number | null;
+    unit?: string | null;
     created_at: string;
 }
 
@@ -61,6 +63,8 @@ export interface Company {
     company_type?: 'ÜST FİRMA' | 'ASIL' | 'ŞUBE';
     main_company_id?: number | null;
     booking_flow?: string;
+    staff_label?: string;
+    service_label?: string;
 }
 
 export interface Province {
@@ -107,6 +111,8 @@ export interface Service {
     is_active?: boolean;
     department_id?: number | null;
     department_name?: string | null;
+    quantity?: number | null;
+    unit?: string | null;
 }
 
 export interface Package {

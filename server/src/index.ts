@@ -533,6 +533,12 @@ const runMigrations = async () => {
 
         await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS department_id INTEGER');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS booking_flow VARCHAR(10) DEFAULT \'SHP\'');
+        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS staff_label VARCHAR(50) DEFAULT \'Personel\'');
+        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS service_label VARCHAR(50) DEFAULT \'Hizmet\'');
+        await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS quantity NUMERIC');
+        await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS unit VARCHAR(30)');
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS quantity NUMERIC');
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS unit VARCHAR(30)');
         await pool.query('UPDATE services SET is_active = true WHERE is_active IS NULL');
         await pool.query('UPDATE packages SET is_active = true WHERE is_active IS NULL');
 

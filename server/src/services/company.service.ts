@@ -47,6 +47,8 @@ export interface Company {
     company_type?: 'ÜST FİRMA' | 'ASIL' | 'ŞUBE' | null;
     main_company_id?: number | null;
     booking_flow?: string | null;
+    staff_label?: string | null;
+    service_label?: string | null;
 }
 
 class CompanyService {

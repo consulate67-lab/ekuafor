@@ -60,6 +60,8 @@ const companySchema = z.object({
     company_type: z.enum(['ÜST FİRMA', 'ASIL', 'ŞUBE']).nullable().optional(),
     main_company_id: nullableNumber,
     booking_flow: z.string().max(10).nullable().optional(),
+    staff_label: z.string().max(50).nullable().optional(),
+    service_label: z.string().max(50).nullable().optional(),
 });
 
 /**
@@ -332,7 +334,7 @@ router.post('/admin-login', async (req: Request, res: Response) => {
 router.post('/:id/create-staff-board', async (req: Request, res: Response) => {
     try {
         const companyId = parseInt(req.params.id);
-        const { first_name, last_name, gender, department_id, photo } = req.body;
+        const { first_name, last_name, gender, department_id, photo, quantity, unit } = req.body;
 
         if (!first_name || !last_name) {
             return res.status(400).json({ success: false, error: 'İsim ve soyisim gereklidir' });
@@ -346,10 +348,10 @@ router.post('/:id/create-staff-board', async (req: Request, res: Response) => {
         // Kullanıcı oluştur (şifre olmadan, board_code ile erişim)
         const email = `${board_code.toLowerCase()}@staff.local`;
         const userResult = await pool.query(
-            `INSERT INTO users (email, password, role, first_name, last_name, phone, company_id, board_code, gender, department_id, photo)
-             VALUES ($1, $2, 'company_admin', $3, $4, '', $5, $6, $7, $8, $9)
+            `INSERT INTO users (email, password, role, first_name, last_name, phone, company_id, board_code, gender, department_id, photo, quantity, unit)
+             VALUES ($1, $2, 'company_admin', $3, $4, '', $5, $6, $7, $8, $9, $10, $11)
              RETURNING *`,
-            [email, 'board-auth-only', first_name, last_name, companyId, board_code, gender || null, department_id || null, photo || null]
+            [email, 'board-auth-only', first_name, last_name, companyId, board_code, gender || null, department_id || null, photo || null, quantity || null, unit || null]
         );
 
         // company_users bağlantısı ekle (constraint yoksa hata vermeden devam et)
@@ -379,7 +381,7 @@ router.get('/:id/staff-boards', async (req: Request, res: Response) => {
     try {
         const companyId = parseInt(req.params.id);
         const result = await pool.query(
-            `SELECT DISTINCT u.id, u.first_name, u.last_name, u.board_code, u.gender, u.department_id, u.photo, d.name as department_name
+            `SELECT DISTINCT u.id, u.first_name, u.last_name, u.board_code, u.gender, u.department_id, u.photo, u.quantity, u.unit, d.name as department_name
              FROM users u
              LEFT JOIN departments d ON u.department_id = d.id
              LEFT JOIN company_users cu ON cu.user_id = u.id AND cu.company_id = $1
