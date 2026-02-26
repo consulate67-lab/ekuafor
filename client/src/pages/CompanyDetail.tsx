@@ -192,7 +192,7 @@ export default function CompanyDetail() {
                         </p>
                     </div>
 
-                    {/* Firma Yönetim Paneli - YENİ */}
+                    {/* Firma Yönetim Paneli */}
                     <div className="card bg-slate-900 text-white border-none shadow-2xl shadow-slate-200 overflow-hidden relative">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
                         <div className="relative z-10">
@@ -212,7 +212,7 @@ export default function CompanyDetail() {
                                             {company.admin_key || 'ADM-NEW-RANDOM'}
                                         </p>
                                     </div>
-                                    <div className="flex gap-2">
+                                    <div className="flex flex-wrap gap-2">
                                         <button
                                             onClick={() => {
                                                 navigator.clipboard.writeText(company.admin_key || '');
@@ -228,6 +228,15 @@ export default function CompanyDetail() {
                                         >
                                             Panele Git
                                         </Link>
+                                        {/* Sadece ASIL tipindeki firmalarda, board_key varsa rapor butonu göster */}
+                                        {company.company_type === 'ASIL' && company.board_key && (
+                                            <Link
+                                                to={`/main-reports/${company.board_key}`}
+                                                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5"
+                                            >
+                                                📊 Raporlara Git
+                                            </Link>
+                                        )}
                                     </div>
                                 </div>
 

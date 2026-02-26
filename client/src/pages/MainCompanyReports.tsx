@@ -22,7 +22,7 @@ const branchIcon = (revenue: number) => {
 export default function MainCompanyReports() {
     const { code } = useParams();
     const [reportKey, setReportKey] = useState<string | null>(localStorage.getItem('main_reports_key'));
-    const [inputKey, setInputKey] = useState(code || '');
+    const [inputKey, setInputKey] = useState(code || localStorage.getItem('main_reports_key') || '');
     const [mainCompany, setMainCompany] = useState<any>(null);
     const [stats, setStats] = useState<any>(null);
     const [branches, setBranches] = useState<any[]>([]);
@@ -30,10 +30,13 @@ export default function MainCompanyReports() {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        if (reportKey) {
+        // URL'den gelen code varsa önce onu dene (CompanyDetail'dan doğrudan gelme)
+        if (code && code.length > 3) {
+            handleLogin(code);
+        } else if (reportKey) {
             handleLogin(reportKey);
         }
-    }, [reportKey]);
+    }, []);  // sadece mount'ta çalışsın
 
     const handleLogin = async (keyToUse: string) => {
         try {
