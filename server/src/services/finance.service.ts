@@ -224,8 +224,12 @@ class FinanceService {
                 ? 'https://erpefaturatest.cs.com.tr:8443/efatura/ws/connectorService'
                 : 'https://earsivtest.efinans.com.tr/earsiv/ws/EarsivWebService';
 
+            // 0. Firma Bilgilerini Getir (Vergi No, Adres vb için)
+            const companyResult = await pool.query('SELECT * FROM companies WHERE id = $1', [companyId]);
+            const companyInfo = companyResult.rows[0];
+
             // 1. UBL-TR XML Hazırla (Base64)
-            const ublXml = this.generateUBLTR(invoice);
+            const ublXml = this.generateUBLTR(invoice, companyInfo);
             const base64Veri = Buffer.from(ublXml).toString('base64');
 
             // 2. SOAP Request Gövdesi
@@ -274,49 +278,106 @@ class FinanceService {
         }
     }
 
-    private generateUBLTR(invoice: any) {
-        // En basit haliyle UBL-TR 2.1 Fatura Şablonu
+    private generateUBLTR(invoice: any, company: any) {
         const now = new Date();
         const issueDate = now.toISOString().split('T')[0];
         const issueTime = now.toTimeString().split(' ')[0];
+        const uuid = invoice.gib_uuid || `GIB-${Date.now()}`;
 
         return `<?xml version="1.0" encoding="UTF-8"?>
+        <?xml-stylesheet type="text/xsl" href="invoice_template.xslt"?>
         <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" 
                  xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" 
                  xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" 
+                 xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2"
                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
             <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
             <cbc:CustomizationID>TR1.2</cbc:CustomizationID>
-            <cbc:ProfileID>TEMELFATURA</cbc:ProfileID>
+            <cbc:ProfileID>${invoice.type === 'e-fatura' ? 'TEMELFATURA' : 'EARSIVFATURA'}</cbc:ProfileID>
             <cbc:ID>${invoice.invoice_no || ''}</cbc:ID>
-            <cbc:UUID>${invoice.gib_uuid || ''}</cbc:UUID>
+            <cbc:UUID>${uuid}</cbc:UUID>
             <cbc:IssueDate>${issueDate}</cbc:IssueDate>
             <cbc:IssueTime>${issueTime}</cbc:IssueTime>
             <cbc:InvoiceTypeCode>SATIS</cbc:InvoiceTypeCode>
             <cbc:DocumentCurrencyCode>TRY</cbc:DocumentCurrencyCode>
+            <cbc:LineCountNumeric>1</cbc:LineCountNumeric>
+            
+            <cac:AdditionalDocumentReference>
+                <cbc:ID>${uuid}</cbc:ID>
+                <cbc:IssueDate>${issueDate}</cbc:IssueDate>
+                <cbc:DocumentTypeCode>XSLT</cbc:DocumentTypeCode>
+            </cac:AdditionalDocumentReference>
+
             <cac:AccountingSupplierParty>
                 <cac:Party>
-                    <cbc:EndpointID schemeID="VKN">FIRMA_VKN</cbc:EndpointID>
-                    <cac:PartyName><cbc:Name>SALON_ADI</cbc:Name></cac:PartyName>
+                    <cbc:WebsiteURI>${company?.website || ''}</cbc:WebsiteURI>
+                    <cac:PartyIdentification>
+                        <cbc:ID schemeID="VKN">${company?.tax_number || '1111111111'}</cbc:ID>
+                    </cac:PartyIdentification>
+                    <cac:PartyName>
+                        <cbc:Name>${company?.name || 'İşletme Adı'}</cbc:Name>
+                    </cac:PartyName>
+                    <cac:PostalAddress>
+                        <cbc:StreetName>${company?.address_line || ''}</cbc:StreetName>
+                        <cbc:CitySubdivisionName>${company?.district || ''}</cbc:CitySubdivisionName>
+                        <cbc:CityName>${company?.city || ''}</cbc:CityName>
+                        <cac:Country>
+                            <cbc:Name>Türkiye</cbc:Name>
+                        </cac:Country>
+                    </cac:PostalAddress>
+                    <cac:PartyTaxScheme>
+                        <cac:TaxScheme>
+                            <cbc:Name>${company?.tax_office || ''}</cbc:Name>
+                        </cac:TaxScheme>
+                    </cac:PartyTaxScheme>
+                    <cac:Contact>
+                        <cbc:Telephone>${company?.phone || ''}</cbc:Telephone>
+                        <cbc:ElectronicMail>${company?.email || ''}</cbc:ElectronicMail>
+                    </cac:Contact>
                 </cac:Party>
             </cac:AccountingSupplierParty>
+
             <cac:AccountingCustomerParty>
                 <cac:Party>
-                    <cac:PartyName><cbc:Name>${invoice.customer_name}</cbc:Name></cac:PartyName>
+                    <cac:PartyIdentification>
+                        <cbc:ID schemeID="${invoice.customer_tax_number?.length === 11 ? 'TCKN' : 'VKN'}">${invoice.customer_tax_number || '11111111111'}</cbc:ID>
+                    </cac:PartyIdentification>
+                    <cac:PartyName>
+                        <cbc:Name>${invoice.customer_name}</cbc:Name>
+                    </cac:PartyName>
                 </cac:Party>
             </cac:AccountingCustomerParty>
+
+            <cac:TaxTotal>
+                <cbc:TaxAmount currencyID="TRY">${((invoice.amount || 0) * 0.20).toFixed(2).replace(',', '.')}</cbc:TaxAmount>
+                <cac:TaxSubtotal>
+                    <cbc:TaxableAmount currencyID="TRY">${(invoice.amount || 0).toFixed(2).replace(',', '.')}</cbc:TaxableAmount>
+                    <cbc:TaxAmount currencyID="TRY">${((invoice.amount || 0) * 0.20).toFixed(2).replace(',', '.')}</cbc:TaxAmount>
+                    <cac:TaxCategory>
+                        <cac:TaxScheme>
+                            <cbc:Name>KDV</cbc:Name>
+                            <cbc:TaxTypeCode>0015</cbc:TaxTypeCode>
+                        </cac:TaxScheme>
+                    </cac:TaxCategory>
+                </cac:TaxSubtotal>
+            </cac:TaxTotal>
+
             <cac:LegalMonetaryTotal>
-                <cbc:PayableAmount currencyID="TRY">${invoice.amount}</cbc:PayableAmount>
+                <cbc:LineExtensionAmount currencyID="TRY">${(invoice.amount || 0).toFixed(2).replace(',', '.')}</cbc:LineExtensionAmount>
+                <cbc:TaxExclusiveAmount currencyID="TRY">${(invoice.amount || 0).toFixed(2).replace(',', '.')}</cbc:TaxExclusiveAmount>
+                <cbc:TaxInclusiveAmount currencyID="TRY">${((invoice.amount || 0) * 1.20).toFixed(2).replace(',', '.')}</cbc:TaxInclusiveAmount>
+                <cbc:PayableAmount currencyID="TRY">${((invoice.amount || 0) * 1.20).toFixed(2).replace(',', '.')}</cbc:PayableAmount>
             </cac:LegalMonetaryTotal>
+
             <cac:InvoiceLine>
                 <cbc:ID>1</cbc:ID>
                 <cbc:InvoicedQuantity unitCode="C62">1</cbc:InvoicedQuantity>
-                <cbc:LineExtensionAmount currencyID="TRY">${invoice.amount}</cbc:LineExtensionAmount>
+                <cbc:LineExtensionAmount currencyID="TRY">${(invoice.amount || 0).toFixed(2).replace(',', '.')}</cbc:LineExtensionAmount>
                 <cac:Item>
                     <cbc:Name>Hizmet Bedeli</cbc:Name>
                 </cac:Item>
                 <cac:Price>
-                    <cbc:PriceAmount currencyID="TRY">${invoice.amount}</cbc:PriceAmount>
+                    <cbc:PriceAmount currencyID="TRY">${(invoice.amount || 0).toFixed(2).replace(',', '.')}</cbc:PriceAmount>
                 </cac:Price>
             </cac:InvoiceLine>
         </Invoice>`;

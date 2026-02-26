@@ -941,6 +941,27 @@ export default function CompanyPanel() {
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Vergi Numarası / TCKN</label>
+                                            <input
+                                                type="text"
+                                                maxLength={11}
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.tax_number || ''}
+                                                onChange={e => setCompany({ ...company, tax_number: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Vergi Dairesi</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.tax_office || ''}
+                                                onChange={e => setCompany({ ...company, tax_office: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
                                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Telefon</label>
                                             <input
                                                 type="tel"
@@ -967,6 +988,26 @@ export default function CompanyPanel() {
                                             value={company.address_line || ''}
                                             onChange={e => setCompany({ ...company, address_line: e.target.value })}
                                         />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">İl (Şehir)</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.city || ''}
+                                                onChange={e => setCompany({ ...company, city: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">İlçe</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.district || ''}
+                                                onChange={e => setCompany({ ...company, district: e.target.value })}
+                                            />
+                                        </div>
                                     </div>
 
                                     {/* Terminoloji Ayarları */}
