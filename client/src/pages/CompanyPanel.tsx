@@ -3170,7 +3170,7 @@ export default function CompanyPanel() {
                                 onClick={() => {
                                     setShowInvoiceModal(false);
                                     setVknCheckResult(null);
-                                    setInvoiceForm({ vkn: '', type: 'e-arsiv' });
+                                    setInvoiceForm({ vkn: '', tax_office: '', vat_rate: 20, discount_rate: 0, type: 'e-arsiv' });
                                 }}
                                 className="w-full py-5 bg-slate-100 text-slate-400 rounded-2xl font-black text-base uppercase tracking-widest"
                             >
