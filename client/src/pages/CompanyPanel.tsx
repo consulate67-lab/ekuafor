@@ -110,6 +110,8 @@ export default function CompanyPanel() {
     const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
     const [cashTransactions, setCashTransactions] = useState<any[]>([]);
     const [purchaseInvoices, setPurchaseInvoices] = useState<any[]>([]);
+    const [invoices, setInvoices] = useState<any[]>([]);
+    const [salesSubTab, setSalesSubTab] = useState<'pending' | 'invoiced'>('pending');
     const [showPurchaseModal, setShowPurchaseModal] = useState(false);
     const [showCashModal, setShowCashModal] = useState(false);
     const [reportError, setReportError] = useState('');
@@ -174,9 +176,21 @@ export default function CompanyPanel() {
                 if (financeDateRange.end) params.append('endDate', financeDateRange.end);
                 if (financeSearch) params.append('search', financeSearch);
 
-                const res = await api.get(`/appointments/company/${targetCid}/completed?${params.toString()}`);
-                if (res.data.success) {
-                    setCompletedAppointments(res.data.data);
+                // Fetch both pending completed appointments and issued invoices
+                const [aptRes, invRes] = await Promise.all([
+                    api.get(`/appointments/company/${targetCid}/completed?${params.toString()}`),
+                    api.get(`/finance/invoices/company/${targetCid}`, {
+                        params: { startDate: financeDateRange.start, endDate: financeDateRange.end }
+                    })
+                ]);
+                if (aptRes.data.success) {
+                    // Filter out appointments that are already invoiced
+                    const invoicedAptIds = new Set(invRes.data.data?.map((inv: any) => inv.appointment_id) || []);
+                    const pending = (aptRes.data.data || []).filter((apt: any) => !invoicedAptIds.has(apt.id) && apt.status !== 'invoiced');
+                    setCompletedAppointments(pending);
+                }
+                if (invRes.data.success) {
+                    setInvoices(invRes.data.data || []);
                 }
             } else if (activeFinanceTab === 'cash') {
                 const res = await api.get(`/finance/company/${targetCid}/transactions`, {
@@ -1739,49 +1753,152 @@ export default function CompanyPanel() {
                                         </div>
                                     </div>
 
-                                    {/* Grid List */}
-                                    <div className="grid grid-cols-1 gap-4">
-                                        {loadingFinance ? (
-                                            <div className="py-20 text-center animate-pulse text-slate-400 font-black">Yükleniyor...</div>
-                                        ) : completedAppointments.length === 0 ? (
-                                            <div className="bg-white rounded-3xl p-10 text-center shadow-lg border border-slate-50">
-                                                <span className="text-4xl block mb-2">🧾</span>
-                                                <p className="text-slate-400 font-bold uppercase text-xs">Tamamlanmış kayıt bulunamadı</p>
-                                            </div>
-                                        ) : (
-                                            completedAppointments.map(apt => (
-                                                <div key={apt.id} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-md transition-shadow">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center font-black">
-                                                            {apt.customer_name?.charAt(0).toUpperCase() || 'M'}
-                                                        </div>
-                                                        <div>
-                                                            <h4 className="font-black text-slate-900">{apt.customer_name}</h4>
-                                                            <p className="text-[10px] font-bold text-slate-400 uppercase">{new Date(apt.date).toLocaleDateString('tr-TR')} {apt.time}</p>
-                                                            <p className="text-[9px] font-black text-indigo-500 uppercase tracking-tighter mt-1">{apt.service_name}</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-8">
-                                                        <div className="text-right">
-                                                            <p className="text-lg font-black text-slate-900">{apt.price} ₺</p>
-                                                            <p className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-lg inline-block ${apt.invoice_status === 'fatura' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
-                                                                {apt.invoice_status === 'fatura' ? 'Faturalandırıldı' : 'Bekliyor'}
-                                                            </p>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => {
-                                                                setSelectedAppointment(apt);
-                                                                setShowInvoiceModal(true);
-                                                            }}
-                                                            className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-100 hover:scale-105 active:scale-95 transition-all"
-                                                        >
-                                                            Faturaya Dönüştür
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ))
-                                        )}
+                                    {/* Sub Tabs: Bekleyen / Faturalar */}
+                                    <div className="flex bg-slate-100/80 p-1 rounded-2xl gap-1 self-start">
+                                        <button
+                                            onClick={() => setSalesSubTab('pending')}
+                                            className={`flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${salesSubTab === 'pending' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-400'}`}
+                                        >
+                                            <span>⏳</span> Bekleyen ({completedAppointments.length})
+                                        </button>
+                                        <button
+                                            onClick={() => setSalesSubTab('invoiced')}
+                                            className={`flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${salesSubTab === 'invoiced' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}
+                                        >
+                                            <span>✅</span> Faturalar ({invoices.length})
+                                        </button>
                                     </div>
+
+                                    {/* Pending Appointments */}
+                                    {salesSubTab === 'pending' && (
+                                        <div className="grid grid-cols-1 gap-4">
+                                            {loadingFinance ? (
+                                                <div className="py-20 text-center animate-pulse text-slate-400 font-black">Yükleniyor...</div>
+                                            ) : completedAppointments.length === 0 ? (
+                                                <div className="bg-white rounded-3xl p-10 text-center shadow-lg border border-slate-50">
+                                                    <span className="text-4xl block mb-2">🎉</span>
+                                                    <p className="text-slate-400 font-bold uppercase text-xs">Tüm randevular faturalandırıldı!</p>
+                                                </div>
+                                            ) : (
+                                                completedAppointments.map(apt => (
+                                                    <div key={apt.id} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-md transition-shadow">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center font-black">
+                                                                {apt.customer_name?.charAt(0).toUpperCase() || 'M'}
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="font-black text-slate-900">{apt.customer_name}</h4>
+                                                                <p className="text-[10px] font-bold text-slate-400 uppercase">{new Date(apt.date).toLocaleDateString('tr-TR')} {apt.time}</p>
+                                                                <p className="text-[9px] font-black text-indigo-500 uppercase tracking-tighter mt-1">{apt.service_name}</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-8">
+                                                            <div className="text-right">
+                                                                <p className="text-lg font-black text-slate-900">{apt.price} ₺</p>
+                                                                <p className="text-[8px] font-black uppercase px-2 py-0.5 rounded-lg inline-block bg-amber-100 text-amber-600">
+                                                                    Bekliyor
+                                                                </p>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedAppointment(apt);
+                                                                    setShowInvoiceModal(true);
+                                                                }}
+                                                                className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-100 hover:scale-105 active:scale-95 transition-all"
+                                                            >
+                                                                Faturaya Dönüştür
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Issued Invoices - E-Fatura / E-Arşiv View */}
+                                    {salesSubTab === 'invoiced' && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {loadingFinance ? (
+                                                <div className="col-span-2 py-20 text-center animate-pulse text-slate-400 font-black">Yükleniyor...</div>
+                                            ) : invoices.length === 0 ? (
+                                                <div className="col-span-2 bg-white rounded-3xl p-10 text-center shadow-lg border border-slate-50">
+                                                    <span className="text-4xl block mb-2">📄</span>
+                                                    <p className="text-slate-400 font-bold uppercase text-xs">Henüz fatura kesilmedi</p>
+                                                </div>
+                                            ) : (
+                                                invoices.map(inv => (
+                                                    <div key={inv.id} className="bg-white rounded-[2rem] shadow-lg border border-slate-100 overflow-hidden hover:shadow-xl transition-shadow">
+                                                        {/* Invoice Header - Document Style */}
+                                                        <div className={`p-6 ${inv.type === 'e-fatura' ? 'bg-gradient-to-r from-blue-600 to-blue-500' : 'bg-gradient-to-r from-indigo-600 to-purple-600'} text-white relative overflow-hidden`}>
+                                                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10" />
+                                                            <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/5 rounded-full -ml-8 -mb-8" />
+                                                            <div className="relative z-10">
+                                                                <div className="flex justify-between items-start">
+                                                                    <div>
+                                                                        <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-70 mb-1">
+                                                                            {inv.type === 'e-fatura' ? 'E-FATURA' : inv.type === 'e-arsiv' ? 'E-ARŞİV FATURA' : 'FİŞ'}
+                                                                        </p>
+                                                                        <h3 className="text-xl font-black">{company?.name || 'Firma'}</h3>
+                                                                    </div>
+                                                                    <div className="text-right">
+                                                                        <p className="text-[8px] font-bold uppercase tracking-widest opacity-60">Fatura No</p>
+                                                                        <p className="text-sm font-black mt-0.5">{inv.invoice_no || `INV-${String(inv.id).padStart(6, '0')}`}</p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Invoice Body */}
+                                                        <div className="p-6 space-y-4">
+                                                            <div className="flex justify-between items-start">
+                                                                <div>
+                                                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Müşteri</p>
+                                                                    <p className="text-base font-black text-slate-900 mt-0.5">{inv.customer_name}</p>
+                                                                    {inv.customer_tax_number && (
+                                                                        <p className="text-[9px] text-slate-400 font-bold mt-0.5">VKN: {inv.customer_tax_number}</p>
+                                                                    )}
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Tarih</p>
+                                                                    <p className="text-sm font-bold text-slate-700 mt-0.5">
+                                                                        {new Date(inv.created_at).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Divider */}
+                                                            <div className="border-t-2 border-dashed border-slate-100" />
+
+                                                            <div className="flex justify-between items-end">
+                                                                <div className="flex gap-2">
+                                                                    <span className={`text-[8px] font-black uppercase px-3 py-1.5 rounded-lg ${inv.payment_method === 'nakit' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                                                                        {inv.payment_method === 'nakit' ? '💰 Nakit' : '💳 Kredi Kartı'}
+                                                                    </span>
+                                                                    <span className="text-[8px] font-black uppercase px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+                                                                        ✓ Tahsil Edildi
+                                                                    </span>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Toplam</p>
+                                                                    <p className="text-2xl font-black text-slate-900">{Number(inv.amount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Invoice Footer */}
+                                                        <div className="px-6 py-3 bg-slate-50/80 border-t border-slate-100 flex justify-between items-center">
+                                                            <p className="text-[8px] font-bold text-slate-400">
+                                                                {inv.type === 'e-fatura' ? '📋 GİB Onaylı E-Fatura' : inv.type === 'e-arsiv' ? '📋 GİB Onaylı E-Arşiv' : '🖨️ Yazar Kasa Fişi'}
+                                                            </p>
+                                                            <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">
+                                                                Kesildi ✓
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -1790,7 +1907,7 @@ export default function CompanyPanel() {
                                 <div className="space-y-6">
                                     <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-slate-50 shadow-sm">
                                         <h3 className="font-black text-slate-900 uppercase text-xs tracking-widest">Alış Faturaları</h3>
-                                        <button 
+                                        <button
                                             onClick={() => setShowPurchaseModal(true)}
                                             className="px-6 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest">+ Yeni Alış Girişi</button>
                                     </div>
@@ -1842,10 +1959,10 @@ export default function CompanyPanel() {
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
-                                        <button 
+                                        <button
                                             onClick={() => setShowCashModal(true)}
                                             className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest transition-all hover:bg-slate-200">- Yeni Gider İşlemi</button>
-                                        <button 
+                                        <button
                                             onClick={() => setShowCashModal(true)}
                                             className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest transition-all hover:bg-emerald-50 hover:text-emerald-500">💸 Nakit Ödeme</button>
                                     </div>

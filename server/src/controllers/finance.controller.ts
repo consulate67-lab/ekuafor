@@ -96,6 +96,23 @@ class FinanceController {
             next(error);
         }
     }
+
+    async getInvoices(req: Request, res: Response, next: NextFunction) {
+        try {
+            const companyId = req.params.companyId ? parseInt(req.params.companyId) : req.user?.companyId;
+            const { startDate, endDate } = req.query;
+            if (!companyId) return res.status(400).json({ success: false, error: 'Firma ID eksik' });
+
+            if (req.user?.companyId !== companyId && req.user?.role !== 'super_admin') {
+                return res.status(403).json({ success: false, error: 'Yetkisiz erişim' });
+            }
+
+            const invoices = await financeService.getInvoices(companyId, startDate as string, endDate as string);
+            res.json({ success: true, data: invoices });
+        } catch (error) {
+            next(error);
+        }
+    }
 }
 
 export default new FinanceController();

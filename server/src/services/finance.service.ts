@@ -59,7 +59,13 @@ class FinanceService {
                 due_date: invoice.payment_method === 'kart' ? this.calculateDueDate() : undefined
             });
 
-            // Update appointment status to reflect it's invoiced (optional column could be added but status is 'completed' already)
+            // Mark appointment as invoiced so it won't appear in pending list
+            if (invoice.appointment_id) {
+                await client.query(
+                    "UPDATE appointments SET status = 'invoiced' WHERE id = $1",
+                    [invoice.appointment_id]
+                );
+            }
 
             await client.query('COMMIT');
             return newInvoice;
@@ -170,6 +176,22 @@ class FinanceService {
 
     async getPurchaseInvoices(companyId: number) {
         const result = await pool.query('SELECT * FROM purchase_invoices WHERE company_id = $1 ORDER BY invoice_date DESC', [companyId]);
+        return result.rows;
+    }
+
+    async getInvoices(companyId: number, startDate?: string, endDate?: string) {
+        let query = 'SELECT * FROM invoices WHERE company_id = $1';
+        const values: any[] = [companyId];
+        let i = 2;
+
+        if (startDate && endDate) {
+            query += ` AND created_at::date BETWEEN $${i} AND $${i + 1}`;
+            values.push(startDate, endDate);
+            i += 2;
+        }
+
+        query += ' ORDER BY created_at DESC';
+        const result = await pool.query(query, values);
         return result.rows;
     }
 

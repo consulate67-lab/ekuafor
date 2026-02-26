@@ -6,7 +6,7 @@ const router = Router();
 
 // Invoices
 router.post('/invoices', authMiddleware, financeController.createInvoice);
-router.get('/invoices/company/:companyId', authMiddleware, financeController.getPurchaseInvoices); // Generic list or specific? Let's fix names
+router.get('/invoices/company/:companyId', authMiddleware, financeController.getInvoices);
 
 // Detailed Finances
 router.get('/company/:companyId/balance', authMiddleware, financeController.getMonthlyBalance);
