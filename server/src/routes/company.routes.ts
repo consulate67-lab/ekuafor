@@ -65,6 +65,11 @@ const companySchema = z.object({
     tax_office: nullableString,
     city: nullableString,
     district: nullableString,
+    qnb_username: nullableString,
+    qnb_password: nullableString,
+    qnb_vkn: nullableString,
+    efatura_test_mode: z.preprocess(v => (v === "" || v === null) ? null : v, z.boolean().nullable().optional()),
+    invoice_prefix: z.string().max(3).nullable().optional(),
 });
 
 /**

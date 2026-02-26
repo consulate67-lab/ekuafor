@@ -19,7 +19,7 @@ interface StaffBoard {
     photo: string | null;
 }
 
-type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'finance' | 'ai' | 'reports' | 'profile';
+type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'finance' | 'ai' | 'reports' | 'profile' | 'integration';
 
 const menuItems: { key: TabKey; icon: string; label: string }[] = [
     { key: 'home', icon: '🏠', label: 'Ana Sayfa' },
@@ -27,6 +27,7 @@ const menuItems: { key: TabKey; icon: string; label: string }[] = [
     { key: 'reports', icon: '📊', label: 'Raporlar' },
     { key: 'services', icon: '✂️', label: 'Hizmetler' },
     { key: 'profile', icon: '🏢', label: 'Firma Tanıtımı' },
+    { key: 'integration', icon: '🔌', label: 'Entegrasyon' },
     { key: 'booking', icon: '📅', label: 'Müşteri QR' },
     { key: 'ai', icon: '🤖', label: 'Yapay Zeka' },
     { key: 'qr', icon: '🔑', label: 'Yönetim Kodu' },
@@ -1180,6 +1181,96 @@ export default function CompanyPanel() {
                                 >
                                     Müşteri Sayfasını Görüntüle
                                 </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* INTEGRATION TAB - Entegrasyon Ayarları */}
+                    {activeTab === 'integration' && company && (
+                        <div className="space-y-6">
+                            <div className="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/40">
+                                <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-2">QNB e-Finans Entegrasyonu</h2>
+                                <p className="text-xs text-slate-400 mb-6">e-Fatura ve e-Arşiv gönderimi için API bilgilerini buradan yönetebilirsiniz.</p>
+
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Kullanıcı Adı</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.qnb_username || ''}
+                                                onChange={e => setCompany({ ...company, qnb_username: e.target.value })}
+                                                placeholder="e-Finans kullanıcı adı"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Şifre</label>
+                                            <input
+                                                type="password"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.qnb_password || ''}
+                                                onChange={e => setCompany({ ...company, qnb_password: e.target.value })}
+                                                placeholder="e-Finans şifresi"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Entegrasyon VKN/TCKN</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.qnb_vkn || company.tax_number || ''}
+                                                onChange={e => setCompany({ ...company, qnb_vkn: e.target.value })}
+                                                placeholder="Genellikle firma VKN'si"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Fatura Öneki (Prefix)</label>
+                                            <input
+                                                type="text"
+                                                maxLength={3}
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900 uppercase"
+                                                value={company.invoice_prefix || 'GIB'}
+                                                onChange={e => setCompany({ ...company, invoice_prefix: e.target.value.toUpperCase() })}
+                                            />
+                                            <p className="text-[8px] text-slate-300 mt-1 ml-1">Örn: GIB, ABC, EFA</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                                        <div>
+                                            <h4 className="text-sm font-bold text-slate-700">Test Modu</h4>
+                                            <p className="text-[10px] text-slate-400">Aktif olduğunda işlemler test ortamına (test web servislerine) gönderilir.</p>
+                                        </div>
+                                        <button
+                                            onClick={() => setCompany({ ...company, efatura_test_mode: !company.efatura_test_mode })}
+                                            className={`w-14 h-8 rounded-full transition-all relative ${company.efatura_test_mode !== false ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                                        >
+                                            <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all ${company.efatura_test_mode !== false ? 'right-1' : 'left-1'}`} />
+                                        </button>
+                                    </div>
+
+                                    <div className="pt-6">
+                                        <button
+                                            onClick={handleUpdateCompany}
+                                            disabled={loading}
+                                            className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all"
+                                        >
+                                            {loading ? 'Kaydediliyor...' : 'Entegrasyon Bilgilerini Kaydet'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-slate-900 rounded-3xl p-8 text-white relative overflow-hidden shadow-2xl">
+                                <h3 className="text-lg font-black mb-2 italic">UBL-TR Bilgilendirme</h3>
+                                <p className="text-slate-400 text-xs font-bold leading-relaxed">
+                                    Girdiğiniz bilgiler QNB e-Finans SOAP servisleri üzerinden UBL 2.1 formatında fatura üretmek için kullanılır.
+                                    Hatalı kullanıcı adı veya şifre girişinde GİB gönderimlerinde hata alırsınız.
+                                </p>
                             </div>
                         </div>
                     )}

@@ -130,8 +130,11 @@ class FinanceController {
     async checkEInvoiceUser(req: Request, res: Response, next: NextFunction) {
         try {
             const { vkn } = req.query;
+            const companyId = req.user?.companyId;
             if (!vkn) return res.status(400).json({ success: false, error: 'VKN/TCKN eksik' });
-            const result = await financeService.checkEInvoiceUser(vkn as string);
+            if (!companyId) return res.status(403).json({ success: false, error: 'Firma ID eksik' });
+
+            const result = await financeService.checkEInvoiceUser(vkn as string, companyId);
             res.json({ success: true, data: result });
         } catch (error: any) {
             res.status(400).json({ success: false, error: error.message });

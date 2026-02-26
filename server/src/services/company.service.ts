@@ -53,6 +53,11 @@ export interface Company {
     tax_office?: string | null;
     city?: string | null;
     district?: string | null;
+    qnb_username?: string | null;
+    qnb_password?: string | null;
+    qnb_vkn?: string | null;
+    efatura_test_mode?: boolean | null;
+    invoice_prefix?: string | null;
 }
 
 class CompanyService {
@@ -88,8 +93,9 @@ class CompanyService {
           is_active, is_verified, created_by, board_key, 
           work_start_time, work_end_time, slot_interval, admin_key,
           genders, company_type, main_company_id,
-          tax_number, tax_office, city, district
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36)
+          tax_number, tax_office, city, district,
+          qnb_username, qnb_password, qnb_vkn, efatura_test_mode, invoice_prefix
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41)
         RETURNING *
       `;
 
@@ -129,7 +135,12 @@ class CompanyService {
                 company.tax_number || null,
                 company.tax_office || null,
                 company.city || null,
-                company.district || null
+                company.district || null,
+                company.qnb_username || null,
+                company.qnb_password || null,
+                company.qnb_vkn || null,
+                company.efatura_test_mode !== false,
+                company.invoice_prefix || 'GIB'
             ];
 
             const result = await client.query(query, values);

@@ -41,7 +41,12 @@ class FinanceService {
                 ['tax_number', 'VARCHAR(20)'],
                 ['tax_office', 'VARCHAR(100)'],
                 ['city', 'VARCHAR(50)'],
-                ['district', 'VARCHAR(50)']
+                ['district', 'VARCHAR(50)'],
+                ['qnb_username', 'VARCHAR(100)'],
+                ['qnb_password', 'VARCHAR(100)'],
+                ['qnb_vkn', 'VARCHAR(20)'],
+                ['efatura_test_mode', 'BOOLEAN DEFAULT true'],
+                ['invoice_prefix', "VARCHAR(3) DEFAULT 'GIB'"]
             ];
             for (const [col, type] of companyCols) {
                 await client.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS ${col} ${type}`);
@@ -285,21 +290,21 @@ class FinanceService {
         await pool.query("UPDATE invoices SET gib_status = 'pending' WHERE id = $1", [invoiceId]);
 
         try {
-            // QNB / e-Finans Kullanıcı Bilgileri (Normalde firma ayarlarından gelmeli)
-            const QNB_CONFIG = {
-                username: 'USERNAME_PLACEHOLDER', // e-Finans kullanıcı adı
-                password: 'PASSWORD_PLACEHOLDER', // e-Finans şifre
-                vkn: '3250566851', // Firmanın kendi VKN/TCKN'si
-                test: true // Test ortamı mı?
-            };
-
-            const soapEndpoint = invoice.type === 'e-fatura'
-                ? 'https://erpefaturatest.cs.com.tr:8443/efatura/ws/connectorService'
-                : 'https://earsivtest.efinans.com.tr/earsiv/ws/EarsivWebService';
-
             // 0. Firma Bilgilerini Getir (Vergi No, Adres vb için)
             const companyResult = await pool.query('SELECT * FROM companies WHERE id = $1', [companyId]);
             const companyInfo = companyResult.rows[0];
+
+            // QNB / e-Finans Kullanıcı Bilgileri
+            const QNB_CONFIG = {
+                username: companyInfo.qnb_username || 'USERNAME_PLACEHOLDER',
+                password: companyInfo.qnb_password || 'PASSWORD_PLACEHOLDER',
+                vkn: companyInfo.qnb_vkn || companyInfo.tax_number || '',
+                test: companyInfo.efatura_test_mode !== false // varsayılan true
+            };
+
+            const soapEndpoint = invoice.type === 'e-fatura'
+                ? (QNB_CONFIG.test ? 'https://erpefaturatest.cs.com.tr:8443/efatura/ws/connectorService' : 'https://efatura.cs.com.tr/efatura/ws/connectorService')
+                : (QNB_CONFIG.test ? 'https://earsivtest.efinans.com.tr/earsiv/ws/EarsivWebService' : 'https://earsiv.efinans.com.tr/earsiv/ws/EarsivWebService');
 
             // 1. UBL-TR XML Hazırla (Base64)
             const ublXml = this.generateUBLTR(invoice, companyInfo);
@@ -456,12 +461,16 @@ class FinanceService {
         </Invoice>`;
     }
 
-    async checkEInvoiceUser(vkn: string) {
+    async checkEInvoiceUser(vkn: string, companyId: number) {
+        // Firma Bilgilerini Getir
+        const companyResult = await pool.query('SELECT qnb_username, qnb_password, efatura_test_mode FROM companies WHERE id = $1', [companyId]);
+        const company = companyResult.rows[0];
+
         // QNB SOAP Check
         const QNB_CONFIG = {
-            username: 'USERNAME_PLACEHOLDER',
-            password: 'PASSWORD_PLACEHOLDER',
-            test: true
+            username: company?.qnb_username || 'USERNAME_PLACEHOLDER',
+            password: company?.qnb_password || 'PASSWORD_PLACEHOLDER',
+            test: company?.efatura_test_mode !== false
         };
 
         const soapRequest = `
