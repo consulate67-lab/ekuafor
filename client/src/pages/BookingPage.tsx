@@ -568,7 +568,14 @@ export default function BookingPage() {
                                             </div>
                                             <div className="flex-1">
                                                 <h3 className={`font-black text-sm uppercase tracking-tight ${isSelected ? 'text-indigo-900' : 'text-slate-900'}`}>{s.name}</h3>
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.duration_minutes} dakika {s.department_name ? `• ${s.department_name}` : ''}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.duration_minutes} dk {s.department_name ? `• ${s.department_name}` : ''}</p>
+                                                    {s.quantity && s.unit && (
+                                                        <span className="text-[9px] font-black text-violet-500 bg-violet-50 px-2 py-0.5 rounded-lg border border-violet-100">
+                                                            {s.quantity} {s.unit}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                             <div className={`font-black text-base ${isSelected ? 'text-indigo-600' : 'text-slate-900'}`}>₺{s.price}</div>
                                         </button>
@@ -679,7 +686,14 @@ export default function BookingPage() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <h3 className="font-black text-slate-900 text-lg group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{u.first_name} {u.last_name}</h3>
-                                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-2">{u.department_name || (u.role === 'company_admin' ? 'Baş Uzman' : 'Uzman')}</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest leading-none">{u.department_name || (u.role === 'company_admin' ? `Baş ${company?.staff_label || 'Uzman'}` : (company?.staff_label || 'Uzman'))}</p>
+                                            {(u as any).quantity && (u as any).unit && (
+                                                <span className="text-[8px] font-black text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded-md border border-indigo-100 uppercase tracking-widest">
+                                                    {(u as any).quantity} {(u as any).unit}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="w-8 h-8 rounded-full bg-slate-50 text-slate-300 flex items-center justify-center group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all">
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>

@@ -1266,6 +1266,11 @@ export default function CompanyPanel() {
                                                                 {staff.department_name}
                                                             </span>
                                                         )}
+                                                        {(staff as any).quantity && (staff as any).unit && (
+                                                            <span className="px-2 py-0.5 bg-violet-50 text-violet-600 rounded-full text-[9px] font-black uppercase tracking-widest">
+                                                                {(staff as any).quantity} {(staff as any).unit}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

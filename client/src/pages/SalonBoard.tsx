@@ -591,7 +591,7 @@ export default function SalonBoard() {
                                 <th className="sticky top-0 left-0 z-[100] bg-slate-900 p-4 lg:p-5 text-left border-b border-white/5 min-w-[240px] lg:min-w-[280px] shadow-[10px_0_30px_-15px_rgba(0,0,0,0.3)] rounded-tl-[1.5rem]">
                                     <div className="flex flex-col">
                                         <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-0.5">Organizasyon</span>
-                                        <span className="text-base font-black text-white tracking-tight">Uzmanlar</span>
+                                        <span className="text-base font-black text-white tracking-tight">{company?.staff_label ? (company.staff_label + 'lar') : 'Uzmanlar'}</span>
                                     </div>
                                 </th>
                                 {hours.map(hour => {
@@ -810,7 +810,7 @@ export default function SalonBoard() {
 
                                                                             return app.services && app.services.length > 0
                                                                                 ? app.services.map((s: any) => s.name).join(', ')
-                                                                                : (app.service_name || 'Hizmet');
+                                                                                : (app.service_name || (company?.service_label || 'Hizmet'));
                                                                         })()}
                                                                     </p>
                                                                 </div>
@@ -867,7 +867,7 @@ export default function SalonBoard() {
                                                     onClick={() => setFastForm({ ...fastForm, packageId: '' })}
                                                     className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${!fastForm.packageId ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}
                                                 >
-                                                    Hizmetler
+                                                    {company?.service_label ? (company.service_label + 'ler') : 'Hizmetler'}
                                                 </button>
                                                 <button
                                                     type="button"
@@ -880,7 +880,7 @@ export default function SalonBoard() {
 
                                             {!fastForm.packageId ? (
                                                 <>
-                                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Hizmet Seçimi (Birden Fazla Seçebilirsiniz)</label>
+                                                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">{(company?.service_label || 'Hizmet')} Seçimi (Birden Fazla Seçebilirsiniz)</label>
                                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-48 overflow-y-auto p-4 bg-slate-50 rounded-[2.5rem]">
                                                         {services.map(s => {
                                                             const isSelected = fastForm.serviceIds.includes(s.id);
@@ -964,7 +964,7 @@ export default function SalonBoard() {
                                                                                             </div>
                                                                                         </div>
                                                                                         <div className="flex flex-col items-end gap-1">
-                                                                                            <span className="text-[8px] font-black text-slate-400 uppercase">Uzman</span>
+                                                                                            <span className="text-[8px] font-black text-slate-400 uppercase">{company?.staff_label || 'Uzman'}</span>
                                                                                             <select
                                                                                                 value={fastForm.serviceStaffOverrides[ps.id] || fastForm.staffId || selectedCell?.person.user_id || selectedCell?.person.id}
                                                                                                 onChange={(e) => {
