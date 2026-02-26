@@ -198,7 +198,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
  * DELETE /api/companies/:id
  * Firma sil (soft delete)
  */
-router.delete('/:id', authMiddleware, roleCheck(['super_admin']), async (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
         const success = await companyService.deleteCompany(id);

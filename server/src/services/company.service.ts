@@ -310,7 +310,7 @@ class CompanyService {
      */
     async deleteCompany(id: number): Promise<boolean> {
         const result = await pool.query(
-            'UPDATE companies SET is_active = false WHERE id = $1 RETURNING id',
+            'DELETE FROM companies WHERE id = $1 RETURNING id',
             [id]
         );
         return result.rowCount ? result.rowCount > 0 : false;
