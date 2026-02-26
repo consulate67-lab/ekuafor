@@ -49,6 +49,10 @@ export interface Company {
     booking_flow?: string | null;
     staff_label?: string | null;
     service_label?: string | null;
+    tax_number?: string | null;
+    tax_office?: string | null;
+    city?: string | null;
+    district?: string | null;
 }
 
 class CompanyService {
@@ -83,8 +87,9 @@ class CompanyService {
           commission_rate, payment_enabled,
           is_active, is_verified, created_by, board_key, 
           work_start_time, work_end_time, slot_interval, admin_key,
-          genders, company_type, main_company_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)
+          genders, company_type, main_company_id,
+          tax_number, tax_office, city, district
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36)
         RETURNING *
       `;
 
@@ -120,7 +125,11 @@ class CompanyService {
                 company.admin_key || `ADM-${company.name.substring(0, 3).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
                 company.genders || [],
                 company.company_type || 'ASIL',
-                company.main_company_id || null
+                company.main_company_id || null,
+                company.tax_number || null,
+                company.tax_office || null,
+                company.city || null,
+                company.district || null
             ];
 
             const result = await client.query(query, values);

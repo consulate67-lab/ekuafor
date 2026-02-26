@@ -27,6 +27,46 @@ export interface CashTransaction {
 }
 
 class FinanceService {
+    constructor() {
+        this.runMigrations().catch(err => console.error('Migration Error:', err));
+    }
+
+    private async runMigrations() {
+        const client = await pool.connect();
+        try {
+            console.log('[Migration] Checking for new columns...');
+
+            // 1. Companies tablosu güncellemesi
+            const companyCols = [
+                ['tax_number', 'VARCHAR(20)'],
+                ['tax_office', 'VARCHAR(100)'],
+                ['city', 'VARCHAR(50)'],
+                ['district', 'VARCHAR(50)']
+            ];
+            for (const [col, type] of companyCols) {
+                await client.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+            }
+
+            // 2. Invoices tablosu güncellemesi
+            const invoiceCols = [
+                ['customer_tax_number', 'VARCHAR(20)'],
+                ['customer_tax_office', 'VARCHAR(100)'],
+                ['gib_uuid', 'UUID'],
+                ['gib_status', "VARCHAR(20) DEFAULT 'not_sent'"],
+                ['invoice_no', 'VARCHAR(20)']
+            ];
+            for (const [col, type] of invoiceCols) {
+                await client.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+            }
+
+            console.log('[Migration] Database is up to date.');
+        } catch (error) {
+            console.error('[Migration] Failed:', error);
+        } finally {
+            client.release();
+        }
+    }
+
     async createInvoice(invoice: Invoice) {
         const client = await pool.connect();
         try {
