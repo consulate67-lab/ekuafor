@@ -257,6 +257,9 @@ class CompanyService {
             whereClauses.push(`c.company_type = $${paramIndex}`);
             values.push(filters.company_type);
             paramIndex++;
+        } else {
+            // Varsayılan: Üst firmaları son kullanıcı listesinden hariç tut
+            whereClauses.push(`(c.company_type IS NULL OR c.company_type != 'ÜST FİRMA')`);
         }
 
         // Spatial filtering (Haversine formula)
