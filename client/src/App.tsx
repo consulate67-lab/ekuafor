@@ -81,6 +81,7 @@ function App() {
                     <Route path="/board" element={<SalonBoard />} />
                     <Route path="/company-panel" element={<CompanyPanel />} />
                     <Route path="/main-management" element={<MainCompanyPanel />} />
+                    <Route path="/main-reports" element={<MainCompanyReports />} />
                     <Route path="/main-reports/:code" element={<MainCompanyReports />} />
 
 

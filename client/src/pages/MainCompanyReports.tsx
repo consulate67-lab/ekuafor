@@ -79,14 +79,14 @@ export default function MainCompanyReports() {
                         📊
                     </div>
                     <h1 className="text-4xl font-black text-white mb-3 tracking-tight">Grup Raporları</h1>
-                    <p className="text-slate-400 mb-10 font-medium italic">Şube performans verilerine erişmek için anahtarı girin.</p>
+                    <p className="text-slate-400 mb-10 font-medium italic">Firm tanımlarındaki <span className="text-emerald-400 font-black">Board Key</span> değerini girerek erişim sağlayın.</p>
 
                     <form onSubmit={onLoginSubmit} className="space-y-6">
                         <input
                             type="text"
                             value={inputKey}
                             onChange={e => setInputKey(e.target.value)}
-                            placeholder="RAPOR ANAHTARI"
+                            placeholder="BOARD KEY (TABLET ŞİFRESİ)"
                             className="w-full p-6 bg-white/5 rounded-2xl border-2 border-white/10 font-mono text-center text-xl tracking-[0.2em] text-emerald-400 focus:border-emerald-500 focus:bg-white/10 transition-all outline-none uppercase"
                             required
                         />
