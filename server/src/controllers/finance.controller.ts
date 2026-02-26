@@ -113,6 +113,19 @@ class FinanceController {
             next(error);
         }
     }
+    async sendToGIB(req: Request, res: Response, next: NextFunction) {
+        try {
+            const companyId = req.user?.companyId;
+            const invoiceId = parseInt(req.params.invoiceId);
+            if (!companyId) return res.status(403).json({ success: false, error: 'Firma ID eksik' });
+            if (!invoiceId) return res.status(400).json({ success: false, error: 'Fatura ID eksik' });
+
+            const result = await financeService.sendToGIB(invoiceId, companyId);
+            res.json({ success: true, data: result });
+        } catch (error: any) {
+            res.status(400).json({ success: false, error: error.message });
+        }
+    }
 }
 
 export default new FinanceController();

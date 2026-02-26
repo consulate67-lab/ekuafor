@@ -1885,14 +1885,75 @@ export default function CompanyPanel() {
                                                             </div>
                                                         </div>
 
-                                                        {/* Invoice Footer */}
-                                                        <div className="px-6 py-3 bg-slate-50/80 border-t border-slate-100 flex justify-between items-center">
-                                                            <p className="text-[8px] font-bold text-slate-400">
-                                                                {inv.type === 'e-fatura' ? '📋 GİB Onaylı E-Fatura' : inv.type === 'e-arsiv' ? '📋 GİB Onaylı E-Arşiv' : '🖨️ Yazar Kasa Fişi'}
-                                                            </p>
-                                                            <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">
-                                                                Kesildi ✓
-                                                            </span>
+                                                        {/* Invoice Footer - GIB Actions */}
+                                                        <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-100">
+                                                            <div className="flex justify-between items-center">
+                                                                <p className="text-[8px] font-bold text-slate-400">
+                                                                    {inv.type === 'e-fatura' ? '📋 E-Fatura' : inv.type === 'e-arsiv' ? '📋 E-Arşiv Fatura' : '🖨️ Yazar Kasa Fişi'}
+                                                                </p>
+                                                                {/* GIB Status Badge */}
+                                                                {inv.gib_status === 'sent' ? (
+                                                                    <div className="flex flex-col items-end gap-0.5">
+                                                                        <span className="text-[8px] font-black uppercase px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 flex items-center gap-1.5">
+                                                                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                                                                            GİB'e İletildi
+                                                                        </span>
+                                                                        {inv.gib_uuid && (
+                                                                            <p className="text-[7px] text-slate-400 font-mono truncate max-w-[160px]" title={inv.gib_uuid}>{inv.gib_uuid}</p>
+                                                                        )}
+                                                                    </div>
+                                                                ) : inv.gib_status === 'pending' ? (
+                                                                    <span className="text-[8px] font-black uppercase px-3 py-1.5 rounded-lg bg-amber-50 text-amber-600 flex items-center gap-1.5 animate-pulse">
+                                                                        <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                                                                        GİB'e Gönderiliyor...
+                                                                    </span>
+                                                                ) : inv.gib_status === 'failed' ? (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-[8px] font-black uppercase px-3 py-1.5 rounded-lg bg-red-50 text-red-500">
+                                                                            ✗ Gönderim Başarısız
+                                                                        </span>
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                try {
+                                                                                    setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, gib_status: 'pending' } : i));
+                                                                                    const res = await api.post(`/finance/invoices/${inv.id}/gib-send`);
+                                                                                    if (res.data.success) {
+                                                                                        setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, ...res.data.data.invoice } : i));
+                                                                                    }
+                                                                                } catch (err: any) {
+                                                                                    setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, gib_status: 'failed' } : i));
+                                                                                    alert(err.response?.data?.error || 'GİB gönderim hatası');
+                                                                                }
+                                                                            }}
+                                                                            className="text-[8px] font-black uppercase px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-all"
+                                                                        >
+                                                                            Tekrar Dene
+                                                                        </button>
+                                                                    </div>
+                                                                ) : (
+                                                                    /* not_sent — main CTA */
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            try {
+                                                                                // Optimistic: show pending
+                                                                                setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, gib_status: 'pending' } : i));
+                                                                                const res = await api.post(`/finance/invoices/${inv.id}/gib-send`);
+                                                                                if (res.data.success) {
+                                                                                    // Update invoice in local state with server response
+                                                                                    setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, ...res.data.data.invoice } : i));
+                                                                                }
+                                                                            } catch (err: any) {
+                                                                                setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, gib_status: 'failed' } : i));
+                                                                                alert(err.response?.data?.error || 'GİB gönderim hatası');
+                                                                            }
+                                                                        }}
+                                                                        className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-red-100 hover:shadow-red-200 hover:scale-105 active:scale-95 transition-all"
+                                                                    >
+                                                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                                                                        GİB'e Gönder
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 ))

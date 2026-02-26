@@ -195,8 +195,73 @@ class FinanceService {
         return result.rows;
     }
 
+    async getInvoiceById(invoiceId: number, companyId: number) {
+        const result = await pool.query(
+            'SELECT * FROM invoices WHERE id = $1 AND company_id = $2',
+            [invoiceId, companyId]
+        );
+        return result.rows[0] || null;
+    }
+
+    async sendToGIB(invoiceId: number, companyId: number) {
+        // Ensure gib_status column exists (idempotent migration)
+        await pool.query(`
+            ALTER TABLE invoices 
+            ADD COLUMN IF NOT EXISTS gib_status VARCHAR(20) DEFAULT 'not_sent',
+            ADD COLUMN IF NOT EXISTS gib_uuid VARCHAR(100),
+            ADD COLUMN IF NOT EXISTS gib_sent_at TIMESTAMPTZ
+        `).catch(() => { }); // ignore if already exists
+
+        const invoice = await this.getInvoiceById(invoiceId, companyId);
+        if (!invoice) throw new Error('Fatura bulunamadı');
+        if (invoice.gib_status === 'sent') throw new Error('Bu fatura zaten GİB\'e gönderildi');
+
+        // Mark as pending
+        await pool.query(
+            "UPDATE invoices SET gib_status = 'pending' WHERE id = $1",
+            [invoiceId]
+        );
+
+        try {
+            // ------------------------------------------------------------------
+            // REAL GIB INTEGRATION POINT:
+            // Replace the block below with actual GİB e-Arşiv / e-Fatura API call.
+            //
+            // Required: GİB entegratör credentials (username, password, VKN)
+            // Endpoint: https://earsivportal.efatura.gov.tr/intragiris (test)
+            //           https://earsivportaltest.efatura.gov.tr/intragiris (prod)
+            //
+            // Flow:
+            //   1. Login  → get token
+            //   2. Create UBL-TR XML from invoice data
+            //   3. POST /earsiv-services/dispatch → get UUID
+            //   4. Store UUID for cancellation / query
+            // ------------------------------------------------------------------
+
+            // SIMULATED RESPONSE (remove when real GIB integration is active):
+            const simulatedUUID = `GIB-${Date.now()}-${String(invoiceId).padStart(6, '0')}`;
+            await new Promise(r => setTimeout(r, 1200)); // simulate network
+
+            // Update with success
+            const updated = await pool.query(
+                `UPDATE invoices 
+                 SET gib_status = 'sent', gib_uuid = $1, gib_sent_at = NOW() 
+                 WHERE id = $2 RETURNING *`,
+                [simulatedUUID, invoiceId]
+            );
+
+            return { success: true, uuid: simulatedUUID, invoice: updated.rows[0] };
+        } catch (gibError: any) {
+            // Mark as failed
+            await pool.query(
+                "UPDATE invoices SET gib_status = 'failed' WHERE id = $1",
+                [invoiceId]
+            );
+            throw new Error(`GİB gönderim hatası: ${gibError.message}`);
+        }
+    }
+
     private calculateDueDate() {
-        // Standard 30 days for credit card payments (example logic)
         const date = new Date();
         date.setDate(date.getDate() + 30);
         return date.toISOString().split('T')[0];
