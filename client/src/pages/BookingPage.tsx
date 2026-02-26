@@ -437,8 +437,10 @@ export default function BookingPage() {
                 }
             }
 
-            // Save phone locally to identify this customer in MyAppointments
-            localStorage.setItem('customer_phone', selection.customerPhone);
+            // Phone is optional - if provided, save for backward compatibility only
+            if (selection.customerPhone) {
+                localStorage.setItem('customer_phone', selection.customerPhone);
+            }
 
             // Request notification permission if not already granted
             if ("Notification" in window && Notification.permission === "default") {
