@@ -1,4 +1,5 @@
 import pool from '../config/database';
+import crypto from 'crypto';
 
 export interface Invoice {
     id?: number;
@@ -12,6 +13,8 @@ export interface Invoice {
     amount: number;
     status: string;
     invoice_no?: string;
+    gib_uuid?: string;
+    gib_status?: string;
 }
 
 export interface CashTransaction {
@@ -75,7 +78,7 @@ class FinanceService {
                 await client.query(`ALTER TABLE services ADD COLUMN IF NOT EXISTS ${col} ${type}`);
             }
 
-            // 4. Users tablosu güncellemesi (Personel Board vb için)
+            // 4. Users tablosu güncellemesi
             const userCols = [
                 ['board_code', 'VARCHAR(20)'],
                 ['gender', 'VARCHAR(20)'],
@@ -105,6 +108,12 @@ class FinanceService {
         }
     }
 
+    private calculateDueDate() {
+        const date = new Date();
+        date.setDate(date.getDate() + 30);
+        return date.toISOString().split('T')[0];
+    }
+
     async createInvoice(invoice: Invoice) {
         const client = await pool.connect();
         try {
@@ -125,7 +134,6 @@ class FinanceService {
             const result = await client.query(query, values);
             const newInvoice = result.rows[0];
 
-            // Create Cash Transaction automatically
             await this.createCashTransactionInternal(client, {
                 company_id: invoice.company_id,
                 type: 'income',
@@ -137,7 +145,6 @@ class FinanceService {
                 due_date: invoice.payment_method === 'kart' ? this.calculateDueDate() : undefined
             });
 
-            // Mark appointment as invoiced so it won't appear in pending list
             if (invoice.appointment_id) {
                 await client.query(
                     "UPDATE appointments SET status = 'invoiced' WHERE id = $1",
@@ -171,19 +178,13 @@ class FinanceService {
     }
 
     async createCashTransaction(transaction: CashTransaction) {
-        const query = `
-            INSERT INTO cash_transactions (
-                company_id, type, category, payment_method, amount, description, transaction_date, due_date
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING *
-        `;
-        const values = [
-            transaction.company_id, transaction.type, transaction.category,
-            transaction.payment_method, transaction.amount, transaction.description,
-            transaction.transaction_date, transaction.due_date
-        ];
-        const result = await pool.query(query, values);
-        return result.rows[0];
+        const client = await pool.connect();
+        try {
+            const result = await this.createCashTransactionInternal(client, transaction);
+            return result.rows[0];
+        } finally {
+            client.release();
+        }
     }
 
     async getCashTransactions(companyId: number, startDate?: string, endDate?: string) {
@@ -231,12 +232,11 @@ class FinanceService {
             const values = [data.company_id, data.supplier_name, data.invoice_no, data.amount, data.invoice_date, data.description];
             const result = await client.query(query, values);
 
-            // Log as expense
             await this.createCashTransactionInternal(client, {
                 company_id: data.company_id,
                 type: 'expense',
                 category: 'purchase',
-                payment_method: 'nakit', // Assuming purchase paid cash for now
+                payment_method: 'nakit',
                 amount: data.amount,
                 description: `${data.supplier_name} - Alış Faturası (${data.invoice_no})`,
                 transaction_date: data.invoice_date
@@ -281,36 +281,52 @@ class FinanceService {
         return result.rows[0] || null;
     }
 
+    async prepareInvoice(invoiceId: number, companyId: number) {
+        const invoice = await this.getInvoiceById(invoiceId, companyId);
+        if (!invoice) throw new Error('Fatura bulunamadı');
+        if (invoice.gib_status === 'sent') throw new Error('Bu fatura zaten gönderildi');
+
+        const companyRes = await pool.query('SELECT invoice_prefix FROM companies WHERE id = $1', [companyId]);
+        const prefix = companyRes.rows[0]?.invoice_prefix || 'GIB';
+        const year = new Date().getFullYear();
+
+        const randomSequence = Math.floor(Math.random() * 900000000) + 100000000;
+        const invoiceNo = `${prefix}${year}${randomSequence}`;
+        const gibUUID = crypto.randomUUID ? crypto.randomUUID() : `uuid-${Date.now()}`;
+
+        const updated = await pool.query(
+            `UPDATE invoices SET invoice_no = $1, gib_uuid = $2, gib_status = 'prepared' WHERE id = $3 RETURNING *`,
+            [invoiceNo, gibUUID, invoiceId]
+        );
+
+        return updated.rows[0];
+    }
+
     async sendToGIB(invoiceId: number, companyId: number) {
         const invoice = await this.getInvoiceById(invoiceId, companyId);
         if (!invoice) throw new Error('Fatura bulunamadı');
         if (invoice.gib_status === 'sent') throw new Error('Bu fatura zaten gönderildi');
 
-        // GİB Durumunu 'pending' yap (Optimistik)
         await pool.query("UPDATE invoices SET gib_status = 'pending' WHERE id = $1", [invoiceId]);
 
         try {
-            // 0. Firma Bilgilerini Getir (Vergi No, Adres vb için)
             const companyResult = await pool.query('SELECT * FROM companies WHERE id = $1', [companyId]);
             const companyInfo = companyResult.rows[0];
 
-            // QNB / e-Finans Kullanıcı Bilgileri
             const QNB_CONFIG = {
                 username: companyInfo.qnb_username || 'USERNAME_PLACEHOLDER',
                 password: companyInfo.qnb_password || 'PASSWORD_PLACEHOLDER',
                 vkn: companyInfo.qnb_vkn || companyInfo.tax_number || '',
-                test: companyInfo.efatura_test_mode !== false // varsayılan true
+                test: companyInfo.efatura_test_mode !== false
             };
 
             const soapEndpoint = invoice.type === 'e-fatura'
                 ? (QNB_CONFIG.test ? 'https://erpefaturatest.cs.com.tr:8443/efatura/ws/connectorService' : 'https://efatura.cs.com.tr/efatura/ws/connectorService')
                 : (QNB_CONFIG.test ? 'https://earsivtest.efinans.com.tr/earsiv/ws/EarsivWebService' : 'https://earsiv.efinans.com.tr/earsiv/ws/EarsivWebService');
 
-            // 1. UBL-TR XML Hazırla (Base64)
             const ublXml = this.generateUBLTR(invoice, companyInfo);
             const base64Veri = Buffer.from(ublXml).toString('base64');
 
-            // 2. SOAP Request Gövdesi
             const soapRequest = `
                 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://service.connector.uut.cs.com.tr/">
                     <soapenv:Header>
@@ -335,20 +351,15 @@ class FinanceService {
                 </soapenv:Envelope>
             `;
 
-            // Not: axios ile gönderim yapılacak. Şimdilik simüle ediyoruz ama yapı hazır.
-            // const response = await axios.post(soapEndpoint, soapRequest, { headers: { 'Content-Type': 'text/xml' } });
-
-            const simulatedUUID = `QNB-${Date.now()}-${invoiceId}`;
+            // Simulating QNB response
             await new Promise(r => setTimeout(r, 1500));
 
             const updated = await pool.query(
-                `UPDATE invoices 
-                 SET gib_status = 'sent', gib_uuid = $1, gib_sent_at = NOW() 
-                 WHERE id = $2 RETURNING *`,
-                [simulatedUUID, invoiceId]
+                `UPDATE invoices SET gib_status = 'sent', gib_sent_at = NOW() WHERE id = $1 RETURNING *`,
+                [invoiceId]
             );
 
-            return { success: true, uuid: simulatedUUID, invoice: updated.rows[0] };
+            return { success: true, uuid: invoice.gib_uuid, invoice: updated.rows[0] };
 
         } catch (error: any) {
             await pool.query("UPDATE invoices SET gib_status = 'failed' WHERE id = $1", [invoiceId]);
@@ -462,40 +473,95 @@ class FinanceService {
     }
 
     async checkEInvoiceUser(vkn: string, companyId: number) {
-        // Firma Bilgilerini Getir
         const companyResult = await pool.query('SELECT qnb_username, qnb_password, efatura_test_mode FROM companies WHERE id = $1', [companyId]);
         const company = companyResult.rows[0];
 
-        // QNB SOAP Check
         const QNB_CONFIG = {
             username: company?.qnb_username || 'USERNAME_PLACEHOLDER',
             password: company?.qnb_password || 'PASSWORD_PLACEHOLDER',
             test: company?.efatura_test_mode !== false
         };
 
-        const soapRequest = `
-            <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://service.connector.uut.cs.com.tr/">
-                <soapenv:Header/>
-                <soapenv:Body>
-                    <ser:efaturaKullaniciBilgisi>
-                        <vergiTcKimlikNo>${vkn}</vergiTcKimlikNo>
-                    </ser:efaturaKullaniciBilgisi>
-                </soapenv:Body>
-            </soapenv:Envelope>
-        `;
-
-        // axios.post(...) call would go here.
-        // For now, let's pretend we checked and if VKN starts with '1', it's e-invoice for testing.
         await new Promise(r => setTimeout(r, 800));
         const isEInvoice = vkn.startsWith('1');
-
         return { isEInvoice };
     }
 
-    private calculateDueDate() {
-        const date = new Date();
-        date.setDate(date.getDate() + 30);
-        return date.toISOString().split('T')[0];
+    async getInvoiceHTML(invoiceId: number, companyId: number) {
+        const invoice = await this.getInvoiceById(invoiceId, companyId);
+        if (!invoice) throw new Error('Fatura bulunamadı');
+        const companyRes = await pool.query('SELECT * FROM companies WHERE id = $1', [companyId]);
+        const company = companyRes.rows[0];
+
+        return `
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body { font-family: sans-serif; padding: 40px; color: #333; max-width: 800px; margin: auto; }
+                .header { display: flex; justify-content: space-between; border-bottom: 2px solid #6366f1; padding-bottom: 20px; }
+                .info-box { width: 45%; }
+                table { width: 100%; border-collapse: collapse; margin-top: 30px; }
+                th { background: #f8f9fa; text-align: left; padding: 12px; border-bottom: 2px solid #ddd; font-size: 12px; text-transform: uppercase; }
+                td { padding: 12px; border-bottom: 1px solid #eee; }
+                .total { text-align: right; margin-top: 20px; font-weight: bold; font-size: 1.2em; border-top: 2px solid #eee; padding-top: 10px; }
+                .footer { margin-top: 50px; font-size: 0.8em; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div class="info-box">
+                    <h2 style="margin: 0;">${company.name}</h2>
+                    <p style="margin: 5px 0; font-size: 13px;">${company.address_line || ''}</p>
+                    <p style="margin: 5px 0; font-size: 13px;">${company.city || ''} / ${company.district || ''}</p>
+                    <p style="margin: 5px 0; font-size: 13px;"><b>VKN:</b> ${company.tax_number || ''}</p>
+                </div>
+                <div class="info-box" style="text-align: right;">
+                    <h1 style="color: #6366f1; margin: 0;">FATURA</h1>
+                    <p style="margin: 5px 0;"><b>Fatura No:</b> ${invoice.invoice_no || 'TASLAK'}</p>
+                    <p style="margin: 5px 0;"><b>Tarih:</b> ${new Date().toLocaleDateString('tr-TR')}</p>
+                    <p style="margin: 5px 0;"><b>Tür:</b> ${invoice.type === 'e-fatura' ? 'E-Fatura' : 'E-Arşiv'}</p>
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px; background: #fafafa; padding: 20px; border-radius: 10px;">
+                <label style="font-size: 10px; font-weight: bold; color: #999;">ALICI</label>
+                <p style="margin: 5px 0;"><b>${invoice.customer_name}</b></p>
+                ${invoice.customer_tax_number ? `<p style="margin: 5px 0; font-size: 13px;">VKN/TCKN: ${invoice.customer_tax_number}</p>` : ''}
+                ${invoice.customer_tax_office ? `<p style="margin: 5px 0; font-size: 13px;">Vergi Dairesi: ${invoice.customer_tax_office}</p>` : ''}
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Hizmet / Ürün</th>
+                        <th style="text-align: center;">Miktar</th>
+                        <th style="text-align: right;">Birim Fiyat</th>
+                        <th style="text-align: right;">Toplam</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Hizmet Bedeli</td>
+                        <td style="text-align: center;">1 Adet</td>
+                        <td style="text-align: right;">${Number(invoice.amount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL</td>
+                        <td style="text-align: right;">${Number(invoice.amount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="total">
+                <span style="font-size: 14px; font-weight: normal; color: #666; margin-right: 20px;">GENEL TOPLAM</span>
+                ${Number(invoice.amount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL
+            </div>
+
+            <div class="footer">
+                <p><b>ETTN (UUID):</b> ${invoice.gib_uuid || '-'}</p>
+                <p>Bu belge elektronik ortamda oluşturulmuş bir önizlemedir. Mali değeri yoktur.</p>
+            </div>
+        </body>
+        </html>
+        `;
     }
 }
 

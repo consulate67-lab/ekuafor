@@ -2044,8 +2044,38 @@ export default function CompanyPanel() {
                                                                 ) : inv.gib_status === 'pending' ? (
                                                                     <span className="text-[8px] font-black uppercase px-3 py-1.5 rounded-lg bg-amber-50 text-amber-600 flex items-center gap-1.5 animate-pulse">
                                                                         <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                                                                        GİB'e Gönderiliyor...
+                                                                        İşleniyor...
                                                                     </span>
+                                                                ) : inv.gib_status === 'prepared' ? (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                window.open(`${api.defaults.baseURL}/finance/invoices/${inv.id}/preview`, '_blank');
+                                                                            }}
+                                                                            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl font-black text-[9px] uppercase tracking-widest border border-indigo-100 hover:bg-indigo-100 transition-all"
+                                                                        >
+                                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                                            Görüntüle
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                try {
+                                                                                    setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, gib_status: 'pending' } : i));
+                                                                                    const res = await api.post(`/finance/invoices/${inv.id}/gib-send`);
+                                                                                    if (res.data.success) {
+                                                                                        setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, ...res.data.data.invoice } : i));
+                                                                                    }
+                                                                                } catch (err: any) {
+                                                                                    setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, gib_status: 'failed' } : i));
+                                                                                    alert(err.response?.data?.error || 'GİB gönderim hatası');
+                                                                                }
+                                                                            }}
+                                                                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all"
+                                                                        >
+                                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                                                                            Faturayı Gönder
+                                                                        </button>
+                                                                    </div>
                                                                 ) : inv.gib_status === 'failed' ? (
                                                                     <div className="flex items-center gap-2">
                                                                         <span className="text-[8px] font-black uppercase px-3 py-1.5 rounded-lg bg-red-50 text-red-500">
@@ -2074,22 +2104,21 @@ export default function CompanyPanel() {
                                                                     <button
                                                                         onClick={async () => {
                                                                             try {
-                                                                                // Optimistic: show pending
-                                                                                setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, gib_status: 'pending' } : i));
-                                                                                const res = await api.post(`/finance/invoices/${inv.id}/gib-send`);
+                                                                                setLoading(true);
+                                                                                const res = await api.post(`/finance/invoices/${inv.id}/prepare`);
                                                                                 if (res.data.success) {
-                                                                                    // Update invoice in local state with server response
-                                                                                    setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, ...res.data.data.invoice } : i));
+                                                                                    setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, ...res.data.data } : i));
                                                                                 }
                                                                             } catch (err: any) {
-                                                                                setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, gib_status: 'failed' } : i));
-                                                                                alert(err.response?.data?.error || 'GİB gönderim hatası');
+                                                                                alert(err.response?.data?.error || 'Hazırlama hatası');
+                                                                            } finally {
+                                                                                setLoading(false);
                                                                             }
                                                                         }}
-                                                                        className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-red-100 hover:shadow-red-200 hover:scale-105 active:scale-95 transition-all"
+                                                                        className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-700 to-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-slate-200 hover:scale-105 active:scale-95 transition-all"
                                                                     >
-                                                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-                                                                        GİB'e Gönder
+                                                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                                                        Entegratöre Hazırla
                                                                     </button>
                                                                 )}
                                                             </div>

@@ -7,6 +7,8 @@ const router = Router();
 // Invoices
 router.post('/invoices', authMiddleware, financeController.createInvoice);
 router.get('/invoices/company/:companyId', authMiddleware, financeController.getInvoices);
+router.post('/invoices/:invoiceId/prepare', authMiddleware, financeController.prepareInvoice);
+router.get('/invoices/:invoiceId/preview', authMiddleware, financeController.getInvoicePreview);
 router.post('/invoices/:invoiceId/gib-send', authMiddleware, financeController.sendToGIB);
 router.get('/check-einvoice-user', authMiddleware, financeController.checkEInvoiceUser);
 

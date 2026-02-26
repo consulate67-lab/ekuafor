@@ -22,7 +22,6 @@ class FinanceController {
             const companyId = req.params.companyId ? parseInt(req.params.companyId) : req.user?.companyId;
             if (!companyId) return res.status(400).json({ success: false, error: 'Firma ID eksik' });
 
-            // Yetki kontrolü (Kendi firması mı veya super_admin mi?)
             if (req.user?.companyId !== companyId && req.user?.role !== 'super_admin') {
                 return res.status(403).json({ success: false, error: 'Yetkisiz erişim' });
             }
@@ -113,6 +112,36 @@ class FinanceController {
             next(error);
         }
     }
+
+    async prepareInvoice(req: Request, res: Response, next: NextFunction) {
+        try {
+            const companyId = req.user?.companyId;
+            const invoiceId = parseInt(req.params.invoiceId);
+            if (!companyId) return res.status(403).json({ success: false, error: 'Firma ID eksik' });
+            if (!invoiceId) return res.status(400).json({ success: false, error: 'Fatura ID eksik' });
+
+            const invoice = await financeService.prepareInvoice(invoiceId, companyId);
+            res.json({ success: true, data: invoice });
+        } catch (error: any) {
+            res.status(400).json({ success: false, error: error.message });
+        }
+    }
+
+    async getInvoicePreview(req: Request, res: Response, next: NextFunction) {
+        try {
+            const companyId = req.user?.companyId;
+            const invoiceId = parseInt(req.params.invoiceId);
+            if (!companyId) return res.status(403).json({ success: false, error: 'Firma ID eksik' });
+            if (!invoiceId) return res.status(400).json({ success: false, error: 'Fatura ID eksik' });
+
+            const html = await financeService.getInvoiceHTML(invoiceId, companyId);
+            res.setHeader('Content-Type', 'text/html');
+            res.send(html);
+        } catch (error: any) {
+            res.status(400).json({ success: false, error: error.message });
+        }
+    }
+
     async sendToGIB(req: Request, res: Response, next: NextFunction) {
         try {
             const companyId = req.user?.companyId;
