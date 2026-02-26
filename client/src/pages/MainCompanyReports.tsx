@@ -244,12 +244,21 @@ export default function MainCompanyReports() {
                         <p className="text-4xl font-black italic italic tracking-tighter">₺{Math.round(Number(stats.total_revenue || 0) / (stats.branch_count || 1)).toLocaleString()}</p>
                     </div>
                     <div className="bg-slate-800 p-8 rounded-[2.5rem] flex flex-col justify-between min-h-[160px] text-white border border-white/5">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">GRUP VERİMLİLİĞİ</p>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest text-slate-500">GRUP VERİMLİLİĞİ</p>
                         <div className="flex items-center gap-4">
-                            <p className="text-5xl font-black italic tracking-tighter">%84</p>
-                            <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
-                                <div className="h-full bg-emerald-500 w-[84%]"></div>
-                            </div>
+                            {(() => {
+                                const efficiency = stats.total_appointments > 0
+                                    ? Math.round((stats.completed_appointments / stats.total_appointments) * 100)
+                                    : 0;
+                                return (
+                                    <>
+                                        <p className="text-5xl font-black italic tracking-tighter">%{efficiency}</p>
+                                        <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+                                            <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${efficiency}%` }}></div>
+                                        </div>
+                                    </>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>

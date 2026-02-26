@@ -84,12 +84,13 @@ class MainCompanyService {
         const query = `
             SELECT 
                 COUNT(a.id) as total_appointments,
-                SUM(a.price) as total_revenue,
+                COUNT(CASE WHEN a.status = 'completed' THEN 1 END) as completed_appointments,
+                COALESCE(SUM(CASE WHEN a.status = 'completed' THEN a.price ELSE 0 END), 0) as total_revenue,
                 (SELECT COUNT(*) FROM companies WHERE main_company_id = $1) as branch_count,
-                COUNT(DISTINCT a.customer_phone) as unique_customers
+                COUNT(DISTINCT COALESCE(a.customer_phone, a.device_id, a.customer_name)) as unique_customers
             FROM appointments a
             JOIN companies c ON a.company_id = c.id
-            WHERE c.main_company_id = $1 AND a.status = 'completed'
+            WHERE c.main_company_id = $1 AND a.status != 'cancelled'
         `;
         const result = await pool.query(query, [mainCompanyId]);
         return result.rows[0];
@@ -109,9 +110,9 @@ class MainCompanyService {
                 c.latitude,
                 c.longitude,
                 COUNT(a.id) as appointment_count,
-                COALESCE(SUM(a.price), 0) as revenue
+                COALESCE(SUM(CASE WHEN a.status = 'completed' THEN a.price ELSE 0 END), 0) as revenue
             FROM companies c
-            LEFT JOIN appointments a ON a.company_id = c.id AND a.status = 'completed'
+            LEFT JOIN appointments a ON a.company_id = c.id AND a.status != 'cancelled'
             WHERE c.main_company_id = $1
             GROUP BY c.id, c.name, c.province_name, c.latitude, c.longitude
             ORDER BY revenue DESC
