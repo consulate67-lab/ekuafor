@@ -228,8 +228,8 @@ export default function CompanyDetail() {
                                         >
                                             Panele Git
                                         </Link>
-                                        {/* Sadece ASIL tipindeki firmalarda, board_key varsa rapor butonu göster */}
-                                        {company.company_type === 'ASIL' && company.board_key && (
+                                        {/* Sadece ÜST FİRMA tipindeki firmalarda, board_key varsa rapor butonu göster */}
+                                        {company.company_type === 'ÜST FİRMA' && company.board_key && (
                                             <Link
                                                 to={`/main-reports/${company.board_key}`}
                                                 className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5"
