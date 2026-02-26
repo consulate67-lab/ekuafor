@@ -80,7 +80,8 @@ class FinanceService {
                 ['gib_status', "VARCHAR(20) DEFAULT 'prepared'"],
                 ['gib_sent_at', 'TIMESTAMP'],
                 ['appointment_id', 'INTEGER'],
-                ['invoice_no', 'VARCHAR(20)']
+                ['invoice_no', 'VARCHAR(20)'],
+                ['xml_content', 'TEXT']
             ];
             for (const [col, type] of invoiceCols) {
                 await client.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS ${col} ${type}`);

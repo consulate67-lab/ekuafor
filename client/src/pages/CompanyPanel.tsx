@@ -1906,38 +1906,42 @@ export default function CompanyPanel() {
                             {activeFinanceTab === 'sales' && (
                                 <div className="space-y-6">
                                     {/* Filters */}
-                                    <div className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/20 grid grid-cols-1 md:grid-cols-3 gap-4 border border-slate-50">
-                                        <div className="space-y-2">
+                                    <div className="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/20 grid grid-cols-1 lg:grid-cols-4 gap-6 border border-slate-50">
+                                        <div className="lg:col-span-2 space-y-2">
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tarih Aralığı</label>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="date"
-                                                    value={financeDateRange.start}
-                                                    onChange={e => setFinanceDateRange(p => ({ ...p, start: e.target.value }))}
-                                                    className="flex-1 p-3 bg-slate-50 rounded-xl border-2 border-slate-100 font-bold text-xs"
-                                                />
-                                                <input
-                                                    type="date"
-                                                    value={financeDateRange.end}
-                                                    onChange={e => setFinanceDateRange(p => ({ ...p, end: e.target.value }))}
-                                                    className="flex-1 p-3 bg-slate-50 rounded-xl border-2 border-slate-100 font-bold text-xs"
-                                                />
+                                            <div className="flex gap-3">
+                                                <div className="flex-1 relative">
+                                                    <input
+                                                        type="date"
+                                                        value={financeDateRange.start}
+                                                        onChange={e => setFinanceDateRange(p => ({ ...p, start: e.target.value }))}
+                                                        className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 outline-none transition-all"
+                                                    />
+                                                </div>
+                                                <div className="flex-1 relative">
+                                                    <input
+                                                        type="date"
+                                                        value={financeDateRange.end}
+                                                        onChange={e => setFinanceDateRange(p => ({ ...p, end: e.target.value }))}
+                                                        className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 outline-none transition-all"
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Müşteri Arama (İsim / Tel)</label>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Müşteri Arama</label>
                                             <input
                                                 type="text"
                                                 value={financeSearch}
                                                 onChange={e => setFinanceSearch(e.target.value)}
-                                                placeholder="Müşteri ara..."
-                                                className="w-full p-3 bg-slate-50 rounded-xl border-2 border-slate-100 font-bold text-xs"
+                                                placeholder="İsim veya telefon..."
+                                                className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 outline-none transition-all"
                                             />
                                         </div>
                                         <div className="flex items-end">
                                             <button
                                                 onClick={() => fetchFinanceData(company?.id)}
-                                                className="w-full p-[18px] bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all"
+                                                className="w-full p-[18px] bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 active:scale-95"
                                             >
                                                 Filtrele
                                             </button>
@@ -2044,40 +2048,40 @@ export default function CompanyPanel() {
 
                                                                 return (
                                                                     <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors group">
-                                                                        <td className="px-6 py-4">
+                                                                        <td className="px-8 py-5">
                                                                             <p className="font-black text-slate-900 text-sm leading-tight">{inv.customer_name}</p>
-                                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">{inv.invoice_no || 'TASLAK'}</p>
+                                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-1">{inv.invoice_no || 'TASLAK'}</p>
                                                                         </td>
-                                                                        <td className="px-6 py-4">
-                                                                            <p className="text-xs font-bold text-slate-600 truncate">{new Date(inv.created_at).toLocaleDateString('tr-TR')}</p>
+                                                                        <td className="px-8 py-5">
+                                                                            <p className="text-xs font-bold text-slate-600">{new Date(inv.created_at).toLocaleDateString('tr-TR')}</p>
                                                                         </td>
-                                                                        <td className="px-6 py-4 text-right">
+                                                                        <td className="px-8 py-5 text-right">
                                                                             <p className="text-sm font-bold text-slate-500">{base.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
                                                                         </td>
-                                                                        <td className="px-6 py-4 text-right">
+                                                                        <td className="px-8 py-5 text-right">
                                                                             <p className="text-sm font-bold text-indigo-500">+{vat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
                                                                             <p className="text-[8px] font-black text-slate-300 uppercase">%{inv.vat_rate}</p>
                                                                         </td>
-                                                                        <td className="px-6 py-4 text-right">
+                                                                        <td className="px-8 py-5 text-right">
                                                                             <p className="text-base font-black text-slate-900">{total.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
                                                                         </td>
-                                                                        <td className="px-6 py-4 text-center">
+                                                                        <td className="px-8 py-5 text-center">
                                                                             {inv.gib_status === 'success' ? (
-                                                                                <span className="inline-flex px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase tracking-widest items-center gap-1">
-                                                                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                                                                                <span className="inline-flex px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase tracking-widest items-center gap-1.5">
+                                                                                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
                                                                                     Gönderildi
                                                                                 </span>
                                                                             ) : inv.gib_status === 'pending' ? (
-                                                                                <span className="inline-flex px-2 py-1 rounded-lg bg-amber-50 text-amber-600 text-[9px] font-black uppercase tracking-widest animate-pulse">İşleniyor...</span>
+                                                                                <span className="inline-flex px-3 py-1.5 rounded-lg bg-amber-50 text-amber-600 text-[9px] font-black uppercase tracking-widest animate-pulse">İşleniyor...</span>
                                                                             ) : inv.gib_status === 'failed' ? (
-                                                                                <span className="inline-flex px-2 py-1 rounded-lg bg-red-50 text-red-600 text-[9px] font-black uppercase tracking-widest">Hata</span>
+                                                                                <span className="inline-flex px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-[9px] font-black uppercase tracking-widest">Hata</span>
                                                                             ) : inv.gib_status === 'ready' ? (
-                                                                                <span className="inline-flex px-2 py-1 rounded-lg bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-widest italic">Hazır</span>
+                                                                                <span className="inline-flex px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-widest italic font-bold">Hazır</span>
                                                                             ) : (
-                                                                                <span className="inline-flex px-2 py-1 rounded-lg bg-slate-50 text-slate-400 text-[9px] font-black uppercase tracking-widest">Taslak</span>
+                                                                                <span className="inline-flex px-3 py-1.5 rounded-lg bg-slate-50 text-slate-400 text-[9px] font-black uppercase tracking-widest">Taslak</span>
                                                                             )}
                                                                         </td>
-                                                                        <td className="px-6 py-4 text-right">
+                                                                        <td className="px-8 py-5 text-right">
                                                                             <div className="flex items-center justify-end gap-2">
                                                                                 {/* Action 1: Prepare (if not_sent) */}
                                                                                 {(!inv.gib_status || inv.gib_status === 'not_sent') && (
