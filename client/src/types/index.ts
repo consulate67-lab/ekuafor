@@ -113,6 +113,7 @@ export interface Service {
     department_name?: string | null;
     quantity?: number | null;
     unit?: string | null;
+    photo?: string | null;
 }
 
 export interface Package {

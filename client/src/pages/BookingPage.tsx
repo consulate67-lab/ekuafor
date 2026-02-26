@@ -563,21 +563,32 @@ export default function BookingPage() {
                                             }}
                                             className={`w-full p-5 rounded-[2rem] border-2 transition-all flex items-center gap-4 text-left ${isSelected ? 'bg-indigo-50 border-indigo-500 shadow-lg' : 'bg-white border-transparent shadow-sm'}`}
                                         >
-                                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-indigo-500 border-indigo-500 text-white' : 'bg-white border-slate-200'}`}>
-                                                {isSelected && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                                            </div>
-                                            <div className="flex-1">
-                                                <h3 className={`font-black text-sm uppercase tracking-tight ${isSelected ? 'text-indigo-900' : 'text-slate-900'}`}>{s.name}</h3>
-                                                <div className="flex items-center gap-2">
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.duration_minutes} dk {s.department_name ? `• ${s.department_name}` : ''}</p>
-                                                    {s.quantity && s.unit && (
-                                                        <span className="text-[9px] font-black text-violet-500 bg-violet-50 px-2 py-0.5 rounded-lg border border-violet-100">
-                                                            {s.quantity} {s.unit}
-                                                        </span>
+                                            <div className="flex items-center gap-4 flex-1">
+                                                <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 overflow-hidden border border-slate-100 flex-shrink-0">
+                                                    {s.photo ? (
+                                                        <img src={s.photo} alt={s.name} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <svg className="w-6 h-6 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758L5 19m0-14l4.121 4.121" /></svg>
                                                     )}
                                                 </div>
+                                                <div className="flex-1">
+                                                    <h3 className={`font-black text-sm uppercase tracking-tight ${isSelected ? 'text-indigo-900' : 'text-slate-900'}`}>{s.name}</h3>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.duration_minutes} dk {s.department_name ? `• ${s.department_name}` : ''}</p>
+                                                        {s.quantity && s.unit && (
+                                                            <span className="text-[9px] font-black text-violet-500 bg-violet-50 px-2 py-0.5 rounded-lg border border-violet-100">
+                                                                {s.quantity} {s.unit}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className={`font-black text-base ${isSelected ? 'text-indigo-600' : 'text-slate-900'}`}>₺{s.price}</div>
+                                            <div className="flex items-center gap-4">
+                                                <div className={`font-black text-base ${isSelected ? 'text-indigo-600' : 'text-slate-900'}`}>₺{s.price}</div>
+                                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-indigo-500 border-indigo-500 text-white' : 'bg-white border-slate-200'}`}>
+                                                    {isSelected && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                                                </div>
+                                            </div>
                                         </button>
                                     );
                                 })}

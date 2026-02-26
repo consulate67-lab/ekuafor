@@ -12,7 +12,8 @@ const serviceSchema = z.object({
     price: z.number().min(0, 'Ücret 0 veya daha fazla olmalıdır'),
     department_id: z.number().nullable().optional(),
     quantity: z.number().nullable().optional(),
-    unit: z.string().max(30).nullable().optional()
+    unit: z.string().max(30).nullable().optional(),
+    photo: z.string().nullable().optional()
 });
 
 // Debug middleware for this router

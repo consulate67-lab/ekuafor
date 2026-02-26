@@ -539,6 +539,7 @@ const runMigrations = async () => {
         await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS unit VARCHAR(30)');
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS quantity NUMERIC');
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS unit VARCHAR(30)');
+        await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS photo TEXT');
         await pool.query('UPDATE services SET is_active = true WHERE is_active IS NULL');
         await pool.query('UPDATE packages SET is_active = true WHERE is_active IS NULL');
 
