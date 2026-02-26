@@ -32,24 +32,37 @@ export default function MainCompanyPanel() {
 
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
+        // 1. Super admin sabit kodu
         if (authCode === '996633') {
             localStorage.setItem('main_company_auth', '996633');
             setIsAuthorized(true);
             fetchMainCompanies();
             return;
         }
+        // 2. Admin Key veya Board Key kontrolü (her iki endpoint'i dene)
         try {
+            // Önce admin_key dene
             const res = await api.get(`/main-companies/code/${authCode.toUpperCase()}`);
             if (res.data.success && res.data.data) {
                 localStorage.setItem('main_company_auth', authCode.toUpperCase());
                 setIsAuthorized(true);
                 fetchMainCompanies();
-            } else {
-                alert('Geçersiz yetki kodu!');
+                return;
             }
-        } catch {
-            alert('Geçersiz yetki kodu!');
-        }
+        } catch { /* admin_key başarısız, board_key dene */ }
+
+        try {
+            // Board key dene (rapor girişiyle aynı endpoint)
+            const res2 = await api.post('/main-companies/reports-login', { key: authCode.toUpperCase() });
+            if (res2.data.success && res2.data.data) {
+                localStorage.setItem('main_company_auth', authCode.toUpperCase());
+                setIsAuthorized(true);
+                fetchMainCompanies();
+                return;
+            }
+        } catch { /* board_key de başarısız */ }
+
+        alert('Geçersiz yetki kodu!');
     };
 
     const fetchMainCompanies = async () => {
@@ -102,7 +115,9 @@ export default function MainCompanyPanel() {
             <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
                 <div className="bg-white/10 backdrop-blur-xl p-12 rounded-[3rem] border border-white/10 w-full max-w-md shadow-2xl text-center">
                     <h1 className="text-3xl font-black text-white uppercase tracking-tighter mb-3 italic">Üst Yönetim Paneli</h1>
-                    <p className="text-slate-400 text-sm font-bold mb-8">ÜST FİRMA <span className="text-emerald-400">Yönetim Anahtarı</span> (Admin Key) ile giriş yapın</p>
+                    <p className="text-slate-400 text-sm font-bold mb-8">
+                        <span className="text-emerald-400">Admin Key</span> veya <span className="text-indigo-400">Board Key</span> ile giriş yapın
+                    </p>
                     <form onSubmit={handleAuth} className="space-y-6">
                         <input
                             type="text"
