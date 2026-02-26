@@ -46,7 +46,7 @@ export interface Company {
     review_count?: number | null;
     company_type?: 'ÜST FİRMA' | 'ASIL' | 'ŞUBE' | null;
     main_company_id?: number | null;
-    booking_flow?: 'SHP' | 'SDP' | null;
+    booking_flow?: string | null;
 }
 
 class CompanyService {

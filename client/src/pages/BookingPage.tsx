@@ -28,22 +28,39 @@ export default function BookingPage() {
     const [loading, setLoading] = useState(true);
 
     // Form Steps: Dynamic based on company.booking_flow
-    // SHP (default): 1-Service, 2-Staff, 3-Date, 4-Time, 5-CustomerInfo
-    // SDP:           1-Service, 2-Date, 3-Staff, 4-Time, 5-CustomerInfo
+    // 4-char code like SPDT, DSPT, PDST, etc. + step 5 = confirm
     const initialStaffId = searchParams.get('staff') ? Number(searchParams.get('staff')) : null;
     const [step, setStep] = useState(1);
 
     // Step content mapping based on booking_flow
     const getStepContent = (stepNum: number): 'service' | 'staff' | 'date' | 'time' | 'confirm' => {
-        const flow = company?.booking_flow || 'SHP';
-        if (flow === 'SDP') {
-            // Service → Date → Staff → Time → Confirm
-            const map: Record<number, 'service' | 'staff' | 'date' | 'time' | 'confirm'> = { 1: 'service', 2: 'date', 3: 'staff', 4: 'time', 5: 'confirm' };
-            return map[stepNum] || 'service';
+        if (stepNum === 5) return 'confirm';
+        const flow = company?.booking_flow || 'SPDT';
+        const codeToKey: Record<string, 'service' | 'staff' | 'date' | 'time'> = { 'S': 'service', 'P': 'staff', 'D': 'date', 'T': 'time' };
+
+        let steps: ('service' | 'staff' | 'date' | 'time')[];
+        if (flow.length === 4) {
+            steps = flow.split('').map(c => codeToKey[c] || 'service');
+        } else {
+            // Legacy 3-char codes
+            const legacy: Record<string, ('service' | 'staff' | 'date' | 'time')[]> = {
+                'SHP': ['service', 'staff', 'date', 'time'],
+                'SDP': ['service', 'date', 'staff', 'time'],
+                'SDT': ['service', 'date', 'time', 'staff'],
+            };
+            steps = legacy[flow] || ['service', 'staff', 'date', 'time'];
         }
-        // SHP (default): Service → Staff → Date → Time → Confirm
-        const map: Record<number, 'service' | 'staff' | 'date' | 'time' | 'confirm'> = { 1: 'service', 2: 'staff', 3: 'date', 4: 'time', 5: 'confirm' };
-        return map[stepNum] || 'service';
+
+        return steps[stepNum - 1] || 'service';
+    };
+
+    // Get step number for a given content type
+    const getStepNumber = (content: 'service' | 'staff' | 'date' | 'time' | 'confirm'): number => {
+        if (content === 'confirm') return 5;
+        for (let i = 1; i <= 4; i++) {
+            if (getStepContent(i) === content) return i;
+        }
+        return 1;
     };
 
     // Android Hardware Back Button Support
@@ -176,40 +193,31 @@ export default function BookingPage() {
 
     const handleNext = () => {
         const currentContent = getStepContent(step);
-        if (currentContent === 'service') {
-            // After service selection, check if staff step should be skipped
-            if (selection.packageId || initialStaffId) {
-                if (initialStaffId) {
-                    setSelection(prev => ({ ...prev, staffId: initialStaffId }));
-                }
-                // Skip staff step - find the step AFTER staff
-                const flow = company?.booking_flow || 'SHP';
-                if (flow === 'SDP') {
-                    setStep(2); // SDP: next is date (step 2)
-                } else {
-                    setStep(3); // SHP: skip staff (step 2), go to date (step 3)
-                }
-                return;
+        const shouldSkipStaff = !!(selection.packageId || initialStaffId);
+
+        if (currentContent === 'service' && shouldSkipStaff) {
+            if (initialStaffId) {
+                setSelection(prev => ({ ...prev, staffId: initialStaffId }));
             }
         }
-        setStep(prev => prev + 1);
+
+        // Find next step, skipping staff if needed
+        let nextStep = step + 1;
+        if (shouldSkipStaff && getStepContent(nextStep) === 'staff') {
+            nextStep++;
+        }
+        setStep(nextStep);
     };
 
     const handleBack = () => {
-        const currentContent = getStepContent(step);
-        const flow = company?.booking_flow || 'SHP';
+        const shouldSkipStaff = !!(initialStaffId || selection.packageId);
 
-        // If going back from date and staff was skipped, go back to service
-        if (currentContent === 'date' && (initialStaffId || selection.packageId)) {
-            setStep(1);
-            return;
+        let prevStep = step - 1;
+        if (shouldSkipStaff && getStepContent(prevStep) === 'staff') {
+            prevStep--;
         }
-        // SDP: If going back from staff (step 3) and staff was skipped, go to date (step 2) then service (step 1)
-        if (flow === 'SDP' && currentContent === 'time' && (initialStaffId || selection.packageId)) {
-            setStep(2); // Go back to date
-            return;
-        }
-        setStep(prev => prev - 1);
+        if (prevStep < 1) prevStep = 1;
+        setStep(prevStep);
     };
 
     const generateTimeSlots = () => {
@@ -293,9 +301,11 @@ export default function BookingPage() {
             } else {
                 // Single staff check (Normal flow or single-staff selection)
                 if (!selection.staffId) {
-                    // SDP mode: staff not yet selected, check if ANY staff is available
-                    const flow = company?.booking_flow || 'SHP';
-                    if (flow === 'SDP') {
+                    // Staff not yet selected - check if ANY staff is available
+                    // This happens when time step comes before staff step in the flow
+                    const staffStep = getStepNumber('staff');
+                    const timeStep = getStepNumber('time');
+                    if (staffStep > timeStep || selection.packageId) {
                         const slotEnd = time + totalDuration;
                         // Filter staff by selected service department
                         const relevantStaff = staff.filter(s => {
@@ -515,10 +525,6 @@ export default function BookingPage() {
                     {[1, 2, 3, 4, 5].map(s => (
                         <div key={s} className={`h-1 flex-1 rounded-full transition-colors duration-300 ${s <= step ? 'bg-[#b45309]' : 'bg-gray-200'}`}></div>
                     ))}
-                    {/* Flow indicator */}
-                    {company?.booking_flow === 'SDP' && step <= 4 && (
-                        <span className="text-[7px] font-black text-amber-500 uppercase tracking-widest ml-1 self-center whitespace-nowrap">📅 Önce Tarih</span>
-                    )}
                 </div>
 
                 {/* Step 1: Service/Package Selection */}

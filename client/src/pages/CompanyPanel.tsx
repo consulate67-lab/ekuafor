@@ -844,58 +844,107 @@ export default function CompanyPanel() {
 
                                     {/* Randevu Akış Sırası Ayarı */}
                                     <div className="pt-4 border-t border-slate-100">
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Randevu Akış Sırası</label>
-                                        <p className="text-xs text-slate-400 mb-4 ml-1">Müşterileriniz randevu alırken hangi sırada seçim yapsın?</p>
-                                        <div className="space-y-3">
-                                            <button
-                                                type="button"
-                                                onClick={() => setCompany({ ...company, booking_flow: 'SHP' })}
-                                                className={`w-full p-5 rounded-2xl border-2 text-left transition-all ${(company.booking_flow || 'SHP') === 'SHP'
-                                                    ? 'border-indigo-500 bg-indigo-50 shadow-lg shadow-indigo-100'
-                                                    : 'border-slate-100 bg-white hover:border-slate-200'
-                                                    }`}
-                                            >
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${(company.booking_flow || 'SHP') === 'SHP' ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300'}`}>
-                                                        {(company.booking_flow || 'SHP') === 'SHP' && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                                                    </div>
-                                                    <span className="font-black text-sm text-slate-900">Önce Personel, Sonra Tarih</span>
-                                                    <span className="ml-auto text-[8px] font-black text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">VARSAYILAN</span>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 ml-8">
-                                                    {['✂️ Hizmet', '👤 Personel', '📅 Tarih', '🕐 Saat', '📝 Bilgiler'].map((s, i) => (
-                                                        <span key={i} className="flex items-center gap-1">
-                                                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md ${(company.booking_flow || 'SHP') === 'SHP' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-400'}`}>{s}</span>
-                                                            {i < 4 && <span className="text-slate-300 text-[8px]">→</span>}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            </button>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Randevu Akış Sırası</label>
+                                        <p className="text-xs text-slate-400 mb-4 ml-1">Adımları yukarı/aşağı taşıyarak müşteri randevu akışını belirleyin.</p>
 
-                                            <button
-                                                type="button"
-                                                onClick={() => setCompany({ ...company, booking_flow: 'SDP' })}
-                                                className={`w-full p-5 rounded-2xl border-2 text-left transition-all ${company.booking_flow === 'SDP'
-                                                    ? 'border-amber-500 bg-amber-50 shadow-lg shadow-amber-100'
-                                                    : 'border-slate-100 bg-white hover:border-slate-200'
-                                                    }`}
-                                            >
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${company.booking_flow === 'SDP' ? 'border-amber-500 bg-amber-500' : 'border-slate-300'}`}>
-                                                        {company.booking_flow === 'SDP' && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                                        {(() => {
+                                            // Decode 4-char flow code to step array
+                                            const flow = company.booking_flow || 'SPDT';
+                                            const codeToKey: Record<string, string> = { 'S': 'service', 'P': 'staff', 'D': 'date', 'T': 'time' };
+                                            const keyToCode: Record<string, string> = { 'service': 'S', 'staff': 'P', 'date': 'D', 'time': 'T' };
+
+                                            // Parse flow code (fallback to SPDT for old 3-char codes)
+                                            let steps: string[];
+                                            if (flow.length === 4) {
+                                                steps = flow.split('').map((c: string) => codeToKey[c] || 'service');
+                                            } else {
+                                                // Legacy 3-char codes
+                                                const legacy: Record<string, string[]> = {
+                                                    'SHP': ['service', 'staff', 'date', 'time'],
+                                                    'SDP': ['service', 'date', 'staff', 'time'],
+                                                    'SDT': ['service', 'date', 'time', 'staff'],
+                                                };
+                                                steps = legacy[flow] || ['service', 'staff', 'date', 'time'];
+                                            }
+
+                                            const stepLabels: Record<string, { icon: string; label: string; color: string }> = {
+                                                service: { icon: '✂️', label: 'Hizmet Seçimi', color: 'border-rose-200 bg-rose-50' },
+                                                staff: { icon: '👤', label: 'Personel Seçimi', color: 'border-violet-200 bg-violet-50' },
+                                                date: { icon: '📅', label: 'Tarih Seçimi', color: 'border-emerald-200 bg-emerald-50' },
+                                                time: { icon: '🕐', label: 'Saat Seçimi', color: 'border-amber-200 bg-amber-50' },
+                                            };
+
+                                            const stepsToCode = (s: string[]) => s.map(k => keyToCode[k]).join('');
+
+                                            // Constraint: Time must come after both Service and Date
+                                            const isValidOrder = (s: string[]) => {
+                                                const ti = s.indexOf('time');
+                                                const si = s.indexOf('service');
+                                                const di = s.indexOf('date');
+                                                return si < ti && di < ti;
+                                            };
+
+                                            const moveStep = (index: number, direction: 'up' | 'down') => {
+                                                const newSteps = [...steps];
+                                                const targetIndex = direction === 'up' ? index - 1 : index + 1;
+                                                if (targetIndex < 0 || targetIndex >= newSteps.length) return;
+                                                [newSteps[index], newSteps[targetIndex]] = [newSteps[targetIndex], newSteps[index]];
+                                                if (!isValidOrder(newSteps)) return;
+                                                setCompany({ ...company, booking_flow: stepsToCode(newSteps) });
+                                            };
+
+                                            const canMove = (index: number, direction: 'up' | 'down') => {
+                                                const targetIndex = direction === 'up' ? index - 1 : index + 1;
+                                                if (targetIndex < 0 || targetIndex >= steps.length) return false;
+                                                const newSteps = [...steps];
+                                                [newSteps[index], newSteps[targetIndex]] = [newSteps[targetIndex], newSteps[index]];
+                                                return isValidOrder(newSteps);
+                                            };
+
+                                            return (
+                                                <div className="space-y-2">
+                                                    {steps.map((stepKey, index) => {
+                                                        const info = stepLabels[stepKey];
+                                                        const stepNumber = index + 1;
+                                                        return (
+                                                            <div key={stepKey} className={`flex items-center gap-3 p-4 rounded-2xl border-2 transition-all ${info.color}`}>
+                                                                <div className="w-7 h-7 rounded-lg bg-white/80 flex items-center justify-center text-[10px] font-black text-slate-600 shadow-sm">{stepNumber}</div>
+                                                                <span className="text-base">{info.icon}</span>
+                                                                <span className="font-bold text-sm text-slate-700">{info.label}</span>
+                                                                <div className="ml-auto flex gap-1">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => moveStep(index, 'up')}
+                                                                        disabled={!canMove(index, 'up')}
+                                                                        className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${canMove(index, 'up') ? 'bg-white shadow-sm text-slate-600 hover:bg-slate-100 active:scale-90' : 'bg-transparent text-slate-200 cursor-not-allowed'}`}
+                                                                    >
+                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => moveStep(index, 'down')}
+                                                                        disabled={!canMove(index, 'down')}
+                                                                        className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${canMove(index, 'down') ? 'bg-white shadow-sm text-slate-600 hover:bg-slate-100 active:scale-90' : 'bg-transparent text-slate-200 cursor-not-allowed'}`}
+                                                                    >
+                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+
+                                                    {/* Fixed Last Step */}
+                                                    <div className="flex items-center gap-3 p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50">
+                                                        <div className="w-7 h-7 rounded-lg bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500">5</div>
+                                                        <span className="text-base">📝</span>
+                                                        <span className="font-bold text-sm text-slate-400">Müşteri Bilgileri</span>
+                                                        <span className="ml-auto text-[8px] font-black text-slate-300 bg-slate-100 px-2 py-0.5 rounded-full">SABİT</span>
                                                     </div>
-                                                    <span className="font-black text-sm text-slate-900">Önce Tarih, Sonra Personel</span>
+
+                                                    <p className="text-[9px] text-slate-300 font-bold ml-1 mt-1">ℹ️ Saat seçimi her zaman Hizmet ve Tarihten sonra olmalıdır.</p>
                                                 </div>
-                                                <div className="flex items-center gap-1.5 ml-8">
-                                                    {['✂️ Hizmet', '📅 Tarih', '👤 Personel', '🕐 Saat', '📝 Bilgiler'].map((s, i) => (
-                                                        <span key={i} className="flex items-center gap-1">
-                                                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md ${company.booking_flow === 'SDP' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'}`}>{s}</span>
-                                                            {i < 4 && <span className="text-slate-300 text-[8px]">→</span>}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            </button>
-                                        </div>
+                                            );
+                                        })()}
                                     </div>
 
                                     <div className="pt-6">

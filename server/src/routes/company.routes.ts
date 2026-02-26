@@ -59,7 +59,7 @@ const companySchema = z.object({
     genders: z.array(z.string()).nullable().optional(),
     company_type: z.enum(['ÜST FİRMA', 'ASIL', 'ŞUBE']).nullable().optional(),
     main_company_id: nullableNumber,
-    booking_flow: z.enum(['SHP', 'SDP']).nullable().optional(),
+    booking_flow: z.string().max(10).nullable().optional(),
 });
 
 /**
