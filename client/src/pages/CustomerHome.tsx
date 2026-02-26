@@ -655,7 +655,7 @@ export default function CustomerHome() {
                             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all duration-500 ${sort === 'reviews' ? 'bg-white text-indigo-600 shadow-lg shadow-indigo-100/50 scale-105' : 'text-slate-400 hover:text-slate-600'}`}
                         >
                             <span className="text-xs">🔥</span>
-                            Popüler
+                            En Çok Yorumlanan
                         </button>
                     </div>
                 </div>
