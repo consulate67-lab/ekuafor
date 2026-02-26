@@ -117,7 +117,7 @@ export default function CompanyPanel() {
     const [showCashModal, setShowCashModal] = useState(false);
     const [vknCheckResult, setVknCheckResult] = useState<{ vkn: string; isEInvoice: boolean } | null>(null);
     const [checkingVkn, setCheckingVkn] = useState(false);
-    const [invoiceForm, setInvoiceForm] = useState({ vkn: '', type: 'e-arsiv' });
+    const [invoiceForm, setInvoiceForm] = useState({ vkn: '', tax_office: '', vat_rate: 20, discount_rate: 0, type: 'e-arsiv' });
     const [reportError, setReportError] = useState('');
 
     const handleLogin = async (keyToUse?: string) => {
@@ -2008,185 +2008,140 @@ export default function CompanyPanel() {
                                         </div>
                                     )}
 
-                                    {/* Issued Invoices - E-Fatura / E-Arşiv View */}
+                                    {/* Issued Invoices - DATAGRID LIST VIEW */}
                                     {salesSubTab === 'invoiced' && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                            {loadingFinance ? (
-                                                <div className="col-span-1 md:col-span-2 lg:col-span-3 py-20 text-center animate-pulse text-slate-400 font-black">Yükleniyor...</div>
-                                            ) : invoices.length === 0 ? (
-                                                <div className="col-span-1 md:col-span-2 lg:col-span-3 bg-white rounded-3xl p-10 text-center shadow-lg border border-slate-50">
-                                                    <span className="text-4xl block mb-2">📄</span>
-                                                    <p className="text-slate-400 font-bold uppercase text-xs">Henüz fatura kesilmedi</p>
-                                                </div>
-                                            ) : (
-                                                invoices.map(inv => (
-                                                    <div key={inv.id} className="bg-white rounded-[2rem] shadow-lg border border-slate-100 overflow-hidden hover:shadow-xl transition-shadow">
-                                                        {/* Invoice Header - Document Style */}
-                                                        <div className={`p-6 ${inv.type === 'e-fatura' ? 'bg-gradient-to-r from-blue-600 to-blue-500' : 'bg-gradient-to-r from-indigo-600 to-purple-600'} text-white relative overflow-hidden`}>
-                                                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10" />
-                                                            <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/5 rounded-full -ml-8 -mb-8" />
-                                                            <div className="relative z-10">
-                                                                <div className="flex justify-between items-start">
-                                                                    <div>
-                                                                        <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-70 mb-1">
-                                                                            {inv.type === 'e-fatura' ? 'E-FATURA' : inv.type === 'e-arsiv' ? 'E-ARŞİV FATURA' : 'FİŞ'}
-                                                                        </p>
-                                                                        <h3 className="text-xl font-black">{company?.name || 'Firma'}</h3>
-                                                                    </div>
-                                                                    <div className="text-right">
-                                                                        <p className="text-[8px] font-bold uppercase tracking-widest opacity-60">Fatura No</p>
-                                                                        <p className="text-sm font-black mt-0.5">{inv.invoice_no || `INV-${String(inv.id).padStart(6, '0')}`}</p>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
+                                        <div className="bg-white rounded-3xl overflow-hidden shadow-xl shadow-slate-200/20 border border-slate-100">
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left border-collapse">
+                                                    <thead>
+                                                        <tr className="bg-slate-50 border-b border-slate-100">
+                                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Müşteri / Fatura No</th>
+                                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tarih</th>
+                                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Matrah (KDVsiz)</th>
+                                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">KDV</th>
+                                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Genel Toplam</th>
+                                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Durum</th>
+                                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">İşlemler</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-50">
+                                                        {loadingFinance ? (
+                                                            <tr>
+                                                                <td colSpan={7} className="px-6 py-20 text-center animate-pulse text-slate-400 font-black">Yükleniyor...</td>
+                                                            </tr>
+                                                        ) : invoices.length === 0 ? (
+                                                            <tr>
+                                                                <td colSpan={7} className="px-6 py-20 text-center">
+                                                                    <span className="text-4xl block mb-2">📄</span>
+                                                                    <p className="text-slate-300 font-bold uppercase text-[10px]">Henüz fatura bulunmuyor</p>
+                                                                </td>
+                                                            </tr>
+                                                        ) : (
+                                                            invoices.map(inv => {
+                                                                const total = Number(inv.grand_total || inv.amount || 0);
+                                                                const vat = Number(inv.vat_amount || 0);
+                                                                const base = total - vat;
 
-                                                        {/* Invoice Body */}
-                                                        <div className="p-6 space-y-4">
-                                                            <div className="flex justify-between items-start">
-                                                                <div>
-                                                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Müşteri</p>
-                                                                    <p className="text-base font-black text-slate-900 mt-0.5">{inv.customer_name}</p>
-                                                                    {inv.customer_tax_number && (
-                                                                        <p className="text-[9px] text-slate-400 font-bold mt-0.5">VKN: {inv.customer_tax_number}</p>
-                                                                    )}
-                                                                </div>
-                                                                <div className="text-right">
-                                                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Tarih</p>
-                                                                    <p className="text-sm font-bold text-slate-700 mt-0.5">
-                                                                        {new Date(inv.created_at).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
+                                                                return (
+                                                                    <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                                        <td className="px-6 py-4">
+                                                                            <p className="font-black text-slate-900 text-sm leading-tight">{inv.customer_name}</p>
+                                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">{inv.invoice_no || 'TASLAK'}</p>
+                                                                        </td>
+                                                                        <td className="px-6 py-4">
+                                                                            <p className="text-xs font-bold text-slate-600 truncate">{new Date(inv.created_at).toLocaleDateString('tr-TR')}</p>
+                                                                        </td>
+                                                                        <td className="px-6 py-4 text-right">
+                                                                            <p className="text-sm font-bold text-slate-500">{base.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
+                                                                        </td>
+                                                                        <td className="px-6 py-4 text-right">
+                                                                            <p className="text-sm font-bold text-indigo-500">+{vat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
+                                                                            <p className="text-[8px] font-black text-slate-300 uppercase">%{inv.vat_rate}</p>
+                                                                        </td>
+                                                                        <td className="px-6 py-4 text-right">
+                                                                            <p className="text-base font-black text-slate-900">{total.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
+                                                                        </td>
+                                                                        <td className="px-6 py-4 text-center">
+                                                                            {inv.gib_status === 'success' ? (
+                                                                                <span className="inline-flex px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase tracking-widest items-center gap-1">
+                                                                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                                                                                    Gönderildi
+                                                                                </span>
+                                                                            ) : inv.gib_status === 'pending' ? (
+                                                                                <span className="inline-flex px-2 py-1 rounded-lg bg-amber-50 text-amber-600 text-[9px] font-black uppercase tracking-widest animate-pulse">İşleniyor...</span>
+                                                                            ) : inv.gib_status === 'failed' ? (
+                                                                                <span className="inline-flex px-2 py-1 rounded-lg bg-red-50 text-red-600 text-[9px] font-black uppercase tracking-widest">Hata</span>
+                                                                            ) : inv.gib_status === 'ready' ? (
+                                                                                <span className="inline-flex px-2 py-1 rounded-lg bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-widest italic">Hazır</span>
+                                                                            ) : (
+                                                                                <span className="inline-flex px-2 py-1 rounded-lg bg-slate-50 text-slate-400 text-[9px] font-black uppercase tracking-widest">Taslak</span>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="px-6 py-4 text-right">
+                                                                            <div className="flex items-center justify-end gap-2">
+                                                                                {/* Action 1: Prepare (if not_sent) */}
+                                                                                {(!inv.gib_status || inv.gib_status === 'not_sent') && (
+                                                                                    <button
+                                                                                        onClick={async () => {
+                                                                                            try {
+                                                                                                setLoading(true);
+                                                                                                const res = await api.post(`/finance/invoices/${inv.id}/prepare`);
+                                                                                                if (res.data.success) { fetchFinanceData(); }
+                                                                                            } catch (err: any) { alert(err.response?.data?.error || 'Hazırlama hatası'); }
+                                                                                            finally { setLoading(false); }
+                                                                                        }}
+                                                                                        title="Entegratöre Hazırla"
+                                                                                        className="w-9 h-9 bg-slate-900 text-white rounded-xl flex items-center justify-center hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200"
+                                                                                    >
+                                                                                        <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                                                                    </button>
+                                                                                )}
 
-                                                            {/* Divider */}
-                                                            <div className="border-t-2 border-dashed border-slate-100" />
+                                                                                {/* Action 2: View (if ready or success or failed) */}
+                                                                                {(inv.gib_status === 'ready' || inv.gib_status === 'success' || inv.gib_status === 'failed') && (
+                                                                                    <button
+                                                                                        onClick={async () => {
+                                                                                            try {
+                                                                                                setLoading(true);
+                                                                                                const res = await api.get(`/finance/invoices/${inv.id}/preview`);
+                                                                                                const popup = window.open('', '_blank');
+                                                                                                if (popup) { popup.document.write(res.data); popup.document.close(); }
+                                                                                            } catch (err) { alert('Önizleme yüklenemedi'); }
+                                                                                            finally { setLoading(false); }
+                                                                                        }}
+                                                                                        title="Görüntüle"
+                                                                                        className="w-9 h-9 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center hover:bg-slate-200 transition-all active:scale-95"
+                                                                                    >
+                                                                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                                                    </button>
+                                                                                )}
 
-                                                            <div className="flex justify-between items-end">
-                                                                <div className="flex gap-2">
-                                                                    <span className={`text-[8px] font-black uppercase px-3 py-1.5 rounded-lg ${inv.payment_method === 'nakit' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
-                                                                        {inv.payment_method === 'nakit' ? '💰 Nakit' : '💳 Kredi Kartı'}
-                                                                    </span>
-                                                                    <span className="text-[8px] font-black uppercase px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600">
-                                                                        ✓ Tahsil Edildi
-                                                                    </span>
-                                                                </div>
-                                                                <div className="text-right">
-                                                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Toplam</p>
-                                                                    <p className="text-2xl font-black text-slate-900">{Number(inv.amount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Invoice Footer - GIB Actions */}
-                                                        <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-100">
-                                                            <div className="flex justify-between items-center">
-                                                                <p className="text-[8px] font-bold text-slate-400">
-                                                                    {inv.type === 'e-fatura' ? '📋 E-Fatura' : inv.type === 'e-arsiv' ? '📋 E-Arşiv Fatura' : '🖨️ Yazar Kasa Fişi'}
-                                                                </p>
-                                                                {/* GIB Status Badge */}
-                                                                {inv.gib_status === 'sent' ? (
-                                                                    <div className="flex flex-col items-end gap-0.5">
-                                                                        <span className="text-[8px] font-black uppercase px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 flex items-center gap-1.5">
-                                                                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-                                                                            GİB'e İletildi
-                                                                        </span>
-                                                                        {inv.gib_uuid && (
-                                                                            <p className="text-[7px] text-slate-400 font-mono truncate max-w-[160px]" title={inv.gib_uuid}>{inv.gib_uuid}</p>
-                                                                        )}
-                                                                    </div>
-                                                                ) : inv.gib_status === 'pending' ? (
-                                                                    <span className="text-[8px] font-black uppercase px-3 py-1.5 rounded-lg bg-amber-50 text-amber-600 flex items-center gap-1.5 animate-pulse">
-                                                                        <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                                                                        İşleniyor...
-                                                                    </span>
-                                                                ) : inv.gib_status === 'prepared' ? (
-                                                                    <div className="flex items-center gap-2">
-                                                                        <button
-                                                                            onClick={async () => {
-                                                                                try {
-                                                                                    const res = await api.get(`/finance/invoices/${inv.id}/preview`, { responseType: 'text' });
-                                                                                    const blob = new Blob([res.data], { type: 'text/html' });
-                                                                                    const url = URL.createObjectURL(blob);
-                                                                                    window.open(url, '_blank');
-                                                                                } catch (err: any) {
-                                                                                    alert('Önizleme yüklenemedi');
-                                                                                }
-                                                                            }}
-                                                                            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg font-black text-[8px] uppercase tracking-wider border border-indigo-100 hover:bg-indigo-100 transition-all shrink-0"
-                                                                        >
-                                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                                                                            Görüntüle
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={async () => {
-                                                                                try {
-                                                                                    setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, gib_status: 'pending' } : i));
-                                                                                    const res = await api.post(`/finance/invoices/${inv.id}/gib-send`);
-                                                                                    if (res.data.success) {
-                                                                                        setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, ...res.data.data.invoice } : i));
-                                                                                    }
-                                                                                } catch (err: any) {
-                                                                                    setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, gib_status: 'failed' } : i));
-                                                                                    alert(err.response?.data?.error || 'GİB gönderim hatası');
-                                                                                }
-                                                                            }}
-                                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-black text-[8px] uppercase tracking-wider shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all shrink-0"
-                                                                        >
-                                                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-                                                                            Gönder
-                                                                        </button>
-                                                                    </div>
-                                                                ) : inv.gib_status === 'failed' ? (
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className="text-[8px] font-black uppercase px-3 py-1.5 rounded-lg bg-red-50 text-red-500">
-                                                                            ✗ Gönderim Başarısız
-                                                                        </span>
-                                                                        <button
-                                                                            onClick={async () => {
-                                                                                try {
-                                                                                    setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, gib_status: 'pending' } : i));
-                                                                                    const res = await api.post(`/finance/invoices/${inv.id}/gib-send`);
-                                                                                    if (res.data.success) {
-                                                                                        setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, ...res.data.data.invoice } : i));
-                                                                                    }
-                                                                                } catch (err: any) {
-                                                                                    setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, gib_status: 'failed' } : i));
-                                                                                    alert(err.response?.data?.error || 'GİB gönderim hatası');
-                                                                                }
-                                                                            }}
-                                                                            className="text-[8px] font-black uppercase px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-all"
-                                                                        >
-                                                                            Tekrar Dene
-                                                                        </button>
-                                                                    </div>
-                                                                ) : (
-                                                                    /* not_sent — main CTA */
-                                                                    <button
-                                                                        onClick={async () => {
-                                                                            try {
-                                                                                setLoading(true);
-                                                                                const res = await api.post(`/finance/invoices/${inv.id}/prepare`);
-                                                                                if (res.data.success) {
-                                                                                    setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, ...res.data.data } : i));
-                                                                                }
-                                                                            } catch (err: any) {
-                                                                                alert(err.response?.data?.error || 'Hazırlama hatası');
-                                                                            } finally {
-                                                                                setLoading(false);
-                                                                            }
-                                                                        }}
-                                                                        className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-700 to-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-slate-200 hover:scale-105 active:scale-95 transition-all"
-                                                                    >
-                                                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-                                                                        Entegratöre Hazırla
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))
-                                            )}
+                                                                                {/* Action 3: Send (if ready or failed) */}
+                                                                                {(inv.gib_status === 'ready' || inv.gib_status === 'failed') && (
+                                                                                    <button
+                                                                                        onClick={async () => {
+                                                                                            try {
+                                                                                                setLoading(true);
+                                                                                                const res = await api.post(`/finance/invoices/${inv.id}/gib-send`);
+                                                                                                if (res.data.success) { alert('GİB\'e gönderildi!'); fetchFinanceData(); }
+                                                                                            } catch (err: any) { alert(err.response?.data?.error || 'Gönderim hatası'); }
+                                                                                            finally { setLoading(false); }
+                                                                                        }}
+                                                                                        title="GİB'e Gönder"
+                                                                                        className="w-9 h-9 bg-emerald-600 text-white rounded-xl flex items-center justify-center hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95"
+                                                                                    >
+                                                                                        <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -3113,24 +3068,65 @@ export default function CompanyPanel() {
                                 )}
                             </div>
 
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Fatura Tipi</label>
-                                <div className="grid grid-cols-2 gap-3 mb-6">
-                                    <button
-                                        onClick={() => setInvoiceForm(prev => ({ ...prev, type: 'e-arsiv' }))}
-                                        className={`p-4 rounded-2xl border-2 font-bold text-xs transition-all ${invoiceForm.type === 'e-arsiv' ? 'bg-slate-50 border-indigo-500 text-indigo-600' : 'bg-transparent border-slate-100 text-slate-400'}`}
-                                    >
-                                        E-Arşiv / Fiş
-                                    </button>
-                                    <button
-                                        onClick={() => setInvoiceForm(prev => ({ ...prev, type: 'e-fatura' }))}
-                                        disabled={!!(vknCheckResult && !vknCheckResult.isEInvoice)}
-                                        className={`p-4 rounded-2xl border-2 font-bold text-xs transition-all ${invoiceForm.type === 'e-fatura' ? 'bg-slate-50 border-indigo-500 text-indigo-600' : 'bg-transparent border-slate-100 text-slate-400'} ${vknCheckResult && !vknCheckResult.isEInvoice ? 'opacity-30 cursor-not-allowed' : ''}`}
-                                    >
-                                        E-Fatura
-                                    </button>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Vergi Dairesi</label>
+                                    <input
+                                        type="text"
+                                        value={invoiceForm.tax_office}
+                                        onChange={(e) => setInvoiceForm(prev => ({ ...prev, tax_office: e.target.value }))}
+                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all"
+                                        placeholder="Örn: Beyoğlu"
+                                    />
                                 </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Fatura Tipi</label>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setInvoiceForm(prev => ({ ...prev, type: 'e-arsiv' }))}
+                                            className={`flex-1 py-3.5 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all ${invoiceForm.type === 'e-arsiv' ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-white border-slate-100 text-slate-400'}`}
+                                        >
+                                            E-Arşiv
+                                        </button>
+                                        <button
+                                            onClick={() => setInvoiceForm(prev => ({ ...prev, type: 'e-fatura' }))}
+                                            disabled={!!(vknCheckResult && !vknCheckResult.isEInvoice)}
+                                            className={`flex-1 py-3.5 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all ${invoiceForm.type === 'e-fatura' ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-white border-slate-100 text-slate-400'} ${vknCheckResult && !vknCheckResult.isEInvoice ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                        >
+                                            E-Fatura
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
 
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">KDV Oranı (%)</label>
+                                    <select
+                                        value={invoiceForm.vat_rate}
+                                        onChange={(e) => setInvoiceForm(prev => ({ ...prev, vat_rate: Number(e.target.value) }))}
+                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none"
+                                    >
+                                        <option value={20}>%20 (Genel)</option>
+                                        <option value={10}>%10 (İndirimli)</option>
+                                        <option value={1}>%1 (Gıda vb.)</option>
+                                        <option value={0}>%0 (İstisna)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">İskonto Oranı (%)</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        value={invoiceForm.discount_rate}
+                                        onChange={(e) => setInvoiceForm(prev => ({ ...prev, discount_rate: Number(e.target.value) }))}
+                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Ödeme Şekli Seçin</label>
                                 <div className="grid grid-cols-2 gap-4">
                                     <button
@@ -3138,13 +3134,16 @@ export default function CompanyPanel() {
                                             appointment_id: selectedAppointment.id,
                                             customer_name: selectedAppointment.customer_name,
                                             customer_tax_number: invoiceForm.vkn,
+                                            customer_tax_office: invoiceForm.tax_office,
+                                            vat_rate: invoiceForm.vat_rate,
+                                            discount_rate: invoiceForm.discount_rate,
                                             amount: selectedAppointment.price,
                                             payment_method: 'nakit',
                                             type: invoiceForm.type
                                         })}
-                                        className="p-8 bg-emerald-50 rounded-[2.5rem] border-2 border-emerald-100 flex flex-col items-center gap-3 hover:bg-emerald-100 transition-all font-black text-emerald-600"
+                                        className="p-8 bg-emerald-50 rounded-[2.5rem] border-2 border-emerald-100 flex flex-col items-center gap-3 hover:bg-emerald-100 transition-all font-black text-emerald-600 group"
                                     >
-                                        <span className="text-4xl italic">Nakit</span>
+                                        <span className="text-4xl italic group-active:scale-90 transition-transform">Nakit</span>
                                         <span className="text-[10px] uppercase tracking-widest">💰 Kasaya Giriş</span>
                                     </button>
                                     <button
@@ -3152,13 +3151,16 @@ export default function CompanyPanel() {
                                             appointment_id: selectedAppointment.id,
                                             customer_name: selectedAppointment.customer_name,
                                             customer_tax_number: invoiceForm.vkn,
+                                            customer_tax_office: invoiceForm.tax_office,
+                                            vat_rate: invoiceForm.vat_rate,
+                                            discount_rate: invoiceForm.discount_rate,
                                             amount: selectedAppointment.price,
                                             payment_method: 'kart',
                                             type: invoiceForm.type
                                         })}
-                                        className="p-8 bg-indigo-50 rounded-[2.5rem] border-2 border-indigo-100 flex flex-col items-center gap-3 hover:bg-indigo-100 transition-all font-black text-indigo-600"
+                                        className="p-8 bg-indigo-50 rounded-[2.5rem] border-2 border-indigo-100 flex flex-col items-center gap-3 hover:bg-indigo-100 transition-all font-black text-indigo-600 group"
                                     >
-                                        <span className="text-4xl italic">Kart</span>
+                                        <span className="text-4xl italic group-active:scale-90 transition-transform">Kart</span>
                                         <span className="text-[10px] uppercase tracking-widest">💳 POS Tahsilat</span>
                                     </button>
                                 </div>
