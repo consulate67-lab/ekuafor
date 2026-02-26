@@ -365,7 +365,7 @@ export default function CompanyPanel() {
         }
     };
 
-    const handlePhotoSelection = async (isForNewStaff: boolean, staffId?: number) => {
+    const handlePhotoSelection = async (isForNewStaff: boolean, staffId?: number, isForService: boolean = false) => {
         try {
             // Check if we are running in a native context or if Camera is available
             const isNative = (window as any).Capacitor?.isNativePlatform();
@@ -387,6 +387,8 @@ export default function CompanyPanel() {
                         setStaffForm(p => ({ ...p, photo: base64String }));
                     } else if (staffId) {
                         handleUpdateStaffPhoto(staffId, base64String);
+                    } else if (isForService) {
+                        setServiceForm(p => ({ ...p, photo: base64String }));
                     }
                 }
             } else {
@@ -430,6 +432,8 @@ export default function CompanyPanel() {
                                 setStaffForm(p => ({ ...p, photo: compressedBase64 }));
                             } else if (staffId) {
                                 handleUpdateStaffPhoto(staffId, compressedBase64);
+                            } else if (isForService) {
+                                setServiceForm(p => ({ ...p, photo: compressedBase64 }));
                             }
                         };
                         img.src = event.target?.result as string;
@@ -2939,7 +2943,7 @@ export default function CompanyPanel() {
                                     </button>
                                     <button
                                         onClick={() => setInvoiceForm(prev => ({ ...prev, type: 'e-fatura' }))}
-                                        disabled={vknCheckResult && !vknCheckResult.isEInvoice}
+                                        disabled={!!(vknCheckResult && !vknCheckResult.isEInvoice)}
                                         className={`p-4 rounded-2xl border-2 font-bold text-xs transition-all ${invoiceForm.type === 'e-fatura' ? 'bg-slate-50 border-indigo-500 text-indigo-600' : 'bg-transparent border-slate-100 text-slate-400'} ${vknCheckResult && !vknCheckResult.isEInvoice ? 'opacity-30 cursor-not-allowed' : ''}`}
                                     >
                                         E-Fatura

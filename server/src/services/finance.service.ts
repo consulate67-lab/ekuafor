@@ -51,12 +51,45 @@ class FinanceService {
             const invoiceCols = [
                 ['customer_tax_number', 'VARCHAR(20)'],
                 ['customer_tax_office', 'VARCHAR(100)'],
-                ['gib_uuid', 'UUID'],
+                ['gib_uuid', 'VARCHAR(50)'],
                 ['gib_status', "VARCHAR(20) DEFAULT 'not_sent'"],
                 ['invoice_no', 'VARCHAR(20)']
             ];
             for (const [col, type] of invoiceCols) {
                 await client.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+            }
+
+            // 3. Services tablosu güncellemesi
+            const serviceCols = [
+                ['department_id', 'INTEGER'],
+                ['quantity', 'NUMERIC'],
+                ['unit', 'VARCHAR(30)'],
+                ['photo', 'TEXT']
+            ];
+            for (const [col, type] of serviceCols) {
+                await client.query(`ALTER TABLE services ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+            }
+
+            // 4. Users tablosu güncellemesi (Personel Board vb için)
+            const userCols = [
+                ['board_code', 'VARCHAR(20)'],
+                ['gender', 'VARCHAR(20)'],
+                ['department_id', 'INTEGER'],
+                ['photo', 'TEXT'],
+                ['quantity', 'NUMERIC'],
+                ['unit', 'VARCHAR(30)']
+            ];
+            for (const [col, type] of userCols) {
+                await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+            }
+
+            // 5. Appointments tablosu güncellemesi
+            const appointmentCols = [
+                ['rating', 'INTEGER'],
+                ['comment', 'TEXT']
+            ];
+            for (const [col, type] of appointmentCols) {
+                await client.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS ${col} ${type}`);
             }
 
             console.log('[Migration] Database is up to date.');
