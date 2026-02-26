@@ -20,9 +20,8 @@ export default function MainCompanyPanel() {
     const [isAuthorized, setIsAuthorized] = useState(false);
 
     useEffect(() => {
-        // Simple security check for this special screen
         const savedAuth = localStorage.getItem('main_company_auth');
-        if (savedAuth === '996633') { // Example code
+        if (savedAuth) {
             setIsAuthorized(true);
             fetchMainCompanies();
         } else {
@@ -30,13 +29,26 @@ export default function MainCompanyPanel() {
         }
     }, []);
 
-    const handleAuth = (e: React.FormEvent) => {
+    const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
+        // 1. Super admin sabit kodu
         if (authCode === '996633') {
             localStorage.setItem('main_company_auth', '996633');
             setIsAuthorized(true);
             fetchMainCompanies();
-        } else {
+            return;
+        }
+        // 2. ÜST FİRMA admin_key kontrolü
+        try {
+            const res = await api.get(`/main-companies/code/${authCode.toUpperCase()}`);
+            if (res.data.success && res.data.data) {
+                localStorage.setItem('main_company_auth', authCode.toUpperCase());
+                setIsAuthorized(true);
+                fetchMainCompanies();
+            } else {
+                alert('Geçersiz yetki kodu!');
+            }
+        } catch {
             alert('Geçersiz yetki kodu!');
         }
     };
@@ -84,14 +96,15 @@ export default function MainCompanyPanel() {
         return (
             <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
                 <div className="bg-white/10 backdrop-blur-xl p-12 rounded-[3rem] border border-white/10 w-full max-w-md shadow-2xl text-center">
-                    <h1 className="text-3xl font-black text-white uppercase tracking-tighter mb-8 italic">Üst Yönetim Paneli</h1>
+                    <h1 className="text-3xl font-black text-white uppercase tracking-tighter mb-3 italic">Üst Yönetim Paneli</h1>
+                    <p className="text-slate-400 text-sm font-bold mb-8">ÜST FİRMA <span className="text-emerald-400">Yönetim Anahtarı</span> (Admin Key) ile giriş yapın</p>
                     <form onSubmit={handleAuth} className="space-y-6">
                         <input
-                            type="password"
-                            placeholder="Giriş Kodu"
-                            className="w-full bg-white/5 border-none rounded-2xl py-6 px-8 text-center text-2xl font-black text-white placeholder-white/20 focus:ring-2 focus:ring-emerald-500/50"
+                            type="text"
+                            placeholder="ADM-XXX-XXXX"
+                            className="w-full bg-white/5 border-none rounded-2xl py-6 px-8 text-center text-2xl font-black text-white placeholder-white/20 focus:ring-2 focus:ring-emerald-500/50 uppercase tracking-widest font-mono"
                             value={authCode}
-                            onChange={(e) => setAuthCode(e.target.value)}
+                            onChange={(e) => setAuthCode(e.target.value.toUpperCase())}
                         />
                         <button type="submit" className="w-full bg-emerald-500 text-slate-950 py-5 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-[1.02] active:scale-95 transition-all">Giriş Yap</button>
                     </form>
