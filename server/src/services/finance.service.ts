@@ -49,7 +49,12 @@ class FinanceService {
                 ['qnb_password', 'VARCHAR(100)'],
                 ['qnb_vkn', 'VARCHAR(20)'],
                 ['efatura_test_mode', 'BOOLEAN DEFAULT true'],
-                ['invoice_prefix', "VARCHAR(3) DEFAULT 'GIB'"]
+                ['invoice_prefix', "VARCHAR(3) DEFAULT 'GIB'"],
+                ['nace_code', 'VARCHAR(20)'],
+                ['building_number', 'VARCHAR(20)'],
+                ['door_number', 'VARCHAR(20)'],
+                ['fax_number', 'VARCHAR(20)'],
+                ['postal_code', 'VARCHAR(20)']
             ];
             for (const [col, type] of companyCols) {
                 await client.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS ${col} ${type}`);
@@ -112,6 +117,21 @@ class FinanceService {
         const date = new Date();
         date.setDate(date.getDate() + 30);
         return date.toISOString().split('T')[0];
+    }
+
+    private getXSLT(type: string): string {
+        const fs = require('fs');
+        const path = require('path');
+        const fileName = type === 'e-fatura' ? 'efat.xslt' : 'eArsiv.xslt';
+        const filePath = path.join(process.cwd(), 'xslt', fileName);
+        try {
+            if (fs.existsSync(filePath)) {
+                return fs.readFileSync(filePath, 'utf8');
+            }
+        } catch (e) {
+            console.error('XSLT read error:', e);
+        }
+        return '';
     }
 
     async createInvoice(invoice: Invoice) {
@@ -372,9 +392,10 @@ class FinanceService {
         const issueDate = now.toISOString().split('T')[0];
         const issueTime = now.toTimeString().split(' ')[0];
         const uuid = invoice.gib_uuid || `GIB-${Date.now()}`;
+        const xsltContent = this.getXSLT(invoice.type);
+        const xsltBase64 = xsltContent ? Buffer.from(xsltContent).toString('base64') : '';
 
         return `<?xml version="1.0" encoding="UTF-8"?>
-        <?xml-stylesheet type="text/xsl" href="invoice_template.xslt"?>
         <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" 
                  xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" 
                  xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" 
@@ -391,11 +412,15 @@ class FinanceService {
             <cbc:DocumentCurrencyCode>TRY</cbc:DocumentCurrencyCode>
             <cbc:LineCountNumeric>1</cbc:LineCountNumeric>
             
+            ${xsltBase64 ? `
             <cac:AdditionalDocumentReference>
                 <cbc:ID>${uuid}</cbc:ID>
                 <cbc:IssueDate>${issueDate}</cbc:IssueDate>
                 <cbc:DocumentTypeCode>XSLT</cbc:DocumentTypeCode>
-            </cac:AdditionalDocumentReference>
+                <cac:Attachment>
+                    <cbc:EmbeddedDocumentBinaryObject mimeCode="application/xml" encodingCode="Base64" characterSetCode="UTF-8" filename="${invoice.type === 'e-fatura' ? 'efat.xslt' : 'eArsiv.xslt'}">${xsltBase64}</cbc:EmbeddedDocumentBinaryObject>
+                </cac:Attachment>
+            </cac:AdditionalDocumentReference>` : ''}
 
             <cac:AccountingSupplierParty>
                 <cac:Party>

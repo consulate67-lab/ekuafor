@@ -1015,6 +1015,58 @@ export default function CompanyPanel() {
                                         </div>
                                     </div>
 
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Bina No</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.building_number || ''}
+                                                onChange={e => setCompany({ ...company, building_number: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Kapı No</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.door_number || ''}
+                                                onChange={e => setCompany({ ...company, door_number: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Posta Kodu</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.postal_code || ''}
+                                                onChange={e => setCompany({ ...company, postal_code: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">NACE Kodu</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.nace_code || ''}
+                                                onChange={e => setCompany({ ...company, nace_code: e.target.value })}
+                                                placeholder="Örn: 96.02"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Fax Numarası</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.fax_number || ''}
+                                                onChange={e => setCompany({ ...company, fax_number: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+
                                     {/* Terminoloji Ayarları */}
                                     <div className="pt-4 border-t border-slate-100">
                                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Terminoloji</label>
@@ -1910,43 +1962,45 @@ export default function CompanyPanel() {
 
                                     {/* Pending Appointments */}
                                     {salesSubTab === 'pending' && (
-                                        <div className="grid grid-cols-1 gap-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {loadingFinance ? (
-                                                <div className="py-20 text-center animate-pulse text-slate-400 font-black">Yükleniyor...</div>
+                                                <div className="col-span-1 md:col-span-2 py-20 text-center animate-pulse text-slate-400 font-black">Yükleniyor...</div>
                                             ) : completedAppointments.length === 0 ? (
-                                                <div className="bg-white rounded-3xl p-10 text-center shadow-lg border border-slate-50">
+                                                <div className="col-span-1 md:col-span-2 bg-white rounded-3xl p-10 text-center shadow-lg border border-slate-50">
                                                     <span className="text-4xl block mb-2">🎉</span>
                                                     <p className="text-slate-400 font-bold uppercase text-xs">Tüm randevular faturalandırıldı!</p>
                                                 </div>
                                             ) : (
                                                 completedAppointments.map(apt => (
-                                                    <div key={apt.id} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-md transition-shadow">
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center font-black">
-                                                                {apt.customer_name?.charAt(0).toUpperCase() || 'M'}
+                                                    <div key={apt.id} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col justify-between gap-4 hover:shadow-md transition-shadow relative overflow-hidden group">
+                                                        <div className="absolute top-0 right-0 w-24 h-24 bg-slate-50 rounded-full -mr-12 -mt-12 transition-all group-hover:scale-110"></div>
+                                                        <div className="relative z-10">
+                                                            <div className="flex items-center gap-4 mb-4">
+                                                                <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center font-black shadow-sm">
+                                                                    {apt.customer_name?.charAt(0).toUpperCase() || 'M'}
+                                                                </div>
+                                                                <div>
+                                                                    <h4 className="font-black text-slate-900 truncate max-w-[150px]">{apt.customer_name}</h4>
+                                                                    <p className="text-[10px] font-bold text-slate-400 uppercase">{new Date(apt.date).toLocaleDateString('tr-TR')} {apt.time}</p>
+                                                                </div>
                                                             </div>
-                                                            <div>
-                                                                <h4 className="font-black text-slate-900">{apt.customer_name}</h4>
-                                                                <p className="text-[10px] font-bold text-slate-400 uppercase">{new Date(apt.date).toLocaleDateString('tr-TR')} {apt.time}</p>
-                                                                <p className="text-[9px] font-black text-indigo-500 uppercase tracking-tighter mt-1">{apt.service_name}</p>
+                                                            <p className="text-[10px] font-black text-indigo-500 uppercase tracking-tighter bg-indigo-50 inline-block px-2 py-1 rounded-md mb-4">{apt.service_name}</p>
+
+                                                            <div className="flex items-center justify-between pt-4 border-t border-slate-50">
+                                                                <div>
+                                                                    <p className="text-xl font-black text-slate-900">{apt.price} ₺</p>
+                                                                    <p className="text-[8px] font-black uppercase text-amber-600">BEKLİYOR</p>
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSelectedAppointment(apt);
+                                                                        setShowInvoiceModal(true);
+                                                                    }}
+                                                                    className="px-4 py-2.5 bg-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-slate-200"
+                                                                >
+                                                                    Faturaya Dönüştür
+                                                                </button>
                                                             </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-8">
-                                                            <div className="text-right">
-                                                                <p className="text-lg font-black text-slate-900">{apt.price} ₺</p>
-                                                                <p className="text-[8px] font-black uppercase px-2 py-0.5 rounded-lg inline-block bg-amber-100 text-amber-600">
-                                                                    Bekliyor
-                                                                </p>
-                                                            </div>
-                                                            <button
-                                                                onClick={() => {
-                                                                    setSelectedAppointment(apt);
-                                                                    setShowInvoiceModal(true);
-                                                                }}
-                                                                className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-100 hover:scale-105 active:scale-95 transition-all"
-                                                            >
-                                                                Faturaya Dönüştür
-                                                            </button>
                                                         </div>
                                                     </div>
                                                 ))
@@ -1956,11 +2010,11 @@ export default function CompanyPanel() {
 
                                     {/* Issued Invoices - E-Fatura / E-Arşiv View */}
                                     {salesSubTab === 'invoiced' && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                             {loadingFinance ? (
-                                                <div className="col-span-2 py-20 text-center animate-pulse text-slate-400 font-black">Yükleniyor...</div>
+                                                <div className="col-span-1 md:col-span-2 lg:col-span-3 py-20 text-center animate-pulse text-slate-400 font-black">Yükleniyor...</div>
                                             ) : invoices.length === 0 ? (
-                                                <div className="col-span-2 bg-white rounded-3xl p-10 text-center shadow-lg border border-slate-50">
+                                                <div className="col-span-1 md:col-span-2 lg:col-span-3 bg-white rounded-3xl p-10 text-center shadow-lg border border-slate-50">
                                                     <span className="text-4xl block mb-2">📄</span>
                                                     <p className="text-slate-400 font-bold uppercase text-xs">Henüz fatura kesilmedi</p>
                                                 </div>
