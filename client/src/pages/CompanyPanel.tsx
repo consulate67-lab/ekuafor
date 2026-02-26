@@ -114,6 +114,9 @@ export default function CompanyPanel() {
     const [salesSubTab, setSalesSubTab] = useState<'pending' | 'invoiced'>('pending');
     const [showPurchaseModal, setShowPurchaseModal] = useState(false);
     const [showCashModal, setShowCashModal] = useState(false);
+    const [vknCheckResult, setVknCheckResult] = useState<{ vkn: string; isEInvoice: boolean } | null>(null);
+    const [checkingVkn, setCheckingVkn] = useState(false);
+    const [invoiceForm, setInvoiceForm] = useState({ vkn: '', type: 'e-arsiv' });
     const [reportError, setReportError] = useState('');
 
     const handleLogin = async (keyToUse?: string) => {
@@ -2845,11 +2848,61 @@ export default function CompanyPanel() {
                         <p className="text-sm text-slate-400 mb-8 font-bold uppercase tracking-widest">{selectedAppointment.customer_name} • {selectedAppointment.price} ₺</p>
 
                         <div className="space-y-6">
+                            {/* VKN / TCKN Check */}
+                            <div className="bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Müşteri VKN / TCKN</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        maxLength={11}
+                                        value={invoiceForm.vkn}
+                                        onChange={(e) => setInvoiceForm(prev => ({ ...prev, vkn: e.target.value }))}
+                                        className="flex-1 bg-white border-2 border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all"
+                                        placeholder="11122233344"
+                                    />
+                                    <button
+                                        onClick={async () => {
+                                            if (invoiceForm.vkn.length < 10) return alert('Geçerli bir VKN/TCKN girin');
+                                            setCheckingVkn(true);
+                                            try {
+                                                const res = await api.get(`/finance/check-einvoice-user?vkn=${invoiceForm.vkn}`);
+                                                setVknCheckResult({ vkn: invoiceForm.vkn, isEInvoice: res.data.data.isEInvoice });
+                                                setInvoiceForm(prev => ({ ...prev, type: res.data.data.isEInvoice ? 'e-fatura' : 'e-arsiv' }));
+                                            } catch (err) {
+                                                alert('Sorgulama başarısız');
+                                            } finally {
+                                                setCheckingVkn(false);
+                                            }
+                                        }}
+                                        disabled={checkingVkn}
+                                        className="px-6 bg-slate-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50"
+                                    >
+                                        {checkingVkn ? '...' : 'Sorgula'}
+                                    </button>
+                                </div>
+                                {vknCheckResult && (
+                                    <p className={`mt-3 text-[10px] font-black uppercase tracking-tighter px-3 py-1.5 rounded-lg inline-block ${vknCheckResult.isEInvoice ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'}`}>
+                                        {vknCheckResult.isEInvoice ? '✨ E-Fatura Mükellefi' : '📄 E-Arşiv Kullanıcısı'}
+                                    </p>
+                                )}
+                            </div>
+
                             <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Fatura Tipi</label>
                                 <div className="grid grid-cols-2 gap-3 mb-6">
-                                    <button className="p-4 bg-slate-50 rounded-2xl border-2 border-indigo-500 text-indigo-600 font-bold text-xs">E-Arşiv / Fiş</button>
-                                    <button className="p-4 bg-slate-50 rounded-2xl border-2 border-transparent text-slate-400 font-bold text-xs opacity-50">E-Fatura (Yakında)</button>
+                                    <button
+                                        onClick={() => setInvoiceForm(prev => ({ ...prev, type: 'e-arsiv' }))}
+                                        className={`p-4 rounded-2xl border-2 font-bold text-xs transition-all ${invoiceForm.type === 'e-arsiv' ? 'bg-slate-50 border-indigo-500 text-indigo-600' : 'bg-transparent border-slate-100 text-slate-400'}`}
+                                    >
+                                        E-Arşiv / Fiş
+                                    </button>
+                                    <button
+                                        onClick={() => setInvoiceForm(prev => ({ ...prev, type: 'e-fatura' }))}
+                                        disabled={vknCheckResult && !vknCheckResult.isEInvoice}
+                                        className={`p-4 rounded-2xl border-2 font-bold text-xs transition-all ${invoiceForm.type === 'e-fatura' ? 'bg-slate-50 border-indigo-500 text-indigo-600' : 'bg-transparent border-slate-100 text-slate-400'} ${vknCheckResult && !vknCheckResult.isEInvoice ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                    >
+                                        E-Fatura
+                                    </button>
                                 </div>
 
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Ödeme Şekli Seçin</label>
@@ -2858,9 +2911,10 @@ export default function CompanyPanel() {
                                         onClick={() => handleCreateInvoice({
                                             appointment_id: selectedAppointment.id,
                                             customer_name: selectedAppointment.customer_name,
+                                            customer_tax_number: invoiceForm.vkn,
                                             amount: selectedAppointment.price,
                                             payment_method: 'nakit',
-                                            type: 'e-arsiv'
+                                            type: invoiceForm.type
                                         })}
                                         className="p-8 bg-emerald-50 rounded-[2.5rem] border-2 border-emerald-100 flex flex-col items-center gap-3 hover:bg-emerald-100 transition-all font-black text-emerald-600"
                                     >
@@ -2871,9 +2925,10 @@ export default function CompanyPanel() {
                                         onClick={() => handleCreateInvoice({
                                             appointment_id: selectedAppointment.id,
                                             customer_name: selectedAppointment.customer_name,
+                                            customer_tax_number: invoiceForm.vkn,
                                             amount: selectedAppointment.price,
                                             payment_method: 'kart',
-                                            type: 'e-arsiv'
+                                            type: invoiceForm.type
                                         })}
                                         className="p-8 bg-indigo-50 rounded-[2.5rem] border-2 border-indigo-100 flex flex-col items-center gap-3 hover:bg-indigo-100 transition-all font-black text-indigo-600"
                                     >
@@ -2884,7 +2939,11 @@ export default function CompanyPanel() {
                             </div>
 
                             <button
-                                onClick={() => setShowInvoiceModal(false)}
+                                onClick={() => {
+                                    setShowInvoiceModal(false);
+                                    setVknCheckResult(null);
+                                    setInvoiceForm({ vkn: '', type: 'e-arsiv' });
+                                }}
                                 className="w-full py-5 bg-slate-100 text-slate-400 rounded-2xl font-black text-base uppercase tracking-widest"
                             >
                                 Vazgeç

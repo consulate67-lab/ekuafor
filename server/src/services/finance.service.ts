@@ -204,45 +204,61 @@ class FinanceService {
     }
 
     async sendToGIB(invoiceId: number, companyId: number) {
-        // Ensure gib_status column exists (idempotent migration)
-        await pool.query(`
-            ALTER TABLE invoices 
-            ADD COLUMN IF NOT EXISTS gib_status VARCHAR(20) DEFAULT 'not_sent',
-            ADD COLUMN IF NOT EXISTS gib_uuid VARCHAR(100),
-            ADD COLUMN IF NOT EXISTS gib_sent_at TIMESTAMPTZ
-        `).catch(() => { }); // ignore if already exists
-
         const invoice = await this.getInvoiceById(invoiceId, companyId);
         if (!invoice) throw new Error('Fatura bulunamadı');
-        if (invoice.gib_status === 'sent') throw new Error('Bu fatura zaten GİB\'e gönderildi');
+        if (invoice.gib_status === 'sent') throw new Error('Bu fatura zaten gönderildi');
 
-        // Mark as pending
-        await pool.query(
-            "UPDATE invoices SET gib_status = 'pending' WHERE id = $1",
-            [invoiceId]
-        );
+        // GİB Durumunu 'pending' yap (Optimistik)
+        await pool.query("UPDATE invoices SET gib_status = 'pending' WHERE id = $1", [invoiceId]);
 
         try {
-            // ------------------------------------------------------------------
-            // REAL GIB INTEGRATION POINT:
-            // Replace the block below with actual GİB e-Arşiv / e-Fatura API call.
-            //
-            // Required: GİB entegratör credentials (username, password, VKN)
-            // Endpoint: https://earsivportal.efatura.gov.tr/intragiris (test)
-            //           https://earsivportaltest.efatura.gov.tr/intragiris (prod)
-            //
-            // Flow:
-            //   1. Login  → get token
-            //   2. Create UBL-TR XML from invoice data
-            //   3. POST /earsiv-services/dispatch → get UUID
-            //   4. Store UUID for cancellation / query
-            // ------------------------------------------------------------------
+            // QNB / e-Finans Kullanıcı Bilgileri (Normalde firma ayarlarından gelmeli)
+            const QNB_CONFIG = {
+                username: 'USERNAME_PLACEHOLDER', // e-Finans kullanıcı adı
+                password: 'PASSWORD_PLACEHOLDER', // e-Finans şifre
+                vkn: '3250566851', // Firmanın kendi VKN/TCKN'si
+                test: true // Test ortamı mı?
+            };
 
-            // SIMULATED RESPONSE (remove when real GIB integration is active):
-            const simulatedUUID = `GIB-${Date.now()}-${String(invoiceId).padStart(6, '0')}`;
-            await new Promise(r => setTimeout(r, 1200)); // simulate network
+            const soapEndpoint = invoice.type === 'e-fatura'
+                ? 'https://erpefaturatest.cs.com.tr:8443/efatura/ws/connectorService'
+                : 'https://earsivtest.efinans.com.tr/earsiv/ws/EarsivWebService';
 
-            // Update with success
+            // 1. UBL-TR XML Hazırla (Base64)
+            const ublXml = this.generateUBLTR(invoice);
+            const base64Veri = Buffer.from(ublXml).toString('base64');
+
+            // 2. SOAP Request Gövdesi
+            const soapRequest = `
+                <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://service.connector.uut.cs.com.tr/">
+                    <soapenv:Header>
+                        <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
+                            <wsse:UsernameToken>
+                                <wsse:Username>${QNB_CONFIG.username}</wsse:Username>
+                                <wsse:Password>${QNB_CONFIG.password}</wsse:Password>
+                            </wsse:UsernameToken>
+                        </wsse:Security>
+                    </soapenv:Header>
+                    <soapenv:Body>
+                        <ser:belgeGonderExt>
+                            <parametreler>
+                                <vergiTcKimlikNo>${QNB_CONFIG.vkn}</vergiTcKimlikNo>
+                                <belgeTuru>${invoice.type === 'e-fatura' ? 'FATURA_UBL' : 'EARSIV_FATURA'}</belgeTuru>
+                                <belgeNo>${invoice.invoice_no || ''}</belgeNo>
+                                <veri>${base64Veri}</veri>
+                                <belgeHash></belgeHash>
+                            </parametreler>
+                        </ser:belgeGonderExt>
+                    </soapenv:Body>
+                </soapenv:Envelope>
+            `;
+
+            // Not: axios ile gönderim yapılacak. Şimdilik simüle ediyoruz ama yapı hazır.
+            // const response = await axios.post(soapEndpoint, soapRequest, { headers: { 'Content-Type': 'text/xml' } });
+
+            const simulatedUUID = `QNB-${Date.now()}-${invoiceId}`;
+            await new Promise(r => setTimeout(r, 1500));
+
             const updated = await pool.query(
                 `UPDATE invoices 
                  SET gib_status = 'sent', gib_uuid = $1, gib_sent_at = NOW() 
@@ -251,14 +267,86 @@ class FinanceService {
             );
 
             return { success: true, uuid: simulatedUUID, invoice: updated.rows[0] };
-        } catch (gibError: any) {
-            // Mark as failed
-            await pool.query(
-                "UPDATE invoices SET gib_status = 'failed' WHERE id = $1",
-                [invoiceId]
-            );
-            throw new Error(`GİB gönderim hatası: ${gibError.message}`);
+
+        } catch (error: any) {
+            await pool.query("UPDATE invoices SET gib_status = 'failed' WHERE id = $1", [invoiceId]);
+            throw new Error(`QNB Entegrasyon Hatası: ${error.message}`);
         }
+    }
+
+    private generateUBLTR(invoice: any) {
+        // En basit haliyle UBL-TR 2.1 Fatura Şablonu
+        const now = new Date();
+        const issueDate = now.toISOString().split('T')[0];
+        const issueTime = now.toTimeString().split(' ')[0];
+
+        return `<?xml version="1.0" encoding="UTF-8"?>
+        <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" 
+                 xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" 
+                 xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" 
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
+            <cbc:CustomizationID>TR1.2</cbc:CustomizationID>
+            <cbc:ProfileID>TEMELFATURA</cbc:ProfileID>
+            <cbc:ID>${invoice.invoice_no || ''}</cbc:ID>
+            <cbc:UUID>${invoice.gib_uuid || ''}</cbc:UUID>
+            <cbc:IssueDate>${issueDate}</cbc:IssueDate>
+            <cbc:IssueTime>${issueTime}</cbc:IssueTime>
+            <cbc:InvoiceTypeCode>SATIS</cbc:InvoiceTypeCode>
+            <cbc:DocumentCurrencyCode>TRY</cbc:DocumentCurrencyCode>
+            <cac:AccountingSupplierParty>
+                <cac:Party>
+                    <cbc:EndpointID schemeID="VKN">FIRMA_VKN</cbc:EndpointID>
+                    <cac:PartyName><cbc:Name>SALON_ADI</cbc:Name></cac:PartyName>
+                </cac:Party>
+            </cac:AccountingSupplierParty>
+            <cac:AccountingCustomerParty>
+                <cac:Party>
+                    <cac:PartyName><cbc:Name>${invoice.customer_name}</cbc:Name></cac:PartyName>
+                </cac:Party>
+            </cac:AccountingCustomerParty>
+            <cac:LegalMonetaryTotal>
+                <cbc:PayableAmount currencyID="TRY">${invoice.amount}</cbc:PayableAmount>
+            </cac:LegalMonetaryTotal>
+            <cac:InvoiceLine>
+                <cbc:ID>1</cbc:ID>
+                <cbc:InvoicedQuantity unitCode="C62">1</cbc:InvoicedQuantity>
+                <cbc:LineExtensionAmount currencyID="TRY">${invoice.amount}</cbc:LineExtensionAmount>
+                <cac:Item>
+                    <cbc:Name>Hizmet Bedeli</cbc:Name>
+                </cac:Item>
+                <cac:Price>
+                    <cbc:PriceAmount currencyID="TRY">${invoice.amount}</cbc:PriceAmount>
+                </cac:Price>
+            </cac:InvoiceLine>
+        </Invoice>`;
+    }
+
+    async checkEInvoiceUser(vkn: string) {
+        // QNB SOAP Check
+        const QNB_CONFIG = {
+            username: 'USERNAME_PLACEHOLDER',
+            password: 'PASSWORD_PLACEHOLDER',
+            test: true
+        };
+
+        const soapRequest = `
+            <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://service.connector.uut.cs.com.tr/">
+                <soapenv:Header/>
+                <soapenv:Body>
+                    <ser:efaturaKullaniciBilgisi>
+                        <vergiTcKimlikNo>${vkn}</vergiTcKimlikNo>
+                    </ser:efaturaKullaniciBilgisi>
+                </soapenv:Body>
+            </soapenv:Envelope>
+        `;
+
+        // axios.post(...) call would go here.
+        // For now, let's pretend we checked and if VKN starts with '1', it's e-invoice for testing.
+        await new Promise(r => setTimeout(r, 800));
+        const isEInvoice = vkn.startsWith('1');
+
+        return { isEInvoice };
     }
 
     private calculateDueDate() {
