@@ -85,6 +85,17 @@ class MainCompanyController {
             res.status(500).json({ success: false, error: error.message });
         }
     }
+
+    async delete(req: Request, res: Response) {
+        try {
+            const id = parseInt(req.params.id);
+            const success = await MainCompanyService.delete(id);
+            if (!success) return res.status(404).json({ success: false, error: 'Firma bulunamadı' });
+            res.json({ success: true, message: 'Üst firma başarıyla silindi' });
+        } catch (error: any) {
+            res.status(500).json({ success: false, error: error.message });
+        }
+    }
 }
 
 export default new MainCompanyController();

@@ -68,6 +68,16 @@ export default function MainCompanyPanel() {
         }
     };
 
+    const handleDelete = async (id: number) => {
+        if (!confirm('Bu üst firmayı silmek istediğinize emin misiniz? Şubeler bağımsız hale gelecektir.')) return;
+        try {
+            await api.delete(`/main-companies/${id}`);
+            fetchMainCompanies();
+        } catch (err: any) {
+            alert('Silme işlemi başarısız oldu');
+        }
+    };
+
     if (loading) return <div className="p-20 text-center font-black">YÜKLENİYOR...</div>;
 
     if (!isAuthorized) {
@@ -130,6 +140,15 @@ export default function MainCompanyPanel() {
                                     className="flex-1 bg-slate-50 text-slate-400 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all"
                                 >
                                     Şubeler
+                                </button>
+                                <button
+                                    onClick={() => handleDelete(mc.id)}
+                                    className="w-12 bg-rose-50 text-rose-500 py-3 rounded-xl flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all"
+                                    title="Sil"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
                                 </button>
                             </div>
                         </div>

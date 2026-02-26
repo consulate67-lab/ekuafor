@@ -11,5 +11,6 @@ router.get('/code/:code', MainCompanyController.getByAdminCode);
 router.put('/:id', MainCompanyController.update);
 router.get('/:id/branches', MainCompanyController.getBranches);
 router.get('/:id/reports', MainCompanyController.getReports);
+router.delete('/:id', MainCompanyController.delete);
 
 export default router;

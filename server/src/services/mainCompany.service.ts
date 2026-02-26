@@ -119,6 +119,27 @@ class MainCompanyService {
         const result = await pool.query(query, [mainCompanyId]);
         return result.rows;
     }
+
+    async delete(id: number): Promise<boolean> {
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            // 1. Decouple branches
+            await client.query('UPDATE companies SET main_company_id = NULL WHERE main_company_id = $1', [id]);
+
+            // 2. Delete the main company
+            const result = await client.query('DELETE FROM companies WHERE id = $1 AND company_type = \'ÜST FİRMA\'', [id]);
+
+            await client.query('COMMIT');
+            return (result.rowCount || 0) > 0;
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
 }
 
 export default new MainCompanyService();
