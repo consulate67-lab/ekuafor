@@ -19,10 +19,11 @@ interface StaffBoard {
     photo: string | null;
 }
 
-type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'ai' | 'reports' | 'profile';
+type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'finance' | 'ai' | 'reports' | 'profile';
 
 const menuItems: { key: TabKey; icon: string; label: string }[] = [
     { key: 'home', icon: '🏠', label: 'Ana Sayfa' },
+    { key: 'finance', icon: '💰', label: 'Finans' },
     { key: 'reports', icon: '📊', label: 'Raporlar' },
     { key: 'services', icon: '✂️', label: 'Hizmetler' },
     { key: 'profile', icon: '🏢', label: 'Firma Tanıtımı' },
@@ -72,7 +73,10 @@ export default function CompanyPanel() {
         description: '',
         duration_minutes: 30,
         price: 0,
-        department_id: null as number | null
+        department_id: null as number | null,
+        photo: '' as string | null,
+        quantity: '' as string | number,
+        unit: ''
     });
     const [packageForm, setPackageForm] = useState({
         id: null as number | null,
@@ -95,6 +99,19 @@ export default function CompanyPanel() {
     const [reportData, setReportData] = useState<any>(null);
     const [reportPeriod, setReportPeriod] = useState<'today' | 'week' | 'month' | 'year'>('today');
     const [loadingReport, setLoadingReport] = useState(false);
+
+    // Finance states
+    const [activeFinanceTab, setActiveFinanceTab] = useState<'sales' | 'purchases' | 'cash'>('sales');
+    const [financeDateRange, setFinanceDateRange] = useState({ start: '', end: '' });
+    const [financeSearch, setFinanceSearch] = useState('');
+    const [completedAppointments, setCompletedAppointments] = useState<any[]>([]);
+    const [loadingFinance, setLoadingFinance] = useState(false);
+    const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+    const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+    const [cashTransactions, setCashTransactions] = useState<any[]>([]);
+    const [purchaseInvoices, setPurchaseInvoices] = useState<any[]>([]);
+    const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+    const [showCashModal, setShowCashModal] = useState(false);
     const [reportError, setReportError] = useState('');
 
     const handleLogin = async (keyToUse?: string) => {
@@ -136,6 +153,87 @@ export default function CompanyPanel() {
         }
     }, []);
 
+    const fetchAIContent = async (cid: number) => {
+        try {
+            const res = await api.get(`/companies/${cid}/ai-config`);
+            if (res.data.success) {
+                setAiRules(res.data.data.rules || '');
+            }
+        } catch (err) { }
+    };
+
+    const fetchFinanceData = async (cid?: number) => {
+        const targetCid = cid || company?.id;
+        if (!targetCid) return;
+
+        setLoadingFinance(true);
+        try {
+            if (activeFinanceTab === 'sales') {
+                const params = new URLSearchParams();
+                if (financeDateRange.start) params.append('startDate', financeDateRange.start);
+                if (financeDateRange.end) params.append('endDate', financeDateRange.end);
+                if (financeSearch) params.append('search', financeSearch);
+
+                const res = await api.get(`/appointments/company/${targetCid}/completed?${params.toString()}`);
+                if (res.data.success) {
+                    setCompletedAppointments(res.data.data);
+                }
+            } else if (activeFinanceTab === 'cash') {
+                const res = await api.get(`/finance/company/${targetCid}/transactions`, {
+                    params: { startDate: financeDateRange.start, endDate: financeDateRange.end }
+                });
+                if (res.data.success) {
+                    setCashTransactions(res.data.data);
+                }
+            } else if (activeFinanceTab === 'purchases') {
+                const res = await api.get(`/finance/purchase-invoices/company/${targetCid}`);
+                if (res.data.success) {
+                    setPurchaseInvoices(res.data.data);
+                }
+            }
+        } catch (err) {
+            console.error('Finans verisi yüklenemedi:', err);
+        } finally {
+            setLoadingFinance(false);
+        }
+    };
+
+    const handleCreateInvoice = async (data: any) => {
+        try {
+            const res = await api.post('/finance/invoices', data);
+            if (res.data.success) {
+                setShowInvoiceModal(false);
+                fetchFinanceData();
+            }
+        } catch (err) {
+            console.error('Fatura oluşturulamadı:', err);
+        }
+    };
+
+    const handleCreatePurchase = async (data: any) => {
+        try {
+            const res = await api.post('/finance/purchase-invoices', data);
+            if (res.data.success) {
+                setShowPurchaseModal(false);
+                fetchFinanceData();
+            }
+        } catch (err) {
+            console.error('Alış faturası oluşturulamadı:', err);
+        }
+    };
+
+    const handleCreateCashTransaction = async (data: any) => {
+        try {
+            const res = await api.post('/finance/transactions', data);
+            if (res.data.success) {
+                setShowCashModal(false);
+                fetchFinanceData();
+            }
+        } catch (err) {
+            console.error('Kasa işlemi oluşturulamadı:', err);
+        }
+    };
+
     const fetchReports = async (period: string) => {
         if (!company) return;
         setLoadingReport(true);
@@ -163,7 +261,9 @@ export default function CompanyPanel() {
                 console.warn('Reports tab active but NO token found in localStorage!');
             }
         }
-    }, [activeTab, reportPeriod, company]);
+        if (activeTab === 'ai' && company) fetchAIContent(company.id);
+        if (activeTab === 'finance' && company) fetchFinanceData(company.id);
+    }, [activeTab, reportPeriod, company, activeFinanceTab, financeDateRange, financeSearch]);
 
     const fetchData = async (companyId: number) => {
         try {
@@ -341,7 +441,10 @@ export default function CompanyPanel() {
                     description: serviceForm.description.trim(),
                     duration_minutes: serviceForm.duration_minutes,
                     price: serviceForm.price,
-                    department_id: serviceForm.department_id
+                    department_id: serviceForm.department_id,
+                    photo: serviceForm.photo,
+                    quantity: serviceForm.quantity ? Number(serviceForm.quantity) : null,
+                    unit: serviceForm.unit || null
                 });
             } else {
                 // Yeni ekle
@@ -351,10 +454,13 @@ export default function CompanyPanel() {
                     description: serviceForm.description.trim(),
                     duration_minutes: serviceForm.duration_minutes,
                     price: serviceForm.price,
-                    department_id: serviceForm.department_id
+                    department_id: serviceForm.department_id,
+                    photo: serviceForm.photo,
+                    quantity: serviceForm.quantity ? Number(serviceForm.quantity) : null,
+                    unit: serviceForm.unit || null
                 });
             }
-            setServiceForm({ id: null, name: '', description: '', duration_minutes: 30, price: 0, department_id: null });
+            setServiceForm({ id: null, name: '', description: '', duration_minutes: 30, price: 0, department_id: null, photo: null, quantity: '', unit: '' });
             setShowServiceModal(false);
             fetchData(company.id);
         } catch (err: any) {
@@ -1416,7 +1522,7 @@ export default function CompanyPanel() {
                                         </button>
                                         <button
                                             onClick={() => {
-                                                setServiceForm({ id: null, name: '', description: '', duration_minutes: 30, price: 0, department_id: null });
+                                                setServiceForm({ id: null, name: '', description: '', duration_minutes: 30, price: 0, department_id: null, photo: null, quantity: '', unit: '' });
                                                 setShowServiceModal(true);
                                             }}
                                             className="flex-[2] py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl font-black text-base tracking-wide shadow-xl shadow-indigo-500/20 active:scale-95 transition-all"
@@ -1434,42 +1540,59 @@ export default function CompanyPanel() {
                                     ) : (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {companyServices.map(svc => (
-                                                <div key={svc.id} className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/20 relative group">
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <div>
-                                                            <h3 className="font-black text-slate-900 text-lg">{svc.name}</h3>
-                                                            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
-                                                                ⏱️ {svc.duration_minutes} dk • 💰 {svc.price} ₺
-                                                            </p>
-                                                        </div>
-                                                        <div className="flex bg-slate-50 rounded-xl p-1 gap-1">
-                                                            <button
-                                                                onClick={() => {
-                                                                    setServiceForm({
-                                                                        id: svc.id,
-                                                                        name: svc.name,
-                                                                        description: svc.description || '',
-                                                                        duration_minutes: svc.duration_minutes,
-                                                                        price: svc.price,
-                                                                        department_id: svc.department_id || null
-                                                                    });
-                                                                    setShowServiceModal(true);
-                                                                }}
-                                                                className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-400 hover:text-indigo-600 transition-all font-bold"
-                                                            >
-                                                                ✏️
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDeleteService(svc.id)}
-                                                                className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-400 hover:text-red-600 transition-all font-bold"
-                                                            >
-                                                                🗑️
-                                                            </button>
-                                                        </div>
+                                                <div key={svc.id} className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/20 relative group flex gap-4">
+                                                    <div className="w-16 h-16 bg-slate-50 rounded-2xl flex-shrink-0 flex items-center justify-center text-slate-300 overflow-hidden border border-slate-100">
+                                                        {svc.photo ? (
+                                                            <img src={svc.photo} alt={svc.name} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <svg className="w-8 h-8 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758L5 19m0-14l4.121 4.121" /></svg>
+                                                        )}
                                                     </div>
-                                                    {svc.description && (
-                                                        <p className="text-sm text-slate-500 mt-2 line-clamp-2">{svc.description}</p>
-                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <div className="min-w-0">
+                                                                <h3 className="font-black text-slate-900 text-base truncate">{svc.name}</h3>
+                                                                <div className="flex items-center gap-2 mt-1">
+                                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest whitespace-nowrap">
+                                                                        ⏱️ {svc.duration_minutes} dk • 💰 {svc.price} ₺
+                                                                    </p>
+                                                                    {svc.quantity && svc.unit && (
+                                                                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-500 rounded-lg text-[8px] font-black uppercase whitespace-nowrap">{svc.quantity} {svc.unit}</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex bg-slate-50 rounded-xl p-1 gap-1">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setServiceForm({
+                                                                            id: svc.id,
+                                                                            name: svc.name,
+                                                                            description: svc.description || '',
+                                                                            duration_minutes: svc.duration_minutes,
+                                                                            price: svc.price,
+                                                                            department_id: svc.department_id || null,
+                                                                            photo: svc.photo || null,
+                                                                            quantity: svc.quantity || '',
+                                                                            unit: svc.unit || ''
+                                                                        });
+                                                                        setShowServiceModal(true);
+                                                                    }}
+                                                                    className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-400 hover:text-indigo-600 transition-all font-bold"
+                                                                >
+                                                                    ✏️
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteService(svc.id)}
+                                                                    className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-slate-400 hover:text-red-600 transition-all font-bold"
+                                                                >
+                                                                    🗑️
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        {svc.description && (
+                                                            <p className="text-sm text-slate-500 mt-2 line-clamp-2">{svc.description}</p>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -1550,6 +1673,210 @@ export default function CompanyPanel() {
                                         </div>
                                     )}
                                 </>
+                            )}
+                        </div>
+                    )}
+
+                    {/* FINANCE TAB */}
+                    {activeTab === 'finance' && (
+                        <div className="space-y-6">
+                            {/* Sub Tabs */}
+                            <div className="flex bg-white/50 backdrop-blur-sm p-1.5 rounded-2xl border border-slate-100 shadow-sm gap-1 self-start">
+                                {[
+                                    { key: 'sales', label: 'Satışlar (Randevular)', icon: '📈' },
+                                    { key: 'purchases', label: 'Alış Faturaları', icon: '🛒' },
+                                    { key: 'cash', label: 'Kasa İşlemleri', icon: '🏦' }
+                                ].map(tab => (
+                                    <button
+                                        key={tab.key}
+                                        onClick={() => setActiveFinanceTab(tab.key as any)}
+                                        className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeFinanceTab === tab.key ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'text-slate-400 hover:bg-slate-50'}`}
+                                    >
+                                        <span>{tab.icon}</span> {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Sales Content */}
+                            {activeFinanceTab === 'sales' && (
+                                <div className="space-y-6">
+                                    {/* Filters */}
+                                    <div className="bg-white rounded-3xl p-6 shadow-xl shadow-slate-200/20 grid grid-cols-1 md:grid-cols-3 gap-4 border border-slate-50">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tarih Aralığı</label>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="date"
+                                                    value={financeDateRange.start}
+                                                    onChange={e => setFinanceDateRange(p => ({ ...p, start: e.target.value }))}
+                                                    className="flex-1 p-3 bg-slate-50 rounded-xl border-2 border-slate-100 font-bold text-xs"
+                                                />
+                                                <input
+                                                    type="date"
+                                                    value={financeDateRange.end}
+                                                    onChange={e => setFinanceDateRange(p => ({ ...p, end: e.target.value }))}
+                                                    className="flex-1 p-3 bg-slate-50 rounded-xl border-2 border-slate-100 font-bold text-xs"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Müşteri Arama (İsim / Tel)</label>
+                                            <input
+                                                type="text"
+                                                value={financeSearch}
+                                                onChange={e => setFinanceSearch(e.target.value)}
+                                                placeholder="Müşteri ara..."
+                                                className="w-full p-3 bg-slate-50 rounded-xl border-2 border-slate-100 font-bold text-xs"
+                                            />
+                                        </div>
+                                        <div className="flex items-end">
+                                            <button
+                                                onClick={() => fetchFinanceData(company?.id)}
+                                                className="w-full p-[18px] bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all"
+                                            >
+                                                Filtrele
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Grid List */}
+                                    <div className="grid grid-cols-1 gap-4">
+                                        {loadingFinance ? (
+                                            <div className="py-20 text-center animate-pulse text-slate-400 font-black">Yükleniyor...</div>
+                                        ) : completedAppointments.length === 0 ? (
+                                            <div className="bg-white rounded-3xl p-10 text-center shadow-lg border border-slate-50">
+                                                <span className="text-4xl block mb-2">🧾</span>
+                                                <p className="text-slate-400 font-bold uppercase text-xs">Tamamlanmış kayıt bulunamadı</p>
+                                            </div>
+                                        ) : (
+                                            completedAppointments.map(apt => (
+                                                <div key={apt.id} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-md transition-shadow">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center font-black">
+                                                            {apt.customer_name?.charAt(0).toUpperCase() || 'M'}
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-black text-slate-900">{apt.customer_name}</h4>
+                                                            <p className="text-[10px] font-bold text-slate-400 uppercase">{new Date(apt.date).toLocaleDateString('tr-TR')} {apt.time}</p>
+                                                            <p className="text-[9px] font-black text-indigo-500 uppercase tracking-tighter mt-1">{apt.service_name}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-8">
+                                                        <div className="text-right">
+                                                            <p className="text-lg font-black text-slate-900">{apt.price} ₺</p>
+                                                            <p className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-lg inline-block ${apt.invoice_status === 'fatura' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                                                                {apt.invoice_status === 'fatura' ? 'Faturalandırıldı' : 'Bekliyor'}
+                                                            </p>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedAppointment(apt);
+                                                                setShowInvoiceModal(true);
+                                                            }}
+                                                            className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-100 hover:scale-105 active:scale-95 transition-all"
+                                                        >
+                                                            Faturaya Dönüştür
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Purchases Content */}
+                            {activeFinanceTab === 'purchases' && (
+                                <div className="space-y-6">
+                                    <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-slate-50 shadow-sm">
+                                        <h3 className="font-black text-slate-900 uppercase text-xs tracking-widest">Alış Faturaları</h3>
+                                        <button 
+                                            onClick={() => setShowPurchaseModal(true)}
+                                            className="px-6 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest">+ Yeni Alış Girişi</button>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {purchaseInvoices.length === 0 ? (
+                                            <div className="bg-white rounded-3xl p-20 text-center shadow-lg border border-slate-50">
+                                                <span className="text-4xl block mb-2">🛒</span>
+                                                <p className="text-slate-300 font-bold uppercase text-[10px]">Henüz alış faturası bulunmuyor</p>
+                                            </div>
+                                        ) : (
+                                            purchaseInvoices.map(p => (
+                                                <div key={p.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center justify-between">
+                                                    <div>
+                                                        <h4 className="font-black text-slate-900">{p.supplier_name}</h4>
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase">Fatura No: {p.invoice_no || '---'}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-base font-black text-red-600">-{p.amount} ₺</p>
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase">{new Date(p.created_at).toLocaleDateString('tr-TR')}</p>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Cash Content */}
+                            {activeFinanceTab === 'cash' && (
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="bg-emerald-600 p-8 rounded-[2rem] text-white shadow-xl flex justify-between items-end">
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase opacity-60">Kasa Nakit Bakiye</p>
+                                                <h2 className="text-4xl font-black italic mt-2">
+                                                    {(cashTransactions.filter(t => t.payment_method === 'nakit').reduce((sum, t) => sum + (t.type === 'income' ? Number(t.amount) : -Number(t.amount)), 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                                </h2>
+                                            </div>
+                                            <span className="text-4xl opacity-50">💰</span>
+                                        </div>
+                                        <div className="bg-indigo-600 p-8 rounded-[2rem] text-white shadow-xl flex justify-between items-end">
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase opacity-60">Kart / Bekleyen İşlemler</p>
+                                                <h2 className="text-4xl font-black italic mt-2">
+                                                    {(cashTransactions.filter(t => t.payment_method === 'kart').reduce((sum, t) => sum + Number(t.amount), 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                                </h2>
+                                            </div>
+                                            <span className="text-4xl opacity-50">💳</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={() => setShowCashModal(true)}
+                                            className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest transition-all hover:bg-slate-200">- Yeni Gider İşlemi</button>
+                                        <button 
+                                            onClick={() => setShowCashModal(true)}
+                                            className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest transition-all hover:bg-emerald-50 hover:text-emerald-500">💸 Nakit Ödeme</button>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {cashTransactions.length === 0 ? (
+                                            <div className="bg-white rounded-3xl p-12 text-center border border-slate-100">
+                                                <p className="text-slate-400 font-bold uppercase text-[10px]">Henüz kasa hareketi yok</p>
+                                            </div>
+                                        ) : (
+                                            cashTransactions.map(t => (
+                                                <div key={t.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center justify-between">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${t.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                                                            {t.type === 'income' ? '+' : '-'}
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-black text-slate-900 leading-tight">{t.description || (t.type === 'income' ? 'Gelir' : 'Gider')}</h4>
+                                                            <p className="text-[10px] font-bold text-slate-400 uppercase">{t.category} • {t.payment_method}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className={`text-base font-black ${t.type === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                            {t.type === 'income' ? '+' : '-'}{t.amount} ₺
+                                                        </p>
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase">{new Date(t.created_at).toLocaleDateString('tr-TR')}</p>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
                             )}
                         </div>
                     )}
@@ -1945,6 +2272,36 @@ export default function CompanyPanel() {
                             <h2 className="text-2xl font-black text-slate-900 mb-6">{serviceForm.id ? 'Hizmeti Düzenle' : 'Yeni Hizmet'}</h2>
 
                             <div className="space-y-4">
+                                <div className="flex justify-center mb-6">
+                                    <div className="relative group">
+                                        <div className="w-24 h-24 rounded-3xl bg-slate-50 overflow-hidden border-4 border-white shadow-xl flex items-center justify-center text-slate-300">
+                                            {serviceForm.photo ? (
+                                                <img src={serviceForm.photo} alt="Hizmet" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <svg className="w-10 h-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002-2z" /></svg>
+                                            )}
+                                        </div>
+                                        <label className="absolute -bottom-2 -right-2 bg-indigo-600 text-white p-2.5 rounded-xl shadow-lg cursor-pointer hover:scale-110 active:scale-95 transition-all">
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) {
+                                                        const reader = new FileReader();
+                                                        reader.onloadend = () => {
+                                                            setServiceForm(p => ({ ...p, photo: reader.result as string }));
+                                                        };
+                                                        reader.readAsDataURL(file);
+                                                    }
+                                                }}
+                                            />
+                                        </label>
+                                    </div>
+                                </div>
+
                                 <div>
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Hizmet Adı</label>
                                     <input
@@ -1954,6 +2311,39 @@ export default function CompanyPanel() {
                                         placeholder="Örn: Saç Kesimi"
                                         className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-pink-500 text-base font-bold text-slate-900 outline-none"
                                     />
+                                </div>
+
+                                <div className="flex gap-4">
+                                    <div className="flex-1">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Miktar ({company?.service_label || 'Hizmet'})</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={serviceForm.quantity}
+                                            onChange={e => setServiceForm(p => ({ ...p, quantity: e.target.value }))}
+                                            placeholder="Örn: 100"
+                                            className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-pink-500 text-base font-bold text-slate-900 outline-none"
+                                        />
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Birim</label>
+                                        <select
+                                            value={serviceForm.unit}
+                                            onChange={e => setServiceForm(p => ({ ...p, unit: e.target.value }))}
+                                            className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-pink-500 text-base font-bold text-slate-900 outline-none appearance-none"
+                                        >
+                                            <option value="">Seçiniz</option>
+                                            <option value="adet">Adet</option>
+                                            <option value="seans">Seans</option>
+                                            <option value="ml">ml</option>
+                                            <option value="lt">Litre</option>
+                                            <option value="gr">Gram</option>
+                                            <option value="kg">Kilogram</option>
+                                            <option value="paket">Paket</option>
+                                            <option value="kişi">Kişi</option>
+                                            <option value="m²">m²</option>
+                                        </select>
+                                    </div>
                                 </div>
 
                                 <div className="flex gap-4">
@@ -2265,6 +2655,153 @@ export default function CompanyPanel() {
                     </div>
                 )
             }
+
+            {/* Finance Modals */}
+            {/* Invoice Modal */}
+            {showInvoiceModal && selectedAppointment && (
+                <div className="fixed inset-0 z-[300] flex items-end justify-center bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowInvoiceModal(false)}>
+                    <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl" onClick={e => e.stopPropagation()}
+                        style={{ animation: 'slideUp 0.3s ease-out' }}>
+                        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
+                        <h2 className="text-2xl font-black text-slate-900 mb-2">Faturaya Dönüştür</h2>
+                        <p className="text-sm text-slate-400 mb-8 font-bold uppercase tracking-widest">{selectedAppointment.customer_name} • {selectedAppointment.price} ₺</p>
+
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Fatura Tipi</label>
+                                <div className="grid grid-cols-2 gap-3 mb-6">
+                                    <button className="p-4 bg-slate-50 rounded-2xl border-2 border-indigo-500 text-indigo-600 font-bold text-xs">E-Arşiv / Fiş</button>
+                                    <button className="p-4 bg-slate-50 rounded-2xl border-2 border-transparent text-slate-400 font-bold text-xs opacity-50">E-Fatura (Yakında)</button>
+                                </div>
+
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Ödeme Şekli Seçin</label>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <button
+                                        onClick={() => handleCreateInvoice({
+                                            appointment_id: selectedAppointment.id,
+                                            customer_name: selectedAppointment.customer_name,
+                                            amount: selectedAppointment.price,
+                                            payment_method: 'nakit',
+                                            type: 'e-arsiv'
+                                        })}
+                                        className="p-8 bg-emerald-50 rounded-[2.5rem] border-2 border-emerald-100 flex flex-col items-center gap-3 hover:bg-emerald-100 transition-all font-black text-emerald-600"
+                                    >
+                                        <span className="text-4xl italic">Nakit</span>
+                                        <span className="text-[10px] uppercase tracking-widest">💰 Kasaya Giriş</span>
+                                    </button>
+                                    <button
+                                        onClick={() => handleCreateInvoice({
+                                            appointment_id: selectedAppointment.id,
+                                            customer_name: selectedAppointment.customer_name,
+                                            amount: selectedAppointment.price,
+                                            payment_method: 'kart',
+                                            type: 'e-arsiv'
+                                        })}
+                                        className="p-8 bg-indigo-50 rounded-[2.5rem] border-2 border-indigo-100 flex flex-col items-center gap-3 hover:bg-indigo-100 transition-all font-black text-indigo-600"
+                                    >
+                                        <span className="text-4xl italic">Kart</span>
+                                        <span className="text-[10px] uppercase tracking-widest">💳 POS Tahsilat</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => setShowInvoiceModal(false)}
+                                className="w-full py-5 bg-slate-100 text-slate-400 rounded-2xl font-black text-base uppercase tracking-widest"
+                            >
+                                Vazgeç
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Purchase Modal */}
+            {showPurchaseModal && (
+                <div className="fixed inset-0 z-[300] flex items-end justify-center bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowPurchaseModal(false)}>
+                    <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl" onClick={e => e.stopPropagation()}
+                        style={{ animation: 'slideUp 0.3s ease-out' }}>
+                        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
+                        <h2 className="text-2xl font-black text-slate-900 mb-6">Yeni Alış Girişi</h2>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Tedarikçi Adı</label>
+                                <input type="text" id="p_supplier" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Örn: X Kozmetik Ltd." />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Fatura No</label>
+                                    <input type="text" id="p_no" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="ALI20240001" />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Tutar (₺)</label>
+                                    <input type="number" id="p_amount" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="0.00" />
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    const supplier = (document.getElementById('p_supplier') as HTMLInputElement).value;
+                                    const amount = (document.getElementById('p_amount') as HTMLInputElement).value;
+                                    const no = (document.getElementById('p_no') as HTMLInputElement).value;
+                                    if (supplier && amount) {
+                                        handleCreatePurchase({ supplier_name: supplier, amount: Number(amount), invoice_no: no });
+                                    }
+                                }}
+                                className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-base uppercase tracking-widest shadow-xl shadow-slate-200 mt-4"
+                            >
+                                Kaydet
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Cash Modal */}
+            {showCashModal && (
+                <div className="fixed inset-0 z-[300] flex items-end justify-center bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowCashModal(false)}>
+                    <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl" onClick={e => e.stopPropagation()}
+                        style={{ animation: 'slideUp 0.3s ease-out' }}>
+                        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
+                        <h2 className="text-2xl font-black text-slate-900 mb-6">Kasa İşlemi</h2>
+
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Kategori</label>
+                                    <select id="c_cat" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold">
+                                        <option value="general_expense">Genel Gider</option>
+                                        <option value="payment">Ödeme</option>
+                                        <option value="salary">Maaş/Prim</option>
+                                        <option value="other">Diğer</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Tutar (₺)</label>
+                                    <input type="number" id="c_amount" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="0.00" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Açıklama</label>
+                                <textarea id="c_desc" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" rows={2} placeholder="İşlem detayı..." />
+                            </div>
+                            <button
+                                onClick={() => {
+                                    const cat = (document.getElementById('c_cat') as HTMLSelectElement).value;
+                                    const amount = (document.getElementById('c_amount') as HTMLInputElement).value;
+                                    const desc = (document.getElementById('c_desc') as HTMLTextAreaElement).value;
+                                    if (amount) {
+                                        handleCreateCashTransaction({ type: 'expense', category: cat, amount: Number(amount), description: desc, payment_method: 'nakit' });
+                                    }
+                                }}
+                                className="w-full py-5 bg-red-600 text-white rounded-[2rem] font-black text-base uppercase tracking-widest shadow-xl shadow-red-100 mt-4"
+                            >
+                                Gider Olarak İşle
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <style>{`
                 @keyframes slideUp {

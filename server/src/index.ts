@@ -15,6 +15,7 @@ import mapsRoutes from './routes/maps.routes';
 import departmentRoutes from './routes/department.routes';
 import reportRoutes from './routes/report.routes';
 import mainCompanyRoutes from './routes/mainCompany.routes';
+import financeRoutes from './routes/finance.routes';
 import cronService from './services/cron.service';
 
 
@@ -151,6 +152,9 @@ app.use('/ekuafor/api/reports', reportRoutes);
 
 app.use('/api/main-companies', mainCompanyRoutes);
 app.use('/ekuafor/api/main-companies', mainCompanyRoutes);
+
+app.use('/api/finance', financeRoutes);
+app.use('/ekuafor/api/finance', financeRoutes);
 
 
 // Setup Route (For DB Init)
@@ -447,6 +451,52 @@ const runMigrations = async () => {
                 message TEXT NOT NULL,
                 status VARCHAR(20) DEFAULT 'pending',
                 error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Finance Module Tables
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS invoices (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+                appointment_id INTEGER REFERENCES appointments(id) ON DELETE SET NULL,
+                customer_name VARCHAR(255),
+                customer_tax_number VARCHAR(20),
+                customer_tax_office VARCHAR(100),
+                type VARCHAR(20) DEFAULT 'e-arsiv', -- e-fatura, e-arsiv, fis
+                payment_method VARCHAR(20) DEFAULT 'nakit', -- nakit, kart
+                amount DECIMAL(10, 2) NOT NULL,
+                status VARCHAR(20) DEFAULT 'completed',
+                invoice_no VARCHAR(50),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS purchase_invoices (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+                supplier_name VARCHAR(255) NOT NULL,
+                invoice_no VARCHAR(50),
+                amount DECIMAL(10, 2) NOT NULL,
+                invoice_date DATE DEFAULT CURRENT_DATE,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS cash_transactions (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+                type VARCHAR(10) NOT NULL, -- income, expense
+                category VARCHAR(50), -- sales, purchase, general_expense, payment
+                payment_method VARCHAR(20) DEFAULT 'nakit', -- nakit, kart
+                amount DECIMAL(10, 2) NOT NULL,
+                description TEXT,
+                transaction_date DATE DEFAULT CURRENT_DATE,
+                due_date DATE, -- For card payments
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);

@@ -567,6 +567,36 @@ class AppointmentService {
         );
         return result.rows[0] || null;
     }
+
+    async getCompletedAppointments(companyId: number, startDate?: string, endDate?: string, search?: string): Promise<any[]> {
+        let query = `
+            SELECT a.*, s.name as service_name, st.first_name || ' ' || st.last_name as staff_name,
+                   COALESCE(i.status, 'pending') as invoice_status
+            FROM appointments a
+            LEFT JOIN services s ON a.service_id = s.id
+            LEFT JOIN users st ON a.staff_id = st.id
+            LEFT JOIN LATERAL (SELECT status FROM invoices WHERE appointment_id = a.id ORDER BY id DESC LIMIT 1) i ON true
+            WHERE a.company_id = $1 AND a.status = 'completed'
+        `;
+        const values: any[] = [companyId];
+        let i = 2;
+
+        if (startDate && endDate) {
+            query += ` AND a.appointment_date BETWEEN $${i} AND $${i + 1}`;
+            values.push(startDate, endDate);
+            i += 2;
+        }
+
+        if (search) {
+            query += ` AND (a.customer_name ILIKE $${i} OR a.customer_phone ILIKE $${i})`;
+            values.push(`%${search}%`);
+            i++;
+        }
+
+        query += ' ORDER BY a.appointment_date DESC, a.start_time DESC';
+        const result = await pool.query(query, values);
+        return result.rows;
+    }
 }
 
 export default new AppointmentService();

@@ -1,0 +1,101 @@
+import { Request, Response, NextFunction } from 'express';
+import financeService from '../services/finance.service';
+
+class FinanceController {
+    async createInvoice(req: Request, res: Response, next: NextFunction) {
+        try {
+            const companyId = req.user?.companyId;
+            if (!companyId) return res.status(403).json({ success: false, error: 'Firma ID eksik' });
+
+            const invoice = await financeService.createInvoice({
+                ...req.body,
+                company_id: companyId
+            });
+            res.status(201).json({ success: true, data: invoice });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getMonthlyBalance(req: Request, res: Response, next: NextFunction) {
+        try {
+            const companyId = req.params.companyId ? parseInt(req.params.companyId) : req.user?.companyId;
+            if (!companyId) return res.status(400).json({ success: false, error: 'Firma ID eksik' });
+
+            // Yetki kontrolü (Kendi firması mı veya super_admin mi?)
+            if (req.user?.companyId !== companyId && req.user?.role !== 'super_admin') {
+                return res.status(403).json({ success: false, error: 'Yetkisiz erişim' });
+            }
+
+            const balance = await financeService.getMonthlyBalance(companyId);
+            res.json({ success: true, data: balance });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getCashTransactions(req: Request, res: Response, next: NextFunction) {
+        try {
+            const companyId = req.params.companyId ? parseInt(req.params.companyId) : req.user?.companyId;
+            const { startDate, endDate } = req.query;
+            if (!companyId) return res.status(400).json({ success: false, error: 'Firma ID eksik' });
+
+            if (req.user?.companyId !== companyId && req.user?.role !== 'super_admin') {
+                return res.status(403).json({ success: false, error: 'Yetkisiz erişim' });
+            }
+
+            const transactions = await financeService.getCashTransactions(companyId, startDate as string, endDate as string);
+            res.json({ success: true, data: transactions });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createPurchaseInvoice(req: Request, res: Response, next: NextFunction) {
+        try {
+            const companyId = req.user?.companyId;
+            if (!companyId) return res.status(403).json({ success: false, error: 'Firma ID eksik' });
+
+            const invoice = await financeService.createPurchaseInvoice({
+                ...req.body,
+                company_id: companyId
+            });
+            res.status(201).json({ success: true, data: invoice });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getPurchaseInvoices(req: Request, res: Response, next: NextFunction) {
+        try {
+            const companyId = req.params.companyId ? parseInt(req.params.companyId) : req.user?.companyId;
+            if (!companyId) return res.status(400).json({ success: false, error: 'Firma ID eksik' });
+
+            if (req.user?.companyId !== companyId && req.user?.role !== 'super_admin') {
+                return res.status(403).json({ success: false, error: 'Yetkisiz erişim' });
+            }
+
+            const invoices = await financeService.getPurchaseInvoices(companyId);
+            res.json({ success: true, data: invoices });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createCashTransaction(req: Request, res: Response, next: NextFunction) {
+        try {
+            const companyId = req.user?.companyId;
+            if (!companyId) return res.status(403).json({ success: false, error: 'Firma ID eksik' });
+
+            const transaction = await financeService.createCashTransaction({
+                ...req.body,
+                company_id: companyId
+            });
+            res.status(201).json({ success: true, data: transaction });
+        } catch (error) {
+            next(error);
+        }
+    }
+}
+
+export default new FinanceController();

@@ -184,6 +184,29 @@ router.get('/calendar', authMiddleware, async (req: Request, res: Response, next
     }
 });
 
+// Finans: Firma bazlı tamamlanmış randevuları getir
+router.get('/company/:companyId/completed', authMiddleware, async (req: Request, res: Response, next: any) => {
+    try {
+        const companyId = parseInt(req.params.companyId);
+        const { startDate, endDate, search } = req.query;
+
+        if (req.user?.companyId !== companyId && req.user?.role !== 'super_admin') {
+            return res.status(403).json({ success: false, error: 'Bu veriye erişim yetkiniz yok' });
+        }
+
+        const appointments = await appointmentService.getCompletedAppointments(
+            companyId,
+            startDate as string,
+            endDate as string,
+            search as string
+        );
+        res.json({ success: true, data: appointments });
+    } catch (error) {
+        console.error('Completed Appointments Error:', error);
+        next(error);
+    }
+});
+
 // Yeni randevu oluştur (Manuel giriş)
 // Yeni randevu oluştur (Manuel giriş veya Public Booking)
 // Yeni randevu oluştur (Manuel giriş veya Public Booking)
