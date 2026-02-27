@@ -103,7 +103,10 @@ export default function CompanyPanel() {
 
     // Finance states
     const [activeFinanceTab, setActiveFinanceTab] = useState<'sales' | 'purchases' | 'cash'>('sales');
-    const [financeDateRange, setFinanceDateRange] = useState({ start: '', end: '' });
+    const [financeDateRange, setFinanceDateRange] = useState({
+        start: new Date().toISOString().split('T')[0],
+        end: new Date().toISOString().split('T')[0]
+    });
     const [financeSearch, setFinanceSearch] = useState('');
     const [completedAppointments, setCompletedAppointments] = useState<any[]>([]);
     const [loadingFinance, setLoadingFinance] = useState(false);
@@ -204,7 +207,9 @@ export default function CompanyPanel() {
                     setCashTransactions(res.data.data);
                 }
             } else if (activeFinanceTab === 'purchases') {
-                const res = await api.get(`/finance/purchase-invoices/company/${targetCid}`);
+                const res = await api.get(`/finance/purchase-invoices/company/${targetCid}`, {
+                    params: { startDate: financeDateRange.start, endDate: financeDateRange.end }
+                });
                 if (res.data.success) {
                     setPurchaseInvoices(res.data.data);
                 }
@@ -454,39 +459,36 @@ export default function CompanyPanel() {
     const handleSaveService = async () => {
         if (!serviceForm.name.trim() || !company) return;
         setIsSavingService(true);
+        const submitData = {
+            company_id: company.id,
+            name: serviceForm.name.trim(),
+            description: serviceForm.description.trim(),
+            duration_minutes: Number(serviceForm.duration_minutes),
+            price: Number(serviceForm.price),
+            department_id: serviceForm.department_id,
+            photo: serviceForm.photo,
+            quantity: serviceForm.quantity ? Number(serviceForm.quantity) : null,
+            unit: serviceForm.unit || null
+        };
+
+        console.log('Hizmet kaydetme verisi:', submitData);
+
         try {
             if (serviceForm.id) {
                 // Güncelle
-                await api.put(`/services/${serviceForm.id}`, {
-                    company_id: company.id,
-                    name: serviceForm.name.trim(),
-                    description: serviceForm.description.trim(),
-                    duration_minutes: serviceForm.duration_minutes,
-                    price: serviceForm.price,
-                    department_id: serviceForm.department_id,
-                    photo: serviceForm.photo,
-                    quantity: serviceForm.quantity ? Number(serviceForm.quantity) : null,
-                    unit: serviceForm.unit || null
-                });
+                await api.put(`/services/${serviceForm.id}`, submitData);
             } else {
                 // Yeni ekle
-                await api.post('/services', {
-                    company_id: company.id,
-                    name: serviceForm.name.trim(),
-                    description: serviceForm.description.trim(),
-                    duration_minutes: serviceForm.duration_minutes,
-                    price: serviceForm.price,
-                    department_id: serviceForm.department_id,
-                    photo: serviceForm.photo,
-                    quantity: serviceForm.quantity ? Number(serviceForm.quantity) : null,
-                    unit: serviceForm.unit || null
-                });
+                await api.post('/services', submitData);
             }
             setServiceForm({ id: null, name: '', description: '', duration_minutes: 30, price: 0, department_id: null, photo: null, quantity: '', unit: '' });
             setShowServiceModal(false);
             fetchData(company.id);
         } catch (err: any) {
-            alert(err.response?.data?.error || 'Hizmet kaydedilemedi');
+            console.error('Hizmet kaydetme hatası:', err.response?.data || err);
+            const errorMsg = err.response?.data?.error || 'Hizmet kaydedilemedi';
+            const details = err.response?.data?.details ? '\n' + JSON.stringify(err.response.data.details) : '';
+            alert(errorMsg + details);
         } finally {
             setIsSavingService(false);
         }
@@ -1903,62 +1905,64 @@ export default function CompanyPanel() {
                             </div>
 
                             {/* Sales Content */}
-                            {activeFinanceTab === 'sales' && (
-                                <div className="space-y-6">
-                                    {/* Filters */}
-                                    <div className="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/20 grid grid-cols-1 lg:grid-cols-4 gap-6 border border-slate-50">
-                                        <div className="lg:col-span-2 space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tarih Aralığı</label>
-                                            <div className="flex gap-3">
-                                                <div className="flex-1 relative">
-                                                    <input
-                                                        type="date"
-                                                        value={financeDateRange.start}
-                                                        onChange={e => setFinanceDateRange(p => ({ ...p, start: e.target.value }))}
-                                                        className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 outline-none transition-all"
-                                                    />
-                                                </div>
-                                                <div className="flex-1 relative">
-                                                    <input
-                                                        type="date"
-                                                        value={financeDateRange.end}
-                                                        onChange={e => setFinanceDateRange(p => ({ ...p, end: e.target.value }))}
-                                                        className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 outline-none transition-all"
-                                                    />
-                                                </div>
-                                            </div>
+                            {/* Shared Finance Filters */}
+                            <div className="bg-white rounded-[2rem] p-6 lg:p-8 shadow-xl shadow-slate-200/20 border border-slate-50">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 lg:gap-6 items-end">
+                                    <div className="md:col-span-2 lg:col-span-5 space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tarih Aralığı</label>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <input
+                                                type="date"
+                                                value={financeDateRange.start}
+                                                onChange={e => setFinanceDateRange(p => ({ ...p, start: e.target.value }))}
+                                                className="w-full p-3.5 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 outline-none transition-all shadow-sm"
+                                            />
+                                            <input
+                                                type="date"
+                                                value={financeDateRange.end}
+                                                onChange={e => setFinanceDateRange(p => ({ ...p, end: e.target.value }))}
+                                                className="w-full p-3.5 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 outline-none transition-all shadow-sm"
+                                            />
                                         </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Müşteri Arama</label>
+                                    </div>
+                                    <div className="lg:col-span-4 space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Müşteri / Açıklama Arama</label>
+                                        <div className="relative">
                                             <input
                                                 type="text"
                                                 value={financeSearch}
                                                 onChange={e => setFinanceSearch(e.target.value)}
                                                 placeholder="İsim veya telefon..."
-                                                className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 outline-none transition-all"
+                                                className="w-full p-3.5 pl-10 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 outline-none transition-all shadow-sm"
                                             />
-                                        </div>
-                                        <div className="flex items-end">
-                                            <button
-                                                onClick={() => fetchFinanceData(company?.id)}
-                                                className="w-full p-[18px] bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 active:scale-95"
-                                            >
-                                                Filtrele
-                                            </button>
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30">🔍</span>
                                         </div>
                                     </div>
+                                    <div className="lg:col-span-3">
+                                        <button
+                                            onClick={() => fetchFinanceData(company?.id)}
+                                            className="w-full p-4 bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 active:scale-95 flex items-center justify-center gap-2"
+                                        >
+                                            ⚡ Verileri Getir
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
 
+                            {/* Sales Content */}
+                            {activeFinanceTab === 'sales' && (
+                                <div className="space-y-6">
                                     {/* Sub Tabs: Bekleyen / Faturalar */}
-                                    <div className="flex bg-slate-100/80 p-1 rounded-2xl gap-1 self-start">
+                                    <div className="flex bg-slate-100/80 p-1.5 rounded-2xl gap-1.5 self-start shadow-inner">
                                         <button
                                             onClick={() => setSalesSubTab('pending')}
-                                            className={`flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${salesSubTab === 'pending' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-400'}`}
+                                            className={`flex-1 px-8 py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${salesSubTab === 'pending' ? 'bg-white text-amber-600 shadow-md' : 'text-slate-500 hover:bg-white/50'}`}
                                         >
                                             <span>⏳</span> Bekleyen ({completedAppointments.length})
                                         </button>
                                         <button
                                             onClick={() => setSalesSubTab('invoiced')}
-                                            className={`flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${salesSubTab === 'invoiced' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}
+                                            className={`flex-1 px-8 py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${salesSubTab === 'invoiced' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-500 hover:bg-white/50'}`}
                                         >
                                             <span>✅</span> Faturalar ({invoices.length})
                                         </button>
@@ -1968,39 +1972,44 @@ export default function CompanyPanel() {
                                     {salesSubTab === 'pending' && (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {loadingFinance ? (
-                                                <div className="col-span-1 md:col-span-2 py-20 text-center animate-pulse text-slate-400 font-black">Yükleniyor...</div>
+                                                <div className="col-span-full py-20 text-center animate-pulse text-slate-400 font-black">Yükleniyor...</div>
                                             ) : completedAppointments.length === 0 ? (
-                                                <div className="col-span-1 md:col-span-2 bg-white rounded-3xl p-10 text-center shadow-lg border border-slate-50">
-                                                    <span className="text-4xl block mb-2">🎉</span>
-                                                    <p className="text-slate-400 font-bold uppercase text-xs">Tüm randevular faturalandırıldı!</p>
+                                                <div className="col-span-full bg-white rounded-3xl p-16 text-center shadow-lg border border-slate-50">
+                                                    <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl">🎉</div>
+                                                    <p className="text-slate-400 font-black uppercase text-xs tracking-widest">Tüm randevular faturalandırıldı!</p>
                                                 </div>
                                             ) : (
                                                 completedAppointments.map(apt => (
-                                                    <div key={apt.id} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col justify-between gap-4 hover:shadow-md transition-shadow relative overflow-hidden group">
-                                                        <div className="absolute top-0 right-0 w-24 h-24 bg-slate-50 rounded-full -mr-12 -mt-12 transition-all group-hover:scale-110"></div>
+                                                    <div key={apt.id} className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col justify-between gap-4 hover:shadow-xl hover:border-indigo-100 transition-all relative overflow-hidden group">
+                                                        <div className="absolute top-0 right-0 w-24 h-24 bg-slate-50 rounded-full -mr-12 -mt-12 transition-all group-hover:bg-indigo-50/50"></div>
                                                         <div className="relative z-10">
                                                             <div className="flex items-center gap-4 mb-4">
-                                                                <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center font-black shadow-sm">
+                                                                <div className="w-14 h-14 bg-gradient-to-br from-amber-50 to-orange-50 text-amber-600 rounded-2xl flex items-center justify-center font-black shadow-sm text-xl">
                                                                     {apt.customer_name?.charAt(0).toUpperCase() || 'M'}
                                                                 </div>
                                                                 <div>
-                                                                    <h4 className="font-black text-slate-900 truncate max-w-[150px]">{apt.customer_name}</h4>
-                                                                    <p className="text-[10px] font-bold text-slate-400 uppercase">{new Date(apt.date).toLocaleDateString('tr-TR')} {apt.time}</p>
+                                                                    <h4 className="font-black text-slate-900 text-lg leading-tight">{apt.customer_name}</h4>
+                                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                                                        📅 {new Date(apt.date).toLocaleDateString('tr-TR')} • 🕒 {apt.time}
+                                                                    </p>
                                                                 </div>
                                                             </div>
-                                                            <p className="text-[10px] font-black text-indigo-500 uppercase tracking-tighter bg-indigo-50 inline-block px-2 py-1 rounded-md mb-4">{apt.service_name}</p>
+                                                            <div className="flex flex-wrap gap-2 mb-4">
+                                                                <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-3 py-1.5 rounded-full border border-indigo-100/50">{apt.service_name}</span>
+                                                                {apt.staff_name && <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100/50">👤 {apt.staff_name}</span>}
+                                                            </div>
 
-                                                            <div className="flex items-center justify-between pt-4 border-t border-slate-50">
+                                                            <div className="flex items-center justify-between pt-6 border-t border-slate-50">
                                                                 <div>
-                                                                    <p className="text-xl font-black text-slate-900">{apt.price} ₺</p>
-                                                                    <p className="text-[8px] font-black uppercase text-amber-600">BEKLİYOR</p>
+                                                                    <p className="text-2xl font-black text-slate-900">{apt.price} ₺</p>
+                                                                    <p className="text-[9px] font-black uppercase text-amber-500 tracking-[0.2em] mt-0.5">ÖDEME BEKLİYOR</p>
                                                                 </div>
                                                                 <button
                                                                     onClick={() => {
                                                                         setSelectedAppointment(apt);
                                                                         setShowInvoiceModal(true);
                                                                     }}
-                                                                    className="px-4 py-2.5 bg-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-slate-200"
+                                                                    className="px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-slate-200"
                                                                 >
                                                                     Faturaya Dönüştür
                                                                 </button>
@@ -2012,140 +2021,124 @@ export default function CompanyPanel() {
                                         </div>
                                     )}
 
-                                    {/* Issued Invoices - DATAGRID LIST VIEW */}
+                                    {/* Issued Invoices - CARD VIEW */}
                                     {salesSubTab === 'invoiced' && (
-                                        <div className="bg-white rounded-3xl overflow-hidden shadow-xl shadow-slate-200/20 border border-slate-100">
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-left border-collapse">
-                                                    <thead>
-                                                        <tr className="bg-slate-50 border-b border-slate-100">
-                                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Müşteri / Fatura No</th>
-                                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tarih</th>
-                                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Matrah (KDVsiz)</th>
-                                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">KDV</th>
-                                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Genel Toplam</th>
-                                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Durum</th>
-                                                            <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">İşlemler</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-slate-50">
-                                                        {loadingFinance ? (
-                                                            <tr>
-                                                                <td colSpan={7} className="px-6 py-20 text-center animate-pulse text-slate-400 font-black">Yükleniyor...</td>
-                                                            </tr>
-                                                        ) : invoices.length === 0 ? (
-                                                            <tr>
-                                                                <td colSpan={7} className="px-6 py-20 text-center">
-                                                                    <span className="text-4xl block mb-2">📄</span>
-                                                                    <p className="text-slate-300 font-bold uppercase text-[10px]">Henüz fatura bulunmuyor</p>
-                                                                </td>
-                                                            </tr>
-                                                        ) : (
-                                                            invoices.map(inv => {
-                                                                const total = Number(inv.grand_total || inv.amount || 0);
-                                                                const vat = Number(inv.vat_amount || 0);
-                                                                const base = total - vat;
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {loadingFinance ? (
+                                                <div className="col-span-full py-20 text-center animate-pulse text-slate-400 font-black">Yükleniyor...</div>
+                                            ) : invoices.length === 0 ? (
+                                                <div className="col-span-full bg-white rounded-3xl p-16 text-center shadow-lg border border-slate-50">
+                                                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl">📄</div>
+                                                    <p className="text-slate-400 font-black uppercase text-xs tracking-widest">Henüz fatura bulunmuyor</p>
+                                                </div>
+                                            ) : (
+                                                invoices.map(inv => {
+                                                    const total = Number(inv.grand_total || inv.amount || 0);
+                                                    const vat = Number(inv.vat_amount || 0);
+                                                    const base = total - vat;
 
-                                                                return (
-                                                                    <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors group">
-                                                                        <td className="px-8 py-5">
-                                                                            <p className="font-black text-slate-900 text-sm leading-tight">{inv.customer_name}</p>
-                                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-1">{inv.invoice_no || 'TASLAK'}</p>
-                                                                        </td>
-                                                                        <td className="px-8 py-5">
-                                                                            <p className="text-xs font-bold text-slate-600">{new Date(inv.created_at).toLocaleDateString('tr-TR')}</p>
-                                                                        </td>
-                                                                        <td className="px-8 py-5 text-right">
-                                                                            <p className="text-sm font-bold text-slate-500">{base.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
-                                                                        </td>
-                                                                        <td className="px-8 py-5 text-right">
-                                                                            <p className="text-sm font-bold text-indigo-500">+{vat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
-                                                                            <p className="text-[8px] font-black text-slate-300 uppercase">%{inv.vat_rate}</p>
-                                                                        </td>
-                                                                        <td className="px-8 py-5 text-right">
-                                                                            <p className="text-base font-black text-slate-900">{total.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
-                                                                        </td>
-                                                                        <td className="px-8 py-5 text-center">
-                                                                            {inv.gib_status === 'success' ? (
-                                                                                <span className="inline-flex px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase tracking-widest items-center gap-1.5">
-                                                                                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-                                                                                    Gönderildi
-                                                                                </span>
-                                                                            ) : inv.gib_status === 'pending' ? (
-                                                                                <span className="inline-flex px-3 py-1.5 rounded-lg bg-amber-50 text-amber-600 text-[9px] font-black uppercase tracking-widest animate-pulse">İşleniyor...</span>
-                                                                            ) : inv.gib_status === 'failed' ? (
-                                                                                <span className="inline-flex px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-[9px] font-black uppercase tracking-widest">Hata</span>
-                                                                            ) : inv.gib_status === 'ready' ? (
-                                                                                <span className="inline-flex px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-widest italic font-bold">Hazır</span>
-                                                                            ) : (
-                                                                                <span className="inline-flex px-3 py-1.5 rounded-lg bg-slate-50 text-slate-400 text-[9px] font-black uppercase tracking-widest">Taslak</span>
-                                                                            )}
-                                                                        </td>
-                                                                        <td className="px-8 py-5 text-right">
-                                                                            <div className="flex items-center justify-end gap-2">
-                                                                                {/* Action 1: Prepare (if not_sent) */}
-                                                                                {(!inv.gib_status || inv.gib_status === 'not_sent') && (
-                                                                                    <button
-                                                                                        onClick={async () => {
-                                                                                            try {
-                                                                                                setLoading(true);
-                                                                                                const res = await api.post(`/finance/invoices/${inv.id}/prepare`);
-                                                                                                if (res.data.success) { fetchFinanceData(); }
-                                                                                            } catch (err: any) { alert(err.response?.data?.error || 'Hazırlama hatası'); }
-                                                                                            finally { setLoading(false); }
-                                                                                        }}
-                                                                                        title="Entegratöre Hazırla"
-                                                                                        className="w-9 h-9 bg-slate-900 text-white rounded-xl flex items-center justify-center hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200"
-                                                                                    >
-                                                                                        <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-                                                                                    </button>
-                                                                                )}
+                                                    return (
+                                                        <div key={inv.id} className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col justify-between gap-4 hover:shadow-xl transition-all relative group overflow-hidden">
+                                                            <div className="flex items-start justify-between">
+                                                                <div className="flex items-center gap-4">
+                                                                    <div className="w-14 h-14 bg-slate-50 text-slate-600 rounded-2xl flex items-center justify-center font-black shadow-sm text-xl border border-slate-100">
+                                                                        {inv.customer_name?.charAt(0).toUpperCase() || 'F'}
+                                                                    </div>
+                                                                    <div>
+                                                                        <h4 className="font-black text-slate-900 text-lg leading-tight truncate max-w-[180px]">{inv.customer_name}</h4>
+                                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                                                            📄 {inv.invoice_no || 'TASLAK'} • 📅 {new Date(inv.created_at).toLocaleDateString('tr-TR')}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    {inv.gib_status === 'success' ? (
+                                                                        <span className="inline-flex px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 text-[8px] font-black uppercase tracking-widest items-center gap-1">
+                                                                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                                                                            Gönderildi
+                                                                        </span>
+                                                                    ) : inv.gib_status === 'pending' ? (
+                                                                        <span className="inline-flex px-3 py-1.5 rounded-lg bg-amber-50 text-amber-600 text-[8px] font-black uppercase tracking-widest animate-pulse">İşleniyor</span>
+                                                                    ) : inv.gib_status === 'failed' ? (
+                                                                        <span className="inline-flex px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-[8px] font-black uppercase tracking-widest">Hata</span>
+                                                                    ) : (
+                                                                        <span className="inline-flex px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-widest">Taslak</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
 
-                                                                                {/* Action 2: View (if ready or success or failed) */}
-                                                                                {(inv.gib_status === 'ready' || inv.gib_status === 'success' || inv.gib_status === 'failed') && (
-                                                                                    <button
-                                                                                        onClick={async () => {
-                                                                                            try {
-                                                                                                setLoading(true);
-                                                                                                const res = await api.get(`/finance/invoices/${inv.id}/preview`);
-                                                                                                const popup = window.open('', '_blank');
-                                                                                                if (popup) { popup.document.write(res.data); popup.document.close(); }
-                                                                                            } catch (err) { alert('Önizleme yüklenemedi'); }
-                                                                                            finally { setLoading(false); }
-                                                                                        }}
-                                                                                        title="Görüntüle"
-                                                                                        className="w-9 h-9 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center hover:bg-slate-200 transition-all active:scale-95"
-                                                                                    >
-                                                                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                                                                                    </button>
-                                                                                )}
+                                                            <div className="grid grid-cols-2 gap-4 py-4 border-y border-slate-50 my-2">
+                                                                <div>
+                                                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Matrah</p>
+                                                                    <p className="text-xs font-bold text-slate-700">{base.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">KDV (%{inv.vat_rate})</p>
+                                                                    <p className="text-xs font-bold text-indigo-500">+{vat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
+                                                                </div>
+                                                            </div>
 
-                                                                                {/* Action 3: Send (if ready or failed) */}
-                                                                                {(inv.gib_status === 'ready' || inv.gib_status === 'failed') && (
-                                                                                    <button
-                                                                                        onClick={async () => {
-                                                                                            try {
-                                                                                                setLoading(true);
-                                                                                                const res = await api.post(`/finance/invoices/${inv.id}/gib-send`);
-                                                                                                if (res.data.success) { alert('GİB\'e gönderildi!'); fetchFinanceData(); }
-                                                                                            } catch (err: any) { alert(err.response?.data?.error || 'Gönderim hatası'); }
-                                                                                            finally { setLoading(false); }
-                                                                                        }}
-                                                                                        title="GİB'e Gönder"
-                                                                                        className="w-9 h-9 bg-emerald-600 text-white rounded-xl flex items-center justify-center hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95"
-                                                                                    >
-                                                                                        <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-                                                                                    </button>
-                                                                                )}
-                                                                            </div>
-                                                                        </td>
-                                                                    </tr>
-                                                                );
-                                                            })
-                                                        )}
-                                                    </tbody>
-                                                </table>
-                                            </div>
+                                                            <div className="flex items-end justify-between">
+                                                                <div>
+                                                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Genel Toplam</p>
+                                                                    <p className="text-2xl font-black text-slate-900">{total.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
+                                                                </div>
+                                                                <div className="flex gap-1.5">
+                                                                    {(!inv.gib_status || inv.gib_status === 'not_sent') && (
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                try {
+                                                                                    setLoading(true);
+                                                                                    const res = await api.post(`/finance/invoices/${inv.id}/prepare`);
+                                                                                    if (res.data.success) { fetchFinanceData(); }
+                                                                                } catch (err: any) { alert(err.response?.data?.error || 'Hazırlama hatası'); }
+                                                                                finally { setLoading(false); }
+                                                                            }}
+                                                                            className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center hover:bg-slate-800 transition-all shadow-lg shadow-slate-100"
+                                                                            title="Hazırla"
+                                                                        >
+                                                                            <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                                                        </button>
+                                                                    )}
+                                                                    {(inv.gib_status === 'ready' || inv.gib_status === 'success' || inv.gib_status === 'failed') && (
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                try {
+                                                                                    setLoading(true);
+                                                                                    const res = await api.get(`/finance/invoices/${inv.id}/preview`);
+                                                                                    const popup = window.open('', '_blank');
+                                                                                    if (popup) { popup.document.write(res.data); popup.document.close(); }
+                                                                                } catch (err) { alert('Önizleme yüklenemedi'); }
+                                                                                finally { setLoading(false); }
+                                                                            }}
+                                                                            className="w-10 h-10 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center hover:bg-slate-200 transition-all border border-slate-200"
+                                                                            title="Görüntüle"
+                                                                        >
+                                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                                        </button>
+                                                                    )}
+                                                                    {(inv.gib_status === 'ready' || inv.gib_status === 'failed') && (
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                try {
+                                                                                    setLoading(true);
+                                                                                    const res = await api.post(`/finance/invoices/${inv.id}/gib-send`);
+                                                                                    if (res.data.success) { alert('GİB\'e gönderildi!'); fetchFinanceData(); }
+                                                                                } catch (err: any) { alert(err.response?.data?.error || 'Gönderim hatası'); }
+                                                                                finally { setLoading(false); }
+                                                                            }}
+                                                                            className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+                                                                            title="GİB'e Gönder"
+                                                                        >
+                                                                            <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })
+                                            )}
                                         </div>
                                     )}
                                 </div>

@@ -107,14 +107,20 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
 router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
+        console.log(`[PUT /services/${id}] Update attempt:`, req.body);
         const validatedData = serviceSchema.partial().parse(req.body);
         const service = await serviceService.updateService(id, validatedData);
         if (!service) {
             return res.status(404).json({ success: false, error: 'Hizmet bulunamadı' });
         }
+        console.log(`[PUT /services/${id}] Update successful`);
         res.json({ success: true, data: service });
-    } catch (error) {
-        res.status(500).json({ success: false, error: 'Hizmet güncellenirken hata oluştu' });
+    } catch (error: any) {
+        console.error(`[PUT /services/${req.params.id}] Error:`, error);
+        if (error instanceof z.ZodError) {
+            return res.status(400).json({ success: false, error: 'Validasyon hatası', details: error.errors });
+        }
+        res.status(500).json({ success: false, error: error.message || 'Hizmet güncellenirken hata oluştu' });
     }
 });
 
