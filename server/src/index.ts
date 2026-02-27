@@ -479,11 +479,27 @@ const runMigrations = async () => {
                 company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
                 supplier_name VARCHAR(255) NOT NULL,
                 invoice_no VARCHAR(50),
-                amount DECIMAL(10, 2) NOT NULL,
+                amount DECIMAL(15, 2) NOT NULL DEFAULT 0,
+                subtotal DECIMAL(15, 2) DEFAULT 0,
+                vat_total DECIMAL(15, 2) DEFAULT 0,
+                discount_total DECIMAL(15, 2) DEFAULT 0,
                 invoice_date DATE DEFAULT CURRENT_DATE,
                 description TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
+            );
+
+            CREATE TABLE IF NOT EXISTS purchase_invoice_items (
+                id SERIAL PRIMARY KEY,
+                invoice_id INTEGER REFERENCES purchase_invoices(id) ON DELETE CASCADE,
+                product_name VARCHAR(255) NOT NULL,
+                quantity NUMERIC(15, 3) DEFAULT 1,
+                unit_price DECIMAL(15, 2) DEFAULT 0,
+                vat_rate NUMERIC(5, 2) DEFAULT 20,
+                vat_amount DECIMAL(15, 2) DEFAULT 0,
+                discount_rate NUMERIC(5, 2) DEFAULT 0,
+                discount_amount DECIMAL(15, 2) DEFAULT 0,
+                total_amount DECIMAL(15, 2) DEFAULT 0
+            );
         `);
 
         await pool.query(`

@@ -121,6 +121,13 @@ export default function CompanyPanel() {
     const [showCashModal, setShowCashModal] = useState(false);
     const [vknCheckResult, setVknCheckResult] = useState<{ vkn: string; isEInvoice: boolean } | null>(null);
     const [checkingVkn, setCheckingVkn] = useState(false);
+    const [purchaseForm, setPurchaseForm] = useState({
+        supplier_name: '',
+        invoice_no: '',
+        invoice_date: new Date().toISOString().split('T')[0],
+        description: '',
+        items: [] as any[]
+    });
     const [invoiceForm, setInvoiceForm] = useState({
         vkn: '',
         tax_office: '',
@@ -3291,40 +3298,225 @@ export default function CompanyPanel() {
 
             {/* Purchase Modal */}
             {showPurchaseModal && (
-                <div className="fixed inset-0 z-[300] flex items-end justify-center bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowPurchaseModal(false)}>
-                    <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl" onClick={e => e.stopPropagation()}
+                <div className="fixed inset-0 z-[300] flex items-end lg:items-center justify-center bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowPurchaseModal(false)}>
+                    <div className="bg-white w-full max-w-2xl rounded-t-[3rem] lg:rounded-[3rem] p-8 lg:p-10 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}
                         style={{ animation: 'slideUp 0.3s ease-out' }}>
                         <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
-                        <h2 className="text-2xl font-black text-slate-900 mb-6">Yeni Alış Girişi</h2>
+                        <h2 className="text-2xl font-black text-slate-900 mb-6">Alış Faturası Girişi</h2>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Tedarikçi Adı</label>
-                                <input type="text" id="p_supplier" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Örn: X Kozmetik Ltd." />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Tedarikçi Adı</label>
+                                    <input
+                                        type="text"
+                                        value={purchaseForm.supplier_name}
+                                        onChange={e => setPurchaseForm({ ...purchaseForm, supplier_name: e.target.value })}
+                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
+                                        placeholder="Örn: X Kozmetik Ltd."
+                                    />
+                                </div>
                                 <div>
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Fatura No</label>
-                                    <input type="text" id="p_no" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="ALI20240001" />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Tutar (₺)</label>
-                                    <input type="number" id="p_amount" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="0.00" />
+                                    <input
+                                        type="text"
+                                        value={purchaseForm.invoice_no}
+                                        onChange={e => setPurchaseForm({ ...purchaseForm, invoice_no: e.target.value })}
+                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
+                                        placeholder="ALI20240001"
+                                    />
                                 </div>
                             </div>
-                            <button
-                                onClick={() => {
-                                    const supplier = (document.getElementById('p_supplier') as HTMLInputElement).value;
-                                    const amount = (document.getElementById('p_amount') as HTMLInputElement).value;
-                                    const no = (document.getElementById('p_no') as HTMLInputElement).value;
-                                    if (supplier && amount) {
-                                        handleCreatePurchase({ supplier_name: supplier, amount: Number(amount), invoice_no: no });
-                                    }
-                                }}
-                                className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-base uppercase tracking-widest shadow-xl shadow-slate-200 mt-4"
-                            >
-                                Kaydet
-                            </button>
+
+                            {/* Item Section */}
+                            <div className="bg-slate-50 rounded-[2rem] p-6 space-y-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest">Fatura Satırları</h3>
+                                    <button
+                                        onClick={() => setPurchaseForm({
+                                            ...purchaseForm,
+                                            items: [...purchaseForm.items, { product_name: '', quantity: 1, unit_price: 0, vat_rate: 20, discount_rate: 0 }]
+                                        })}
+                                        className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-100"
+                                    >
+                                        + Satır Ekle
+                                    </button>
+                                </div>
+
+                                {purchaseForm.items.map((item, idx) => (
+                                    <div key={idx} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3 relative">
+                                        <button
+                                            onClick={() => {
+                                                const newItems = [...purchaseForm.items];
+                                                newItems.splice(idx, 1);
+                                                setPurchaseForm({ ...purchaseForm, items: newItems });
+                                            }}
+                                            className="absolute top-2 right-2 text-red-300 hover:text-red-500 transition-colors"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <div className="md:col-span-2">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Ürün / Hizmet Tanımı</label>
+                                                <input
+                                                    type="text"
+                                                    value={item.product_name}
+                                                    onChange={e => {
+                                                        const newItems = [...purchaseForm.items];
+                                                        newItems[idx].product_name = e.target.value;
+                                                        setPurchaseForm({ ...purchaseForm, items: newItems });
+                                                    }}
+                                                    className="w-full p-3 bg-slate-50 border-none rounded-xl font-bold text-sm"
+                                                    placeholder="Loreal Şampuan 500ml"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Miktar</label>
+                                                <input
+                                                    type="number"
+                                                    value={item.quantity}
+                                                    onChange={e => {
+                                                        const newItems = [...purchaseForm.items];
+                                                        newItems[idx].quantity = Number(e.target.value);
+                                                        setPurchaseForm({ ...purchaseForm, items: newItems });
+                                                    }}
+                                                    className="w-full p-3 bg-slate-50 border-none rounded-xl font-bold text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Birim Fiyat (₺)</label>
+                                                <input
+                                                    type="number"
+                                                    value={item.unit_price}
+                                                    onChange={e => {
+                                                        const newItems = [...purchaseForm.items];
+                                                        newItems[idx].unit_price = Number(e.target.value);
+                                                        setPurchaseForm({ ...purchaseForm, items: newItems });
+                                                    }}
+                                                    className="w-full p-3 bg-slate-50 border-none rounded-xl font-bold text-sm"
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">KDV %</label>
+                                                    <select
+                                                        value={item.vat_rate}
+                                                        onChange={e => {
+                                                            const newItems = [...purchaseForm.items];
+                                                            newItems[idx].vat_rate = Number(e.target.value);
+                                                            setPurchaseForm({ ...purchaseForm, items: newItems });
+                                                        }}
+                                                        className="w-full p-3 bg-slate-50 border-none rounded-xl font-bold text-xs"
+                                                    >
+                                                        <option value={0}>0</option>
+                                                        <option value={1}>1</option>
+                                                        <option value={10}>10</option>
+                                                        <option value={20}>20</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">İskonto %</label>
+                                                    <input
+                                                        type="number"
+                                                        value={item.discount_rate}
+                                                        onChange={e => {
+                                                            const newItems = [...purchaseForm.items];
+                                                            newItems[idx].discount_rate = Number(e.target.value);
+                                                            setPurchaseForm({ ...purchaseForm, items: newItems });
+                                                        }}
+                                                        className="w-full p-3 bg-slate-50 border-none rounded-xl font-bold text-xs"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="flex items-end justify-end">
+                                                <p className="text-xs font-black text-indigo-600">
+                                                    Satır Toplam: {((item.unit_price * item.quantity) * (1 - item.discount_rate / 100) * (1 + item.vat_rate / 100)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {purchaseForm.items.length === 0 && (
+                                    <div className="bg-white/50 border border-dashed border-slate-200 rounded-2xl p-8 text-center">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Henüz satır eklenmedi</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Summary Section */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="col-span-2 md:col-span-1">
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Açıklama</label>
+                                    <textarea
+                                        value={purchaseForm.description}
+                                        onChange={e => setPurchaseForm({ ...purchaseForm, description: e.target.value })}
+                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
+                                        rows={2}
+                                        placeholder="İşlem detayı..."
+                                    />
+                                </div>
+                                <div className="bg-slate-900 rounded-3xl p-6 text-white flex flex-col justify-center">
+                                    <p className="text-[10px] font-black uppercase opacity-60 tracking-widest">Genel Toplam</p>
+                                    <h2 className="text-3xl font-black italic mt-1">
+                                        {purchaseForm.items.reduce((sum, item) =>
+                                            sum + ((item.unit_price * item.quantity) * (1 - item.discount_rate / 100) * (1 + item.vat_rate / 100)),
+                                            0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                    </h2>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4">
+                                <button
+                                    onClick={() => setShowPurchaseModal(false)}
+                                    className="flex-1 py-5 bg-slate-100 text-slate-500 rounded-[2rem] font-black text-base uppercase tracking-widest shadow-sm"
+                                >
+                                    Vazgeç
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (!purchaseForm.supplier_name) return alert('Tedarikçi adı gereklidir');
+                                        if (purchaseForm.items.length === 0) return alert('En az bir ürün eklemelisiniz');
+
+                                        const processedItems = purchaseForm.items.map(item => {
+                                            const lineSubtotal = item.unit_price * item.quantity;
+                                            const discount_amount = lineSubtotal * (item.discount_rate / 100);
+                                            const afterDiscount = lineSubtotal - discount_amount;
+                                            const vat_amount = afterDiscount * (item.vat_rate / 100);
+                                            return {
+                                                ...item,
+                                                vat_amount,
+                                                discount_amount,
+                                                total_amount: afterDiscount + vat_amount
+                                            };
+                                        });
+
+                                        const totalAmount = processedItems.reduce((sum, i) => sum + i.total_amount, 0);
+
+                                        handleCreatePurchase({
+                                            supplier_name: purchaseForm.supplier_name,
+                                            invoice_no: purchaseForm.invoice_no,
+                                            description: purchaseForm.description,
+                                            invoice_date: purchaseForm.invoice_date,
+                                            amount: totalAmount,
+                                            items: processedItems
+                                        });
+
+                                        // Reset form
+                                        setPurchaseForm({
+                                            supplier_name: '',
+                                            invoice_no: '',
+                                            invoice_date: new Date().toISOString().split('T')[0],
+                                            description: '',
+                                            items: []
+                                        });
+                                    }}
+                                    className="flex-[2] py-5 bg-indigo-600 text-white rounded-[2rem] font-black text-base uppercase tracking-widest shadow-xl shadow-indigo-100"
+                                >
+                                    Faturayı Kaydet
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

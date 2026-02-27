@@ -124,6 +124,31 @@ class FinanceService {
                 await client.query(`ALTER TABLE cash_transactions ADD COLUMN IF NOT EXISTS ${col} ${type}`);
             }
 
+            // 7. Purchase Invoices tablosu güncellemesi
+            const purchaseCols = [
+                ['subtotal', 'DECIMAL(15,2) DEFAULT 0'],
+                ['vat_total', 'DECIMAL(15,2) DEFAULT 0'],
+                ['discount_total', 'DECIMAL(15,2) DEFAULT 0']
+            ];
+            for (const [col, type] of purchaseCols) {
+                await client.query(`ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+            }
+
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS purchase_invoice_items (
+                    id SERIAL PRIMARY KEY,
+                    invoice_id INTEGER REFERENCES purchase_invoices(id) ON DELETE CASCADE,
+                    product_name VARCHAR(255) NOT NULL,
+                    quantity NUMERIC(15, 3) DEFAULT 1,
+                    unit_price DECIMAL(15, 2) DEFAULT 0,
+                    vat_rate NUMERIC(5, 2) DEFAULT 20,
+                    vat_amount DECIMAL(15, 2) DEFAULT 0,
+                    discount_rate NUMERIC(5, 2) DEFAULT 0,
+                    discount_amount DECIMAL(15, 2) DEFAULT 0,
+                    total_amount DECIMAL(15, 2) DEFAULT 0
+                )
+            `);
+
             console.log('[Migration] Database is up to date.');
         } catch (error) {
             console.error('[Migration] Failed:', error);
@@ -288,22 +313,43 @@ class FinanceService {
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
+
+            const subtotal = data.items?.reduce((sum: number, item: any) => sum + (Number(item.unit_price) * Number(item.quantity)), 0) || 0;
+            const discount_total = data.items?.reduce((sum: number, item: any) => sum + (Number(item.discount_amount) || 0), 0) || 0;
+            const vat_total = data.items?.reduce((sum: number, item: any) => sum + (Number(item.vat_amount) || 0), 0) || 0;
+            const amount = subtotal - discount_total + vat_total;
+
             const query = `
-                INSERT INTO purchase_invoices (company_id, supplier_name, invoice_no, amount, invoice_date, description)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                INSERT INTO purchase_invoices (company_id, supplier_name, invoice_no, amount, subtotal, vat_total, discount_total, invoice_date, description)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 RETURNING *
             `;
-            const values = [data.company_id, data.supplier_name, data.invoice_no, data.amount, data.invoice_date, data.description];
+            const values = [data.company_id, data.supplier_name, data.invoice_no, amount, subtotal, vat_total, discount_total, data.invoice_date || new Date().toISOString().split('T')[0], data.description];
             const result = await client.query(query, values);
+            const invoiceId = result.rows[0].id;
+
+            if (data.items && Array.isArray(data.items)) {
+                for (const item of data.items) {
+                    await client.query(`
+                        INSERT INTO purchase_invoice_items (
+                            invoice_id, product_name, quantity, unit_price, 
+                            vat_rate, vat_amount, discount_rate, discount_amount, total_amount
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    `, [
+                        invoiceId, item.product_name, item.quantity, item.unit_price,
+                        item.vat_rate, item.vat_amount, item.discount_rate, item.discount_amount, item.total_amount
+                    ]);
+                }
+            }
 
             await this.createCashTransactionInternal(client, {
                 company_id: data.company_id,
                 type: 'expense',
                 category: 'purchase',
                 payment_method: 'nakit',
-                amount: data.amount,
+                amount: amount,
                 debit: 0,
-                credit: data.amount,
+                credit: amount,
                 description: `${data.supplier_name} - Alış Faturası (${data.invoice_no})`,
                 transaction_date: data.invoice_date || new Date().toISOString().split('T')[0]
             });
