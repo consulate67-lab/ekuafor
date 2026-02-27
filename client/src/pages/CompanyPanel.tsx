@@ -1028,7 +1028,7 @@ export default function CompanyPanel() {
                 </div>
 
                 {/* Content Area */}
-                <div className="p-5 lg:p-8 max-w-2xl mx-auto">
+                <div className="p-5 lg:p-8 max-w-6xl mx-auto">
 
                     {/* HOME TAB */}
                     {activeTab === 'home' && (
