@@ -213,14 +213,14 @@ export default function CompanyPanel() {
                 }
             } else if (activeFinanceTab === 'cash') {
                 const res = await api.get(`/finance/company/${targetCid}/transactions`, {
-                    params: { startDate: financeDateRange.start, endDate: financeDateRange.end }
+                    params: { startDate: financeDateRange.start, endDate: financeDateRange.end, search: financeSearch }
                 });
                 if (res.data.success) {
                     setCashTransactions(res.data.data);
                 }
             } else if (activeFinanceTab === 'purchases') {
                 const res = await api.get(`/finance/purchase-invoices/company/${targetCid}`, {
-                    params: { startDate: financeDateRange.start, endDate: financeDateRange.end }
+                    params: { startDate: financeDateRange.start, endDate: financeDateRange.end, search: financeSearch }
                 });
                 if (res.data.success) {
                     setPurchaseInvoices(res.data.data);
@@ -1918,45 +1918,63 @@ export default function CompanyPanel() {
 
                             {/* Sales Content */}
                             {/* Shared Finance Filters */}
-                            <div className="bg-white rounded-[2rem] p-6 lg:p-8 shadow-xl shadow-slate-200/20 border border-slate-50">
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 lg:gap-6 items-end">
-                                    <div className="md:col-span-2 lg:col-span-5 space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tarih Aralığı</label>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <input
-                                                type="date"
-                                                value={financeDateRange.start}
-                                                onChange={e => setFinanceDateRange(p => ({ ...p, start: e.target.value }))}
-                                                className="w-full p-3.5 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 outline-none transition-all shadow-sm"
-                                            />
-                                            <input
-                                                type="date"
-                                                value={financeDateRange.end}
-                                                onChange={e => setFinanceDateRange(p => ({ ...p, end: e.target.value }))}
-                                                className="w-full p-3.5 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 outline-none transition-all shadow-sm"
-                                            />
+                            <div className="bg-white rounded-[2.5rem] p-8 lg:p-10 shadow-xl shadow-slate-200/20 border border-slate-100">
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                                    {/* Left: Date Selection (Stacked) */}
+                                    <div className="lg:col-span-4 space-y-4">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-xl">📅</span>
+                                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Tarih Aralığı</label>
+                                        </div>
+                                        <div className="flex flex-col gap-3">
+                                            <div className="relative">
+                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs opacity-40 font-bold">BAŞLANGIÇ</span>
+                                                <input
+                                                    type="date"
+                                                    value={financeDateRange.start}
+                                                    onChange={e => setFinanceDateRange(p => ({ ...p, start: e.target.value }))}
+                                                    className="w-full p-4 pl-24 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 focus:bg-white outline-none transition-all shadow-sm text-slate-700"
+                                                />
+                                            </div>
+                                            <div className="relative">
+                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs opacity-40 font-bold">BİTİŞ</span>
+                                                <input
+                                                    type="date"
+                                                    value={financeDateRange.end}
+                                                    onChange={e => setFinanceDateRange(p => ({ ...p, end: e.target.value }))}
+                                                    className="w-full p-4 pl-24 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 focus:bg-white outline-none transition-all shadow-sm text-slate-700"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="lg:col-span-4 space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Müşteri / Açıklama Arama</label>
-                                        <div className="relative">
-                                            <input
-                                                type="text"
-                                                value={financeSearch}
-                                                onChange={e => setFinanceSearch(e.target.value)}
-                                                placeholder="İsim veya telefon..."
-                                                onKeyDown={e => e.key === 'Enter' && fetchFinanceData(company?.id)}
-                                                className="w-full p-3.5 pl-10 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 outline-none transition-all shadow-sm"
-                                            />
-                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30">🔍</span>
+
+                                    {/* Right: Search & Action (Expanded) */}
+                                    <div className="lg:col-span-8 space-y-6">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-4">
+                                                <span className="text-xl">🔍</span>
+                                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Müşteri / Açıklama Arama</label>
+                                            </div>
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    value={financeSearch}
+                                                    onChange={e => setFinanceSearch(e.target.value)}
+                                                    placeholder="İsim, telefon veya işlem açıklaması yazın..."
+                                                    onKeyDown={e => e.key === 'Enter' && fetchFinanceData(company?.id)}
+                                                    className="w-full p-5 pl-14 bg-slate-50 rounded-[1.5rem] border-2 border-slate-100 font-bold text-base focus:border-indigo-500 focus:bg-white outline-none transition-all shadow-sm text-slate-800 placeholder:text-slate-300"
+                                                />
+                                                <svg className="absolute left-5 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                                </svg>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="lg:col-span-3">
+
                                         <button
                                             onClick={() => fetchFinanceData(company?.id)}
-                                            className="w-full p-4 bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 active:scale-95 flex items-center justify-center gap-2"
+                                            className="w-full py-5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-2xl font-black text-sm uppercase tracking-[0.2em] hover:from-indigo-700 hover:to-blue-700 transition-all shadow-xl shadow-indigo-100 active:scale-[0.98] flex items-center justify-center gap-3"
                                         >
-                                            ⚡ Verileri Getir
+                                            <span>✨</span> Verileri Getir ve Filtrele
                                         </button>
                                     </div>
                                 </div>

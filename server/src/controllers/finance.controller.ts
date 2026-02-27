@@ -36,14 +36,14 @@ class FinanceController {
     async getCashTransactions(req: Request, res: Response, next: NextFunction) {
         try {
             const companyId = req.params.companyId ? parseInt(req.params.companyId) : req.user?.companyId;
-            const { startDate, endDate } = req.query;
+            const { startDate, endDate, search } = req.query;
             if (!companyId) return res.status(400).json({ success: false, error: 'Firma ID eksik' });
 
             if (req.user?.companyId !== companyId && req.user?.role !== 'super_admin') {
                 return res.status(403).json({ success: false, error: 'Yetkisiz erişim' });
             }
 
-            const transactions = await financeService.getCashTransactions(companyId, startDate as string, endDate as string);
+            const transactions = await financeService.getCashTransactions(companyId, startDate as string, endDate as string, search as string);
             res.json({ success: true, data: transactions });
         } catch (error) {
             next(error);
@@ -68,13 +68,14 @@ class FinanceController {
     async getPurchaseInvoices(req: Request, res: Response, next: NextFunction) {
         try {
             const companyId = req.params.companyId ? parseInt(req.params.companyId) : req.user?.companyId;
+            const { startDate, endDate, search } = req.query;
             if (!companyId) return res.status(400).json({ success: false, error: 'Firma ID eksik' });
 
             if (req.user?.companyId !== companyId && req.user?.role !== 'super_admin') {
                 return res.status(403).json({ success: false, error: 'Yetkisiz erişim' });
             }
 
-            const invoices = await financeService.getPurchaseInvoices(companyId);
+            const invoices = await financeService.getPurchaseInvoices(companyId, startDate as string, endDate as string, search as string);
             res.json({ success: true, data: invoices });
         } catch (error) {
             next(error);

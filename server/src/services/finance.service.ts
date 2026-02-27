@@ -221,7 +221,7 @@ class FinanceService {
         }
     }
 
-    async getCashTransactions(companyId: number, startDate?: string, endDate?: string) {
+    async getCashTransactions(companyId: number, startDate?: string, endDate?: string, search?: string) {
         let query = 'SELECT * FROM cash_transactions WHERE company_id = $1';
         const values: any[] = [companyId];
         let i = 2;
@@ -230,6 +230,12 @@ class FinanceService {
             query += ` AND transaction_date BETWEEN $${i} AND $${i + 1}`;
             values.push(startDate, endDate);
             i += 2;
+        }
+
+        if (search) {
+            query += ` AND (description ILIKE $${i} OR category ILIKE $${i} OR payment_method ILIKE $${i})`;
+            values.push(`%${search}%`);
+            i++;
         }
 
         query += ' ORDER BY transaction_date DESC, created_at DESC';
@@ -286,8 +292,25 @@ class FinanceService {
         }
     }
 
-    async getPurchaseInvoices(companyId: number) {
-        const result = await pool.query('SELECT * FROM purchase_invoices WHERE company_id = $1 ORDER BY invoice_date DESC', [companyId]);
+    async getPurchaseInvoices(companyId: number, startDate?: string, endDate?: string, search?: string) {
+        let query = 'SELECT * FROM purchase_invoices WHERE company_id = $1';
+        const values: any[] = [companyId];
+        let i = 2;
+
+        if (startDate && endDate) {
+            query += ` AND invoice_date BETWEEN $${i} AND $${i + 1}`;
+            values.push(startDate, endDate);
+            i += 2;
+        }
+
+        if (search) {
+            query += ` AND (supplier_name ILIKE $${i} OR invoice_no ILIKE $${i} OR description ILIKE $${i})`;
+            values.push(`%${search}%`);
+            i++;
+        }
+
+        query += ' ORDER BY invoice_date DESC';
+        const result = await pool.query(query, values);
         return result.rows;
     }
 
