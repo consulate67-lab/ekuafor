@@ -2535,95 +2535,92 @@ export default function CompanyPanel() {
                                             className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-100">+ Yeni Cari Kart</button>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <div className="space-y-4">
                                         {currentAccounts.length === 0 ? (
-                                            <div className="col-span-full bg-white rounded-3xl p-20 text-center shadow-lg border border-slate-50">
+                                            <div className="bg-white rounded-3xl p-20 text-center shadow-lg border border-slate-50">
                                                 <span className="text-4xl block mb-2">👥</span>
                                                 <p className="text-slate-300 font-bold uppercase text-[10px]">Henüz cari kart tanımlanmadı</p>
                                             </div>
                                         ) : (
                                             currentAccounts.map(c => (
-                                                <div key={c.id} className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100 hover:shadow-xl hover:border-indigo-200 transition-all group relative overflow-hidden flex flex-col justify-between">
-                                                    <div className="absolute top-0 right-0 w-24 h-24 bg-slate-50 rounded-full -mr-12 -mt-12 group-hover:bg-indigo-50/50 transition-all"></div>
+                                                <div key={c.id} className="bg-white rounded-[2.5rem] p-6 lg:p-8 shadow-sm border border-slate-100 hover:shadow-xl hover:border-indigo-200 transition-all group relative overflow-hidden">
+                                                    <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-16 -mt-16 group-hover:bg-indigo-50/50 transition-all"></div>
 
-                                                    <div className="relative z-10">
-                                                        <div className="flex items-start justify-between mb-6">
-                                                            <div className="flex items-center gap-4">
-                                                                <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-blue-600 text-white rounded-[1.2rem] flex items-center justify-center font-black text-2xl shadow-lg shadow-indigo-100">
-                                                                    {c.name.charAt(0).toUpperCase()}
+                                                    <div className="relative z-10 flex flex-col lg:flex-row gap-8 items-start lg:items-center">
+                                                        {/* Avatar & Basic Info */}
+                                                        <div className="flex items-center gap-6 min-w-[280px]">
+                                                            <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-blue-600 text-white rounded-3xl flex items-center justify-center font-black text-3xl shadow-xl shadow-indigo-100 flex-shrink-0">
+                                                                {c.name.charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <div>
+                                                                <div className="flex items-center gap-3 mb-1">
+                                                                    <h4 className="font-black text-slate-900 text-2xl leading-tight">{c.name}</h4>
+                                                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${c.type === 'SUPPLIER' ? 'bg-amber-100 text-amber-600' : c.type === 'CUSTOMER' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-600'}`}>
+                                                                        {c.type === 'SUPPLIER' ? 'Tedarikçi' : c.type === 'CUSTOMER' ? 'Müşteri' : 'Genel'}
+                                                                    </span>
                                                                 </div>
-                                                                <div>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <h4 className="font-black text-slate-900 text-xl leading-tight">{c.name}</h4>
-                                                                        <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${c.type === 'SUPPLIER' ? 'bg-amber-100 text-amber-600' : c.type === 'CUSTOMER' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-600'}`}>
-                                                                            {c.type === 'SUPPLIER' ? 'Tedarikçi' : c.type === 'CUSTOMER' ? 'Müşteri' : 'Genel'}
-                                                                        </span>
-                                                                    </div>
-                                                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">{c.code}</p>
+                                                                <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.3em] font-mono">{c.code}</p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Content Grid */}
+                                                        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
+                                                            {/* Contact */}
+                                                            <div>
+                                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> İletişim Bilgileri
+                                                                </p>
+                                                                <div className="space-y-2">
+                                                                    {c.phone && <p className="text-sm font-bold text-slate-600 flex items-center gap-2"><span>📞</span> {c.phone}</p>}
+                                                                    {c.email && <p className="text-sm font-bold text-slate-600 flex items-center gap-2 truncate" title={c.email}><span>✉️</span> {c.email}</p>}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Tax & Business */}
+                                                            <div>
+                                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Vergi & Ticari
+                                                                </p>
+                                                                <div className="space-y-2">
+                                                                    <p className="text-sm font-bold text-slate-600 flex items-center gap-2"><span>📄</span> {c.tax_number || 'Belirtilmedi'}</p>
+                                                                    {c.tax_office && <p className="text-[11px] font-bold text-slate-400 ml-6 uppercase">{c.tax_office} V.D.</p>}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Address */}
+                                                            <div>
+                                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Konum
+                                                                </p>
+                                                                <div className="space-y-1">
+                                                                    <p className="text-sm font-bold text-slate-600 line-clamp-2 italic leading-tight">
+                                                                        {c.address_line || 'Adres belirtilmedi'}
+                                                                    </p>
+                                                                    <p className="text-[11px] font-black text-indigo-600 uppercase tracking-wider">
+                                                                        {c.district ? `${c.district} / ` : ''}{c.city}
+                                                                    </p>
                                                                 </div>
                                                             </div>
                                                         </div>
 
-                                                        {c.title && (
-                                                            <div className="mb-4">
-                                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Ticari Ünvan</p>
-                                                                <p className="text-xs font-bold text-slate-700">{c.title}</p>
-                                                            </div>
-                                                        )}
-
-                                                        <div className="grid grid-cols-2 gap-4 mb-6">
-                                                            <div className="space-y-3">
-                                                                <div>
-                                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">İletişim</p>
-                                                                    <div className="space-y-1.5">
-                                                                        {c.phone && <p className="text-xs font-bold text-slate-600 flex items-center gap-2"><span>📞</span> {c.phone}</p>}
-                                                                        {c.email && <p className="text-xs font-bold text-slate-600 flex items-center gap-2 truncate" title={c.email}><span>✉️</span> {c.email}</p>}
-                                                                        {c.website && <p className="text-xs font-bold text-indigo-500 flex items-center gap-2 truncate"><span>🌐</span> {c.website}</p>}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div className="space-y-3">
-                                                                <div>
-                                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Vergi Bilgileri</p>
-                                                                    <div className="space-y-1.5">
-                                                                        <p className="text-xs font-bold text-slate-600 flex items-center gap-2"><span>📄</span> {c.tax_number || 'Belirtilmedi'}</p>
-                                                                        {c.tax_office && <p className="text-[10px] font-bold text-slate-400 ml-5">{c.tax_office}</p>}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
+                                                        {/* Actions */}
+                                                        <div className="flex lg:flex-col gap-3 w-full lg:w-32 border-t lg:border-t-0 lg:border-l border-slate-50 pt-6 lg:pt-0 lg:pl-8">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setCurrentAccountForm(c);
+                                                                    setShowCurrentAccountModal(true);
+                                                                }}
+                                                                className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-100"
+                                                            >
+                                                                <span>✏️</span> Düzenle
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteCurrentAccount(c.id!)}
+                                                                className="w-14 h-14 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center hover:bg-red-100 transition-all group/del"
+                                                            >
+                                                                <svg className="w-5 h-5 group-hover/del:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                            </button>
                                                         </div>
-
-                                                        {c.address_line && (
-                                                            <div className="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100/50">
-                                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                                                    <span>📍</span> Adres Bilgisi
-                                                                </p>
-                                                                <p className="text-[11px] font-bold text-slate-600 leading-relaxed italic">
-                                                                    {c.address_line}
-                                                                </p>
-                                                                <p className="text-[10px] font-black text-indigo-600 uppercase mt-2">
-                                                                    {c.district ? `${c.district} / ` : ''}{c.city}
-                                                                </p>
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="flex gap-3 pt-6 border-t border-slate-50 relative z-10">
-                                                        <button
-                                                            onClick={() => {
-                                                                setCurrentAccountForm(c);
-                                                                setShowCurrentAccountModal(true);
-                                                            }}
-                                                            className="flex-1 py-4 bg-slate-900 text-white rounded-[1.2rem] font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-slate-100 flex items-center justify-center gap-2"
-                                                        >
-                                                            <span>✏️</span> Düzenle
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteCurrentAccount(c.id!)}
-                                                            className="w-14 h-14 bg-red-50 text-red-500 rounded-[1.2rem] flex items-center justify-center hover:bg-red-100 hover:scale-[1.02] active:scale-95 transition-all group/del"
-                                                        >
-                                                            <svg className="w-5 h-5 group-hover/del:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                        </button>
                                                     </div>
                                                 </div>
                                             ))
