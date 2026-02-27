@@ -27,4 +27,11 @@ router.delete('/purchase-invoices/:id', authMiddleware, financeController.delete
 router.delete('/invoices/:id', authMiddleware, financeController.deleteInvoice);
 router.delete('/transactions/:id', authMiddleware, financeController.deleteCashTransaction);
 
+// Current Accounts (Cari Kartlar)
+router.get('/current-accounts', authMiddleware, financeController.getCurrentAccounts);
+router.get('/current-accounts/:id', authMiddleware, financeController.getCurrentAccountById);
+router.post('/current-accounts', authMiddleware, financeController.createCurrentAccount);
+router.put('/current-accounts/:id', authMiddleware, financeController.updateCurrentAccount);
+router.delete('/current-accounts/:id', authMiddleware, financeController.deleteCurrentAccount);
+
 export default router;

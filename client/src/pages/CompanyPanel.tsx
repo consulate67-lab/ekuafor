@@ -19,6 +19,25 @@ interface StaffBoard {
     photo: string | null;
 }
 
+interface CurrentAccount {
+    id?: number;
+    company_id: number;
+    code?: string;
+    name: string;
+    title?: string;
+    tax_office?: string;
+    tax_number?: string;
+    type?: 'CUSTOMER' | 'SUPPLIER' | 'ALL';
+    phone?: string;
+    email?: string;
+    website?: string;
+    address_line?: string;
+    city?: string;
+    district?: string;
+    country?: string;
+    is_active?: boolean;
+}
+
 type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'finance' | 'ai' | 'reports' | 'profile' | 'integration';
 
 const menuItems: { key: TabKey; icon: string; label: string }[] = [
@@ -102,7 +121,7 @@ export default function CompanyPanel() {
     const [loadingReport, setLoadingReport] = useState(false);
 
     // Finance states
-    const [activeFinanceTab, setActiveFinanceTab] = useState<'sales' | 'purchases' | 'cash'>('sales');
+    const [activeFinanceTab, setActiveFinanceTab] = useState<'sales' | 'purchases' | 'cash' | 'contacts'>('sales');
     const [financeDateRange, setFinanceDateRange] = useState({
         start: new Date().toISOString().split('T')[0],
         end: new Date().toISOString().split('T')[0]
@@ -123,11 +142,30 @@ export default function CompanyPanel() {
     const [checkingVkn, setCheckingVkn] = useState(false);
     const [purchaseForm, setPurchaseForm] = useState({
         supplier_name: '',
+        current_account_id: '' as string | number,
         invoice_no: '',
         invoice_date: new Date().toISOString().split('T')[0],
         description: '',
         is_closed: true,
         items: [] as any[]
+    });
+    const [currentAccounts, setCurrentAccounts] = useState<CurrentAccount[]>([]);
+    const [showCurrentAccountModal, setShowCurrentAccountModal] = useState(false);
+    const [currentAccountForm, setCurrentAccountForm] = useState<CurrentAccount>({
+        company_id: 0,
+        code: '',
+        name: '',
+        title: '',
+        tax_office: '',
+        tax_number: '',
+        type: 'ALL',
+        phone: '',
+        email: '',
+        website: '',
+        address_line: '',
+        city: '',
+        district: '',
+        country: 'Türkiye'
     });
     const [invoiceForm, setInvoiceForm] = useState({
         vkn: '',
@@ -136,7 +174,8 @@ export default function CompanyPanel() {
         discount_rate: 0,
         type: 'e-arsiv',
         customer_name: '',
-        customer_phone: ''
+        customer_phone: '',
+        customer_id: null as number | null
     });
     const [showPurchaseDetailModal, setShowPurchaseDetailModal] = useState(false);
     const [selectedPurchaseInvoice, setSelectedPurchaseInvoice] = useState<any>(null);
@@ -243,6 +282,13 @@ export default function CompanyPanel() {
                 if (res.data.success) {
                     setPurchaseInvoices(res.data.data);
                 }
+            } else if (activeFinanceTab === 'contacts') {
+                const res = await api.get('/finance/current-accounts', {
+                    params: { search: financeSearch }
+                });
+                if (res.data.success) {
+                    setCurrentAccounts(res.data.data);
+                }
             }
         } catch (err) {
             console.error('Finans verisi yüklenemedi:', err);
@@ -251,11 +297,32 @@ export default function CompanyPanel() {
         }
     };
 
-    const handleCreateInvoice = async (data: any) => {
+    const handleCreateInvoice = async (payment_method: 'nakit' | 'kart') => {
+        if (!selectedAppointment) return;
         try {
+            const data = {
+                ...invoiceForm,
+                payment_method,
+                appointment_id: selectedAppointment.id,
+                amount: selectedAppointment.price,
+                customer_name: invoiceForm.customer_name || selectedAppointment.customer_name,
+                customer_tax_number: invoiceForm.vkn,
+                customer_tax_office: invoiceForm.tax_office,
+                customer_id: invoiceForm.customer_id || selectedAppointment.customer_id
+            };
             const res = await api.post('/finance/invoices', data);
             if (res.data.success) {
                 setShowInvoiceModal(false);
+                setInvoiceForm({
+                    vkn: '',
+                    tax_office: '',
+                    vat_rate: 20,
+                    discount_rate: 0,
+                    type: 'e-arsiv',
+                    customer_name: '',
+                    customer_phone: '',
+                    customer_id: null
+                });
                 fetchFinanceData();
             }
         } catch (err) {
@@ -270,8 +337,42 @@ export default function CompanyPanel() {
                 setShowPurchaseModal(false);
                 fetchFinanceData();
             }
-        } catch (err) {
-            console.error('Alış faturası oluşturulamadı:', err);
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Alış faturası oluşturulamadı');
+        }
+    };
+
+    const handleCreateCurrentAccount = async (data: Partial<CurrentAccount>) => {
+        try {
+            const res = await api.post('/finance/current-accounts', data);
+            if (res.data.success) {
+                setShowCurrentAccountModal(false);
+                fetchFinanceData();
+            }
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Cari oluşturulamadı');
+        }
+    };
+
+    const handleUpdateCurrentAccount = async (id: number, data: Partial<CurrentAccount>) => {
+        try {
+            const res = await api.put(`/finance/current-accounts/${id}`, data);
+            if (res.data.success) {
+                setShowCurrentAccountModal(false);
+                fetchFinanceData();
+            }
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Cari güncellenemedi');
+        }
+    };
+
+    const handleDeleteCurrentAccount = async (id: number) => {
+        if (!confirm('Bu cari hesabı silmek istediğinize emin misiniz?')) return;
+        try {
+            await api.delete(`/finance/current-accounts/${id}`);
+            fetchFinanceData();
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Silme hatası');
         }
     };
 
@@ -1978,7 +2079,8 @@ export default function CompanyPanel() {
                                 {[
                                     { key: 'sales', label: 'Satışlar (Randevular)', icon: '📈' },
                                     { key: 'purchases', label: 'Alış Faturaları', icon: '🛒' },
-                                    { key: 'cash', label: 'Kasa İşlemleri', icon: '🏦' }
+                                    { key: 'cash', label: 'Kasa İşlemleri', icon: '🏦' },
+                                    { key: 'contacts', label: 'Cari Kartlar', icon: '👤' }
                                 ].map(tab => (
                                     <button
                                         key={tab.key}
@@ -2111,7 +2213,8 @@ export default function CompanyPanel() {
                                                                         setInvoiceForm(prev => ({
                                                                             ...prev,
                                                                             customer_name: apt.customer_name || '',
-                                                                            customer_phone: apt.customer_phone || ''
+                                                                            customer_phone: apt.customer_phone || '',
+                                                                            customer_id: apt.customer_id || null
                                                                         }));
                                                                         setShowInvoiceModal(true);
                                                                     }}
@@ -2155,7 +2258,12 @@ export default function CompanyPanel() {
                                                                         {inv.customer_name?.charAt(0).toUpperCase() || 'F'}
                                                                     </div>
                                                                     <div>
-                                                                        <h4 className="font-black text-slate-900 text-lg leading-tight truncate max-w-[180px]">{inv.customer_name}</h4>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <h4 className="font-black text-slate-900 text-lg leading-tight truncate max-w-[150px]">{inv.customer_name}</h4>
+                                                                            {inv.customer_id && (
+                                                                                <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase rounded" title="Sistem Kayıtlı Müşteri">💎 SADAKAT</span>
+                                                                            )}
+                                                                        </div>
                                                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
                                                                             📄 {inv.invoice_no || 'TASLAK'} • 📅 {new Date(inv.created_at).toLocaleDateString('tr-TR')}
                                                                         </p>
@@ -2392,6 +2500,84 @@ export default function CompanyPanel() {
                                                         >
                                                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                                         </button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Current Accounts Content */}
+                            {activeFinanceTab === 'contacts' && (
+                                <div className="space-y-6">
+                                    <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-slate-50 shadow-sm">
+                                        <h3 className="font-black text-slate-900 uppercase text-xs tracking-widest">Cari Kartlar (Müşteri/Tedarikçi)</h3>
+                                        <button
+                                            onClick={() => {
+                                                setCurrentAccountForm({
+                                                    company_id: company.id,
+                                                    code: `CARI-${Date.now().toString().slice(-6)}`,
+                                                    name: '',
+                                                    title: '',
+                                                    tax_office: '',
+                                                    tax_number: '',
+                                                    type: 'ALL',
+                                                    phone: '',
+                                                    email: '',
+                                                    address_line: '',
+                                                    city: '',
+                                                    district: '',
+                                                    country: 'Türkiye'
+                                                });
+                                                setShowCurrentAccountModal(true);
+                                            }}
+                                            className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-100">+ Yeni Cari Kart</button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {currentAccounts.length === 0 ? (
+                                            <div className="col-span-full bg-white rounded-3xl p-20 text-center shadow-lg border border-slate-50">
+                                                <span className="text-4xl block mb-2">👥</span>
+                                                <p className="text-slate-300 font-bold uppercase text-[10px]">Henüz cari kart tanımlanmadı</p>
+                                            </div>
+                                        ) : (
+                                            currentAccounts.map(c => (
+                                                <div key={c.id} className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:border-indigo-200 transition-all group relative overflow-hidden">
+                                                    <div className="absolute top-0 right-0 w-16 h-16 bg-slate-50 rounded-full -mr-8 -mt-8 group-hover:bg-indigo-50/50 transition-all"></div>
+
+                                                    <div className="relative z-10">
+                                                        <div className="flex items-center gap-3 mb-4">
+                                                            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-black text-lg">
+                                                                {c.name.charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="font-black text-slate-900 leading-tight">{c.name}</h4>
+                                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{c.code}</p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="space-y-2 mb-6 text-[11px] font-medium text-slate-500">
+                                                            {c.phone && <p className="flex items-center gap-2">📞 {c.phone}</p>}
+                                                            {c.tax_number && <p className="flex items-center gap-2">📄 {c.tax_number} {c.tax_office ? `(${c.tax_office})` : ''}</p>}
+                                                            {c.city && <p className="flex items-center gap-2">📍 {c.district ? `${c.district} / ` : ''}{c.city}</p>}
+                                                        </div>
+
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setCurrentAccountForm(c);
+                                                                    setShowCurrentAccountModal(true);
+                                                                }}
+                                                                className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-200 transition-all"
+                                                            >Düzenle</button>
+                                                            <button
+                                                                onClick={() => handleDeleteCurrentAccount(c.id!)}
+                                                                className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-100 transition-all"
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             ))
@@ -3313,36 +3499,14 @@ export default function CompanyPanel() {
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Ödeme Şekli Seçin</label>
                                 <div className="grid grid-cols-2 gap-4">
                                     <button
-                                        onClick={() => handleCreateInvoice({
-                                            appointment_id: selectedAppointment.id,
-                                            customer_name: invoiceForm.customer_name,
-                                            customer_phone: invoiceForm.customer_phone,
-                                            customer_tax_number: invoiceForm.vkn,
-                                            customer_tax_office: invoiceForm.tax_office,
-                                            vat_rate: invoiceForm.vat_rate,
-                                            discount_rate: invoiceForm.discount_rate,
-                                            amount: selectedAppointment.price,
-                                            payment_method: 'nakit',
-                                            type: invoiceForm.type
-                                        })}
+                                        onClick={() => handleCreateInvoice('nakit')}
                                         className="p-8 bg-emerald-50 rounded-[2.5rem] border-2 border-emerald-100 flex flex-col items-center gap-3 hover:bg-emerald-100 transition-all font-black text-emerald-600 group"
                                     >
                                         <span className="text-4xl italic group-active:scale-90 transition-transform">Nakit</span>
                                         <span className="text-[10px] uppercase tracking-widest">💰 Kasaya Giriş</span>
                                     </button>
                                     <button
-                                        onClick={() => handleCreateInvoice({
-                                            appointment_id: selectedAppointment.id,
-                                            customer_name: invoiceForm.customer_name,
-                                            customer_phone: invoiceForm.customer_phone,
-                                            customer_tax_number: invoiceForm.vkn,
-                                            customer_tax_office: invoiceForm.tax_office,
-                                            vat_rate: invoiceForm.vat_rate,
-                                            discount_rate: invoiceForm.discount_rate,
-                                            amount: selectedAppointment.price,
-                                            payment_method: 'kart',
-                                            type: invoiceForm.type
-                                        })}
+                                        onClick={() => handleCreateInvoice('kart')}
                                         className="p-8 bg-indigo-50 rounded-[2.5rem] border-2 border-indigo-100 flex flex-col items-center gap-3 hover:bg-indigo-100 transition-all font-black text-indigo-600 group"
                                     >
                                         <span className="text-4xl italic group-active:scale-90 transition-transform">Kart</span>
@@ -3362,7 +3526,8 @@ export default function CompanyPanel() {
                                         discount_rate: 0,
                                         type: 'e-arsiv',
                                         customer_name: '',
-                                        customer_phone: ''
+                                        customer_phone: '',
+                                        customer_id: null
                                     });
                                 }}
                                 className="w-full py-5 bg-slate-100 text-slate-400 rounded-2xl font-black text-base uppercase tracking-widest"
@@ -3384,6 +3549,26 @@ export default function CompanyPanel() {
 
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Cari Kart Seçin (İsteğe Bağlı)</label>
+                                    <select
+                                        value={purchaseForm.current_account_id}
+                                        onChange={e => {
+                                            const selectedCari = currentAccounts.find(c => c.id === parseInt(e.target.value));
+                                            setPurchaseForm({
+                                                ...purchaseForm,
+                                                current_account_id: e.target.value,
+                                                supplier_name: selectedCari ? selectedCari.name : purchaseForm.supplier_name
+                                            });
+                                        }}
+                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                                    >
+                                        <option value="">Cari Seçilmedi (Manuel Giriş)</option>
+                                        {currentAccounts.map(c => (
+                                            <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+                                        ))}
+                                    </select>
+                                </div>
                                 <div>
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Tedarikçi Adı</label>
                                     <input
@@ -3588,6 +3773,7 @@ export default function CompanyPanel() {
 
                                         handleCreatePurchase({
                                             supplier_name: purchaseForm.supplier_name,
+                                            current_account_id: purchaseForm.current_account_id || null,
                                             invoice_no: purchaseForm.invoice_no,
                                             description: purchaseForm.description,
                                             invoice_date: purchaseForm.invoice_date,
@@ -3599,6 +3785,7 @@ export default function CompanyPanel() {
                                         // Reset form
                                         setPurchaseForm({
                                             supplier_name: '',
+                                            current_account_id: '',
                                             invoice_no: '',
                                             invoice_date: new Date().toISOString().split('T')[0],
                                             description: '',
@@ -3779,6 +3966,172 @@ export default function CompanyPanel() {
                             >
                                 İşlemi Kaydet
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showCurrentAccountModal && (
+                <div className="fixed inset-0 z-[500] flex items-end lg:items-center justify-center bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowCurrentAccountModal(false)}>
+                    <div className="bg-white w-full max-w-2xl rounded-t-[3rem] lg:rounded-[3rem] p-8 lg:p-10 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}
+                        style={{ animation: 'slideUp 0.3s ease-out' }}>
+                        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
+                        <h2 className="text-2xl font-black text-slate-900 mb-6">{currentAccountForm.id ? 'Cari Kart Düzenle' : 'Yeni Cari Kart Oluştur'}</h2>
+
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Cari Kodu</label>
+                                    <input
+                                        type="text"
+                                        value={currentAccountForm.code}
+                                        onChange={e => setCurrentAccountForm({ ...currentAccountForm, code: e.target.value })}
+                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
+                                        placeholder="CARI-001"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Cari Grubu</label>
+                                    <select
+                                        value={currentAccountForm.type}
+                                        onChange={e => setCurrentAccountForm({ ...currentAccountForm, type: e.target.value as any })}
+                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
+                                    >
+                                        <option value="ALL">Hepsi</option>
+                                        <option value="CUSTOMER">Müşteri</option>
+                                        <option value="SUPPLIER">Tedarikçi</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Cari Adı / Soyadı (Zorunlu)</label>
+                                <input
+                                    type="text"
+                                    value={currentAccountForm.name}
+                                    onChange={e => setCurrentAccountForm({ ...currentAccountForm, name: e.target.value })}
+                                    className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
+                                    placeholder="Selim Yılmaz"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Ticari Ünvan</label>
+                                <input
+                                    type="text"
+                                    value={currentAccountForm.title}
+                                    onChange={e => setCurrentAccountForm({ ...currentAccountForm, title: e.target.value })}
+                                    className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
+                                    placeholder="Saloon Bilişim Ltd. Şti."
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Vergi Dairesi</label>
+                                    <input
+                                        type="text"
+                                        value={currentAccountForm.tax_office}
+                                        onChange={e => setCurrentAccountForm({ ...currentAccountForm, tax_office: e.target.value })}
+                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
+                                        placeholder="Beyoğlu"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Vergi No / T.C. No</label>
+                                    <input
+                                        type="text"
+                                        value={currentAccountForm.tax_number}
+                                        onChange={e => setCurrentAccountForm({ ...currentAccountForm, tax_number: e.target.value })}
+                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
+                                        placeholder="1234567890"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Telefon</label>
+                                    <input
+                                        type="text"
+                                        value={currentAccountForm.phone}
+                                        onChange={e => setCurrentAccountForm({ ...currentAccountForm, phone: e.target.value })}
+                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
+                                        placeholder="05..."
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">E-Posta</label>
+                                    <input
+                                        type="email"
+                                        value={currentAccountForm.email}
+                                        onChange={e => setCurrentAccountForm({ ...currentAccountForm, email: e.target.value })}
+                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
+                                        placeholder="info@saloon.com"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Şehir</label>
+                                    <input
+                                        type="text"
+                                        value={currentAccountForm.city}
+                                        onChange={e => setCurrentAccountForm({ ...currentAccountForm, city: e.target.value })}
+                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
+                                        placeholder="İstanbul"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">İlçe</label>
+                                    <input
+                                        type="text"
+                                        value={currentAccountForm.district}
+                                        onChange={e => setCurrentAccountForm({ ...currentAccountForm, district: e.target.value })}
+                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
+                                        placeholder="Beşiktaş"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Ülke</label>
+                                    <input
+                                        type="text"
+                                        value={currentAccountForm.country}
+                                        onChange={e => setCurrentAccountForm({ ...currentAccountForm, country: e.target.value })}
+                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
+                                        placeholder="Türkiye"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Adres Detayı</label>
+                                <textarea
+                                    value={currentAccountForm.address_line}
+                                    onChange={e => setCurrentAccountForm({ ...currentAccountForm, address_line: e.target.value })}
+                                    className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold h-24 resize-none"
+                                    placeholder="Cadde, sokak, no..."
+                                />
+                            </div>
+
+                            <div className="flex gap-4">
+                                <button
+                                    onClick={() => setShowCurrentAccountModal(false)}
+                                    className="flex-1 py-5 bg-slate-100 text-slate-500 rounded-[2rem] font-black text-base uppercase tracking-widest"
+                                >Vazgeç</button>
+                                <button
+                                    onClick={() => {
+                                        if (!currentAccountForm.name) return alert('İsim zorunludur');
+                                        if (currentAccountForm.id) {
+                                            handleUpdateCurrentAccount(currentAccountForm.id, currentAccountForm);
+                                        } else {
+                                            handleCreateCurrentAccount(currentAccountForm);
+                                        }
+                                    }}
+                                    className="flex-[2] py-5 bg-indigo-600 text-white rounded-[2rem] font-black text-base uppercase tracking-widest shadow-xl shadow-indigo-100"
+                                >{currentAccountForm.id ? 'Güncelle' : 'Cari Kartı Oluştur'}</button>
+                            </div>
                         </div>
                     </div>
                 </div>

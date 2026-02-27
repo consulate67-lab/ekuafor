@@ -455,6 +455,32 @@ const runMigrations = async () => {
             )
         `);
 
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS current_accounts (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+                code VARCHAR(50),
+                name VARCHAR(255) NOT NULL,
+                title VARCHAR(255),
+                tax_office VARCHAR(100),
+                tax_number VARCHAR(20),
+                type VARCHAR(20) DEFAULT 'ALL', -- CUSTOMER, SUPPLIER, ALL
+                phone VARCHAR(20),
+                email VARCHAR(255),
+                website VARCHAR(255),
+                address_line TEXT,
+                city VARCHAR(100),
+                district VARCHAR(100),
+                country VARCHAR(100) DEFAULT 'Türkiye',
+                is_active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_curr_acc_company ON current_accounts(company_id);
+            CREATE INDEX IF NOT EXISTS idx_curr_acc_code ON current_accounts(code);
+        `);
+
         // Finance Module Tables
         await pool.query(`
             CREATE TABLE IF NOT EXISTS invoices (
@@ -477,7 +503,8 @@ const runMigrations = async () => {
             CREATE TABLE IF NOT EXISTS purchase_invoices (
                 id SERIAL PRIMARY KEY,
                 company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
-                supplier_name VARCHAR(255) NOT NULL,
+                current_account_id INTEGER REFERENCES current_accounts(id) ON DELETE SET NULL,
+                supplier_name VARCHAR(255),
                 invoice_no VARCHAR(50),
                 amount DECIMAL(15, 2) NOT NULL DEFAULT 0,
                 subtotal DECIMAL(15, 2) DEFAULT 0,
@@ -500,6 +527,15 @@ const runMigrations = async () => {
                 discount_amount DECIMAL(15, 2) DEFAULT 0,
                 total_amount DECIMAL(15, 2) DEFAULT 0
             );
+        `);
+
+        await pool.query(`
+            ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS current_account_id INTEGER REFERENCES current_accounts(id) ON DELETE SET NULL;
+            ALTER TABLE purchase_invoices ALTER COLUMN supplier_name DROP NOT NULL;
+            
+            ALTER TABLE invoices ADD COLUMN IF NOT EXISTS customer_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+            -- We don't need current_account_id for sales invoices as per user request
+            -- ALTER TABLE invoices ADD COLUMN IF NOT EXISTS current_account_id INTEGER REFERENCES current_accounts(id) ON DELETE SET NULL;
         `);
 
         await pool.query(`

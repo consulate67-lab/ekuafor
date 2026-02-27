@@ -7,6 +7,7 @@ export interface Invoice {
     id?: number;
     company_id: number;
     appointment_id?: number;
+    customer_id?: number;
     customer_name: string;
     customer_tax_number?: string;
     customer_tax_office?: string;
@@ -37,6 +38,25 @@ export interface CashTransaction {
     description?: string;
     transaction_date?: string;
     due_date?: string;
+}
+
+export interface CurrentAccount {
+    id?: number;
+    company_id: number;
+    code?: string;
+    name: string;
+    title?: string;
+    tax_office?: string;
+    tax_number?: string;
+    type?: 'CUSTOMER' | 'SUPPLIER' | 'ALL';
+    phone?: string;
+    email?: string;
+    website?: string;
+    address_line?: string;
+    city?: string;
+    district?: string;
+    country?: string;
+    is_active?: boolean;
 }
 
 class FinanceService {
@@ -74,6 +94,7 @@ class FinanceService {
             const invoiceCols = [
                 ['customer_tax_number', 'VARCHAR(20)'],
                 ['customer_tax_office', 'VARCHAR(100)'],
+                ['customer_id', 'INTEGER REFERENCES users(id) ON DELETE SET NULL'],
                 ['vat_rate', 'NUMERIC(5,2) DEFAULT 20'],
                 ['vat_amount', 'NUMERIC(15,2) DEFAULT 0'],
                 ['discount_rate', 'NUMERIC(5,2) DEFAULT 0'],
@@ -181,15 +202,15 @@ class FinanceService {
 
             const query = `
                 INSERT INTO invoices (
-                    company_id, appointment_id, customer_name, customer_tax_number,
+                    company_id, appointment_id, customer_id, customer_name, customer_tax_number,
                     customer_tax_office, type, payment_method, amount, 
                     vat_rate, vat_amount, discount_rate, discount_amount, grand_total,
                     status, gib_status
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
                 RETURNING *
             `;
             const values = [
-                invoice.company_id, invoice.appointment_id, invoice.customer_name,
+                invoice.company_id, invoice.appointment_id, invoice.customer_id, invoice.customer_name,
                 invoice.customer_tax_number, invoice.customer_tax_office,
                 invoice.type, invoice.payment_method, amount,
                 vatRate, vat_amount, discRate, discount_amount, grand_total,
@@ -402,23 +423,28 @@ class FinanceService {
     }
 
     async getInvoices(companyId: number, startDate?: string, endDate?: string, search?: string) {
-        let query = 'SELECT * FROM invoices WHERE company_id = $1';
+        let query = `
+            SELECT i.*, u.first_name, u.last_name, u.phone as u_phone 
+            FROM invoices i
+            LEFT JOIN users u ON i.customer_id = u.id
+            WHERE i.company_id = $1
+        `;
         const values: any[] = [companyId];
         let i = 2;
 
         if (startDate && endDate) {
-            query += ` AND created_at::date BETWEEN $${i} AND $${i + 1}`;
+            query += ` AND i.created_at::date BETWEEN $${i} AND $${i + 1}`;
             values.push(startDate, endDate);
             i += 2;
         }
 
         if (search) {
-            query += ` AND (customer_name ILIKE $${i} OR invoice_no ILIKE $${i})`;
+            query += ` AND (i.customer_name ILIKE $${i} OR i.invoice_no ILIKE $${i} OR u.first_name ILIKE $${i} OR u.last_name ILIKE $${i})`;
             values.push(`%${search}%`);
             i++;
         }
 
-        query += ' ORDER BY created_at DESC';
+        query += ' ORDER BY i.created_at DESC';
         const result = await pool.query(query, values);
         return result.rows;
     }
@@ -797,6 +823,72 @@ class FinanceService {
         const result = await pool.query('DELETE FROM cash_transactions WHERE id = $1 AND company_id = $2', [id, companyId]);
         if (result.rowCount === 0) throw new Error('İşlem bulunamadı');
         return true;
+    }
+
+    // Current Accounts (Cari Kartlar)
+    async createCurrentAccount(data: CurrentAccount) {
+        const query = `
+            INSERT INTO current_accounts (
+                company_id, code, name, title, tax_office, tax_number, type,
+                phone, email, website, address_line, city, district, country
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            RETURNING *
+        `;
+        const values = [
+            data.company_id, data.code, data.name, data.title, data.tax_office, data.tax_number, data.type || 'ALL',
+            data.phone, data.email, data.website, data.address_line, data.city, data.district, data.country || 'Türkiye'
+        ];
+        const result = await pool.query(query, values);
+        return result.rows[0];
+    }
+
+    async updateCurrentAccount(id: number, companyId: number, data: Partial<CurrentAccount>) {
+        const fields: string[] = [];
+        const values: any[] = [];
+        let i = 1;
+
+        Object.entries(data).forEach(([key, value]) => {
+            if (key !== 'id' && key !== 'company_id') {
+                fields.push(`${key} = $${i}`);
+                values.push(value);
+                i++;
+            }
+        });
+
+        values.push(id, companyId);
+        const query = `
+            UPDATE current_accounts 
+            SET ${fields.join(', ')}, updated_at = NOW()
+            WHERE id = $${i} AND company_id = $${i + 1}
+            RETURNING *
+        `;
+        const result = await pool.query(query, values);
+        return result.rows[0];
+    }
+
+    async getCurrentAccounts(companyId: number, search?: string) {
+        let query = 'SELECT * FROM current_accounts WHERE company_id = $1 AND is_active = true';
+        const values: any[] = [companyId];
+
+        if (search) {
+            query += ' AND (name ILIKE $2 OR code ILIKE $2 OR tax_number ILIKE $2 OR title ILIKE $2)';
+            values.push(`%${search}%`);
+        }
+
+        query += ' ORDER BY name ASC';
+        const result = await pool.query(query, values);
+        return result.rows;
+    }
+
+    async getCurrentAccountById(id: number, companyId: number) {
+        const result = await pool.query('SELECT * FROM current_accounts WHERE id = $1 AND company_id = $2', [id, companyId]);
+        return result.rows[0] || null;
+    }
+
+    async deleteCurrentAccount(id: number, companyId: number) {
+        // Soft delete
+        const result = await pool.query('UPDATE current_accounts SET is_active = false WHERE id = $1 AND company_id = $2', [id, companyId]);
+        return result.rowCount ? result.rowCount > 0 : false;
     }
 
     async checkEInvoiceUser(vkn: string, companyId: number) {

@@ -224,6 +224,76 @@ class FinanceController {
             res.status(400).json({ success: false, error: error.message });
         }
     }
+
+    // Current Accounts (Cari Kartlar)
+    async createCurrentAccount(req: Request, res: Response, next: NextFunction) {
+        try {
+            const companyId = req.user?.companyId;
+            if (!companyId) return res.status(403).json({ success: false, error: 'Firma ID eksik' });
+
+            const result = await financeService.createCurrentAccount({
+                ...req.body,
+                company_id: companyId
+            });
+            res.status(201).json({ success: true, data: result });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getCurrentAccounts(req: Request, res: Response, next: NextFunction) {
+        try {
+            const companyId = req.user?.companyId;
+            const { search } = req.query;
+            if (!companyId) return res.status(403).json({ success: false, error: 'Firma ID eksik' });
+
+            const result = await financeService.getCurrentAccounts(companyId, search as string);
+            res.json({ success: true, data: result });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getCurrentAccountById(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const companyId = req.user?.companyId;
+            if (!id || !companyId) return res.status(400).json({ success: false, error: 'Eksik parametre' });
+
+            const result = await financeService.getCurrentAccountById(parseInt(id), companyId);
+            if (!result) return res.status(404).json({ success: false, error: 'Cari bulunamadı' });
+
+            res.json({ success: true, data: result });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateCurrentAccount(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const companyId = req.user?.companyId;
+            if (!id || !companyId) return res.status(400).json({ success: false, error: 'Eksik parametre' });
+
+            const result = await financeService.updateCurrentAccount(parseInt(id), companyId, req.body);
+            res.json({ success: true, data: result });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async deleteCurrentAccount(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const companyId = req.user?.companyId;
+            if (!id || !companyId) return res.status(400).json({ success: false, error: 'Eksik parametre' });
+
+            await financeService.deleteCurrentAccount(parseInt(id), companyId);
+            res.json({ success: true, message: 'Cari başarıyla silindi' });
+        } catch (error: any) {
+            res.status(400).json({ success: false, error: error.message });
+        }
+    }
 }
 
 export default new FinanceController();
