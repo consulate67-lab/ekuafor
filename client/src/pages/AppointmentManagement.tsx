@@ -398,6 +398,20 @@ export default function AppointmentManagement() {
             const totalPr = (selectedPackage && !hasOverrides) ? Number(selectedPackage.price) : sSelections.reduce((sum: number, s: any) => sum + Number(s.price), 0);
             const totalDur = (selectedPackage && !hasOverrides) ? Number(selectedPackage.duration_minutes) : sSelections.reduce((sum: number, s: any) => sum + Number(s.duration_minutes), 0);
 
+            // Geçmiş zaman kontrolü
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (newAppointment.appointment_date === todayStr) {
+                const now = new Date();
+                const currentMinutes = now.getHours() * 60 + now.getMinutes();
+                const [sh, sm] = newAppointment.start_time.split(':').map(Number);
+                const startMinutes = sh * 60 + sm;
+
+                if (startMinutes < currentMinutes) {
+                    setFormError('⚠️ Geçmiş bir saate randevu oluşturamazsınız.');
+                    return;
+                }
+            }
+
             // Re-calculate end time for safety
             const [sh, sm] = newAppointment.start_time.split(':').map(Number);
             const totalMin = sh * 60 + sm + totalDur;
