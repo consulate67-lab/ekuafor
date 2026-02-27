@@ -847,8 +847,9 @@ class FinanceService {
         const values: any[] = [];
         let i = 1;
 
+        const excludedFields = ['id', 'company_id', 'created_at', 'updated_at'];
         Object.entries(data).forEach(([key, value]) => {
-            if (key !== 'id' && key !== 'company_id') {
+            if (!excludedFields.includes(key) && value !== undefined) {
                 fields.push(`${key} = $${i}`);
                 values.push(value);
                 i++;
