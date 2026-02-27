@@ -343,7 +343,8 @@ class FinanceService {
     async getXSLT(type: string): Promise<string> {
         // Filenames as found in d:/Saloon/xslt/
         const fileName = (type === 'e-fatura') ? 'efat.xslt' : 'eArsiv.xslt';
-        const filePath = path.join(process.cwd(), 'xslt', fileName);
+        // Correct path: xslt is at the project root, one level up from server directory
+        const filePath = path.resolve(process.cwd(), '..', 'xslt', fileName);
 
         try {
             return await fs.readFile(filePath, 'utf8');
