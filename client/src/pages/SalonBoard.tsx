@@ -939,27 +939,15 @@ export default function SalonBoard() {
                                                                                             <div className="flex gap-2 mt-1">
                                                                                                 <div className="flex-1">
                                                                                                     <label className="block text-[7px] font-bold text-slate-400 uppercase mb-0.5 ml-1">Süre (Dk)</label>
-                                                                                                    <input
-                                                                                                        type="number"
-                                                                                                        value={fastForm.serviceDurationOverrides[ps.id] || ps.duration_minutes}
-                                                                                                        onChange={e => setFastForm(prev => ({
-                                                                                                            ...prev,
-                                                                                                            serviceDurationOverrides: { ...prev.serviceDurationOverrides, [ps.id]: parseInt(e.target.value) || 0 }
-                                                                                                        }))}
-                                                                                                        className="w-full p-1 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-900 outline-none"
-                                                                                                    />
+                                                                                                    <div className="w-full p-2 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-400">
+                                                                                                        {ps.duration_minutes}
+                                                                                                    </div>
                                                                                                 </div>
                                                                                                 <div className="flex-1">
                                                                                                     <label className="block text-[7px] font-bold text-slate-400 uppercase mb-0.5 ml-1">Fiyat (₺)</label>
-                                                                                                    <input
-                                                                                                        type="number"
-                                                                                                        value={fastForm.servicePriceOverrides[ps.id] || ps.price}
-                                                                                                        onChange={e => setFastForm(prev => ({
-                                                                                                            ...prev,
-                                                                                                            servicePriceOverrides: { ...prev.servicePriceOverrides, [ps.id]: parseFloat(e.target.value) || 0 }
-                                                                                                        }))}
-                                                                                                        className="w-full p-1 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-900 outline-none"
-                                                                                                    />
+                                                                                                    <div className="w-full p-2 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-400">
+                                                                                                        {ps.price}
+                                                                                                    </div>
                                                                                                 </div>
                                                                                             </div>
                                                                                         </div>
@@ -990,39 +978,16 @@ export default function SalonBoard() {
                                                                             </div>
                                                                             <div className="flex justify-between items-center bg-amber-50 p-4 rounded-2xl border-2 border-amber-200 shadow-inner mt-2">
                                                                                 <div className="flex flex-col">
-                                                                                    <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">GÜNCEL TOPLAM SÜRE</span>
+                                                                                    <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">TOPLAM SÜRE</span>
                                                                                     <span className="text-sm font-black text-amber-900">
-                                                                                        {(() => {
-                                                                                            const hasOverrides = Object.keys(fastForm.serviceDurationOverrides).length > 0;
-                                                                                            if (hasOverrides) {
-                                                                                                return p.services?.reduce((sum: number, ps: any) => sum + (fastForm.serviceDurationOverrides[ps.id] !== undefined ? fastForm.serviceDurationOverrides[ps.id] : (ps.duration_minutes || 0)), 0);
-                                                                                            }
-                                                                                            return p.duration_minutes || 0;
-                                                                                        })()} DK
+                                                                                        {p.duration_minutes || 0} DK
                                                                                     </span>
                                                                                 </div>
                                                                                 <div className="flex flex-col items-end">
-                                                                                    <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">GÜNCEL TOPLAM FİYAT</span>
+                                                                                    <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">TOPLAM FİYAT</span>
                                                                                     <div className="flex items-center gap-2">
-                                                                                        {(() => {
-                                                                                            const standardTotal = p.services?.reduce((sum: number, ps: any) => sum + (ps.price || 0), 0) || 0;
-                                                                                            const currentTotal = Object.keys(fastForm.servicePriceOverrides).length > 0
-                                                                                                ? p.services?.reduce((sum: number, ps: any) => sum + Number(fastForm.servicePriceOverrides[ps.id] !== undefined ? fastForm.servicePriceOverrides[ps.id] : (ps.price || 0)), 0)
-                                                                                                : (p.price || 0);
-
-                                                                                            if (standardTotal > currentTotal) {
-                                                                                                return <span className="text-[10px] font-black line-through text-amber-600/50">₺{standardTotal}</span>;
-                                                                                            }
-                                                                                            return null;
-                                                                                        })()}
                                                                                         <span className="text-lg font-black text-amber-900">
-                                                                                            ₺{(() => {
-                                                                                                const hasOverrides = Object.keys(fastForm.servicePriceOverrides).length > 0;
-                                                                                                if (hasOverrides) {
-                                                                                                    return p.services?.reduce((sum: number, ps: any) => sum + Number(fastForm.servicePriceOverrides[ps.id] !== undefined ? fastForm.servicePriceOverrides[ps.id] : (ps.price || 0)), 0);
-                                                                                                }
-                                                                                                return p.price || 0;
-                                                                                            })()}
+                                                                                            ₺{p.price || 0}
                                                                                         </span>
                                                                                     </div>
                                                                                 </div>

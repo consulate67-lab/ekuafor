@@ -855,36 +855,15 @@ export default function AppointmentManagement() {
                                                                         <div className="grid grid-cols-2 gap-3">
                                                                             <div>
                                                                                 <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 ml-1">Süre (Dk)</label>
-                                                                                <input
-                                                                                    type="number"
-                                                                                    value={newAppointment.serviceDurationOverrides[ps.id] || ps.duration_minutes}
-                                                                                    onChange={e => {
-                                                                                        const val = parseInt(e.target.value) || 0;
-                                                                                        const newOverrides = { ...newAppointment.serviceDurationOverrides, [ps.id]: val };
-                                                                                        setNewAppointment(prev => ({
-                                                                                            ...prev,
-                                                                                            serviceDurationOverrides: newOverrides
-                                                                                        }));
-                                                                                    }}
-                                                                                    className="w-full p-2 bg-white rounded-lg border border-slate-200 text-[10px] font-bold text-slate-900 outline-none"
-                                                                                />
+                                                                                <div className="w-full p-2 bg-white rounded-lg border border-slate-200 text-[10px] font-bold text-slate-400">
+                                                                                    {ps.duration_minutes}
+                                                                                </div>
                                                                             </div>
                                                                             <div>
                                                                                 <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 ml-1">Fiyat (₺)</label>
-                                                                                <input
-                                                                                    type="number"
-                                                                                    value={newAppointment.servicePriceOverrides[ps.id] || ps.price}
-                                                                                    onChange={e => {
-                                                                                        const val = parseFloat(e.target.value) || 0;
-                                                                                        const newOverrides = { ...newAppointment.servicePriceOverrides, [ps.id]: val };
-                                                                                        setNewAppointment(prev => ({
-                                                                                            ...prev,
-                                                                                            servicePriceOverrides: newOverrides,
-                                                                                            price: p.services.reduce((sum: number, s: any) => sum + (newOverrides[s.id] || s.price || 0), 0)
-                                                                                        }));
-                                                                                    }}
-                                                                                    className="w-full p-2 bg-white rounded-lg border border-slate-200 text-[10px] font-bold text-slate-900 outline-none"
-                                                                                />
+                                                                                <div className="w-full p-2 bg-white rounded-lg border border-slate-200 text-[10px] font-bold text-slate-400">
+                                                                                    {ps.price}
+                                                                                </div>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -893,13 +872,13 @@ export default function AppointmentManagement() {
                                                                     <div className="flex flex-col">
                                                                         <span className="text-[8px] font-black text-pink-400 uppercase tracking-widest">TOPLAM SÜRE</span>
                                                                         <span className="text-xs font-black text-pink-600">
-                                                                            {p.services?.reduce((sum: number, ps: any) => sum + (newAppointment.serviceDurationOverrides[ps.id] || ps.duration_minutes || 0), 0)} DK
+                                                                            {p.duration_minutes || 0} Dakika
                                                                         </span>
                                                                     </div>
                                                                     <div className="flex flex-col items-end">
                                                                         <span className="text-[8px] font-black text-pink-400 uppercase tracking-widest">TOPLAM FİYAT</span>
                                                                         <span className="text-base font-black text-pink-600">
-                                                                            ₺{p.services?.reduce((sum: number, ps: any) => sum + Number(newAppointment.servicePriceOverrides[ps.id] || ps.price || 0), 0)}
+                                                                            ₺{p.price || 0}
                                                                         </span>
                                                                     </div>
                                                                 </div>

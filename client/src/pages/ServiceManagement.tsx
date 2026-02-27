@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../lib/api';
 import { Service, Package } from '../types';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/authStore';
 
 export default function ServiceManagement() {
     const [activeTab, setActiveTab] = useState<'services' | 'packages'>('services');
@@ -56,9 +57,16 @@ export default function ServiceManagement() {
         }
     };
 
+    const navigate = useNavigate();
+    const { user } = useAuthStore();
+
     useEffect(() => {
+        if (user && user.role !== 'company_admin') {
+            navigate('/dashboard');
+            return;
+        }
         fetchData();
-    }, []);
+    }, [user, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
