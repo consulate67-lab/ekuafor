@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import api from '../lib/api';
 import { Camera, CameraResultType, CameraSource, CameraDirection } from '@capacitor/camera';
 
@@ -1323,7 +1323,7 @@ export default function CompanyPanel() {
                                 <h3 className="text-lg font-black mb-2 italic">UBL-TR Bilgilendirme</h3>
                                 <p className="text-slate-400 text-xs font-bold leading-relaxed">
                                     Girdiğiniz bilgiler QNB e-Finans SOAP servisleri üzerinden UBL 2.1 formatında fatura üretmek için kullanılır.
-                                    Hatalı kullanıcı adı veya şifre girişinde GİB gönderimlerinde hata alırsınız.
+                                    Hatalı kullanıcı adı veya şifre girişinde entegratör gönderimlerinde hata alırsınız.
                                 </p>
                             </div>
                         </div>
@@ -2123,12 +2123,12 @@ export default function CompanyPanel() {
                                                                                 try {
                                                                                     setLoading(true);
                                                                                     const res = await api.post(`/finance/invoices/${inv.id}/gib-send`);
-                                                                                    if (res.data.success) { alert('GİB\'e gönderildi!'); fetchFinanceData(); }
+                                                                                    if (res.data.success) { alert('Entegratöre gönderildi!'); fetchFinanceData(); }
                                                                                 } catch (err: any) { alert(err.response?.data?.error || 'Gönderim hatası'); }
                                                                                 finally { setLoading(false); }
                                                                             }}
                                                                             className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
-                                                                            title="GİB'e Gönder"
+                                                                            title="Entegratöre Gönder"
                                                                         >
                                                                             <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
                                                                         </button>
