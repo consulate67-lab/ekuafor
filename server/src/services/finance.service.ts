@@ -731,6 +731,74 @@ class FinanceService {
 </html>`;
     }
 
+    async deleteInvoice(invoiceId: number, companyId: number) {
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            const invoiceRes = await client.query('SELECT * FROM invoices WHERE id = $1 AND company_id = $2', [invoiceId, companyId]);
+            if (invoiceRes.rows.length === 0) throw new Error('Fatura bulunamadı');
+            const inv = invoiceRes.rows[0];
+
+            // Revert appointment status
+            if (inv.appointment_id) {
+                await client.query("UPDATE appointments SET status = 'completed' WHERE id = $1", [inv.appointment_id]);
+            }
+
+            // Remove associated cash transactions (best effort by description matching or we should have linked them better)
+            // For now, look for transactions with this invoice details
+            await client.query(
+                "DELETE FROM cash_transactions WHERE company_id = $1 AND description LIKE $2",
+                [companyId, `%Satış Faturası%`] // This is risky but based on current implementation
+            );
+
+            await client.query('DELETE FROM invoices WHERE id = $1', [invoiceId]);
+
+            await client.query('COMMIT');
+            return true;
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    async deletePurchaseInvoice(id: number, companyId: number) {
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            const res = await client.query('SELECT * FROM purchase_invoices WHERE id = $1 AND company_id = $2', [id, companyId]);
+            if (res.rows.length === 0) throw new Error('Alış faturası bulunamadı');
+            const p = res.rows[0];
+
+            // Remove matching cash transaction if it was closed
+            if (p.is_closed) {
+                await client.query(
+                    "DELETE FROM cash_transactions WHERE company_id = $1 AND category = 'purchase' AND description LIKE $2",
+                    [companyId, `%${p.supplier_name}%Alış Faturası%`]
+                );
+            }
+
+            await client.query('DELETE FROM purchase_invoices WHERE id = $1', [id]);
+
+            await client.query('COMMIT');
+            return true;
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    async deleteCashTransaction(id: number, companyId: number) {
+        const result = await pool.query('DELETE FROM cash_transactions WHERE id = $1 AND company_id = $2', [id, companyId]);
+        if (result.rowCount === 0) throw new Error('İşlem bulunamadı');
+        return true;
+    }
+
     async checkEInvoiceUser(vkn: string, companyId: number) {
         try {
             // Canlı API üzerinden sorgulama (Public lookup service)

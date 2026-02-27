@@ -290,6 +290,47 @@ export default function CompanyPanel() {
         }
     };
 
+    const handleDeleteInvoice = async (id: number) => {
+        if (!confirm('Bu faturayı silmek istediğinize emin misiniz? Randevu durumu tekrar tamamlanmış haline dönecektir.')) return;
+        try {
+            setLoading(true);
+            await api.delete(`/finance/invoices/${id}`);
+            fetchFinanceData();
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Silme hatası');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDeletePurchaseInvoice = async (id: number) => {
+        if (!confirm('Bu alış faturası girişini silmek istediğinize emin misiniz?')) return;
+        try {
+            setLoadingFinance(true);
+            await api.delete(`/finance/purchase-invoices/${id}`);
+            setShowPurchaseDetailModal(false);
+            setSelectedPurchaseInvoice(null);
+            fetchFinanceData();
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Silme hatası');
+        } finally {
+            setLoadingFinance(false);
+        }
+    };
+
+    const handleDeleteCashTransaction = async (id: number) => {
+        if (!confirm('Bu kasa işlemini silmek istediğinize emin misiniz?')) return;
+        try {
+            setLoadingFinance(true);
+            await api.delete(`/finance/transactions/${id}`);
+            fetchFinanceData();
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Silme hatası');
+        } finally {
+            setLoadingFinance(false);
+        }
+    };
+
     const handleCreateCashTransaction = async (data: any) => {
         try {
             const res = await api.post('/finance/transactions', data);
@@ -2202,6 +2243,15 @@ export default function CompanyPanel() {
                                                                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
                                                                         </button>
                                                                     )}
+                                                                    {(!inv.gib_status || inv.gib_status === 'not_sent' || inv.gib_status === 'failed' || inv.gib_status === 'ready') && (
+                                                                        <button
+                                                                            onClick={() => handleDeleteInvoice(inv.id)}
+                                                                            className="w-10 h-10 bg-red-100 text-red-600 rounded-xl flex items-center justify-center hover:bg-red-200 transition-all border border-red-200"
+                                                                            title="Faturayı Sil"
+                                                                        >
+                                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                                        </button>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -2324,7 +2374,7 @@ export default function CompanyPanel() {
                                                             </p>
                                                         </div>
                                                     </div>
-                                                    <div className="text-right">
+                                                    <div className="text-right flex items-center gap-4">
                                                         {t.type === 'income' ? (
                                                             <div className="space-y-0.5">
                                                                 <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">BORÇ (TAHSİLAT)</p>
@@ -2336,6 +2386,12 @@ export default function CompanyPanel() {
                                                                 <p className="text-lg font-black text-red-600">-{Number(Number(t.credit) || Number(t.amount)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
                                                             </div>
                                                         )}
+                                                        <button
+                                                            onClick={e => { e.stopPropagation(); handleDeleteCashTransaction(t.id); }}
+                                                            className="w-8 h-8 flex items-center justify-center bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-all"
+                                                        >
+                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                        </button>
                                                     </div>
                                                 </div>
                                             ))
@@ -3484,8 +3540,8 @@ export default function CompanyPanel() {
                                         <button
                                             onClick={() => setPurchaseForm({ ...purchaseForm, is_closed: !purchaseForm.is_closed })}
                                             className={`px-3 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest transition-all border ${purchaseForm.is_closed
-                                                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                                                    : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                                : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
                                                 }`}
                                         >
                                             {purchaseForm.is_closed ? '🔐 Kapalı Fatura' : '🔓 Açık Fatura'}
@@ -3636,12 +3692,21 @@ export default function CompanyPanel() {
                             </div>
                         )}
 
-                        <button
-                            onClick={() => { setShowPurchaseDetailModal(false); setSelectedPurchaseInvoice(null); }}
-                            className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-base uppercase tracking-widest shadow-xl shadow-slate-200"
-                        >
-                            Kapat
-                        </button>
+                        <div className="flex gap-4">
+                            <button
+                                onClick={() => { setShowPurchaseDetailModal(false); setSelectedPurchaseInvoice(null); }}
+                                className="flex-[3] py-5 bg-slate-900 text-white rounded-[2rem] font-black text-base uppercase tracking-widest shadow-xl shadow-slate-200"
+                            >
+                                Kapat
+                            </button>
+                            <button
+                                onClick={() => handleDeletePurchaseInvoice(selectedPurchaseInvoice.id)}
+                                className="flex-1 py-5 bg-red-50 text-red-600 rounded-[2rem] font-black text-base uppercase tracking-widest hover:bg-red-100 transition-all flex items-center justify-center border border-red-100"
+                                title="Faturayı Sil"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

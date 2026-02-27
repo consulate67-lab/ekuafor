@@ -21,5 +21,10 @@ router.post('/transactions', authMiddleware, financeController.createCashTransac
 router.post('/purchase-invoices', authMiddleware, financeController.createPurchaseInvoice);
 router.get('/purchase-invoices/company/:companyId', authMiddleware, financeController.getPurchaseInvoices);
 router.get('/purchase-invoices/:id', authMiddleware, financeController.getPurchaseInvoiceById);
+router.delete('/purchase-invoices/:id', authMiddleware, financeController.deletePurchaseInvoice);
+
+// General Deletions
+router.delete('/invoices/:id', authMiddleware, financeController.deleteInvoice);
+router.delete('/transactions/:id', authMiddleware, financeController.deleteCashTransaction);
 
 export default router;

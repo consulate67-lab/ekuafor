@@ -185,6 +185,45 @@ class FinanceController {
             next(error);
         }
     }
+
+    async deleteInvoice(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const companyId = req.user?.companyId;
+            if (!id || !companyId) return res.status(400).json({ success: false, error: 'Eksik parametre' });
+
+            await financeService.deleteInvoice(parseInt(id), companyId);
+            res.json({ success: true, message: 'Fatura başarıyla silindi' });
+        } catch (error: any) {
+            res.status(400).json({ success: false, error: error.message });
+        }
+    }
+
+    async deletePurchaseInvoice(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const companyId = req.user?.companyId;
+            if (!id || !companyId) return res.status(400).json({ success: false, error: 'Eksik parametre' });
+
+            await financeService.deletePurchaseInvoice(parseInt(id), companyId);
+            res.json({ success: true, message: 'Alış faturası başarıyla silindi' });
+        } catch (error: any) {
+            res.status(400).json({ success: false, error: error.message });
+        }
+    }
+
+    async deleteCashTransaction(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const companyId = req.user?.companyId;
+            if (!id || !companyId) return res.status(400).json({ success: false, error: 'Eksik parametre' });
+
+            await financeService.deleteCashTransaction(parseInt(id), companyId);
+            res.json({ success: true, message: 'İşlem başarıyla silindi' });
+        } catch (error: any) {
+            res.status(400).json({ success: false, error: error.message });
+        }
+    }
 }
 
 export default new FinanceController();
