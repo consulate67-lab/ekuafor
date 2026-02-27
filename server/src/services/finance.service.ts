@@ -386,6 +386,18 @@ class FinanceService {
         return result.rows;
     }
 
+    async getPurchaseInvoiceById(id: number, companyId: number) {
+        const invoice = await pool.query('SELECT * FROM purchase_invoices WHERE id = $1 AND company_id = $2', [id, companyId]);
+        if (invoice.rows.length === 0) return null;
+
+        const items = await pool.query('SELECT * FROM purchase_invoice_items WHERE invoice_id = $1', [id]);
+
+        return {
+            ...invoice.rows[0],
+            items: items.rows
+        };
+    }
+
     async getInvoices(companyId: number, startDate?: string, endDate?: string, search?: string) {
         let query = 'SELECT * FROM invoices WHERE company_id = $1';
         const values: any[] = [companyId];

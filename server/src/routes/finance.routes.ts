@@ -20,5 +20,6 @@ router.post('/transactions', authMiddleware, financeController.createCashTransac
 // Purchase Invoices
 router.post('/purchase-invoices', authMiddleware, financeController.createPurchaseInvoice);
 router.get('/purchase-invoices/company/:companyId', authMiddleware, financeController.getPurchaseInvoices);
+router.get('/purchase-invoices/:id', authMiddleware, financeController.getPurchaseInvoiceById);
 
 export default router;

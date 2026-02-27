@@ -137,6 +137,8 @@ export default function CompanyPanel() {
         customer_name: '',
         customer_phone: ''
     });
+    const [showPurchaseDetailModal, setShowPurchaseDetailModal] = useState(false);
+    const [selectedPurchaseInvoice, setSelectedPurchaseInvoice] = useState<any>(null);
     const [reportError, setReportError] = useState('');
 
     const handleLogin = async (keyToUse?: string) => {
@@ -269,6 +271,21 @@ export default function CompanyPanel() {
             }
         } catch (err) {
             console.error('Alış faturası oluşturulamadı:', err);
+        }
+    };
+
+    const handleViewPurchaseDetail = async (id: number) => {
+        try {
+            setLoadingFinance(true);
+            const res = await api.get(`/finance/purchase-invoices/${id}`);
+            if (res.data.success) {
+                setSelectedPurchaseInvoice(res.data.data);
+                setShowPurchaseDetailModal(true);
+            }
+        } catch (err) {
+            alert('Fatura detayları yüklenemedi');
+        } finally {
+            setLoadingFinance(false);
         }
     };
 
@@ -2212,13 +2229,17 @@ export default function CompanyPanel() {
                                             </div>
                                         ) : (
                                             purchaseInvoices.map(p => (
-                                                <div key={p.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center justify-between">
+                                                <div
+                                                    key={p.id}
+                                                    onClick={() => handleViewPurchaseDetail(p.id)}
+                                                    className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center justify-between hover:border-indigo-400 cursor-pointer transition-all"
+                                                >
                                                     <div>
                                                         <h4 className="font-black text-slate-900">{p.supplier_name}</h4>
                                                         <p className="text-[10px] font-bold text-slate-400 uppercase">Fatura No: {p.invoice_no || '---'}</p>
                                                     </div>
                                                     <div className="text-right">
-                                                        <p className="text-base font-black text-red-600">-{p.amount} ₺</p>
+                                                        <p className="text-base font-black text-red-600">-{parseFloat(p.amount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
                                                         <p className="text-[9px] font-bold text-slate-400 uppercase">{new Date(p.created_at).toLocaleDateString('tr-TR')}</p>
                                                     </div>
                                                 </div>
@@ -3522,7 +3543,86 @@ export default function CompanyPanel() {
                 </div>
             )}
 
-            {/* Cash Modal */}
+            {/* Purchase Detail Modal */}
+            {showPurchaseDetailModal && selectedPurchaseInvoice && (
+                <div className="fixed inset-0 z-[400] flex items-end lg:items-center justify-center bg-slate-950/60 backdrop-blur-sm" onClick={() => { setShowPurchaseDetailModal(false); setSelectedPurchaseInvoice(null); }}>
+                    <div className="bg-white w-full max-w-2xl rounded-t-[3rem] lg:rounded-[3rem] p-8 lg:p-10 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}
+                        style={{ animation: 'slideUp 0.3s ease-out' }}>
+                        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
+
+                        <div className="flex justify-between items-start mb-8">
+                            <div>
+                                <h2 className="text-2xl font-black text-slate-900 leading-tight">{selectedPurchaseInvoice.supplier_name}</h2>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Alış Faturası Detayı</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xs font-black text-slate-900">{selectedPurchaseInvoice.invoice_no || '---'}</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">{new Date(selectedPurchaseInvoice.invoice_date).toLocaleDateString('tr-TR')}</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-50 rounded-[2rem] p-6 space-y-4 mb-8">
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Fatura Satırları</h3>
+                            <div className="space-y-2">
+                                {selectedPurchaseInvoice.items?.map((item: any, idx: number) => (
+                                    <div key={idx} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <h4 className="font-black text-slate-900 text-sm">{item.product_name}</h4>
+                                            <p className="text-sm font-black text-slate-900">{parseFloat(item.total_amount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
+                                        </div>
+                                        <div className="flex items-center gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                                            <span>Miktar: {parseFloat(item.quantity).toLocaleString('tr-TR')}</span>
+                                            <span>•</span>
+                                            <span>Birim: {parseFloat(item.unit_price).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</span>
+                                            {parseFloat(item.discount_rate) > 0 && (
+                                                <>
+                                                    <span>•</span>
+                                                    <span className="text-red-400">İsk: %{item.discount_rate}</span>
+                                                </>
+                                            )}
+                                            <span>•</span>
+                                            <span className="text-indigo-400">KDV: %{item.vat_rate}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 px-2">
+                            <div>
+                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Ara Toplam</p>
+                                <p className="text-sm font-bold text-slate-700">{parseFloat(selectedPurchaseInvoice.subtotal).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
+                            </div>
+                            <div>
+                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">İskonto</p>
+                                <p className="text-sm font-bold text-red-400">-{parseFloat(selectedPurchaseInvoice.discount_total).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
+                            </div>
+                            <div>
+                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">KDV Toplam</p>
+                                <p className="text-sm font-bold text-indigo-500">+{parseFloat(selectedPurchaseInvoice.vat_total).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Genel Toplam</p>
+                                <p className="text-lg font-black text-slate-900">{parseFloat(selectedPurchaseInvoice.amount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
+                            </div>
+                        </div>
+
+                        {selectedPurchaseInvoice.description && (
+                            <div className="mb-8 px-2">
+                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Açıklama</p>
+                                <p className="text-xs text-slate-600 font-medium bg-slate-50 p-4 rounded-xl">{selectedPurchaseInvoice.description}</p>
+                            </div>
+                        )}
+
+                        <button
+                            onClick={() => { setShowPurchaseDetailModal(false); setSelectedPurchaseInvoice(null); }}
+                            className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-base uppercase tracking-widest shadow-xl shadow-slate-200"
+                        >
+                            Kapat
+                        </button>
+                    </div>
+                </div>
+            )}
             {showCashModal && (
                 <div className="fixed inset-0 z-[300] flex items-end justify-center bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowCashModal(false)}>
                     <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl" onClick={e => e.stopPropagation()}

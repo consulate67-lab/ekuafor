@@ -170,6 +170,21 @@ class FinanceController {
             res.status(400).json({ success: false, error: error.message });
         }
     }
+
+    async getPurchaseInvoiceById(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const companyId = req.user?.companyId;
+            if (!id || !companyId) return res.status(400).json({ success: false, error: 'Eksik parametre' });
+
+            const result = await financeService.getPurchaseInvoiceById(parseInt(id), companyId);
+            if (!result) return res.status(404).json({ success: false, error: 'Fatura bulunamadı' });
+
+            res.json({ success: true, data: result });
+        } catch (error) {
+            next(error);
+        }
+    }
 }
 
 export default new FinanceController();
