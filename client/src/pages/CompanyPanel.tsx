@@ -2222,10 +2222,10 @@ export default function CompanyPanel() {
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => setShowCashModal(true)}
-                                            className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest transition-all hover:bg-slate-200">- Yeni Gider İşlemi</button>
-                                        <button
-                                            onClick={() => setShowCashModal(true)}
-                                            className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest transition-all hover:bg-emerald-50 hover:text-emerald-500">💸 Nakit Ödeme</button>
+                                            className="w-full py-5 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest transition-all hover:bg-red-50 hover:text-red-500 flex items-center justify-center gap-2"
+                                        >
+                                            <span>💸</span> Ödeme Yap
+                                        </button>
                                     </div>
                                     <div className="space-y-3">
                                         {cashTransactions.length === 0 ? (
@@ -3277,7 +3277,7 @@ export default function CompanyPanel() {
                     <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl" onClick={e => e.stopPropagation()}
                         style={{ animation: 'slideUp 0.3s ease-out' }}>
                         <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
-                        <h2 className="text-2xl font-black text-slate-900 mb-6">Kasa İşlemi</h2>
+                        <h2 className="text-2xl font-black text-slate-900 mb-6">Ödeme Yap</h2>
 
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
@@ -3310,7 +3310,7 @@ export default function CompanyPanel() {
                                 }}
                                 className="w-full py-5 bg-red-600 text-white rounded-[2rem] font-black text-base uppercase tracking-widest shadow-xl shadow-red-100 mt-4"
                             >
-                                Gider Olarak İşle
+                                Ödeme Yap
                             </button>
                         </div>
                     </div>
