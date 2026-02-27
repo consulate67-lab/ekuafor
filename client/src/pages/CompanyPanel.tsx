@@ -120,7 +120,15 @@ export default function CompanyPanel() {
     const [showCashModal, setShowCashModal] = useState(false);
     const [vknCheckResult, setVknCheckResult] = useState<{ vkn: string; isEInvoice: boolean } | null>(null);
     const [checkingVkn, setCheckingVkn] = useState(false);
-    const [invoiceForm, setInvoiceForm] = useState({ vkn: '', tax_office: '', vat_rate: 20, discount_rate: 0, type: 'e-arsiv' });
+    const [invoiceForm, setInvoiceForm] = useState({
+        vkn: '',
+        tax_office: '',
+        vat_rate: 20,
+        discount_rate: 0,
+        type: 'e-arsiv',
+        customer_name: '',
+        customer_phone: ''
+    });
     const [reportError, setReportError] = useState('');
 
     const handleLogin = async (keyToUse?: string) => {
@@ -2007,10 +2015,16 @@ export default function CompanyPanel() {
                                                                 <button
                                                                     onClick={() => {
                                                                         setSelectedAppointment(apt);
+                                                                        setInvoiceForm(prev => ({
+                                                                            ...prev,
+                                                                            customer_name: apt.customer_name || '',
+                                                                            customer_phone: apt.customer_phone || ''
+                                                                        }));
                                                                         setShowInvoiceModal(true);
                                                                     }}
-                                                                    className="px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-slate-200"
+                                                                    className="px-5 py-2.5 bg-slate-900 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-indigo-600 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-slate-200 flex items-center gap-2"
                                                                 >
+                                                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                                                                     Faturaya Dönüştür
                                                                 </button>
                                                             </div>
@@ -2097,7 +2111,7 @@ export default function CompanyPanel() {
                                                                             className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center hover:bg-slate-800 transition-all shadow-lg shadow-slate-100"
                                                                             title="Hazırla"
                                                                         >
-                                                                            <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                                                                         </button>
                                                                     )}
                                                                     {(inv.gib_status === 'ready' || inv.gib_status === 'success' || inv.gib_status === 'failed') && (
@@ -2114,7 +2128,7 @@ export default function CompanyPanel() {
                                                                             className="w-10 h-10 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center hover:bg-slate-200 transition-all border border-slate-200"
                                                                             title="Görüntüle"
                                                                         >
-                                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                                                                         </button>
                                                                     )}
                                                                     {(inv.gib_status === 'ready' || inv.gib_status === 'failed') && (
@@ -2130,7 +2144,7 @@ export default function CompanyPanel() {
                                                                             className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
                                                                             title="Entegratöre Gönder"
                                                                         >
-                                                                            <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
                                                                         </button>
                                                                     )}
                                                                 </div>
@@ -3067,6 +3081,29 @@ export default function CompanyPanel() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Müşteri Adı Soyadı</label>
+                                    <input
+                                        type="text"
+                                        value={invoiceForm.customer_name}
+                                        onChange={(e) => setInvoiceForm(prev => ({ ...prev, customer_name: e.target.value }))}
+                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all"
+                                        placeholder="Müşteri Adı"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Telefon Numarası</label>
+                                    <input
+                                        type="text"
+                                        value={invoiceForm.customer_phone}
+                                        onChange={(e) => setInvoiceForm(prev => ({ ...prev, customer_phone: e.target.value }))}
+                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all"
+                                        placeholder="05..."
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Vergi Dairesi</label>
                                     <input
                                         type="text"
@@ -3129,7 +3166,8 @@ export default function CompanyPanel() {
                                     <button
                                         onClick={() => handleCreateInvoice({
                                             appointment_id: selectedAppointment.id,
-                                            customer_name: selectedAppointment.customer_name,
+                                            customer_name: invoiceForm.customer_name,
+                                            customer_phone: invoiceForm.customer_phone,
                                             customer_tax_number: invoiceForm.vkn,
                                             customer_tax_office: invoiceForm.tax_office,
                                             vat_rate: invoiceForm.vat_rate,
@@ -3146,7 +3184,8 @@ export default function CompanyPanel() {
                                     <button
                                         onClick={() => handleCreateInvoice({
                                             appointment_id: selectedAppointment.id,
-                                            customer_name: selectedAppointment.customer_name,
+                                            customer_name: invoiceForm.customer_name,
+                                            customer_phone: invoiceForm.customer_phone,
                                             customer_tax_number: invoiceForm.vkn,
                                             customer_tax_office: invoiceForm.tax_office,
                                             vat_rate: invoiceForm.vat_rate,
@@ -3167,7 +3206,15 @@ export default function CompanyPanel() {
                                 onClick={() => {
                                     setShowInvoiceModal(false);
                                     setVknCheckResult(null);
-                                    setInvoiceForm({ vkn: '', tax_office: '', vat_rate: 20, discount_rate: 0, type: 'e-arsiv' });
+                                    setInvoiceForm({
+                                        vkn: '',
+                                        tax_office: '',
+                                        vat_rate: 20,
+                                        discount_rate: 0,
+                                        type: 'e-arsiv',
+                                        customer_name: '',
+                                        customer_phone: ''
+                                    });
                                 }}
                                 className="w-full py-5 bg-slate-100 text-slate-400 rounded-2xl font-black text-base uppercase tracking-widest"
                             >
