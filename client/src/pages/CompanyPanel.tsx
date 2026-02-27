@@ -2543,41 +2543,87 @@ export default function CompanyPanel() {
                                             </div>
                                         ) : (
                                             currentAccounts.map(c => (
-                                                <div key={c.id} className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:border-indigo-200 transition-all group relative overflow-hidden">
-                                                    <div className="absolute top-0 right-0 w-16 h-16 bg-slate-50 rounded-full -mr-8 -mt-8 group-hover:bg-indigo-50/50 transition-all"></div>
+                                                <div key={c.id} className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100 hover:shadow-xl hover:border-indigo-200 transition-all group relative overflow-hidden flex flex-col justify-between">
+                                                    <div className="absolute top-0 right-0 w-24 h-24 bg-slate-50 rounded-full -mr-12 -mt-12 group-hover:bg-indigo-50/50 transition-all"></div>
 
                                                     <div className="relative z-10">
-                                                        <div className="flex items-center gap-3 mb-4">
-                                                            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-black text-lg">
-                                                                {c.name.charAt(0).toUpperCase()}
-                                                            </div>
-                                                            <div>
-                                                                <h4 className="font-black text-slate-900 leading-tight">{c.name}</h4>
-                                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{c.code}</p>
+                                                        <div className="flex items-start justify-between mb-6">
+                                                            <div className="flex items-center gap-4">
+                                                                <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-blue-600 text-white rounded-[1.2rem] flex items-center justify-center font-black text-2xl shadow-lg shadow-indigo-100">
+                                                                    {c.name.charAt(0).toUpperCase()}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <h4 className="font-black text-slate-900 text-xl leading-tight">{c.name}</h4>
+                                                                        <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${c.type === 'SUPPLIER' ? 'bg-amber-100 text-amber-600' : c.type === 'CUSTOMER' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-600'}`}>
+                                                                            {c.type === 'SUPPLIER' ? 'Tedarikçi' : c.type === 'CUSTOMER' ? 'Müşteri' : 'Genel'}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">{c.code}</p>
+                                                                </div>
                                                             </div>
                                                         </div>
 
-                                                        <div className="space-y-2 mb-6 text-[11px] font-medium text-slate-500">
-                                                            {c.phone && <p className="flex items-center gap-2">📞 {c.phone}</p>}
-                                                            {c.tax_number && <p className="flex items-center gap-2">📄 {c.tax_number} {c.tax_office ? `(${c.tax_office})` : ''}</p>}
-                                                            {c.city && <p className="flex items-center gap-2">📍 {c.district ? `${c.district} / ` : ''}{c.city}</p>}
+                                                        {c.title && (
+                                                            <div className="mb-4">
+                                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Ticari Ünvan</p>
+                                                                <p className="text-xs font-bold text-slate-700">{c.title}</p>
+                                                            </div>
+                                                        )}
+
+                                                        <div className="grid grid-cols-2 gap-4 mb-6">
+                                                            <div className="space-y-3">
+                                                                <div>
+                                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">İletişim</p>
+                                                                    <div className="space-y-1.5">
+                                                                        {c.phone && <p className="text-xs font-bold text-slate-600 flex items-center gap-2"><span>📞</span> {c.phone}</p>}
+                                                                        {c.email && <p className="text-xs font-bold text-slate-600 flex items-center gap-2 truncate" title={c.email}><span>✉️</span> {c.email}</p>}
+                                                                        {c.website && <p className="text-xs font-bold text-indigo-500 flex items-center gap-2 truncate"><span>🌐</span> {c.website}</p>}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="space-y-3">
+                                                                <div>
+                                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Vergi Bilgileri</p>
+                                                                    <div className="space-y-1.5">
+                                                                        <p className="text-xs font-bold text-slate-600 flex items-center gap-2"><span>📄</span> {c.tax_number || 'Belirtilmedi'}</p>
+                                                                        {c.tax_office && <p className="text-[10px] font-bold text-slate-400 ml-5">{c.tax_office}</p>}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
                                                         </div>
 
-                                                        <div className="flex gap-2">
-                                                            <button
-                                                                onClick={() => {
-                                                                    setCurrentAccountForm(c);
-                                                                    setShowCurrentAccountModal(true);
-                                                                }}
-                                                                className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-200 transition-all"
-                                                            >Düzenle</button>
-                                                            <button
-                                                                onClick={() => handleDeleteCurrentAccount(c.id!)}
-                                                                className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-100 transition-all"
-                                                            >
-                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                            </button>
-                                                        </div>
+                                                        {c.address_line && (
+                                                            <div className="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100/50">
+                                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                                    <span>📍</span> Adres Bilgisi
+                                                                </p>
+                                                                <p className="text-[11px] font-bold text-slate-600 leading-relaxed italic">
+                                                                    {c.address_line}
+                                                                </p>
+                                                                <p className="text-[10px] font-black text-indigo-600 uppercase mt-2">
+                                                                    {c.district ? `${c.district} / ` : ''}{c.city}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex gap-3 pt-6 border-t border-slate-50 relative z-10">
+                                                        <button
+                                                            onClick={() => {
+                                                                setCurrentAccountForm(c);
+                                                                setShowCurrentAccountModal(true);
+                                                            }}
+                                                            className="flex-1 py-4 bg-slate-900 text-white rounded-[1.2rem] font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-slate-100 flex items-center justify-center gap-2"
+                                                        >
+                                                            <span>✏️</span> Düzenle
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteCurrentAccount(c.id!)}
+                                                            className="w-14 h-14 bg-red-50 text-red-500 rounded-[1.2rem] flex items-center justify-center hover:bg-red-100 hover:scale-[1.02] active:scale-95 transition-all group/del"
+                                                        >
+                                                            <svg className="w-5 h-5 group-hover/del:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                        </button>
                                                     </div>
                                                 </div>
                                             ))
