@@ -113,6 +113,7 @@ export default function CompanyPanel() {
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
     const [cashTransactions, setCashTransactions] = useState<any[]>([]);
+    const [openingBalance, setOpeningBalance] = useState(0);
     const [purchaseInvoices, setPurchaseInvoices] = useState<any[]>([]);
     const [invoices, setInvoices] = useState<any[]>([]);
     const [salesSubTab, setSalesSubTab] = useState<'pending' | 'invoiced'>('pending');
@@ -216,7 +217,14 @@ export default function CompanyPanel() {
                     params: { startDate: financeDateRange.start, endDate: financeDateRange.end, search: financeSearch }
                 });
                 if (res.data.success) {
-                    setCashTransactions(res.data.data);
+                    const cashData = res.data.data;
+                    if (cashData && typeof cashData === 'object' && 'transactions' in cashData) {
+                        setCashTransactions(cashData.transactions || []);
+                        setOpeningBalance(Number(cashData.openingBalance) || 0);
+                    } else {
+                        setCashTransactions(Array.isArray(cashData) ? cashData : []);
+                        setOpeningBalance(0);
+                    }
                 }
             } else if (activeFinanceTab === 'purchases') {
                 const res = await api.get(`/finance/purchase-invoices/company/${targetCid}`, {
@@ -2216,27 +2224,45 @@ export default function CompanyPanel() {
                             {/* Cash Content */}
                             {activeFinanceTab === 'cash' && (
                                 <div className="space-y-6">
+                                    {/* Devir Alanı */}
+                                    <div className="bg-white/60 backdrop-blur-md p-5 rounded-3xl border border-white/50 flex items-center justify-between mb-2 shadow-sm">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl shadow-sm">📊</div>
+                                            <div>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Dönem Öncesinden Devir</p>
+                                                <p className="text-[11px] font-bold text-slate-500 mt-1">{new Date(financeDateRange.start).toLocaleDateString('tr-TR')} öncesi bakiye</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className={`text-base font-black ${openingBalance >= 0 ? 'text-emerald-600' : 'text-red-400'}`}>
+                                                {openingBalance >= 0 ? '+' : ''}{openingBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                            </p>
+                                        </div>
+                                    </div>
+
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div className="bg-emerald-600 p-6 rounded-[2rem] text-white shadow-xl">
                                             <p className="text-[10px] font-black uppercase opacity-60 tracking-widest">TOPLAM Tahsilat (BORÇ)</p>
                                             <h2 className="text-3xl font-black italic mt-2">
-                                                {(cashTransactions.reduce((sum, t) => sum + Number(t.debit || (t.type === 'income' ? t.amount : 0)), 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                                {(cashTransactions.reduce((sum, t) => sum + (t.type === 'income' ? (Number(t.debit) || Number(t.amount)) : 0), 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
                                             </h2>
                                             <p className="text-[8px] mt-2 font-black uppercase opacity-40">Seçili Tarih Aralığı</p>
                                         </div>
                                         <div className="bg-red-600 p-6 rounded-[2rem] text-white shadow-xl">
                                             <p className="text-[10px] font-black uppercase opacity-60 tracking-widest">TOPLAM Ödeme (ALACAK)</p>
                                             <h2 className="text-3xl font-black italic mt-2">
-                                                {(cashTransactions.reduce((sum, t) => sum + Number(t.credit || (t.type === 'expense' ? t.amount : 0)), 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                                {(cashTransactions.reduce((sum, t) => sum + (t.type === 'expense' ? (Number(t.credit) || Number(t.amount)) : 0), 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
                                             </h2>
                                             <p className="text-[8px] mt-2 font-black uppercase opacity-40">Seçili Tarih Aralığı</p>
                                         </div>
                                         <div className="bg-slate-900 p-6 rounded-[2rem] text-white shadow-xl shadow-slate-200">
                                             <p className="text-[10px] font-black uppercase opacity-60 tracking-widest">GÜNCEL Bakiye</p>
                                             <h2 className="text-3xl font-black italic mt-2">
-                                                {(cashTransactions.reduce((sum, t) => sum + Number(t.debit || (t.type === 'income' ? t.amount : 0)) - Number(t.credit || (t.type === 'expense' ? t.amount : 0)), 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                                {(openingBalance + cashTransactions.reduce((sum, t) =>
+                                                    sum + (t.type === 'income' ? (Number(t.debit) || Number(t.amount)) : -(Number(t.credit) || Number(t.amount))),
+                                                    0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
                                             </h2>
-                                            <p className="text-[8px] mt-2 font-black uppercase tracking-widest text-indigo-400">Net Kasa Durumu</p>
+                                            <p className="text-[8px] mt-2 font-black uppercase tracking-widest text-indigo-400">Devir + Dönem İçi Net</p>
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
@@ -2273,12 +2299,12 @@ export default function CompanyPanel() {
                                                         {t.type === 'income' ? (
                                                             <div className="space-y-0.5">
                                                                 <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">BORÇ (TAHSİLAT)</p>
-                                                                <p className="text-lg font-black text-emerald-600">+{Number(t.debit || t.amount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
+                                                                <p className="text-lg font-black text-emerald-600">+{Number(Number(t.debit) || Number(t.amount)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
                                                             </div>
                                                         ) : (
                                                             <div className="space-y-0.5">
                                                                 <p className="text-[9px] font-black text-red-600 uppercase tracking-widest">ALACAK (ÖDEME)</p>
-                                                                <p className="text-lg font-black text-red-600">-{Number(t.credit || t.amount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
+                                                                <p className="text-lg font-black text-red-600">-{Number(Number(t.credit) || Number(t.amount)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
                                                             </div>
                                                         )}
                                                     </div>

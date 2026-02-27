@@ -231,6 +231,18 @@ class FinanceService {
     }
 
     async getCashTransactions(companyId: number, startDate?: string, endDate?: string, search?: string) {
+        // Calculate Opening Balance (Devir) - Balance before startDate
+        let openingBalance = 0;
+        if (startDate) {
+            const obResult = await pool.query(
+                `SELECT COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) as balance 
+                 FROM cash_transactions 
+                 WHERE company_id = $1 AND transaction_date < $2`,
+                [companyId, startDate]
+            );
+            openingBalance = Number(obResult.rows[0].balance);
+        }
+
         let query = 'SELECT * FROM cash_transactions WHERE company_id = $1';
         const values: any[] = [companyId];
         let i = 2;
@@ -249,15 +261,18 @@ class FinanceService {
 
         query += ' ORDER BY transaction_date DESC, created_at DESC';
         const result = await pool.query(query, values);
-        return result.rows;
+        return {
+            transactions: result.rows,
+            openingBalance
+        };
     }
 
     async getMonthlyBalance(companyId: number) {
         const query = `
             SELECT 
-                SUM(CASE WHEN type = 'income' AND payment_method = 'nakit' THEN amount ELSE 0 END) as total_cash_income,
-                SUM(CASE WHEN type = 'expense' AND payment_method = 'nakit' THEN amount ELSE 0 END) as total_cash_expense,
-                SUM(CASE WHEN payment_method = 'kart' THEN amount ELSE 0 END) as total_card_transactions
+                SUM(CASE WHEN type = 'income' AND payment_method = 'nakit' THEN COALESCE(debit, amount) ELSE 0 END) as total_cash_income,
+                SUM(CASE WHEN type = 'expense' AND payment_method = 'nakit' THEN COALESCE(credit, amount) ELSE 0 END) as total_cash_expense,
+                SUM(CASE WHEN payment_method = 'kart' THEN COALESCE(debit, amount) ELSE 0 END) as total_card_transactions
             FROM cash_transactions 
             WHERE company_id = $1 AND transaction_date >= date_trunc('month', CURRENT_DATE)
         `;
