@@ -491,9 +491,11 @@ const runMigrations = async () => {
                 id SERIAL PRIMARY KEY,
                 company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
                 type VARCHAR(10) NOT NULL, -- income, expense
-                category VARCHAR(50), -- sales, purchase, general_expense, payment
+                category VARCHAR(50), -- sales, purchase, general_expense, payment, devir
                 payment_method VARCHAR(20) DEFAULT 'nakit', -- nakit, kart
-                amount DECIMAL(10, 2) NOT NULL,
+                amount DECIMAL(15, 2) NOT NULL DEFAULT 0,
+                debit DECIMAL(15, 2) DEFAULT 0,
+                credit DECIMAL(15, 2) DEFAULT 0,
                 description TEXT,
                 transaction_date DATE DEFAULT CURRENT_DATE,
                 due_date DATE, -- For card payments

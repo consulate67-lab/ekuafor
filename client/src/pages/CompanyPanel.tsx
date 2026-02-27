@@ -1928,21 +1928,19 @@ export default function CompanyPanel() {
                                         </div>
                                         <div className="flex flex-col gap-3">
                                             <div className="relative">
-                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs opacity-40 font-bold">BAŞLANGIÇ</span>
                                                 <input
                                                     type="date"
                                                     value={financeDateRange.start}
                                                     onChange={e => setFinanceDateRange(p => ({ ...p, start: e.target.value }))}
-                                                    className="w-full p-4 pl-24 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 focus:bg-white outline-none transition-all shadow-sm text-slate-700"
+                                                    className="w-full p-4 px-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 focus:bg-white outline-none transition-all shadow-sm text-slate-700"
                                                 />
                                             </div>
                                             <div className="relative">
-                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs opacity-40 font-bold">BİTİŞ</span>
                                                 <input
                                                     type="date"
                                                     value={financeDateRange.end}
                                                     onChange={e => setFinanceDateRange(p => ({ ...p, end: e.target.value }))}
-                                                    className="w-full p-4 pl-24 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 focus:bg-white outline-none transition-all shadow-sm text-slate-700"
+                                                    className="w-full p-4 px-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 focus:bg-white outline-none transition-all shadow-sm text-slate-700"
                                                 />
                                             </div>
                                         </div>
@@ -2030,11 +2028,9 @@ export default function CompanyPanel() {
                                                                 {apt.staff_name && <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100/50">👤 {apt.staff_name}</span>}
                                                             </div>
 
-                                                            <div className="flex items-center justify-between pt-6 border-t border-slate-50">
-                                                                <div>
-                                                                    <p className="text-2xl font-black text-slate-900">{apt.price} ₺</p>
-                                                                    <p className="text-[9px] font-black uppercase text-amber-500 tracking-[0.2em] mt-0.5">ÖDEME BEKLİYOR</p>
-                                                                </div>
+                                                            <div className="pt-6 border-t border-slate-50 flex flex-col items-center">
+                                                                <p className="text-[10px] font-black uppercase text-amber-500 tracking-[0.2em] mb-1">ÖDEME BEKLİYOR</p>
+                                                                <p className="text-xl font-black text-slate-900 mb-4">{apt.price} ₺</p>
                                                                 <button
                                                                     onClick={() => {
                                                                         setSelectedAppointment(apt);
@@ -2045,7 +2041,7 @@ export default function CompanyPanel() {
                                                                         }));
                                                                         setShowInvoiceModal(true);
                                                                     }}
-                                                                    className="px-5 py-2.5 bg-slate-900 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-indigo-600 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-slate-200 flex items-center gap-2"
+                                                                    className="w-full py-3 bg-indigo-600 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-slate-900 hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-indigo-100 flex items-center justify-center gap-2"
                                                                 >
                                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
                                                                         <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1z" />
@@ -2220,32 +2216,35 @@ export default function CompanyPanel() {
                             {/* Cash Content */}
                             {activeFinanceTab === 'cash' && (
                                 <div className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="bg-emerald-600 p-8 rounded-[2rem] text-white shadow-xl flex justify-between items-end">
-                                            <div>
-                                                <p className="text-[10px] font-black uppercase opacity-60">Kasa Nakit Bakiye</p>
-                                                <h2 className="text-4xl font-black italic mt-2">
-                                                    {(cashTransactions.filter(t => t.payment_method === 'nakit').reduce((sum, t) => sum + (t.type === 'income' ? Number(t.amount) : -Number(t.amount)), 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
-                                                </h2>
-                                            </div>
-                                            <span className="text-4xl opacity-50">💰</span>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="bg-emerald-600 p-6 rounded-[2rem] text-white shadow-xl">
+                                            <p className="text-[10px] font-black uppercase opacity-60 tracking-widest">TOPLAM Tahsilat (BORÇ)</p>
+                                            <h2 className="text-3xl font-black italic mt-2">
+                                                {(cashTransactions.reduce((sum, t) => sum + Number(t.debit || (t.type === 'income' ? t.amount : 0)), 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                            </h2>
+                                            <p className="text-[8px] mt-2 font-black uppercase opacity-40">Seçili Tarih Aralığı</p>
                                         </div>
-                                        <div className="bg-indigo-600 p-8 rounded-[2rem] text-white shadow-xl flex justify-between items-end">
-                                            <div>
-                                                <p className="text-[10px] font-black uppercase opacity-60">Kart / Bekleyen İşlemler</p>
-                                                <h2 className="text-4xl font-black italic mt-2">
-                                                    {(cashTransactions.filter(t => t.payment_method === 'kart').reduce((sum, t) => sum + Number(t.amount), 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
-                                                </h2>
-                                            </div>
-                                            <span className="text-4xl opacity-50">💳</span>
+                                        <div className="bg-red-600 p-6 rounded-[2rem] text-white shadow-xl">
+                                            <p className="text-[10px] font-black uppercase opacity-60 tracking-widest">TOPLAM Ödeme (ALACAK)</p>
+                                            <h2 className="text-3xl font-black italic mt-2">
+                                                {(cashTransactions.reduce((sum, t) => sum + Number(t.credit || (t.type === 'expense' ? t.amount : 0)), 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                            </h2>
+                                            <p className="text-[8px] mt-2 font-black uppercase opacity-40">Seçili Tarih Aralığı</p>
+                                        </div>
+                                        <div className="bg-slate-900 p-6 rounded-[2rem] text-white shadow-xl shadow-slate-200">
+                                            <p className="text-[10px] font-black uppercase opacity-60 tracking-widest">GÜNCEL Bakiye</p>
+                                            <h2 className="text-3xl font-black italic mt-2">
+                                                {(cashTransactions.reduce((sum, t) => sum + Number(t.debit || (t.type === 'income' ? t.amount : 0)) - Number(t.credit || (t.type === 'expense' ? t.amount : 0)), 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                            </h2>
+                                            <p className="text-[8px] mt-2 font-black uppercase tracking-widest text-indigo-400">Net Kasa Durumu</p>
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => setShowCashModal(true)}
-                                            className="w-full py-5 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest transition-all hover:bg-red-50 hover:text-red-500 flex items-center justify-center gap-2"
+                                            className="w-full py-5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all hover:bg-slate-800 flex items-center justify-center gap-3 shadow-xl shadow-slate-200"
                                         >
-                                            <span>💸</span> Ödeme Yap
+                                            <span className="text-xl">📊</span> Kasa İşlemi Oluştur
                                         </button>
                                     </div>
                                     <div className="space-y-3">
@@ -2255,21 +2254,33 @@ export default function CompanyPanel() {
                                             </div>
                                         ) : (
                                             cashTransactions.map(t => (
-                                                <div key={t.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center justify-between">
+                                                <div key={t.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center justify-between hover:border-indigo-100 transition-all group">
                                                     <div className="flex items-center gap-4">
-                                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${t.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                                                            {t.type === 'income' ? '+' : '-'}
+                                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg ${t.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                                                            {t.category === 'devir' ? '🔄' : t.type === 'income' ? '📥' : '📤'}
                                                         </div>
                                                         <div>
-                                                            <h4 className="font-black text-slate-900 leading-tight">{t.description || (t.type === 'income' ? 'Gelir' : 'Gider')}</h4>
-                                                            <p className="text-[10px] font-bold text-slate-400 uppercase">{t.category} • {t.payment_method}</p>
+                                                            <div className="flex items-center gap-2">
+                                                                <h4 className="font-black text-slate-900 leading-tight">{t.description || (t.type === 'income' ? 'Gelir İşlemi' : 'Gider İşlemi')}</h4>
+                                                                <span className="text-[8px] font-black px-2 py-0.5 rounded bg-slate-100 text-slate-500 uppercase tracking-widest">{t.category}</span>
+                                                            </div>
+                                                            <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">
+                                                                {new Date(t.transaction_date || t.created_at).toLocaleDateString('tr-TR')} • {t.payment_method}
+                                                            </p>
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
-                                                        <p className={`text-base font-black ${t.type === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
-                                                            {t.type === 'income' ? '+' : '-'}{t.amount} ₺
-                                                        </p>
-                                                        <p className="text-[9px] font-bold text-slate-400 uppercase">{new Date(t.created_at).toLocaleDateString('tr-TR')}</p>
+                                                        {t.type === 'income' ? (
+                                                            <div className="space-y-0.5">
+                                                                <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">BORÇ (TAHSİLAT)</p>
+                                                                <p className="text-lg font-black text-emerald-600">+{Number(t.debit || t.amount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-0.5">
+                                                                <p className="text-[9px] font-black text-red-600 uppercase tracking-widest">ALACAK (ÖDEME)</p>
+                                                                <p className="text-lg font-black text-red-600">-{Number(t.credit || t.amount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</p>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))
@@ -3299,22 +3310,33 @@ export default function CompanyPanel() {
                     <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl" onClick={e => e.stopPropagation()}
                         style={{ animation: 'slideUp 0.3s ease-out' }}>
                         <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
-                        <h2 className="text-2xl font-black text-slate-900 mb-6">Ödeme Yap</h2>
+                        <h2 className="text-2xl font-black text-slate-900 mb-6">Kasa İşlemi Oluştur</h2>
 
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
+                                <div className="col-span-2">
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Kategori</label>
                                     <select id="c_cat" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold">
-                                        <option value="general_expense">Genel Gider</option>
-                                        <option value="payment">Ödeme</option>
-                                        <option value="salary">Maaş/Prim</option>
+                                        <option value="income">Tahsilat / Gelir</option>
+                                        <option value="expense">Ödeme / Gider</option>
+                                        <option value="salary">Maaş / Prim</option>
+                                        <option value="devir">Kasa Devir İşlemi</option>
                                         <option value="other">Diğer</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Tutar (₺)</label>
-                                    <input type="number" id="c_amount" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="0.00" />
+                                    <label className="block text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2 ml-1">Borç (Tahsilat)</label>
+                                    <input type="number" id="c_debit" className="w-full p-4 bg-emerald-50 border-none rounded-2xl font-bold text-emerald-700" placeholder="0.00" />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-red-600 uppercase tracking-widest mb-2 ml-1">Alacak (Ödeme)</label>
+                                    <input type="number" id="c_credit" className="w-full p-4 bg-red-50 border-none rounded-2xl font-bold text-red-700" placeholder="0.00" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="col-span-2">
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">İşlem Tarihi</label>
+                                    <input type="date" id="c_date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" />
                                 </div>
                             </div>
                             <div>
@@ -3324,15 +3346,33 @@ export default function CompanyPanel() {
                             <button
                                 onClick={() => {
                                     const cat = (document.getElementById('c_cat') as HTMLSelectElement).value;
-                                    const amount = (document.getElementById('c_amount') as HTMLInputElement).value;
+                                    const debit = Number((document.getElementById('c_debit') as HTMLInputElement).value || 0);
+                                    const credit = Number((document.getElementById('c_credit') as HTMLInputElement).value || 0);
+                                    const date = (document.getElementById('c_date') as HTMLInputElement).value;
                                     const desc = (document.getElementById('c_desc') as HTMLTextAreaElement).value;
-                                    if (amount) {
-                                        handleCreateCashTransaction({ type: 'expense', category: cat, amount: Number(amount), description: desc, payment_method: 'nakit' });
+
+                                    if (debit === 0 && credit === 0) {
+                                        alert('Lütfen bir tutar girin');
+                                        return;
                                     }
+
+                                    const type = debit > 0 ? 'income' : 'expense';
+                                    const amount = debit > 0 ? debit : credit;
+
+                                    handleCreateCashTransaction({
+                                        type,
+                                        category: cat,
+                                        amount,
+                                        debit,
+                                        credit,
+                                        description: desc,
+                                        transaction_date: date,
+                                        payment_method: 'nakit'
+                                    });
                                 }}
-                                className="w-full py-5 bg-red-600 text-white rounded-[2rem] font-black text-base uppercase tracking-widest shadow-xl shadow-red-100 mt-4"
+                                className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-base uppercase tracking-widest shadow-xl shadow-slate-200 mt-4"
                             >
-                                Ödeme Yap
+                                İşlemi Kaydet
                             </button>
                         </div>
                     </div>

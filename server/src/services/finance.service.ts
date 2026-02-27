@@ -22,6 +22,7 @@ export interface Invoice {
     invoice_no?: string;
     gib_uuid?: string;
     gib_status?: string;
+    created_at?: string;
 }
 
 export interface CashTransaction {
@@ -31,6 +32,8 @@ export interface CashTransaction {
     category: string;
     payment_method: 'nakit' | 'kart';
     amount: number;
+    debit?: number;
+    credit?: number;
     description?: string;
     transaction_date?: string;
     due_date?: string;
@@ -111,13 +114,14 @@ class FinanceService {
                 await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ${col} ${type}`);
             }
 
-            // 5. Appointments tablosu güncellemesi
-            const appointmentCols = [
-                ['rating', 'INTEGER'],
-                ['comment', 'TEXT']
+            // 6. Cash Transactions tablosu güncellemesi
+            const cashCols = [
+                ['debit', 'NUMERIC(15,2) DEFAULT 0'],
+                ['credit', 'NUMERIC(15,2) DEFAULT 0'],
+                ['transaction_date', 'DATE DEFAULT CURRENT_DATE']
             ];
-            for (const [col, type] of appointmentCols) {
-                await client.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+            for (const [col, type] of cashCols) {
+                await client.query(`ALTER TABLE cash_transactions ADD COLUMN IF NOT EXISTS ${col} ${type}`);
             }
 
             console.log('[Migration] Database is up to date.');
@@ -174,8 +178,10 @@ class FinanceService {
                 category: 'sales',
                 payment_method: invoice.payment_method,
                 amount: grand_total,
+                debit: grand_total,
+                credit: 0,
                 description: `${invoice.customer_name} - Satış Faturası (${invoice.type})`,
-                transaction_date: new Date().toISOString().split('T')[0],
+                transaction_date: invoice.created_at ? new Date(invoice.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                 due_date: invoice.payment_method === 'kart' ? this.calculateDueDate() : undefined
             });
 
@@ -199,14 +205,17 @@ class FinanceService {
     async createCashTransactionInternal(client: any, transaction: CashTransaction) {
         const query = `
             INSERT INTO cash_transactions (
-                company_id, type, category, payment_method, amount, description, transaction_date, due_date
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                company_id, type, category, payment_method, amount, debit, credit, description, transaction_date, due_date
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
         `;
         const values = [
             transaction.company_id, transaction.type, transaction.category,
-            transaction.payment_method, transaction.amount, transaction.description,
-            transaction.transaction_date, transaction.due_date
+            transaction.payment_method, transaction.amount,
+            transaction.debit || 0, transaction.credit || 0,
+            transaction.description,
+            transaction.transaction_date || new Date().toISOString().split('T')[0],
+            transaction.due_date
         ];
         return await client.query(query, values);
     }
@@ -278,8 +287,10 @@ class FinanceService {
                 category: 'purchase',
                 payment_method: 'nakit',
                 amount: data.amount,
+                debit: 0,
+                credit: data.amount,
                 description: `${data.supplier_name} - Alış Faturası (${data.invoice_no})`,
-                transaction_date: data.invoice_date
+                transaction_date: data.invoice_date || new Date().toISOString().split('T')[0]
             });
 
             await client.query('COMMIT');
