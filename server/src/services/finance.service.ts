@@ -291,7 +291,7 @@ class FinanceService {
         return result.rows;
     }
 
-    async getInvoices(companyId: number, startDate?: string, endDate?: string) {
+    async getInvoices(companyId: number, startDate?: string, endDate?: string, search?: string) {
         let query = 'SELECT * FROM invoices WHERE company_id = $1';
         const values: any[] = [companyId];
         let i = 2;
@@ -300,6 +300,12 @@ class FinanceService {
             query += ` AND created_at::date BETWEEN $${i} AND $${i + 1}`;
             values.push(startDate, endDate);
             i += 2;
+        }
+
+        if (search) {
+            query += ` AND (customer_name ILIKE $${i} OR invoice_no ILIKE $${i})`;
+            values.push(`%${search}%`);
+            i++;
         }
 
         query += ' ORDER BY created_at DESC';

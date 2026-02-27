@@ -195,7 +195,11 @@ export default function CompanyPanel() {
                 const [aptRes, invRes] = await Promise.all([
                     api.get(`/appointments/company/${targetCid}/completed?${params.toString()}`),
                     api.get(`/finance/invoices/company/${targetCid}`, {
-                        params: { startDate: financeDateRange.start, endDate: financeDateRange.end }
+                        params: {
+                            startDate: financeDateRange.start,
+                            endDate: financeDateRange.end,
+                            search: financeSearch
+                        }
                     })
                 ]);
                 if (aptRes.data.success) {
@@ -1941,6 +1945,7 @@ export default function CompanyPanel() {
                                                 value={financeSearch}
                                                 onChange={e => setFinanceSearch(e.target.value)}
                                                 placeholder="İsim veya telefon..."
+                                                onKeyDown={e => e.key === 'Enter' && fetchFinanceData(company?.id)}
                                                 className="w-full p-3.5 pl-10 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 outline-none transition-all shadow-sm"
                                             />
                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30">🔍</span>
