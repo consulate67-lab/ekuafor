@@ -528,125 +528,88 @@ class FinanceService {
         const companyRes = await pool.query('SELECT * FROM companies WHERE id = $1', [companyId]);
         const comp = companyRes.rows[0];
 
-        const total = Number(inv.grand_total || inv.amount || 0);
-        const vat = Number(inv.vat_amount || 0);
-        const disc = Number(inv.discount_amount || 0);
-        const base = Number(inv.amount || 0);
-        const taxable = base - disc;
+        // XML Content exists? If not, prepare it temporarily
+        let xmlContent = inv.xml_content;
+        if (!xmlContent) {
+            const xsltContent = await this.getXSLT(inv.type);
+            const prefix = comp?.invoice_prefix || 'GIB';
+            const year = new Date().getFullYear();
+            const invoiceNo = inv.invoice_no || `${prefix}${year}${Math.floor(Math.random() * 900000000) + 100000000}`;
+            const uuid = inv.gib_uuid || crypto.randomUUID();
+            xmlContent = this.generateUBLTR(inv, comp, invoiceNo, uuid, xsltContent);
+        }
 
-        return `<!DOCTYPE html>
+        const xsltContent = await this.getXSLT(inv.type);
+
+        // Return an HTML that performs client-side XSLT transformation
+        // This is the most reliable way to use the provided XSLT "design files" without complex server-side native libraries
+        return `
+<!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fatura Önizleme - ${inv.invoice_no || 'TASLAK'}</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background: #f8fafc; padding: 40px; color: #0f172a; margin: 0; }
-        .invoice-box { max-width: 800px; margin: auto; background: white; padding: 50px; border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; position: relative; overflow: hidden; }
-        .invoice-box::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 8px; background: linear-gradient(to right, #6366f1, #a855f7); }
-        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
-        .company-info h1 { margin: 0; font-size: 24px; font-weight: 900; color: #1e293b; text-transform: uppercase; letter-spacing: -0.025em; }
-        .company-info p { margin: 4px 0; font-size: 13px; color: #64748b; font-weight: 500; }
-        .invoice-details { text-align: right; }
-        .invoice-details h2 { margin: 0; font-size: 32px; font-weight: 900; color: #6366f1; letter-spacing: -0.05em; }
-        .invoice-details p { margin: 4px 0; font-size: 13px; color: #94a3b8; font-weight: 700; text-transform: uppercase; }
-        
-        .section-title { font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; }
-        .client-info { margin-bottom: 40px; }
-        .client-info p { margin: 2px 0; font-size: 14px; font-weight: 600; }
-
-        table { width: 100%; border-collapse: collapse; margin: 30px 0; }
-        th { background: #f8fafc; color: #475569; font-size: 11px; font-weight: 900; text-transform: uppercase; padding: 15px; text-align: left; border-bottom: 2px solid #e2e8f0; }
-        td { padding: 15px; font-size: 14px; border-bottom: 1px solid #f1f5f9; color: #334155; font-weight: 500; }
-        
-        .totals-container { display: flex; justify-content: flex-end; margin-top: 20px; }
-        .totals-table { width: 300px; }
-        .totals-table td { padding: 8px 15px; border: none; font-size: 13px; font-weight: 600; color: #64748b; }
-        .totals-table .grand-total { border-top: 2px solid #e2e8f0; padding-top: 15px; margin-top: 10px; }
-        .totals-table .grand-total td { font-size: 20px; font-weight: 900; color: #1e293b; }
-        
-        .badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 10px; font-weight: 900; text-transform: uppercase; margin-bottom: 10px; }
-        .badge-blue { background: #eff6ff; color: #2563eb; }
-        
-        @media print { body { background: white; padding: 0; } .invoice-box { box-shadow: none; border: none; width: 100%; max-width: none; } }
+        body { margin: 0; padding: 20px; background: #f1f5f9; font-family: sans-serif; }
+        .preview-container { max-width: 900px; margin: 0 auto; background: white; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-radius: 8px; min-height: 100vh; padding: 1px; }
+        @media print {
+            body { background: white; padding: 0; }
+            .preview-container { box-shadow: none; border: none; max-width: none; }
+            .no-print { display: none; }
+        }
+        .error-msg { color: #ef4444; padding: 40px; text-align: center; font-weight: bold; }
+        .loading-msg { padding: 40px; text-align: center; color: #64748b; }
     </style>
 </head>
 <body>
-    <div class="invoice-box">
-        <div class="header">
-            <div class="company-info">
-                <h1>${comp.name}</h1>
-                <p>${comp.address_line || ''}</p>
-                <p>${comp.district || ''} / ${comp.city || ''}</p>
-                <p>VKN: ${comp.tax_number || ''} - Vergi Dairesi: ${comp.tax_office || ''}</p>
-                <p>Tel: ${comp.phone || ''}</p>
-            </div>
-            <div class="invoice-details">
-                <span class="badge badge-blue">${inv.type === 'e-fatura' ? 'E-Fatura' : 'E-Arşiv Fatura'}</span>
-                <h2>FATURA</h2>
-                <p>No: ${inv.invoice_no || 'TASLAK'}</p>
-                <p>Tarih: ${new Date(inv.created_at).toLocaleDateString('tr-TR')}</p>
-                <p>UUID: ${inv.gib_uuid || '-'}</p>
-            </div>
-        </div>
-
-        <div class="client-info">
-            <div class="section-title">SAYIN ALICI</div>
-            <p style="font-size: 18px; color: #1e293b;">${inv.customer_name}</p>
-            <p>VKN/TCKN: ${inv.customer_tax_number || '11111111111'}</p>
-            ${inv.customer_tax_office ? `<p>Vergi Dairesi: ${inv.customer_tax_office}</p>` : ''}
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Açıklama</th>
-                    <th style="text-align: right;">Birim Fiyat</th>
-                    <th style="text-align: right;">İskonto</th>
-                    <th style="text-align: right;">KDV</th>
-                    <th style="text-align: right;">Toplam</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>Hizmet Bedeli</td>
-                    <td style="text-align: right;">${base.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</td>
-                    <td style="text-align: right;">${disc > 0 ? `%${inv.discount_rate} (${disc.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺)` : '-'}</td>
-                    <td style="text-align: right;">%${inv.vat_rate}</td>
-                    <td style="text-align: right;">${taxable.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <div class="totals-container">
-            <table class="totals-table">
-                <tr>
-                    <td>Ara Toplam</td>
-                    <td style="text-align: right;">${base.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</td>
-                </tr>
-                <tr>
-                    <td>Toplam İskonto</td>
-                    <td style="text-align: right;">-${disc.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</td>
-                </tr>
-                <tr>
-                    <td>KDV Matrahı</td>
-                    <td style="text-align: right;">${taxable.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</td>
-                </tr>
-                <tr>
-                    <td>Hesaplanan KDV (%${inv.vat_rate})</td>
-                    <td style="text-align: right;">${vat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</td>
-                </tr>
-                <tr class="grand-total">
-                    <td>GENEL TOPLAM</td>
-                    <td style="text-align: right;">${total.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</td>
-                </tr>
-            </table>
-        </div>
-        
-        <div style="margin-top: 50px; border-top: 1px solid #f1f5f9; padding-top: 20px; font-size: 11px; color: #94a3b8; text-align: center;">
-            Bu belge 213 sayılı VUK hükümlerine göre elektronik ortamda düzenlenmiştir.
-        </div>
+    <div class="no-print" style="position: sticky; top: 0; background: white; padding: 10px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; z-index: 100;">
+        <span style="font-weight: bold; color: #1e293b;">${inv.type === 'e-fatura' ? 'E-Fatura' : 'E-Arşiv'} Önizleme (${inv.invoice_no || 'TASLAK'})</span>
+        <button onclick="window.print()" style="background: #4f46e5; color: white; border: none; padding: 8px 16px; rounded: 6px; cursor: pointer; font-weight: bold;">Yazdır / PDF Kaydet</button>
     </div>
+    
+    <div class="preview-container" id="invoice-render">
+        <div class="loading-msg">Fatura tasarımı yükleniyor...</div>
+    </div>
+
+    <script>
+        (function() {
+            try {
+                const xmlData = ${JSON.stringify(xmlContent)};
+                const xsltData = ${JSON.stringify(xsltContent)};
+
+                if (!xsltData) {
+                    document.getElementById('invoice-render').innerHTML = '<div class="error-msg">Tasarım dosyası (XSLT) bulunamadı.</div>';
+                    return;
+                }
+
+                const parser = new DOMParser();
+                const xml = parser.parseFromString(xmlData, "text/xml");
+                const xslt = parser.parseFromString(xsltData, "text/xml");
+
+                if (xml.getElementsByTagName("parsererror").length > 0) {
+                    throw new Error("XML Ayrıştırma Hatası");
+                }
+                if (xslt.getElementsByTagName("parsererror").length > 0) {
+                    throw new Error("XSLT Ayrıştırma Hatası");
+                }
+
+                if (window.XSLTProcessor) {
+                    const xsltProcessor = new XSLTProcessor();
+                    xsltProcessor.importStylesheet(xslt);
+                    const resultDocument = xsltProcessor.transformToFragment(xml, document);
+                    const container = document.getElementById('invoice-render');
+                    container.innerHTML = '';
+                    container.appendChild(resultDocument);
+                } else {
+                    document.getElementById('invoice-render').innerHTML = '<div class="error-msg">Tarayıcınız XSLT dönüşümünü desteklemiyor. Lütfen modern bir tarayıcı kullanın.</div>';
+                }
+            } catch (err) {
+                console.error("XSLT Transformation Error:", err);
+                document.getElementById('invoice-render').innerHTML = '<div class="error-msg">Görünüm oluşturulurken bir hata oluştu: ' + err.message + '</div>';
+            }
+        })();
+    </script>
 </body>
 </html>`;
     }
