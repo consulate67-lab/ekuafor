@@ -9,6 +9,7 @@ export default function SalonBoard() {
     const [inputKey, setInputKey] = useState('');
     const [company, setCompany] = useState<Company | null>(null);
     const [appointments, setAppointments] = useState<Appointment[]>([]);
+    const [pendingAppointments, setPendingAppointments] = useState<Appointment[]>([]);
     const [staff, setStaff] = useState<any[]>([]);
     const [services, setServices] = useState<any[]>([]);
     const [packages, setPackages] = useState<any[]>([]);
@@ -81,14 +82,16 @@ export default function SalonBoard() {
         try {
             const dateToFetch = date || selectedDate;
 
-            const [appsRes, staffRes, servRes, pkgRes] = await Promise.all([
+            const [appsRes, pendingRes, staffRes, servRes, pkgRes] = await Promise.all([
                 api.get('/appointments', { params: { company_id: compId, start_date: dateToFetch, end_date: dateToFetch } }),
+                api.get('/appointments', { params: { company_id: compId, status: 'pending' } }),
                 api.get(`/companies/${compId}/employees`),
                 api.get('/services', { params: { company_id: compId } }),
                 api.get('/packages', { params: { company_id: compId } })
             ]);
 
             setAppointments(appsRes.data.data || []);
+            setPendingAppointments(pendingRes.data.data || []);
             setStaff(staffRes.data.data || []);
             setServices(servRes.data.data || []);
             setPackages(pkgRes.data.data || []);
@@ -423,7 +426,7 @@ export default function SalonBoard() {
         );
     }
 
-    const filteredPending = appointments.filter(a => {
+    const filteredPending = pendingAppointments.filter(a => {
         if (a.status !== 'pending') return false;
         if (!staffMode || !staffInfo) return true;
         const myId = Number(staffInfo?.id);
