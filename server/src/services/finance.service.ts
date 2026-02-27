@@ -128,7 +128,8 @@ class FinanceService {
             const purchaseCols = [
                 ['subtotal', 'DECIMAL(15,2) DEFAULT 0'],
                 ['vat_total', 'DECIMAL(15,2) DEFAULT 0'],
-                ['discount_total', 'DECIMAL(15,2) DEFAULT 0']
+                ['discount_total', 'DECIMAL(15,2) DEFAULT 0'],
+                ['is_closed', 'BOOLEAN DEFAULT TRUE']
             ];
             for (const [col, type] of purchaseCols) {
                 await client.query(`ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS ${col} ${type}`);
@@ -320,11 +321,11 @@ class FinanceService {
             const amount = subtotal - discount_total + vat_total;
 
             const query = `
-                INSERT INTO purchase_invoices (company_id, supplier_name, invoice_no, amount, subtotal, vat_total, discount_total, invoice_date, description)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                INSERT INTO purchase_invoices (company_id, supplier_name, invoice_no, amount, subtotal, vat_total, discount_total, invoice_date, description, is_closed)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 RETURNING *
             `;
-            const values = [data.company_id, data.supplier_name, data.invoice_no, amount, subtotal, vat_total, discount_total, data.invoice_date || new Date().toISOString().split('T')[0], data.description];
+            const values = [data.company_id, data.supplier_name, data.invoice_no, amount, subtotal, vat_total, discount_total, data.invoice_date || new Date().toISOString().split('T')[0], data.description, data.is_closed !== false];
             const result = await client.query(query, values);
             const invoiceId = result.rows[0].id;
 
@@ -342,17 +343,19 @@ class FinanceService {
                 }
             }
 
-            await this.createCashTransactionInternal(client, {
-                company_id: data.company_id,
-                type: 'expense',
-                category: 'purchase',
-                payment_method: 'nakit',
-                amount: amount,
-                debit: 0,
-                credit: amount,
-                description: `${data.supplier_name} - Alış Faturası (${data.invoice_no})`,
-                transaction_date: data.invoice_date || new Date().toISOString().split('T')[0]
-            });
+            if (data.is_closed !== false) {
+                await this.createCashTransactionInternal(client, {
+                    company_id: data.company_id,
+                    type: 'expense',
+                    category: 'purchase',
+                    payment_method: 'nakit',
+                    amount: amount,
+                    debit: 0,
+                    credit: amount,
+                    description: `${data.supplier_name} - Alış Faturası (${data.invoice_no})`,
+                    transaction_date: data.invoice_date || new Date().toISOString().split('T')[0]
+                });
+            }
 
             await client.query('COMMIT');
             return result.rows[0];

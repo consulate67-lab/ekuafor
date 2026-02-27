@@ -126,6 +126,7 @@ export default function CompanyPanel() {
         invoice_no: '',
         invoice_date: new Date().toISOString().split('T')[0],
         description: '',
+        is_closed: true,
         items: [] as any[]
     });
     const [invoiceForm, setInvoiceForm] = useState({
@@ -3478,13 +3479,27 @@ export default function CompanyPanel() {
                                         placeholder="İşlem detayı..."
                                     />
                                 </div>
-                                <div className="bg-slate-900 rounded-3xl p-6 text-white flex flex-col justify-center">
+                                <div className="bg-slate-900 rounded-3xl p-6 text-white flex flex-col justify-center relative overflow-hidden group">
+                                    <div className="absolute top-4 right-4 z-10">
+                                        <button
+                                            onClick={() => setPurchaseForm({ ...purchaseForm, is_closed: !purchaseForm.is_closed })}
+                                            className={`px-3 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest transition-all border ${purchaseForm.is_closed
+                                                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                                    : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                                }`}
+                                        >
+                                            {purchaseForm.is_closed ? '🔐 Kapalı Fatura' : '🔓 Açık Fatura'}
+                                        </button>
+                                    </div>
                                     <p className="text-[10px] font-black uppercase opacity-60 tracking-widest">Genel Toplam</p>
                                     <h2 className="text-3xl font-black italic mt-1">
                                         {purchaseForm.items.reduce((sum, item) =>
                                             sum + ((item.unit_price * item.quantity) * (1 - item.discount_rate / 100) * (1 + item.vat_rate / 100)),
                                             0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
                                     </h2>
+                                    <p className="text-[8px] mt-2 font-black text-white/30 uppercase tracking-widest group-hover:text-white/50 transition-colors">
+                                        {purchaseForm.is_closed ? '* Kasadan Nakit Çıkışı Yapılacak' : '* Cari Borç Olarak Kaydedilecek'}
+                                    </p>
                                 </div>
                             </div>
 
@@ -3520,6 +3535,7 @@ export default function CompanyPanel() {
                                             invoice_no: purchaseForm.invoice_no,
                                             description: purchaseForm.description,
                                             invoice_date: purchaseForm.invoice_date,
+                                            is_closed: purchaseForm.is_closed,
                                             amount: totalAmount,
                                             items: processedItems
                                         });
@@ -3530,6 +3546,7 @@ export default function CompanyPanel() {
                                             invoice_no: '',
                                             invoice_date: new Date().toISOString().split('T')[0],
                                             description: '',
+                                            is_closed: true,
                                             items: []
                                         });
                                     }}
@@ -3553,7 +3570,12 @@ export default function CompanyPanel() {
                         <div className="flex justify-between items-start mb-8">
                             <div>
                                 <h2 className="text-2xl font-black text-slate-900 leading-tight">{selectedPurchaseInvoice.supplier_name}</h2>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Alış Faturası Detayı</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Alış Faturası Detayı</p>
+                                    <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase ${selectedPurchaseInvoice.is_closed ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                                        {selectedPurchaseInvoice.is_closed ? 'Kapalı' : 'Açık'}
+                                    </span>
+                                </div>
                             </div>
                             <div className="text-right">
                                 <p className="text-xs font-black text-slate-900">{selectedPurchaseInvoice.invoice_no || '---'}</p>
