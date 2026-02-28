@@ -167,23 +167,55 @@ export default function ServiceManagement() {
     };
 
     const Templates = {
-        men: [
-            { name: 'Saç Kesimi', duration: 30, price: 200, description: 'Yıkama dahil saç kesimi' },
-            { name: 'Sakal Tıraşı', duration: 15, price: 100, description: 'Sakal düzeltme ve şekillendirme' },
-            { name: 'Saç & Sakal', duration: 45, price: 280, description: 'Komple bakım paketi' },
-            { name: 'Çocuk Tıraşı', duration: 20, price: 150, description: '12 yaş altı' },
-            { name: 'Saç Boyama', duration: 60, price: 500, description: 'Dip boya veya komple' },
-            { name: 'Fön', duration: 15, price: 80, description: 'Yıkama ve fön' }
+        hairdresser: [
+            { name: 'Saç Kesimi', duration: 45, price: 300, description: 'Modern saç kesimi ve şekillendirme' },
+            { name: 'Fön ve Şekillendirme', duration: 30, price: 150, description: 'Fön ve günlük şekillendirme' },
+            { name: 'Topuz ve Özel Tasarım', duration: 60, price: 500, description: 'Özel gün ve davet saç tasarımı' },
+            { name: 'Saç Boyama (Dip)', duration: 90, price: 600, description: 'Dip boyama işlemi' },
+            { name: 'Saç Boyama (Komple)', duration: 120, price: 1000, description: 'Tüm saç boyama' },
+            { name: 'Röfle / Balyaj', duration: 180, price: 2000, description: 'Röfle, balyaj, ombre, sombre işlemleri' },
+            { name: 'Saç Açma İşlemleri', duration: 150, price: 1500, description: 'Saç rengi açma ve temizleme' },
+            { name: 'Keratin Bakım', duration: 90, price: 800, description: 'Saç düzleştirme ve bakım' },
+            { name: 'Saç Botoksu', duration: 60, price: 600, description: 'Yoğun nem ve dolgunluk veren bakım' },
+            { name: 'Perma', duration: 120, price: 1200, description: 'Kalıcı dalga işlemi' },
+            { name: 'Saç Kaynak', duration: 180, price: 3000, description: 'Mikro veya boncuk kaynak uygulaması' },
+            { name: 'Saç Bakım Kürleri', duration: 30, price: 250, description: 'Özel bakım maskeleri ve kürler' },
+            { name: 'Gelin Saçı & Prova', duration: 120, price: 2500, description: 'Gelin saç tasarımı ve prova' },
+            { name: 'Kaş Alma', duration: 15, price: 100, description: 'Kaş şekillendirme' }
         ],
-        women: [
-            { name: 'Saç Kesimi', duration: 45, price: 300, description: 'Yıkama ve şekillendirme dahil' },
-            { name: 'Fön', duration: 30, price: 150, description: 'Düz veya dalgalı fön' },
-            { name: 'Dip Boya', duration: 90, price: 600, description: 'Dip boyama işlemi' },
-            { name: 'Komple Boya', duration: 120, price: 1000, description: 'Tüm saç boyama' },
-            { name: 'Ombre / Balyaj', duration: 180, price: 2000, description: 'Açma boyama işlemleri' },
-            { name: 'Manikür', duration: 30, price: 200, description: 'Klasik manikür' },
-            { name: 'Pedikür', duration: 45, price: 300, description: 'Klasik pedikür' },
-            { name: 'Kaş Bıyık', duration: 15, price: 100, description: 'İple veya ağda ile' }
+        barber: [
+            { name: 'Erkek Saç Kesimi', duration: 30, price: 200, description: 'Yıkama dahil saç kesimi' },
+            { name: 'Sakal Tıraşı (Makine)', duration: 15, price: 100, description: 'Makine ile sakal düzeltme' },
+            { name: 'Sakal Tıraşı (Ustura)', duration: 25, price: 150, description: 'Geleneksel ustura tıraşı' },
+            { name: 'Yıkama & Şekillendirme', duration: 20, price: 100, description: 'Saç yıkama ve fön' },
+            { name: 'Çocuk Saç Kesimi', duration: 25, price: 150, description: '12 yaş altı çocuk kesimi' },
+            { name: 'Saç Boyama (Erkek)', duration: 60, price: 400, description: 'Erkek saç boyama işlemi' },
+            { name: 'Beyaz Kapatma', duration: 30, price: 300, description: 'Doğal beyaz kapatma işlemi' },
+            { name: 'Keratin / Bakım', duration: 45, price: 350, description: 'Erkek saç bakım uygulaması' },
+            { name: 'Damat Tıraşı Paketi', duration: 90, price: 1000, description: 'Damat özel bakım paketi' },
+            { name: 'Kaş Düzeltme', duration: 10, price: 50, description: 'Doğal kaş düzeltme' },
+            { name: 'Saç Tasarım (Fade)', duration: 45, price: 250, description: 'Fade ve modern kesimler' }
+        ],
+        beauty: [
+            { name: 'Cilt Bakımı (Klasik)', duration: 60, price: 500, description: 'Derinlemesine gözenek temizliği' },
+            { name: 'Hydrafacial / Medikal', duration: 75, price: 1200, description: 'Cihazlı medikal cilt bakımı' },
+            { name: 'Lazer Epilasyon', duration: 60, price: 1500, description: 'Kalıcı tüy yok etme işlemi' },
+            { name: 'IPL Epilasyon', duration: 45, price: 1000, description: 'Işık bazlı tüy azaltma' },
+            { name: 'İğneli Epilasyon', duration: 30, price: 400, description: 'Tekli tüy yok etme işlemi' },
+            { name: 'Kalıcı Makyaj', duration: 120, price: 2500, description: 'Microblading, dudak renklendirme vb.' },
+            { name: 'Kirpik Lifting', duration: 45, price: 400, description: 'Doğal kirpik kaldırma işlemi' },
+            { name: 'Kirpik Uzatma / İpek', duration: 90, price: 800, description: 'İpek kirpik uygulaması' },
+            { name: 'Kaş Laminasyon', duration: 45, price: 450, description: 'Kaş şekillendirme ve sabitleme' },
+            { name: 'Bölgesel İncelme', duration: 45, price: 800, description: 'G5, kavitasyon vb. uygulamalar' },
+            { name: 'Masaj Hizmetleri', duration: 50, price: 750, description: 'Profesyonel vücut masajı' },
+            { name: 'Manikür', duration: 30, price: 200, description: 'Klasik el bakımı' },
+            { name: 'Pedikür', duration: 45, price: 300, description: 'Klasik ayak bakımı' },
+            { name: 'Protez Tırnak', duration: 120, price: 800, description: 'Tırnak uzatma ve güçlendirme' },
+            { name: 'Nail Art', duration: 30, price: 150, description: 'Özel tırnak süsleme tasarımları' },
+            { name: 'Ağda', duration: 30, price: 150, description: 'Geleneksel tüy alma işlemi' },
+            { name: 'Solaryum', duration: 15, price: 200, description: 'Yapay bronzlaşma seansı' },
+            { name: 'Leke Tedavisi', duration: 60, price: 1500, description: 'Cilt leke giderme protokolü' },
+            { name: 'Akne Tedavisi', duration: 60, price: 1000, description: 'Aktif akne ve iz tedavisi' }
         ]
     };
 
@@ -556,33 +588,68 @@ export default function ServiceManagement() {
             {/* Template Modal */}
             {showTemplates && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col relative">
+                    <div className="bg-white w-full max-w-6xl rounded-[3rem] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col relative">
                         <button onClick={() => setShowTemplates(false)} className="absolute top-6 right-6 p-2 bg-slate-50 text-slate-400 rounded-full hover:bg-slate-100 transition-colors z-10">
                             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                         <div className="p-10 border-b border-slate-50 flex flex-col bg-slate-50/30">
                             <h3 className="text-2xl font-black text-slate-900 tracking-tight">Hizmet Şablonları</h3>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">İşletmenize uygun hizmetleri tek tıkla ekleyin</p>
                         </div>
                         <div className="p-10 overflow-y-auto">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                {/* Kuaför */}
                                 <div>
-                                    <h4 className="text-indigo-600 font-black uppercase tracking-widest text-xs mb-6">Erkek Kuaförü</h4>
-                                    <div className="space-y-4">
-                                        {Templates.men.map((t, i) => (
-                                            <div key={i} className="flex items-center justify-between p-5 rounded-3xl border border-slate-100">
-                                                <span>{t.name} (₺{t.price})</span>
-                                                <button onClick={() => handleAddFromTemplate(t)} className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl">+</button>
+                                    <h4 className="text-violet-600 font-black uppercase tracking-widest text-[10px] mb-6 flex items-center gap-2">
+                                        <span className="w-2 h-2 bg-violet-600 rounded-full"></span>
+                                        Kuaför & Saç
+                                    </h4>
+                                    <div className="space-y-3">
+                                        {Templates.hairdresser.map((t: any, i: number) => (
+                                            <div key={i} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 group hover:border-violet-100 transition-all">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[11px] font-bold text-slate-700">{t.name}</span>
+                                                    <span className="text-[9px] text-slate-400">₺{t.price} | {t.duration} dk</span>
+                                                </div>
+                                                <button onClick={() => handleAddFromTemplate(t)} className="w-8 h-8 bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-600 hover:text-white transition-all font-bold">+</button>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
+
+                                {/* Berber */}
                                 <div>
-                                    <h4 className="text-pink-600 font-black uppercase tracking-widest text-xs mb-6">Kadın Kuaförü</h4>
-                                    <div className="space-y-4">
-                                        {Templates.women.map((t, i) => (
-                                            <div key={i} className="flex items-center justify-between p-5 rounded-3xl border border-slate-100">
-                                                <span>{t.name} (₺{t.price})</span>
-                                                <button onClick={() => handleAddFromTemplate(t)} className="w-10 h-10 bg-pink-50 text-pink-600 rounded-xl">+</button>
+                                    <h4 className="text-indigo-600 font-black uppercase tracking-widest text-[10px] mb-6 flex items-center gap-2">
+                                        <span className="w-2 h-2 bg-indigo-600 rounded-full"></span>
+                                        Berber & Erkek
+                                    </h4>
+                                    <div className="space-y-3">
+                                        {Templates.barber.map((t: any, i: number) => (
+                                            <div key={i} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 group hover:border-indigo-100 transition-all">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[11px] font-bold text-slate-700">{t.name}</span>
+                                                    <span className="text-[9px] text-slate-400">₺{t.price} | {t.duration} dk</span>
+                                                </div>
+                                                <button onClick={() => handleAddFromTemplate(t)} className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all font-bold">+</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Güzellik */}
+                                <div>
+                                    <h4 className="text-rose-600 font-black uppercase tracking-widest text-[10px] mb-6 flex items-center gap-2">
+                                        <span className="w-2 h-2 bg-rose-600 rounded-full"></span>
+                                        Güzellik Merkezi
+                                    </h4>
+                                    <div className="space-y-3">
+                                        {Templates.beauty.map((t: any, i: number) => (
+                                            <div key={i} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 group hover:border-rose-100 transition-all">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[11px] font-bold text-slate-700">{t.name}</span>
+                                                    <span className="text-[9px] text-slate-400">₺{t.price} | {t.duration} dk</span>
+                                                </div>
+                                                <button onClick={() => handleAddFromTemplate(t)} className="w-8 h-8 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-all font-bold">+</button>
                                             </div>
                                         ))}
                                     </div>
