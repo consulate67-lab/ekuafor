@@ -11,8 +11,11 @@ interface Salon {
     address: string;
     city: string;
     district: string;
+    neighborhood?: string;
+    street?: string;
     lat: number;
     lon: number;
+    resolving?: boolean;
 }
 
 export default function SalonDataGenerator() {
@@ -24,6 +27,39 @@ export default function SalonDataGenerator() {
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+
+    const resolveAddress = async (salon: Salon) => {
+        setSalons(prev => prev.map(s => s.osm_id === salon.osm_id ? { ...s, resolving: true } : s));
+        try {
+            const response = await api.get('/generator/resolve-address', {
+                params: { lat: salon.lat, lon: salon.lon }
+            });
+            if (response.data.success) {
+                const info = response.data.data;
+                setSalons(prev => prev.map(s => s.osm_id === salon.osm_id ? {
+                    ...s,
+                    city: info.city || s.city,
+                    district: info.district || s.district,
+                    neighborhood: info.neighborhood,
+                    street: info.street,
+                    address: info.full_address || s.address,
+                    resolving: false
+                } : s));
+            }
+        } catch (err) {
+            console.error('Resolve error:', err);
+            setSalons(prev => prev.map(s => s.osm_id === salon.osm_id ? { ...s, resolving: false } : s));
+        }
+    };
+
+    const resolveSelected = async () => {
+        const toResolve = salons.filter(s => selectedIds.includes(s.osm_id));
+        for (const salon of toResolve) {
+            await resolveAddress(salon);
+            // Sleep for 1 second to respect Nominatim usage policy
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    };
 
     const fetchSalons = async () => {
         if (!city.trim()) {
@@ -40,10 +76,42 @@ export default function SalonDataGenerator() {
                 params: { city, district }
             });
             if (response.data.success) {
-                setSalons(response.data.data);
+                const fetchedSalons = response.data.data;
+                setSalons(fetchedSalons);
+
+                // Automatically start resolving addresses for the first 10 items (to avoid long waits)
+                // The rest can be resolved by selecting them and clicking resolve if needed
+                // Or we can resolve all if it's a small list.
+                if (fetchedSalons.length > 0) {
+                    // We use a small timeout to let the UI render first
+                    setTimeout(async () => {
+                        for (const salon of fetchedSalons.slice(0, 20)) {
+                            await resolveAddress(salon);
+                            await new Promise(r => setTimeout(r, 1000));
+                        }
+                    }, 500);
+                }
             }
         } catch (err: any) {
             setError(err.response?.data?.error || 'Veri çekilirken bir hata oluştu');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const runBulkUpdate = async () => {
+        if (!confirm('Eksik adresi olan tüm mevcut salonlarınızın adresleri koordinatlarına göre güncellenecektir. Bu işlem her kayıt için 1 saniye sürecektir. Devam edilsin mi?')) return;
+
+        setLoading(true);
+        setError('');
+        setSuccess('');
+        try {
+            const response = await api.post('/generator/update-existing-companies');
+            if (response.data.success) {
+                setSuccess(response.data.message);
+            }
+        } catch (err: any) {
+            setError(err.response?.data?.error || 'Güncelleme sırasında hata oluştu');
         } finally {
             setLoading(false);
         }
@@ -101,6 +169,14 @@ export default function SalonDataGenerator() {
                             Salon Veri Oluşturucu <span className="text-emerald-500 font-normal not-italic text-sm lowercase">OpenStreetMap + Overpass</span>
                         </h1>
                     </div>
+                    <button
+                        onClick={runBulkUpdate}
+                        className="text-[10px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100 transition-all flex items-center gap-2"
+                        title="Eksik adresli mevcut salonları koordinatlarından güncelle"
+                    >
+                        <span>🔄</span>
+                        Mevcut Verileri Güncelle
+                    </button>
                 </div>
             </header>
 
@@ -177,34 +253,46 @@ export default function SalonDataGenerator() {
                                 </div>
                             </div>
 
-                            <button
-                                onClick={handleImport}
-                                disabled={selectedIds.length === 0 || importing}
-                                className={`w-full md:w-auto bg-emerald-500 text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-500/20 hover:bg-emerald-600 hover:scale-[1.02] transition-all active:scale-95 flex items-center justify-center gap-3 ${importing || selectedIds.length === 0 ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
-                            >
-                                {importing ? (
-                                    <>
-                                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                                        Aktarılıyor...
-                                    </>
-                                ) : (
-                                    <>
-                                        <span>📥</span>
-                                        Sisteme Aktar
-                                    </>
-                                )}
-                            </button>
+                            <div className="flex items-center gap-3 w-full md:w-auto">
+                                <button
+                                    onClick={resolveSelected}
+                                    disabled={selectedIds.length === 0 || importing}
+                                    className={`flex-1 md:flex-none bg-indigo-50 text-indigo-600 px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-indigo-100 transition-all active:scale-95 flex items-center justify-center gap-2 ${selectedIds.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    <span>🛰️</span>
+                                    Adresleri İyileştir
+                                </button>
+                                <button
+                                    onClick={handleImport}
+                                    disabled={selectedIds.length === 0 || importing}
+                                    className={`flex-[2] md:flex-none bg-emerald-500 text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-500/20 hover:bg-emerald-600 hover:scale-[1.02] transition-all active:scale-95 flex items-center justify-center gap-3 ${importing || selectedIds.length === 0 ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
+                                >
+                                    {importing ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                                            Aktarılıyor...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span>📥</span>
+                                            Sisteme Aktar
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {salons.map(salon => (
                                 <div
                                     key={salon.osm_id}
-                                    onClick={() => toggleSelect(salon.osm_id)}
-                                    className={`group relative bg-white rounded-[2rem] p-6 border-2 transition-all cursor-pointer hover:shadow-xl hover:shadow-slate-200/50 ${selectedIds.includes(salon.osm_id) ? 'border-emerald-500 bg-emerald-50/10' : 'border-white'}`}
+                                    className={`group relative bg-white rounded-[2rem] p-6 border-2 transition-all hover:shadow-xl hover:shadow-slate-200/50 ${selectedIds.includes(salon.osm_id) ? 'border-emerald-500 bg-emerald-50/10' : 'border-white'}`}
                                 >
                                     {/* Selection Checkbox */}
-                                    <div className={`absolute top-6 right-6 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${selectedIds.includes(salon.osm_id) ? 'bg-emerald-500 border-emerald-500 scale-110' : 'bg-slate-50 border-slate-100'}`}>
+                                    <div
+                                        onClick={(e) => { e.stopPropagation(); toggleSelect(salon.osm_id); }}
+                                        className={`absolute top-6 right-6 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all cursor-pointer ${selectedIds.includes(salon.osm_id) ? 'bg-emerald-500 border-emerald-500 scale-110' : 'bg-slate-50 border-slate-100 hover:border-emerald-300'}`}
+                                    >
                                         {selectedIds.includes(salon.osm_id) && (
                                             <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" />
@@ -213,7 +301,7 @@ export default function SalonDataGenerator() {
                                     </div>
 
                                     <div className="flex flex-col h-full">
-                                        <div className="mb-4">
+                                        <div className="mb-4 pr-8">
                                             <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-md tracking-tighter mb-2 inline-block ${salon.type === 'Güzellik Salonu' ? 'bg-indigo-100 text-indigo-700' : 'bg-pink-100 text-pink-700'}`}>
                                                 {salon.type}
                                             </span>
@@ -222,12 +310,20 @@ export default function SalonDataGenerator() {
                                             </h3>
                                         </div>
 
-                                        <div className="space-y-3 mt-auto">
+                                        <div className="space-y-3 mt-auto mb-6">
                                             <div className="flex items-start gap-3">
                                                 <span className="text-sm opacity-40">📍</span>
-                                                <p className="text-xs font-bold text-slate-500 leading-relaxed italic line-clamp-2">
-                                                    {salon.address || 'Adres bilgisi bulunamadı'}
-                                                </p>
+                                                <div className="flex flex-col gap-1">
+                                                    {(salon.street || salon.neighborhood) && (
+                                                        <p className="text-[10px] font-black text-indigo-600 uppercase tracking-tighter leading-none mb-1">
+                                                            {salon.neighborhood && `${salon.neighborhood} MH. `}
+                                                            {salon.street && `${salon.street} CD./SK.`}
+                                                        </p>
+                                                    )}
+                                                    <p className="text-xs font-bold text-slate-500 leading-relaxed italic line-clamp-2">
+                                                        {salon.address || 'Adres bilgisi bulunamadı'}
+                                                    </p>
+                                                </div>
                                             </div>
                                             {salon.phone && (
                                                 <div className="flex items-center gap-3">
@@ -237,9 +333,31 @@ export default function SalonDataGenerator() {
                                             )}
                                         </div>
 
-                                        <div className="mt-6 pt-4 border-t border-slate-50 flex justify-between items-center">
-                                            <span className="text-[10px] font-black text-slate-300 uppercase italic">OSM ID: {salon.osm_id}</span>
-                                            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-tighter">{salon.city}</span>
+                                        <div className="mt-auto space-y-3">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); resolveAddress(salon); }}
+                                                disabled={salon.resolving}
+                                                className={`w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${salon.street ? 'bg-emerald-50 text-emerald-600 cursor-default' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
+                                            >
+                                                {salon.resolving ? (
+                                                    <>
+                                                        <div className="w-3 h-3 border-2 border-slate-200 border-t-slate-500 rounded-full animate-spin"></div>
+                                                        Çözülüyor...
+                                                    </>
+                                                ) : salon.street ? (
+                                                    <>✅ Adres Çözüldü</>
+                                                ) : (
+                                                    <>🛰️ Adres Çöz</>
+                                                )}
+                                            </button>
+
+                                            <div className="pt-4 border-t border-slate-50 flex justify-between items-center">
+                                                <span className="text-[10px] font-black text-slate-300 uppercase italic">OSM ID: {salon.osm_id}</span>
+                                                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-tighter leading-none text-right">
+                                                    {salon.city}<br />
+                                                    <span className="text-slate-400">{salon.district}</span>
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

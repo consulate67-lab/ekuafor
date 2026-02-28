@@ -6,6 +6,31 @@ import { authMiddleware, roleCheck } from '../middleware/auth.middleware';
 const router = Router();
 
 /**
+ * Reverse geocode using Nominatim (OSM)
+ * To follow OSM usage policy, we should use this sparingly or with delays
+ */
+async function reverseGeocode(lat: number, lon: number) {
+    try {
+        const response = await axios.get('https://nominatim.openstreetmap.org/reverse', {
+            params: {
+                format: 'json',
+                lat,
+                lon,
+                zoom: 18,
+                addressdetails: 1
+            },
+            headers: {
+                'User-Agent': 'EkuaforSalonGenerator/1.0'
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error('[Nominatim] Error:', error);
+        return null;
+    }
+}
+
+/**
  * GET /api/maps/overpass
  * Fetch salon data from OpenStreetMap via Overpass API
  */
@@ -93,6 +118,93 @@ router.get('/overpass', authMiddleware, roleCheck(['super_admin', 'company_admin
             error: 'OSM verisi çekilirken hata oluştu',
             details: error.message
         });
+    }
+});
+
+/**
+ * GET /api/generator/resolve-address
+ * Resolve full address components from coordinates using Nominatim
+ */
+router.get('/resolve-address', authMiddleware, async (req: Request, res: Response) => {
+    try {
+        const { lat, lon } = req.query;
+        if (!lat || !lon) return res.status(400).json({ success: false, error: 'Lat and Lon are required' });
+
+        const data = await reverseGeocode(parseFloat(lat as string), parseFloat(lon as string));
+        if (!data) return res.status(404).json({ success: false, error: 'Address not found' });
+
+        const addr = data.address;
+        res.json({
+            success: true,
+            data: {
+                city: addr.province || addr.city || addr.state || '',
+                district: addr.city_district || addr.district || addr.town || addr.borough || '',
+                neighborhood: addr.suburb || addr.neighbourhood || addr.quarter || addr.village || '',
+                street: addr.road || '',
+                full_address: data.display_name
+            }
+        });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/generator/update-existing-companies
+ * Updates all existing companies that have coordinates but missing city/district info
+ */
+router.post('/update-existing-companies', authMiddleware, roleCheck(['super_admin']), async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+        // Find companies with coordinates but missing detailed address info
+        const result = await client.query(`
+            SELECT id, latitude, longitude, name 
+            FROM companies 
+            WHERE latitude IS NOT NULL AND longitude IS NOT NULL 
+            AND (city IS NULL OR district IS NULL OR address_line IS NULL OR address_line = '')
+        `);
+
+        console.log(`[Batch Update] Found ${result.rows.length} companies to update`);
+
+        let updatedCount = 0;
+        for (const company of result.rows) {
+            const geocode = await reverseGeocode(company.latitude, company.longitude);
+            if (geocode && geocode.address) {
+                const addr = geocode.address;
+                const city = addr.province || addr.city || addr.state || '';
+                const district = addr.city_district || addr.district || addr.town || addr.borough || '';
+                const neighborhood = addr.suburb || addr.neighbourhood || addr.quarter || addr.village || '';
+                const street = addr.road || '';
+
+                await client.query(`
+                    UPDATE companies 
+                    SET city = $1, 
+                        province_name = $1,
+                        district = $2, 
+                        district_name = $2,
+                        neighborhood_name = $3,
+                        address_line = $4
+                    WHERE id = $5
+                `, [city, district, neighborhood, geocode.display_name, company.id]);
+
+                updatedCount++;
+                console.log(`[Batch Update] Updated ${company.name}`);
+
+                // Rate limiting for Nominatim (1 request per second)
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        }
+
+        res.json({
+            success: true,
+            message: `${updatedCount} firma bilgisi güncellendi`,
+            count: updatedCount
+        });
+    } catch (error: any) {
+        console.error('[Batch Update] Error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    } finally {
+        client.release();
     }
 });
 
