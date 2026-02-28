@@ -58,14 +58,18 @@ export default function CustomerHome() {
             const allCompanies = res.data?.data || [];
             setCompanies(allCompanies);
 
-            // Client-side distance calculation for DISPLAY only
+            // Haversine formula for precise spherical distance
             const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-                const R = 6371;
+                const R = 6371.071; // Earth's radius in km - more precise for local
+                const rLat1 = lat1 * Math.PI / 180;
+                const rLat2 = lat2 * Math.PI / 180;
                 const dLat = (lat2 - lat1) * Math.PI / 180;
                 const dLon = (lon2 - lon1) * Math.PI / 180;
+
                 const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.cos(rLat1) * Math.cos(rLat2) *
                     Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
                 const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
                 return R * c;
             };
@@ -73,10 +77,11 @@ export default function CustomerHome() {
             const resultWithDistance = allCompanies.map((c: Company) => {
                 let distance = undefined;
                 if (loc) {
-                    const lat2 = c.latitude ? (typeof c.latitude === 'string' ? parseFloat(c.latitude) : c.latitude) : null;
-                    const lng2 = c.longitude ? (typeof c.longitude === 'string' ? parseFloat(c.longitude) : c.longitude) : null;
+                    // Critical: Ensure coordinate values are strictly parsed as floats
+                    const lat2 = c.latitude ? parseFloat(String(c.latitude)) : null;
+                    const lng2 = c.longitude ? parseFloat(String(c.longitude)) : null;
 
-                    if (lat2 !== null && lng2 !== null && lat2 !== 0 && lng2 !== 0) {
+                    if (lat2 !== null && lng2 !== null && !isNaN(lat2) && !isNaN(lng2) && lat2 !== 0 && lng2 !== 0) {
                         distance = calculateDistance(loc.lat, loc.lng, lat2, lng2);
                     }
                 }
@@ -84,14 +89,16 @@ export default function CustomerHome() {
             });
 
             let finalResult = resultWithDistance;
-            // Eğer konum varsa ve mesafe filtresi aktifse eliyoruz
+
+            // Apply strict distance filtering if location is available and slider is active or limit is set
             if (loc) {
                 const threshold = dist || distanceLimit;
+                // Only show results within threshold. If distance is unknown, we hide it to prevent "ghost" results far away.
                 finalResult = resultWithDistance.filter((c: any) =>
-                    c.distance === undefined || c.distance <= threshold
+                    c.distance !== undefined && c.distance <= threshold
                 );
 
-                // Yakından uzağa sıralıyoruz
+                // Sort primarily by distance (closest first)
                 finalResult.sort((a: any, b: any) => (a.distance || 0) - (b.distance || 0));
             }
 

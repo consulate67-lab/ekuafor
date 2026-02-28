@@ -292,7 +292,8 @@ class CompanyService {
         if (filters?.lat && filters?.lng && filters?.radius) {
             // Earth radius: 6371 km
             whereClauses.push(`(
-                (c.latitude IS NULL OR c.longitude IS NULL OR c.latitude = 0 OR c.longitude = 0) OR
+                c.latitude IS NOT NULL AND c.longitude IS NOT NULL AND 
+                c.latitude != 0 AND c.longitude != 0 AND
                 (6371 * acos(
                     LEAST(1.0, GREATEST(-1.0, 
                         cos(radians($${paramIndex})) * cos(radians(c.latitude)) * 
