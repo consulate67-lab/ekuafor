@@ -16,6 +16,7 @@ import departmentRoutes from './routes/department.routes';
 import reportRoutes from './routes/report.routes';
 import mainCompanyRoutes from './routes/mainCompany.routes';
 import financeRoutes from './routes/finance.routes';
+import generatorRoutes from './routes/generator.routes';
 import cronService from './services/cron.service';
 
 
@@ -155,6 +156,9 @@ app.use('/ekuafor/api/main-companies', mainCompanyRoutes);
 
 app.use('/api/finance', financeRoutes);
 app.use('/ekuafor/api/finance', financeRoutes);
+
+app.use('/api/generator', generatorRoutes);
+app.use('/ekuafor/api/generator', generatorRoutes);
 
 
 // Setup Route (For DB Init)

@@ -18,6 +18,7 @@ import CompanyPanel from './pages/CompanyPanel';
 import MyAppointments from './pages/MyAppointments';
 import MainCompanyPanel from './pages/MainCompanyPanel';
 import MainCompanyReports from './pages/MainCompanyReports';
+import SalonDataGenerator from './pages/SalonDataGenerator';
 import { useAppointmentSync } from './hooks/useAppointmentSync';
 
 
@@ -83,6 +84,7 @@ function App() {
                     <Route path="/main-management" element={<MainCompanyPanel />} />
                     <Route path="/main-reports" element={<MainCompanyReports />} />
                     <Route path="/main-reports/:code" element={<MainCompanyReports />} />
+                    <Route path="/salon-generator" element={<SalonDataGenerator />} />
 
 
                     {/* Protected Routes */}
