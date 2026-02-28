@@ -9,7 +9,7 @@ const router = Router();
  * GET /api/maps/overpass
  * Fetch salon data from OpenStreetMap via Overpass API
  */
-router.get('/overpass', authMiddleware, roleCheck(['super_admin']), async (req: Request, res: Response) => {
+router.get('/overpass', authMiddleware, roleCheck(['super_admin', 'company_admin']), async (req: Request, res: Response) => {
     try {
         const { city, district } = req.query;
 
@@ -85,7 +85,7 @@ router.get('/overpass', authMiddleware, roleCheck(['super_admin']), async (req: 
  * POST /api/maps/import-salons
  * Import selected salons into the companies table
  */
-router.post('/import-salons', authMiddleware, roleCheck(['super_admin']), async (req: Request, res: Response) => {
+router.post('/import-salons', authMiddleware, roleCheck(['super_admin', 'company_admin']), async (req: Request, res: Response) => {
     const client = await pool.connect();
     try {
         const { salons } = req.body;
