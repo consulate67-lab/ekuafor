@@ -156,25 +156,35 @@ router.get('/resolve-address', authMiddleware, async (req: Request, res: Respons
 router.post('/update-existing-companies', authMiddleware, roleCheck(['super_admin', 'company_admin']), async (req: Request, res: Response) => {
     const client = await pool.connect();
     try {
-        // Find companies with coordinates but missing detailed address info
+        // Find companies with coordinates but missing detailed address info (city, district or neighborhood)
         const result = await client.query(`
-            SELECT id, latitude, longitude, name 
+            SELECT id, latitude, longitude, name, address_line 
             FROM companies 
             WHERE latitude IS NOT NULL AND longitude IS NOT NULL 
-            AND (city IS NULL OR district IS NULL OR address_line IS NULL OR address_line = '')
+            AND (
+                city IS NULL OR city = '' OR 
+                district IS NULL OR district = '' OR 
+                province_name IS NULL OR province_name = '' OR
+                district_name IS NULL OR district_name = '' OR
+                neighborhood_name IS NULL OR neighborhood_name = ''
+            )
         `);
 
-        console.log(`[Batch Update] Found ${result.rows.length} companies to update`);
+        console.log(`[Batch Update] Found ${result.rows.length} companies to update using Reverse Geocoding`);
 
         let updatedCount = 0;
         for (const company of result.rows) {
+            // Using OSM Nominatim Reverse Geocoding (Coordinates -> Address)
             const geocode = await reverseGeocode(company.latitude, company.longitude);
+
             if (geocode && geocode.address) {
                 const addr = geocode.address;
                 const city = addr.province || addr.city || addr.state || '';
-                const district = addr.city_district || addr.district || addr.town || addr.borough || '';
-                const neighborhood = addr.suburb || addr.neighbourhood || addr.quarter || addr.village || '';
-                const street = addr.road || '';
+                const district = addr.city_district || addr.district || addr.town || addr.borough || addr.suburb || '';
+                const neighborhood = addr.neighbourhood || addr.quarter || addr.suburb || addr.village || '';
+
+                // If the company doesn't have a specific address_line, use the display_name from API
+                const finalAddress = company.address_line || geocode.display_name;
 
                 await client.query(`
                     UPDATE companies 
@@ -185,10 +195,10 @@ router.post('/update-existing-companies', authMiddleware, roleCheck(['super_admi
                         neighborhood_name = $3,
                         address_line = $4
                     WHERE id = $5
-                `, [city, district, neighborhood, geocode.display_name, company.id]);
+                `, [city, district, neighborhood, finalAddress, company.id]);
 
                 updatedCount++;
-                console.log(`[Batch Update] Updated ${company.name}`);
+                console.log(`[Batch Update] Updated: ${company.name} -> ${city}/${district}/${neighborhood}`);
 
                 // Rate limiting for Nominatim (1 request per second)
                 await new Promise(r => setTimeout(r, 1000));
@@ -197,7 +207,7 @@ router.post('/update-existing-companies', authMiddleware, roleCheck(['super_admi
 
         res.json({
             success: true,
-            message: `${updatedCount} firma bilgisi güncellendi`,
+            message: `${updatedCount} firma bilgisi hassas konum verisiyle güncellendi`,
             count: updatedCount
         });
     } catch (error: any) {
@@ -239,10 +249,10 @@ router.post('/import-salons', authMiddleware, roleCheck(['super_admin', 'company
             const query = `
                 INSERT INTO companies (
                     name, phone, website, address_line, 
-                    province_name, district_name, city, district,
+                    province_name, district_name, neighborhood_name, city, district,
                     latitude, longitude, company_type, admin_key,
                     is_active, is_verified, created_by
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
                 RETURNING id
             `;
 
@@ -253,6 +263,7 @@ router.post('/import-salons', authMiddleware, roleCheck(['super_admin', 'company
                 salon.address || null,
                 salon.city || null,
                 salon.district || null,
+                salon.neighborhood || null,
                 salon.city || null,
                 salon.district || null,
                 salon.lat,
