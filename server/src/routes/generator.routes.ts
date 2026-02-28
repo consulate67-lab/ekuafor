@@ -156,7 +156,7 @@ router.get('/resolve-address', authMiddleware, async (req: Request, res: Respons
 router.post('/update-existing-companies', authMiddleware, roleCheck(['super_admin', 'company_admin']), async (req: Request, res: Response) => {
     const client = await pool.connect();
     try {
-        // Find companies with coordinates but missing detailed address info (city, district or neighborhood)
+        // Find companies with coordinates but missing detailed address info
         const result = await client.query(`
             SELECT id, latitude, longitude, name, address_line 
             FROM companies 
@@ -168,51 +168,58 @@ router.post('/update-existing-companies', authMiddleware, roleCheck(['super_admi
                 district_name IS NULL OR district_name = '' OR
                 neighborhood_name IS NULL OR neighborhood_name = ''
             )
+            LIMIT 50
         `);
 
-        console.log(`[Batch Update] Found ${result.rows.length} companies to update using Reverse Geocoding`);
+        console.log(`[Batch Update] Found ${result.rows.length} companies to update`);
 
         let updatedCount = 0;
+        let errorCount = 0;
+
         for (const company of result.rows) {
-            // Using OSM Nominatim Reverse Geocoding (Coordinates -> Address)
-            const geocode = await reverseGeocode(company.latitude, company.longitude);
+            try {
+                const geocode = await reverseGeocode(company.latitude, company.longitude);
+                if (geocode && geocode.address) {
+                    const addr = geocode.address;
+                    const city = addr.province || addr.city || addr.state || '';
+                    const district = addr.city_district || addr.district || addr.town || addr.borough || addr.suburb || '';
+                    const neighborhood = addr.neighbourhood || addr.quarter || addr.suburb || addr.village || '';
 
-            if (geocode && geocode.address) {
-                const addr = geocode.address;
-                const city = addr.province || addr.city || addr.state || '';
-                const district = addr.city_district || addr.district || addr.town || addr.borough || addr.suburb || '';
-                const neighborhood = addr.neighbourhood || addr.quarter || addr.suburb || addr.village || '';
+                    // Truncate to 250 characters to avoid potential DB constraints
+                    const finalAddress = (company.address_line || geocode.display_name || '').substring(0, 250);
 
-                // If the company doesn't have a specific address_line, use the display_name from API
-                const finalAddress = company.address_line || geocode.display_name;
+                    await client.query(`
+                        UPDATE companies 
+                        SET city = $1, 
+                            province_name = $1,
+                            district = $2, 
+                            district_name = $2,
+                            neighborhood_name = $3,
+                            address_line = $4
+                        WHERE id = $5
+                    `, [city, district, neighborhood, finalAddress, company.id]);
 
-                await client.query(`
-                    UPDATE companies 
-                    SET city = $1, 
-                        province_name = $1,
-                        district = $2, 
-                        district_name = $2,
-                        neighborhood_name = $3,
-                        address_line = $4
-                    WHERE id = $5
-                `, [city, district, neighborhood, finalAddress, company.id]);
+                    updatedCount++;
+                } else {
+                    errorCount++;
+                }
 
-                updatedCount++;
-                console.log(`[Batch Update] Updated: ${company.name} -> ${city}/${district}/${neighborhood}`);
-
-                // Rate limiting for Nominatim (1 request per second)
                 await new Promise(r => setTimeout(r, 1000));
+            } catch (err) {
+                console.error(`[Batch Update] Item Error:`, err);
+                errorCount++;
             }
         }
 
         res.json({
             success: true,
-            message: `${updatedCount} firma bilgisi hassas konum verisiyle güncellendi`,
-            count: updatedCount
+            message: `${updatedCount} firma güncellendi. ${errorCount > 0 ? errorCount + ' hata oluştu.' : ''}`,
+            count: updatedCount,
+            has_more: result.rows.length === 50
         });
     } catch (error: any) {
         console.error('[Batch Update] Error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: 'Sunucu hatası: ' + error.message });
     } finally {
         client.release();
     }

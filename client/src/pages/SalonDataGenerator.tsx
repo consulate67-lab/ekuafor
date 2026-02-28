@@ -100,18 +100,23 @@ export default function SalonDataGenerator() {
     };
 
     const runBulkUpdate = async () => {
-        if (!confirm('Eksik adresi olan tüm mevcut salonlarınızın adresleri koordinatlarına göre güncellenecektir. Bu işlem her kayıt için 1 saniye sürecektir. Devam edilsin mi?')) return;
+        if (!confirm('Eksik adresi olan mevcut salonlarınızın adresleri (50\'şerli gruplar halinde) güncellenecektir. Her grup yaklaşık 1 dakika sürer. Devam edilsin mi?')) return;
 
         setLoading(true);
         setError('');
         setSuccess('');
         try {
-            const response = await api.post('/generator/update-existing-companies');
+            const response = await api.post('/generator/update-existing-companies', {}, {
+                timeout: 120000 // 2 minutes
+            });
             if (response.data.success) {
                 setSuccess(response.data.message);
+                if (response.data.has_more) {
+                    setSuccess(prev => prev + ' (Hala güncellenecek veri var, tekrar basabilirsiniz)');
+                }
             }
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Güncelleme sırasında hata oluştu');
+            setError(err.response?.data?.error || 'Güncelleme sırasında hata oluştu. Veri miktarı fazlaysa bağlantı kesilmiş olabilir ancak işlem sunucu tarafında devam edebilir.');
         } finally {
             setLoading(false);
         }
