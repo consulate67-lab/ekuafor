@@ -157,26 +157,42 @@ export default function SalonDataGenerator() {
 
                 {/* Results */}
                 {salons.length > 0 && (
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center px-4">
-                            <div className="flex items-center gap-4">
-                                <button
-                                    onClick={selectAll}
-                                    className="text-xs font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
-                                >
-                                    {selectedIds.length === salons.length ? 'Seçimi Kaldır' : 'Tümünü Seç'}
-                                </button>
-                                <span className="text-xs font-bold text-slate-300">|</span>
-                                <span className="text-xs font-black text-slate-900 uppercase tracking-widest">
-                                    {selectedIds.length} / {salons.length} Seçildi
-                                </span>
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div className="flex items-center gap-6">
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={selectAll}
+                                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${selectedIds.length === salons.length ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                    >
+                                        {selectedIds.length === salons.length ? 'Seçimi Kaldır' : 'Tümünü Seç'}
+                                    </button>
+                                </div>
+                                <div className="h-8 w-px bg-slate-100 hidden md:block"></div>
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Seçilen Salon</span>
+                                    <span className="text-sm font-black text-slate-900 uppercase tracking-tighter mt-0.5">
+                                        {selectedIds.length} <span className="text-slate-300 font-normal">/</span> {salons.length}
+                                    </span>
+                                </div>
                             </div>
+
                             <button
                                 onClick={handleImport}
                                 disabled={selectedIds.length === 0 || importing}
-                                className={`bg-emerald-500 text-white px-8 py-3 rounded-xl font-black uppercase tracking-widest text-xs shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all active:scale-95 flex items-center gap-2 ${importing || selectedIds.length === 0 ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
+                                className={`w-full md:w-auto bg-emerald-500 text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-500/20 hover:bg-emerald-600 hover:scale-[1.02] transition-all active:scale-95 flex items-center justify-center gap-3 ${importing || selectedIds.length === 0 ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
                             >
-                                {importing ? 'Aktarılıyor...' : 'Sisteme Aktar'}
+                                {importing ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                                        Aktarılıyor...
+                                    </>
+                                ) : (
+                                    <>
+                                        <span>📥</span>
+                                        Sisteme Aktar
+                                    </>
+                                )}
                             </button>
                         </div>
 

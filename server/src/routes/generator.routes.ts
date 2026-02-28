@@ -51,20 +51,35 @@ router.get('/overpass', authMiddleware, roleCheck(['super_admin', 'company_admin
 
         const elements = response.data.elements.filter((el: any) => el.tags && el.tags.name);
 
-        const salons = elements.map((el: any) => ({
-            osm_id: el.id,
-            name: el.tags.name,
-            type: el.tags.shop === 'hairdresser' ? 'Kuaför/Berber' : 'Güzellik Salonu',
-            phone: el.tags['phone'] || el.tags['contact:phone'] || '',
-            website: el.tags['website'] || el.tags['contact:website'] || '',
-            address: el.tags['addr:full'] ||
-                `${el.tags['addr:street'] || ''} ${el.tags['addr:housenumber'] || ''} ${el.tags['addr:suburb'] || ''} ${el.tags['addr:city'] || ''}`.trim(),
-            city: el.tags['addr:city'] || city || '',
-            district: el.tags['addr:district'] || district || '',
-            lat: el.lat || (el.center ? el.center.lat : null),
-            lon: el.lon || (el.center ? el.center.lon : null),
-            tags: el.tags
-        }));
+        const salons = elements.map((el: any) => {
+            const tags = el.tags || {};
+
+            // Try to find city/district from various OSM tags
+            const osmCity = tags['addr:city'] || tags['addr:province'] || tags['addr:state'] || city || '';
+            const osmDistrict = tags['addr:district'] || tags['addr:suburb'] || tags['addr:town'] || tags['addr:quarter'] || tags['addr:neighbourhood'] || district || '';
+
+            // Format phone numbers
+            let phone = tags['phone'] || tags['contact:phone'] || tags['mobile'] || '';
+            if (phone && !phone.startsWith('+') && !phone.startsWith('0')) {
+                // Heuristic for Turkish numbers if leading zero is missing
+                if (phone.length === 10) phone = '0' + phone;
+            }
+
+            return {
+                osm_id: el.id,
+                name: tags.name,
+                type: tags.shop === 'hairdresser' ? 'Kuaför/Berber' : 'Güzellik Salonu',
+                phone: phone,
+                website: tags['website'] || tags['contact:website'] || tags['facebook'] || '',
+                address: tags['addr:full'] ||
+                    `${tags['addr:street'] || ''} ${tags['addr:housenumber'] || ''} ${tags['addr:suburb'] || ''} ${tags['addr:district'] || ''} ${tags['addr:city'] || ''}`.trim(),
+                city: osmCity,
+                district: osmDistrict,
+                lat: el.lat || (el.center ? el.center.lat : null),
+                lon: el.lon || (el.center ? el.center.lon : null),
+                tags: tags
+            };
+        });
 
         res.json({
             success: true,
