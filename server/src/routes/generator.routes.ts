@@ -153,7 +153,7 @@ router.get('/resolve-address', authMiddleware, async (req: Request, res: Respons
  * POST /api/generator/update-existing-companies
  * Updates all existing companies that have coordinates but missing city/district info
  */
-router.post('/update-existing-companies', authMiddleware, roleCheck(['super_admin']), async (req: Request, res: Response) => {
+router.post('/update-existing-companies', authMiddleware, roleCheck(['super_admin', 'company_admin']), async (req: Request, res: Response) => {
     const client = await pool.connect();
     try {
         // Find companies with coordinates but missing detailed address info
