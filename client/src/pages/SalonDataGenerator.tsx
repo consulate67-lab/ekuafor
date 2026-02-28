@@ -122,6 +122,24 @@ export default function SalonDataGenerator() {
         }
     };
 
+    const runAutoCategorizeGenders = async () => {
+        if (!confirm('İsminde "Bayan", "Kuaför", "Berber" gibi ifadeler geçen ancak cinsiyeti seçilmemiş olan TÜM firmalar otomatik olarak kategorize edilecektir. Emin misiniz?')) return;
+
+        setLoading(true);
+        setError('');
+        setSuccess('');
+        try {
+            const response = await api.post('/generator/auto-categorize-genders');
+            if (response.data.success) {
+                setSuccess(response.data.message);
+            }
+        } catch (err: any) {
+            setError(err.response?.data?.error || 'Cinsiyet güncelleme sırasında hata oluştu');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleImport = async () => {
         if (selectedIds.length === 0) return;
 
@@ -174,14 +192,24 @@ export default function SalonDataGenerator() {
                             Salon Veri Oluşturucu <span className="text-emerald-500 font-normal not-italic text-sm lowercase">OpenStreetMap + Overpass</span>
                         </h1>
                     </div>
-                    <button
-                        onClick={runBulkUpdate}
-                        className="text-[10px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100 transition-all flex items-center gap-2"
-                        title="Eksik adresli mevcut salonları koordinatlarından güncelle"
-                    >
-                        <span>🔄</span>
-                        Mevcut Verileri Güncelle
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={runAutoCategorizeGenders}
+                            className="text-[10px] font-black text-rose-600 uppercase tracking-widest bg-rose-50 px-4 py-2 rounded-lg hover:bg-rose-100 transition-all flex items-center gap-2"
+                            title="İsminden cinsiyet tahmini yap (Bayan/Erkek)"
+                        >
+                            <span>🚻</span>
+                            Cinsiyetleri Düzenle
+                        </button>
+                        <button
+                            onClick={runBulkUpdate}
+                            className="text-[10px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100 transition-all flex items-center gap-2"
+                            title="Eksik adresli mevcut salonları koordinatlarından güncelle"
+                        >
+                            <span>🔄</span>
+                            Adresleri Güncelle
+                        </button>
+                    </div>
                 </div>
             </header>
 

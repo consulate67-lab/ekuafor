@@ -226,6 +226,54 @@ router.post('/update-existing-companies', authMiddleware, roleCheck(['super_admi
 });
 
 /**
+ * Helper to detect gender from company name keywords
+ */
+function detectGenderFromName(name: string): string[] | null {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('bayan') || lowerName.includes('kadın') || lowerName.includes('kadin') || lowerName.includes('güzellik') || lowerName.includes('guzellik')) {
+        return ['Kadın'];
+    }
+    if (lowerName.includes('berber') || lowerName.includes('erkek') || lowerName.includes('traş') || lowerName.includes('tras')) {
+        return ['Erkek'];
+    }
+    return null;
+}
+
+/**
+ * POST /api/generator/auto-categorize-genders
+ * One-time categorization for all companies based on name
+ */
+router.post('/auto-categorize-genders', authMiddleware, roleCheck(['super_admin', 'company_admin']), async (req: Request, res: Response) => {
+    try {
+        const result = await pool.query(`
+            UPDATE companies 
+            SET genders = 
+                CASE 
+                    WHEN (name ILIKE '%bayan%' OR name ILIKE '%kadın%' OR name ILIKE '%kadin%' OR name ILIKE '%güzellik%' OR name ILIKE '%guzellik%') THEN ARRAY['Kadın']
+                    WHEN (name ILIKE '%berber%' OR name ILIKE '%erkek%' OR name ILIKE '%traş%' OR name ILIKE '%tras%') THEN ARRAY['Erkek']
+                    ELSE genders
+                END
+            WHERE (genders IS NULL OR array_length(genders, 1) IS NULL)
+            AND (
+                name ILIKE '%bayan%' OR name ILIKE '%kadın%' OR name ILIKE '%kadin%' OR 
+                name ILIKE '%güzellik%' OR name ILIKE '%guzellik%' OR
+                name ILIKE '%berber%' OR name ILIKE '%erkek%' OR 
+                name ILIKE '%traş%' OR name ILIKE '%tras%'
+            )
+            RETURNING id
+        `);
+
+        res.json({
+            success: true,
+            message: `${result.rowCount} firma cinsiyet kategorisi güncellendi`,
+            count: result.rowCount
+        });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
  * POST /api/maps/import-salons
  * Import selected salons into the companies table
  */
@@ -253,13 +301,16 @@ router.post('/import-salons', authMiddleware, roleCheck(['super_admin', 'company
 
             const adminKey = `OSM-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
+            // Auto detect gender from name
+            const detectedGenders = detectGenderFromName(salon.name);
+
             const query = `
                 INSERT INTO companies (
                     name, phone, website, address_line, 
                     province_name, district_name, neighborhood_name, city, district,
-                    latitude, longitude, company_type, admin_key,
+                    latitude, longitude, genders, company_type, admin_key,
                     is_active, is_verified, created_by
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
                 RETURNING id
             `;
 
@@ -275,6 +326,7 @@ router.post('/import-salons', authMiddleware, roleCheck(['super_admin', 'company
                 salon.district || null,
                 salon.lat,
                 salon.lon,
+                detectedGenders, // detected genders array ['Kadın'] or ['Erkek'] or null
                 'ASIL',
                 adminKey,
                 true,
