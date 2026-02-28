@@ -181,6 +181,12 @@ export default function CompanyPanel() {
     const [selectedPurchaseInvoice, setSelectedPurchaseInvoice] = useState<any>(null);
     const [reportError, setReportError] = useState('');
 
+    // Turkey Geo API State
+    const [geoProvinces, setGeoProvinces] = useState<any[]>([]);
+    const [geoDistricts, setGeoDistricts] = useState<any[]>([]);
+    const [geoNeighborhoods, setGeoNeighborhoods] = useState<any[]>([]);
+    const [loadingGeo, setLoadingGeo] = useState({ provinces: false, districts: false, neighborhoods: false });
+
     const handleLogin = async (keyToUse?: string) => {
         const key = keyToUse || inputKey.trim();
         if (!key) return;
@@ -295,6 +301,88 @@ export default function CompanyPanel() {
         } finally {
             setLoadingFinance(false);
         }
+    };
+
+    useEffect(() => {
+        const fetchProvinces = async () => {
+            setLoadingGeo(p => ({ ...p, provinces: true }));
+            try {
+                const res = await fetch('https://turkiyeapi.dev/api/v1/provinces?limit=82');
+                const data = await res.json();
+                if (data.status === 'OK') {
+                    setGeoProvinces(data.data.sort((a: any, b: any) => a.name.localeCompare(b.name, 'tr-TR')));
+                }
+            } catch (err) {
+                console.error('İller yüklenemedi:', err);
+            } finally {
+                setLoadingGeo(p => ({ ...p, provinces: false }));
+            }
+        };
+        fetchProvinces();
+    }, []);
+
+    const fetchDistricts = async (provinceName: string) => {
+        const province = geoProvinces.find(p => p.name === provinceName);
+        if (!province) return;
+
+        setLoadingGeo(p => ({ ...p, districts: true }));
+        setGeoDistricts([]);
+        setGeoNeighborhoods([]);
+        try {
+            const res = await fetch(`https://turkiyeapi.dev/api/v1/districts?provinceId=${province.id}`);
+            const data = await res.json();
+            if (data.status === 'OK') {
+                setGeoDistricts(data.data.sort((a: any, b: any) => a.name.localeCompare(b.name, 'tr-TR')));
+            }
+        } catch (err) {
+            console.error('İlçeler yüklenemedi:', err);
+        } finally {
+            setLoadingGeo(p => ({ ...p, districts: false }));
+        }
+    };
+
+    const fetchNeighborhoods = async (districtId: number) => {
+        setLoadingGeo(p => ({ ...p, neighborhoods: true }));
+        setGeoNeighborhoods([]);
+        try {
+            const res = await fetch(`https://turkiyeapi.dev/api/v1/neighborhoods?districtId=${districtId}`);
+            const data = await res.json();
+            if (data.status === 'OK') {
+                setGeoNeighborhoods(data.data.sort((a: any, b: any) => a.name.localeCompare(b.name, 'tr-TR')));
+            }
+        } catch (err) {
+            console.error('Mahalleler yüklenemedi:', err);
+        } finally {
+            setLoadingGeo(p => ({ ...p, neighborhoods: false }));
+        }
+    };
+
+    const openCurrentAccountModal = (c?: any) => {
+        if (c) {
+            setCurrentAccountForm(c);
+            if (c.city) fetchDistricts(c.city);
+            // Neighborhood fetching is tricky without district ID but if we have the district name we can try to find it
+            // For now, fetching districts is most important. 
+        } else {
+            setCurrentAccountForm({
+                company_id: company.id,
+                code: `CARI-${Date.now().toString().slice(-6)}`,
+                name: '',
+                title: '',
+                tax_office: '',
+                tax_number: '',
+                type: 'ALL',
+                phone: '',
+                email: '',
+                address_line: '',
+                city: '',
+                district: '',
+                country: 'Türkiye'
+            });
+            setGeoDistricts([]);
+            setGeoNeighborhoods([]);
+        }
+        setShowCurrentAccountModal(true);
     };
 
     const handleCreateInvoice = async (payment_method: 'nakit' | 'kart') => {
@@ -2514,24 +2602,7 @@ export default function CompanyPanel() {
                                     <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-slate-50 shadow-sm">
                                         <h3 className="font-black text-slate-900 uppercase text-xs tracking-widest">Cari Kartlar (Müşteri/Tedarikçi)</h3>
                                         <button
-                                            onClick={() => {
-                                                setCurrentAccountForm({
-                                                    company_id: company.id,
-                                                    code: `CARI-${Date.now().toString().slice(-6)}`,
-                                                    name: '',
-                                                    title: '',
-                                                    tax_office: '',
-                                                    tax_number: '',
-                                                    type: 'ALL',
-                                                    phone: '',
-                                                    email: '',
-                                                    address_line: '',
-                                                    city: '',
-                                                    district: '',
-                                                    country: 'Türkiye'
-                                                });
-                                                setShowCurrentAccountModal(true);
-                                            }}
+                                            onClick={() => openCurrentAccountModal()}
                                             className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-100">+ Yeni Cari Kart</button>
                                     </div>
 
@@ -2606,10 +2677,7 @@ export default function CompanyPanel() {
                                                         {/* Actions */}
                                                         <div className="flex lg:flex-col gap-3 w-full lg:w-32 border-t lg:border-t-0 lg:border-l border-slate-50 pt-6 lg:pt-0 lg:pl-8">
                                                             <button
-                                                                onClick={() => {
-                                                                    setCurrentAccountForm(c);
-                                                                    setShowCurrentAccountModal(true);
-                                                                }}
+                                                                onClick={() => openCurrentAccountModal(c)}
                                                                 className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-100"
                                                             >
                                                                 <span>✏️</span> Düzenle
@@ -4115,34 +4183,80 @@ export default function CompanyPanel() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Şehir</label>
-                                    <input
-                                        type="text"
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">
+                                        Şehir {loadingGeo.provinces && <span className="inline-block animate-spin ml-1">⏳</span>}
+                                    </label>
+                                    <select
                                         value={currentAccountForm.city}
-                                        onChange={e => setCurrentAccountForm({ ...currentAccountForm, city: e.target.value })}
-                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
-                                        placeholder="İstanbul"
-                                    />
+                                        onChange={e => {
+                                            const cityName = e.target.value;
+                                            setCurrentAccountForm({ ...currentAccountForm, city: cityName, district: '', address_line: '' });
+                                            if (cityName) fetchDistricts(cityName);
+                                        }}
+                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-indigo-500 transition-all"
+                                    >
+                                        <option value="">{loadingGeo.provinces ? 'Yükleniyor...' : 'Şehir Seçin'}</option>
+                                        {geoProvinces.map(p => (
+                                            <option key={p.id} value={p.name}>{p.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">İlçe</label>
-                                    <input
-                                        type="text"
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">
+                                        İlçe {loadingGeo.districts && <span className="inline-block animate-spin ml-1">⏳</span>}
+                                    </label>
+                                    <select
                                         value={currentAccountForm.district}
-                                        onChange={e => setCurrentAccountForm({ ...currentAccountForm, district: e.target.value })}
-                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
-                                        placeholder="Beşiktaş"
-                                    />
+                                        onChange={e => {
+                                            const districtName = e.target.value;
+                                            const dist = geoDistricts.find(d => d.name === districtName);
+                                            setCurrentAccountForm({ ...currentAccountForm, district: districtName });
+                                            if (dist) fetchNeighborhoods(dist.id);
+                                        }}
+                                        disabled={!currentAccountForm.city || loadingGeo.districts}
+                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold disabled:opacity-50 focus:ring-2 focus:ring-indigo-500 transition-all"
+                                    >
+                                        <option value="">{loadingGeo.districts ? 'Yükleniyor...' : 'İlçe Seçin'}</option>
+                                        {geoDistricts.map(d => (
+                                            <option key={d.id} value={d.name}>{d.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">
+                                        Mahalle {loadingGeo.neighborhoods && <span className="inline-block animate-spin ml-1">⏳</span>}
+                                    </label>
+                                    <select
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            if (val) {
+                                                const currentAddress = currentAccountForm.address_line || '';
+                                                // Prepend neighborhood to address if not already there or replace existing Mah. part
+                                                const cleanAddress = currentAddress.includes('Mah.') ? currentAddress.split('Mah.')[1].trim() : currentAddress;
+                                                setCurrentAccountForm({ ...currentAccountForm, address_line: val + ' Mah. ' + cleanAddress });
+                                            }
+                                        }}
+                                        disabled={!currentAccountForm.district || loadingGeo.neighborhoods}
+                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold disabled:opacity-50 focus:ring-2 focus:ring-indigo-500 transition-all"
+                                    >
+                                        <option value="">{loadingGeo.neighborhoods ? 'Yükleniyor...' : 'Mahalle Seçin'}</option>
+                                        {geoNeighborhoods.map(n => (
+                                            <option key={n.id} value={n.name}>{n.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Ülke</label>
                                     <input
                                         type="text"
-                                        value={currentAccountForm.country}
+                                        value={currentAccountForm.country || 'Türkiye'}
                                         onChange={e => setCurrentAccountForm({ ...currentAccountForm, country: e.target.value })}
-                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
+                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold focus:ring-2 focus:ring-indigo-500 transition-all"
                                         placeholder="Türkiye"
                                     />
                                 </div>
