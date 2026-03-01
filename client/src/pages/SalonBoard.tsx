@@ -568,8 +568,8 @@ export default function SalonBoard() {
 
                                 {isOptionsOpen && (
                                     <>
-                                        <div className="fixed inset-0 z-[60]" onClick={() => setIsOptionsOpen(false)}></div>
-                                        <div className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 z-[70] p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <div className="fixed inset-0 z-[160]" onClick={() => setIsOptionsOpen(false)}></div>
+                                        <div className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 z-[170] p-4 animate-in fade-in slide-in-from-top-2 duration-200">
                                             <div className="flex flex-col gap-4">
                                                 <div>
                                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Departman Filtresi</label>
