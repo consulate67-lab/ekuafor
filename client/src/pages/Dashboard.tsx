@@ -53,7 +53,7 @@ export default function Dashboard() {
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [paymentApp, setPaymentApp] = useState<Appointment | null>(null);
     const [nfcState, setNfcState] = useState<'IDLE' | 'SCANNING' | 'SUCCESS' | 'ERROR'>('IDLE');
-    const [loading, setLoading] = useState(false);
+    const [, setLoading] = useState(false);
 
 
     const getLocalDateString = () => {
@@ -79,10 +79,10 @@ export default function Dashboard() {
                 try {
                     const todayStr = getLocalDateString();
                     // Safe fetch for appointments
-                    let appointments: any[] = [];
+                    let statsApps: any[] = [];
                     try {
                         const appointmentsRes = await api.get('/appointments', { params: { start_date: todayStr } });
-                        appointments = appointmentsRes.data?.data || [];
+                        statsApps = appointmentsRes.data?.data || [];
                     } catch (e) {
                         console.warn('Appointments fetch failed', e);
                     }
@@ -97,13 +97,13 @@ export default function Dashboard() {
                     }
 
                     // Active Appointments (Today's pending or approved)
-                    const activeApps = appointments.filter(a =>
+                    const activeApps = statsApps.filter(a =>
                         a.appointment_date === todayStr &&
                         (a.status === 'approved' || a.status === 'pending')
                     );
 
                     // Today's Income (Approved or completed appointments)
-                    const incomeApps = appointments.filter(a =>
+                    const incomeApps = statsApps.filter(a =>
                         a.appointment_date === todayStr &&
                         (a.status === 'approved' || a.status === 'completed')
                     );
@@ -116,7 +116,7 @@ export default function Dashboard() {
                     }, 0);
 
                     // Customer Count (Unique customers)
-                    const uniqueCustomers = new Set(appointments.map(a => a.customer_name || a.customer_id)).size;
+                    const uniqueCustomers = new Set(statsApps.map(a => a.customer_name || a.customer_id)).size;
 
                     setStats(prev => ({
                         ...prev,
