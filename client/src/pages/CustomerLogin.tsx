@@ -6,8 +6,8 @@ import api from '../lib/api';
 export default function CustomerLogin() {
     const [phone, setPhone] = useState('');
     const [code, setCode] = useState('');
-    const [firstName, setFirstName] = useState('');
-    const [lastName, setLastName] = useState('');
+    const firstName = '';
+    const lastName = '';
     const [step, setStep] = useState(1); // 1: Phone, 2: OTP, 3: Profile Info (if needed)
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
