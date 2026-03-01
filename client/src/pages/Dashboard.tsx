@@ -392,11 +392,26 @@ export default function Dashboard() {
         let finalPrice = currentPrice;
 
         if (status === 'completed') {
+            const app = appointments.find(a => a.id === id);
+
+            // If already paid, just update status to completed directly
+            if (app?.payment_status === 'paid') {
+                if (!window.confirm('Ödemesi alınmış bu randevuyu tamamlamak istiyor musunuz?')) return;
+                try {
+                    setLoading(true);
+                    await api.patch(`/appointments/${id}/status`, { status: 'completed' });
+                    window.location.reload();
+                } catch (err) {
+                    alert('Hata oluştu');
+                    setLoading(false);
+                }
+                return;
+            }
+
             const priceInput = window.prompt('Hizmet tamamlandı. Son tutarı onaylıyor musunuz?', currentPrice?.toString() || '0');
             if (priceInput === null) return;
             finalPrice = Number(priceInput);
 
-            const app = appointments.find(a => a.id === id);
             if (app && finalPrice > 0) {
                 setPaymentApp({ ...app, price: finalPrice });
                 setEditableAmount(finalPrice);
@@ -831,9 +846,9 @@ export default function Dashboard() {
                                                             {app.status === 'approved' && (
                                                                 <button
                                                                     onClick={() => handleStatusUpdate(app.id!, 'completed', app.price)}
-                                                                    className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all"
+                                                                    className={`px-8 py-4 ${app.payment_status === 'paid' ? 'bg-emerald-600 shadow-emerald-200' : 'bg-indigo-600 shadow-indigo-200'} text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:opacity-90 active:scale-95 transition-all`}
                                                                 >
-                                                                    Tamamla & Ödeme Al
+                                                                    {app.payment_status === 'paid' ? 'Hizmeti Tamamla' : 'Tamamla & Ödeme Al'}
                                                                 </button>
                                                             )}
                                                             {app.status === 'completed' && (

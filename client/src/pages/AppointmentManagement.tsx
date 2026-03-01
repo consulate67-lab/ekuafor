@@ -361,12 +361,28 @@ export default function AppointmentManagement() {
         if (status === 'approved') msg = 'Bu randevuyu onaylamak istiyor musunuz?';
 
         if (status === 'completed') {
+            const app = appointments.find(a => a.id === id);
+
+            // If already paid, just update status directly
+            if (app?.payment_status === 'paid') {
+                if (!window.confirm('Ödemesi zaten alınmış bu randevuyu tamamlamak istiyor musunuz?')) return;
+                try {
+                    setLoading(true);
+                    await api.patch(`/appointments/${id}/status`, { status: 'completed' });
+                    fetchData();
+                    return;
+                } catch (err) {
+                    alert('Hata oluştu');
+                } finally {
+                    setLoading(false);
+                }
+                return;
+            }
+
             const priceInput = window.prompt('Hizmet tamamlandı. Son tutarı onaylıyor musunuz?', currentPrice?.toString() || '0');
             if (priceInput === null) return;
             finalPrice = Number(priceInput);
 
-            // Re-fetch app to get full data
-            const app = appointments.find(a => a.id === id);
             if (app && finalPrice > 0) {
                 setPaymentApp({ ...app, price: finalPrice });
                 setEditableAmount(finalPrice);
@@ -1110,9 +1126,9 @@ export default function AppointmentManagement() {
                                                 handleStatusUpdate(selectedAppointment.id!, 'completed', selectedAppointment.price);
                                                 setSelectedAppointment(null);
                                             }}
-                                            className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                                            className={`w-full ${selectedAppointment.payment_status === 'paid' ? 'bg-emerald-600 shadow-emerald-100' : 'bg-indigo-600 shadow-indigo-100'} text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl hover:opacity-90 transition-all`}
                                         >
-                                            Hizmeti Tamamla
+                                            {selectedAppointment.payment_status === 'paid' ? '✓ Hizmeti Tamamla' : 'Tamamla & Ödeme Al'}
                                         </button>
                                     )}
                                     <button
