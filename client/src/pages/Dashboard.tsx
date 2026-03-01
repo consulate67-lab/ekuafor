@@ -984,23 +984,33 @@ export default function Dashboard() {
                         </div>
 
                         {/* Commission Breakdown */}
-                        <div className="bg-slate-50 rounded-3xl p-6 mb-8 space-y-3 border border-slate-100">
-                            <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
-                                <span>Platform Komisyonu ({companyInfo?.commission_rate || 0}%)</span>
-                                <span className="text-slate-600">₺{(editableAmount * (companyInfo?.commission_rate || 0) / 100).toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
-                                <span>Iyzico Komisyonu ({companyInfo?.iyzico_commission_rate || 0}%)</span>
-                                <span className="text-slate-600">₺{(editableAmount * (companyInfo?.iyzico_commission_rate || 0) / 100).toFixed(2)}</span>
-                            </div>
-                            <div className="h-px bg-slate-200 mt-2" />
-                            <div className="flex justify-between items-center pt-1">
-                                <span className="text-sm font-black text-slate-900 uppercase tracking-tight">Tahsil Edilecek Toplam</span>
-                                <span className="text-2xl font-black text-indigo-600">
-                                    ₺{(editableAmount + (editableAmount * (companyInfo?.commission_rate || 0) / 100) + (editableAmount * (companyInfo?.iyzico_commission_rate || 0) / 100)).toFixed(2)}
-                                </span>
-                            </div>
-                        </div>
+                        {(() => {
+                            const platformRate = Number(companyInfo?.commission_rate) || 5;
+                            const iyzicoRate = Number(companyInfo?.iyzico_commission_rate) || 1;
+                            const platformComm = (editableAmount * platformRate) / 100;
+                            const iyzicoComm = (editableAmount * iyzicoRate) / 100;
+                            const totalToCollect = editableAmount + platformComm + iyzicoComm;
+
+                            return (
+                                <div className="bg-slate-50 rounded-3xl p-6 mb-8 space-y-3 border border-slate-100">
+                                    <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
+                                        <span>Platform Komisyonu ({platformRate.toFixed(2)}%)</span>
+                                        <span className="text-slate-600">₺{platformComm.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
+                                        <span>Iyzico Komisyonu ({iyzicoRate.toFixed(2)}%)</span>
+                                        <span className="text-slate-600">₺{iyzicoComm.toFixed(2)}</span>
+                                    </div>
+                                    <div className="h-px bg-slate-200 mt-2" />
+                                    <div className="flex justify-between items-center pt-1">
+                                        <span className="text-sm font-black text-slate-900 uppercase tracking-tight">Tahsil Edilecek Toplam</span>
+                                        <span className="text-2xl font-black text-indigo-600">
+                                            ₺{totalToCollect.toFixed(2)}
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         {nfcState === 'IDLE' && (
                             <div className="grid grid-cols-1 gap-4">

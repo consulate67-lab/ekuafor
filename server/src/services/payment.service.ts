@@ -108,7 +108,8 @@ class PaymentService {
 
             const appointment = result.rows[0];
             const platformRate = parseFloat(appointment.platform_rate || '0');
-            const totalIyzicoRate = parseFloat(appointment.iyzico_commission_rate || '0');
+            let totalIyzicoRate = parseFloat(appointment.iyzico_commission_rate || '0');
+            if (totalIyzicoRate <= 0) totalIyzicoRate = 1; // Default to 1% as requested
 
             // 2. Commission Calculations (Adding to the total)
             const platformCommission = (amount * platformRate) / 100;
