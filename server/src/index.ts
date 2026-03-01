@@ -600,6 +600,11 @@ const runMigrations = async () => {
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS city VARCHAR(100)');
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS district VARCHAR(100)');
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS neighborhood VARCHAR(100)');
+            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS sub_merchant_key VARCHAR(255)');
+            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS iyzico_commission_rate DECIMAL(5, 2) DEFAULT 0.00');
+
+            await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS original_price DECIMAL(10, 2)');
+            await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS collected_price DECIMAL(10, 2)');
 
             // Migrate existing address data if new columns are empty
             await pool.query(`

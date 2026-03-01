@@ -42,6 +42,8 @@ export interface Company {
     // Ödeme
     commission_rate?: number;
     payment_enabled?: boolean;
+    iyzico_commission_rate?: number;
+    sub_merchant_key?: string;
 
     // Çalışma Saatleri
     work_start_time?: string;
@@ -158,6 +160,8 @@ export interface Appointment {
     package_name?: string;
     staff_name?: string;
     company_name?: string;
+    original_price?: number;
+    collected_price?: number;
     services?: Array<{
         id: number;
         aps_id?: number;

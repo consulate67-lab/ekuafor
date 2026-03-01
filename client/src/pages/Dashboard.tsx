@@ -54,6 +54,8 @@ export default function Dashboard() {
     const [paymentApp, setPaymentApp] = useState<Appointment | null>(null);
     const [nfcState, setNfcState] = useState<'IDLE' | 'SCANNING' | 'SUCCESS' | 'ERROR'>('IDLE');
     const [, setLoading] = useState(false);
+    const [editableAmount, setEditableAmount] = useState<number>(0);
+    const [companyInfo, setCompanyInfo] = useState<any>(null);
 
 
     const getLocalDateString = () => {
@@ -143,6 +145,14 @@ export default function Dashboard() {
                         setAppointments(myApps);
                     } catch (e) {
                         console.warn('Dashboard appointments fetch failed', e);
+                    }
+
+                    // Fetch company details for commission rates
+                    try {
+                        const compRes = await api.get(`/companies/${user.company_id}`);
+                        setCompanyInfo(compRes.data?.data);
+                    } catch (e) {
+                        console.warn('Company info fetch failed', e);
                     }
 
                 } catch (e) {
@@ -389,6 +399,7 @@ export default function Dashboard() {
             const app = appointments.find(a => a.id === id);
             if (app && finalPrice > 0) {
                 setPaymentApp({ ...app, price: finalPrice });
+                setEditableAmount(finalPrice);
                 setShowPaymentModal(true);
                 return;
             }
@@ -958,9 +969,37 @@ export default function Dashboard() {
 
                         <div className="text-center mb-8">
                             <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">Ödeme Al</h3>
-                            <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">
-                                {paymentApp.customer_name || 'Müşteri'} | <span className="text-indigo-600">₺{paymentApp.price}</span>
-                            </p>
+                            <div className="flex flex-col items-center gap-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hizmet Bedeli</label>
+                                <div className="relative">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-black text-slate-300">₺</span>
+                                    <input
+                                        type="number"
+                                        value={editableAmount}
+                                        onChange={(e) => setEditableAmount(Number(e.target.value))}
+                                        className="w-40 text-center text-3xl font-black text-indigo-600 bg-slate-50 border-none rounded-2xl py-3 pl-8 focus:ring-2 focus:ring-indigo-500 transition-all"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Commission Breakdown */}
+                        <div className="bg-slate-50 rounded-3xl p-6 mb-8 space-y-3 border border-slate-100">
+                            <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
+                                <span>Platform Komisyonu ({companyInfo?.commission_rate || 0}%)</span>
+                                <span className="text-slate-600">₺{(editableAmount * (companyInfo?.commission_rate || 0) / 100).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
+                                <span>Iyzico Komisyonu ({companyInfo?.iyzico_commission_rate || 0}%)</span>
+                                <span className="text-slate-600">₺{(editableAmount * (companyInfo?.iyzico_commission_rate || 0) / 100).toFixed(2)}</span>
+                            </div>
+                            <div className="h-px bg-slate-200 mt-2" />
+                            <div className="flex justify-between items-center pt-1">
+                                <span className="text-sm font-black text-slate-900 uppercase tracking-tight">Tahsil Edilecek Toplam</span>
+                                <span className="text-2xl font-black text-indigo-600">
+                                    ₺{(editableAmount + (editableAmount * (companyInfo?.commission_rate || 0) / 100) + (editableAmount * (companyInfo?.iyzico_commission_rate || 0) / 100)).toFixed(2)}
+                                </span>
+                            </div>
                         </div>
 
                         {nfcState === 'IDLE' && (
@@ -972,17 +1011,14 @@ export default function Dashboard() {
                                             try {
                                                 const res = await api.post('/payments/ceppos/initialize', {
                                                     appointment_id: paymentApp.id,
-                                                    amount: paymentApp.price
+                                                    amount: editableAmount // Send the confirmed base amount
                                                 });
                                                 if (res.data.success) {
                                                     setNfcState('SUCCESS');
                                                     setTimeout(() => {
-                                                        api.patch(`/appointments/${paymentApp.id}/status`, {
-                                                            status: 'completed',
-                                                            price: paymentApp.price
-                                                        }).then(() => {
-                                                            window.location.reload();
-                                                        });
+                                                        // After successful payment, the status and collected price are already set by backend
+                                                        // We just need to reload
+                                                        window.location.reload();
                                                     }, 1500);
                                                 } else {
                                                     setNfcState('ERROR');
@@ -1010,7 +1046,7 @@ export default function Dashboard() {
                                             setLoading(true);
                                             await api.patch(`/appointments/${paymentApp.id}/status`, {
                                                 status: 'completed',
-                                                price: paymentApp.price
+                                                price: editableAmount
                                             });
                                             window.location.reload();
                                         } catch (e) {
