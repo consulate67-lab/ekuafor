@@ -196,12 +196,13 @@ class SmsService {
     /**
      * SMS Geçmişini Getir
      */
-    async getLogs(companyId: number): Promise<SmsLog[]> {
+    async getLogs(companyId: number | null): Promise<SmsLog[]> {
         try {
-            const result = await pool.query(
-                'SELECT * FROM sms_logs WHERE company_id = $1 ORDER BY created_at DESC LIMIT 100',
-                [companyId]
-            );
+            const query = companyId
+                ? 'SELECT * FROM sms_logs WHERE company_id = $1 ORDER BY created_at DESC LIMIT 100'
+                : 'SELECT * FROM sms_logs WHERE company_id IS NULL ORDER BY created_at DESC LIMIT 100';
+            const values = companyId ? [companyId] : [];
+            const result = await pool.query(query, values);
             return result.rows;
         } catch (error) {
             console.error('Error fetching SMS logs:', error);

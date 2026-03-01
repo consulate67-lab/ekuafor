@@ -99,7 +99,7 @@ function App() {
                             <Route path="/companies/:id/edit" element={<CompanyForm />} />
                             <Route path="/services" element={<ServiceManagement />} />
                             <Route path="/appointments" element={<AppointmentManagement />} />
-                            <Route path="/sms" element={<SmsSettings />} />
+                            <Route path="/sms-settings" element={<SmsSettings />} />
                             <Route path="*" element={<Navigate to="/dashboard" replace />} />
                         </>
                     ) : (

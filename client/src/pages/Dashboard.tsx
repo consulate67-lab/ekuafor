@@ -435,16 +435,23 @@ export default function Dashboard() {
                                     </div>
                                 </div>
 
-                                <div className="flex flex-col sm:flex-row gap-6 w-full lg:w-auto">
-                                    <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[3rem] border border-white/5 flex-1 lg:min-w-[180px] text-center group/item hover:bg-white/10 transition-colors">
-                                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 opacity-60">TOPLAM FİRMA</p>
-                                        <p className="text-6xl font-black text-white tracking-tighter group-hover/item:scale-110 transition-transform duration-500">{stats.companyCount}</p>
+                                <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
+                                    <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/5 flex-1 lg:min-w-[150px] text-center group/item hover:bg-white/10 transition-colors">
+                                        <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2 opacity-60">TOPLAM FİRMA</p>
+                                        <p className="text-5xl font-black text-white tracking-tighter group-hover/item:scale-110 transition-transform duration-500">{stats.companyCount}</p>
                                     </div>
-                                    <Link to="/main-management" className="bg-emerald-500/5 backdrop-blur-xl p-8 rounded-[3rem] border border-emerald-500/10 flex-1 lg:min-w-[180px] text-center group/item hover:bg-emerald-500/20 transition-all">
-                                        <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-2 opacity-60">ÜST YÖNETİM</p>
+                                    <Link to="/main-management" className="bg-emerald-500/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-emerald-500/10 flex-1 lg:min-w-[150px] text-center group/item hover:bg-emerald-500/20 transition-all">
+                                        <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-2 opacity-60">ÜST YÖNETİM</p>
                                         <div className="flex items-center justify-center gap-2">
-                                            <svg className="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944" /></svg>
-                                            <span className="text-xl font-black text-white">YÖNET</span>
+                                            <svg className="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944" /></svg>
+                                            <span className="text-lg font-black text-white uppercase">YÖNET</span>
+                                        </div>
+                                    </Link>
+                                    <Link to="/sms-settings" className="bg-indigo-500/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-indigo-500/10 flex-1 lg:min-w-[150px] text-center group/item hover:bg-indigo-500/20 transition-all">
+                                        <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2 opacity-60">SMS / OTP</p>
+                                        <div className="flex items-center justify-center gap-2">
+                                            <svg className="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                                            <span className="text-lg font-black text-white uppercase">AYARLA</span>
                                         </div>
                                     </Link>
                                 </div>
@@ -746,88 +753,90 @@ export default function Dashboard() {
             </main>
 
             {/* Ses Dinleme Overlay (Yönlendirmeli) */}
-            {voiceStep !== 'IDLE' && (
-                <div className="fixed inset-0 z-[100] bg-indigo-950/95 backdrop-blur-2xl flex flex-col items-center justify-center animate-fade-in p-6">
-                    <button
-                        onClick={() => setVoiceStep('IDLE')}
-                        className="absolute top-10 right-10 text-white/40 hover:text-white"
-                    >
-                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
+            {
+                voiceStep !== 'IDLE' && (
+                    <div className="fixed inset-0 z-[100] bg-indigo-950/95 backdrop-blur-2xl flex flex-col items-center justify-center animate-fade-in p-6">
+                        <button
+                            onClick={() => setVoiceStep('IDLE')}
+                            className="absolute top-10 right-10 text-white/40 hover:text-white"
+                        >
+                            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
 
-                    <div className="relative mb-12">
-                        {isListening && (
-                            <>
-                                <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-20 scale-150"></div>
-                                <div className="absolute inset-0 bg-indigo-400 rounded-full animate-pulse opacity-40 scale-125"></div>
-                            </>
-                        )}
-                        <div className={`relative w-24 h-24 rounded-full flex items-center justify-center shadow-2xl transition-all ${isListening ? 'bg-indigo-600' : 'bg-slate-800'}`}>
-                            <svg className={`w-12 h-12 text-white ${isListening ? 'animate-bounce' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m8 0h-8m4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                            </svg>
-                        </div>
-                    </div>
-
-                    <div className="text-center max-w-lg w-full">
-                        <h2 className="text-4xl font-black text-white tracking-tighter mb-4">
-                            {voiceStep === 'NAME' && '1. Müşteri İsmi?'}
-                            {voiceStep === 'DATE' && '2. Randevu Tarihi?'}
-                            {voiceStep === 'TIME' && '3. Randevu Saati?'}
-                            {voiceStep === 'SERVICE' && '4. Yapılacak İşlem?'}
-                            {voiceStep === 'CONFIRM' && 'Son Kontrol'}
-                        </h2>
-
-                        <p className="text-indigo-300 font-bold uppercase tracking-[0.2em] text-[11px] mb-12">
-                            {voiceStep === 'NAME' && 'Müşterinin adını söyleyin'}
-                            {voiceStep === 'DATE' && 'Bugün, Yarın veya bir gün söyleyin'}
-                            {voiceStep === 'TIME' && 'Saat bilgisini söyleyin (örn: 14:30)'}
-                            {voiceStep === 'SERVICE' && 'Hangi hizmet yapılacak?'}
-                            {voiceStep === 'CONFIRM' && 'Randevu detayları aşağıdadır'}
-                        </p>
-
-                        <div className="space-y-4 bg-white/5 p-8 rounded-[2.5rem] border border-white/10 text-left">
-                            <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                                <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Müşteri</span>
-                                <span className="text-white font-black text-lg">{guidedData.customerName || '...'}</span>
-                            </div>
-                            <div className="flex justify-between items-center border-b border-white/5 py-4">
-                                <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Tarih / Saat</span>
-                                <span className="text-white font-black text-lg">{guidedData.date ? new Date(guidedData.date).toLocaleDateString('tr-TR') : '...'} - {guidedData.startTime}</span>
-                            </div>
-                            <div className="flex justify-between items-center py-4">
-                                <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Hizmet</span>
-                                <span className="text-white font-black text-lg">
-                                    {services.find(s => s.id === guidedData.serviceId)?.name || (voiceStep === 'CONFIRM' ? 'Belirlenemedi' : '...')}
-                                </span>
+                        <div className="relative mb-12">
+                            {isListening && (
+                                <>
+                                    <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-20 scale-150"></div>
+                                    <div className="absolute inset-0 bg-indigo-400 rounded-full animate-pulse opacity-40 scale-125"></div>
+                                </>
+                            )}
+                            <div className={`relative w-24 h-24 rounded-full flex items-center justify-center shadow-2xl transition-all ${isListening ? 'bg-indigo-600' : 'bg-slate-800'}`}>
+                                <svg className={`w-12 h-12 text-white ${isListening ? 'animate-bounce' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m8 0h-8m4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                                </svg>
                             </div>
                         </div>
 
-                        {voiceStep === 'CONFIRM' && (
-                            <div className="mt-12 flex gap-4 w-full">
-                                <button
-                                    onClick={() => setVoiceStep('IDLE')}
-                                    className="flex-1 py-6 bg-white/10 text-white rounded-3xl font-black uppercase tracking-widest hover:bg-white/20 transition-all"
-                                >
-                                    İptal
-                                </button>
-                                <button
-                                    onClick={confirmGuidedAppointment}
-                                    className="flex-1 py-6 bg-indigo-600 text-white rounded-3xl font-black uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:scale-105 transition-all"
-                                >
-                                    Onayla
-                                </button>
-                            </div>
-                        )}
+                        <div className="text-center max-w-lg w-full">
+                            <h2 className="text-4xl font-black text-white tracking-tighter mb-4">
+                                {voiceStep === 'NAME' && '1. Müşteri İsmi?'}
+                                {voiceStep === 'DATE' && '2. Randevu Tarihi?'}
+                                {voiceStep === 'TIME' && '3. Randevu Saati?'}
+                                {voiceStep === 'SERVICE' && '4. Yapılacak İşlem?'}
+                                {voiceStep === 'CONFIRM' && 'Son Kontrol'}
+                            </h2>
 
-                        {voiceStep !== 'CONFIRM' && isListening && voiceTranscript && (
-                            <div className="mt-8 text-white/60 italic font-medium">
-                                "{voiceTranscript}..."
+                            <p className="text-indigo-300 font-bold uppercase tracking-[0.2em] text-[11px] mb-12">
+                                {voiceStep === 'NAME' && 'Müşterinin adını söyleyin'}
+                                {voiceStep === 'DATE' && 'Bugün, Yarın veya bir gün söyleyin'}
+                                {voiceStep === 'TIME' && 'Saat bilgisini söyleyin (örn: 14:30)'}
+                                {voiceStep === 'SERVICE' && 'Hangi hizmet yapılacak?'}
+                                {voiceStep === 'CONFIRM' && 'Randevu detayları aşağıdadır'}
+                            </p>
+
+                            <div className="space-y-4 bg-white/5 p-8 rounded-[2.5rem] border border-white/10 text-left">
+                                <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                                    <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Müşteri</span>
+                                    <span className="text-white font-black text-lg">{guidedData.customerName || '...'}</span>
+                                </div>
+                                <div className="flex justify-between items-center border-b border-white/5 py-4">
+                                    <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Tarih / Saat</span>
+                                    <span className="text-white font-black text-lg">{guidedData.date ? new Date(guidedData.date).toLocaleDateString('tr-TR') : '...'} - {guidedData.startTime}</span>
+                                </div>
+                                <div className="flex justify-between items-center py-4">
+                                    <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Hizmet</span>
+                                    <span className="text-white font-black text-lg">
+                                        {services.find(s => s.id === guidedData.serviceId)?.name || (voiceStep === 'CONFIRM' ? 'Belirlenemedi' : '...')}
+                                    </span>
+                                </div>
                             </div>
-                        )}
+
+                            {voiceStep === 'CONFIRM' && (
+                                <div className="mt-12 flex gap-4 w-full">
+                                    <button
+                                        onClick={() => setVoiceStep('IDLE')}
+                                        className="flex-1 py-6 bg-white/10 text-white rounded-3xl font-black uppercase tracking-widest hover:bg-white/20 transition-all"
+                                    >
+                                        İptal
+                                    </button>
+                                    <button
+                                        onClick={confirmGuidedAppointment}
+                                        className="flex-1 py-6 bg-indigo-600 text-white rounded-3xl font-black uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:scale-105 transition-all"
+                                    >
+                                        Onayla
+                                    </button>
+                                </div>
+                            )}
+
+                            {voiceStep !== 'CONFIRM' && isListening && voiceTranscript && (
+                                <div className="mt-8 text-white/60 italic font-medium">
+                                    "{voiceTranscript}..."
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }
