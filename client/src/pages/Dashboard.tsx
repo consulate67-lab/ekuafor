@@ -8,6 +8,7 @@ import { parseVoiceCommand } from '../lib/aiParser';
 import { Device } from '@capacitor/device';
 import { useAuthStore } from '../store/authStore';
 import api from '../lib/api';
+import { Appointment } from '../types';
 
 // Leaflet Icon Fix
 const DefaultIcon = L.icon({
@@ -48,6 +49,11 @@ export default function Dashboard() {
     const [statsLoading, setStatsLoading] = useState(false);
     const [showReports, setShowReports] = useState(false);
     const [allCompanies, setAllCompanies] = useState<Company[]>([]);
+    const [appointments, setAppointments] = useState<Appointment[]>([]);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [paymentApp, setPaymentApp] = useState<Appointment | null>(null);
+    const [nfcState, setNfcState] = useState<'IDLE' | 'SCANNING' | 'SUCCESS' | 'ERROR'>('IDLE');
+    const [loading, setLoading] = useState(false);
 
 
     const getLocalDateString = () => {
@@ -120,6 +126,24 @@ export default function Dashboard() {
                     }));
 
                     setServices(services);
+
+                    // Fetch today's appointments for the staff member
+                    try {
+                        const appsRes = await api.get('/appointments', {
+                            params: {
+                                company_id: user.company_id,
+                                start_date: todayStr,
+                                end_date: todayStr
+                            }
+                        });
+                        const allApps = appsRes.data?.data || [];
+                        const myApps = allApps.filter((a: any) =>
+                            Number(a.staff_id) === Number(user.id) || user.role === 'company_admin'
+                        );
+                        setAppointments(myApps);
+                    } catch (e) {
+                        console.warn('Dashboard appointments fetch failed', e);
+                    }
 
                 } catch (e) {
                     console.error('Stats calculation error:', e);
@@ -351,6 +375,36 @@ export default function Dashboard() {
             console.error('Guided booking error', err);
             alert('Randevu oluşturulurken hata oluştu.');
             setVoiceStep('IDLE');
+        }
+    };
+
+    const handleStatusUpdate = async (id: number, status: string, currentPrice?: number) => {
+        let finalPrice = currentPrice;
+
+        if (status === 'completed') {
+            const priceInput = window.prompt('Hizmet tamamlandı. Son tutarı onaylıyor musunuz?', currentPrice?.toString() || '0');
+            if (priceInput === null) return;
+            finalPrice = Number(priceInput);
+
+            const app = appointments.find(a => a.id === id);
+            if (app && finalPrice > 0) {
+                setPaymentApp({ ...app, price: finalPrice });
+                setShowPaymentModal(true);
+                return;
+            }
+        }
+
+        try {
+            setLoading(true);
+            await api.patch(`/appointments/${id}/status`, {
+                status,
+                price: finalPrice
+            });
+            window.location.reload();
+        } catch (err: any) {
+            alert('İşlem başarısız oldu');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -730,6 +784,64 @@ export default function Dashboard() {
                                         <span className="text-[9px] font-black text-amber-700 uppercase tracking-widest">Hakediş</span>
                                     </div>
                                 </div>
+                                {/* Today's Appointments List for Staff */}
+                                <div className="mt-12 bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/50 border border-slate-100 text-left">
+                                    <div className="flex items-center justify-between mb-8">
+                                        <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Bugünkü Programım</h3>
+                                        <div className="bg-emerald-50 text-emerald-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100">
+                                            CANLI
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        {appointments.length === 0 ? (
+                                            <div className="py-12 text-center bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">
+                                                <p className="text-3xl mb-3">☕</p>
+                                                <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Bugün için randevunuz bulunmuyor</p>
+                                            </div>
+                                        ) : (
+                                            appointments.map((app) => (
+                                                <div key={app.id} className="group bg-white p-6 rounded-[2rem] border border-slate-100 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-300">
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                                                        <div className="flex items-center gap-6">
+                                                            <div className="w-16 h-16 bg-slate-900 text-white rounded-2xl flex flex-col items-center justify-center shadow-lg">
+                                                                <span className="text-xs font-black uppercase text-indigo-400">{app.start_time.split(':')[0]}</span>
+                                                                <span className="text-xs font-black opacity-50">{app.start_time.split(':')[1]}</span>
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="text-lg font-black text-slate-900">{app.customer_name || 'Misafir'}</h4>
+                                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                                                    {services.find(s => s.id === app.service_id)?.name || 'Hizmet'} | {app.start_time} - {app.end_time}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-3">
+                                                            {app.status === 'approved' && (
+                                                                <button
+                                                                    onClick={() => handleStatusUpdate(app.id!, 'completed', app.price)}
+                                                                    className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all"
+                                                                >
+                                                                    Tamamla & Ödeme Al
+                                                                </button>
+                                                            )}
+                                                            {app.status === 'completed' && (
+                                                                <span className="px-6 py-4 bg-emerald-50 text-emerald-600 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-emerald-100">
+                                                                    ✓ Tamamlandı
+                                                                </span>
+                                                            )}
+                                                            {app.status === 'pending' && (
+                                                                <span className="px-6 py-4 bg-amber-50 text-amber-600 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-amber-100">
+                                                                    ⏳ Onay Bekliyor
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -837,6 +949,127 @@ export default function Dashboard() {
                     </div>
                 )
             }
+
+            {/* Payment Modal (NFC / SoftPOS Simulation) */}
+            {showPaymentModal && paymentApp && (
+                <div className="fixed inset-0 z-[150] flex items-end justify-center bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-500">
+                        <div className="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mb-8" />
+
+                        <div className="text-center mb-8">
+                            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">Ödeme Al</h3>
+                            <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">
+                                {paymentApp.customer_name || 'Müşteri'} | <span className="text-indigo-600">₺{paymentApp.price}</span>
+                            </p>
+                        </div>
+
+                        {nfcState === 'IDLE' && (
+                            <div className="grid grid-cols-1 gap-4">
+                                <button
+                                    onClick={async () => {
+                                        setNfcState('SCANNING');
+                                        setTimeout(async () => {
+                                            try {
+                                                const res = await api.post('/payments/ceppos/initialize', {
+                                                    appointment_id: paymentApp.id,
+                                                    amount: paymentApp.price
+                                                });
+                                                if (res.data.success) {
+                                                    setNfcState('SUCCESS');
+                                                    setTimeout(() => {
+                                                        api.patch(`/appointments/${paymentApp.id}/status`, {
+                                                            status: 'completed',
+                                                            price: paymentApp.price
+                                                        }).then(() => {
+                                                            window.location.reload();
+                                                        });
+                                                    }, 1500);
+                                                } else {
+                                                    setNfcState('ERROR');
+                                                }
+                                            } catch (e) {
+                                                setNfcState('ERROR');
+                                            }
+                                        }, 3000);
+                                    }}
+                                    className="p-6 bg-slate-900 text-white rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all shadow-xl shadow-slate-200"
+                                >
+                                    <div className="flex items-center gap-4 text-left">
+                                        <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">📱</div>
+                                        <div>
+                                            <p className="text-xs font-black uppercase tracking-widest text-indigo-400">Temassız Ödeme</p>
+                                            <p className="text-lg font-black leading-tight">SoftPOS / NFC</p>
+                                        </div>
+                                    </div>
+                                    <svg className="w-6 h-6 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
+                                </button>
+
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            setLoading(true);
+                                            await api.patch(`/appointments/${paymentApp.id}/status`, {
+                                                status: 'completed',
+                                                price: paymentApp.price
+                                            });
+                                            window.location.reload();
+                                        } catch (e) {
+                                            alert('Hata oluştu');
+                                            setLoading(false);
+                                        }
+                                    }}
+                                    className="p-6 bg-slate-50 text-slate-900 rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all"
+                                >
+                                    <div className="flex items-center gap-4 text-left">
+                                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">💵</div>
+                                        <div>
+                                            <p className="text-xs font-black uppercase tracking-widest text-slate-400">Nakit Ödeme</p>
+                                            <p className="text-lg font-black leading-tight">Elden Tahsilat</p>
+                                        </div>
+                                    </div>
+                                    <svg className="w-6 h-6 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
+                                </button>
+
+                                <button
+                                    onClick={() => setShowPaymentModal(false)}
+                                    className="w-full py-4 text-slate-400 text-xs font-black uppercase tracking-widest mt-4"
+                                >
+                                    İptal
+                                </button>
+                            </div>
+                        )}
+
+                        {nfcState === 'SCANNING' && (
+                            <div className="py-12 flex flex-col items-center">
+                                <div className="relative mb-12">
+                                    <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-20 scale-150"></div>
+                                    <div className="absolute inset-0 bg-indigo-400 rounded-full animate-pulse opacity-40 scale-125"></div>
+                                    <div className="relative w-32 h-32 bg-slate-900 rounded-full flex items-center justify-center text-4xl shadow-2xl">⚡</div>
+                                </div>
+                                <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Kartı Yaklaştırın</h4>
+                                <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] animate-pulse">Temassız ödeme bekleniyor...</p>
+                            </div>
+                        )}
+
+                        {nfcState === 'SUCCESS' && (
+                            <div className="py-12 flex flex-col items-center animate-in zoom-in duration-500">
+                                <div className="w-32 h-32 bg-emerald-500 rounded-full flex items-center justify-center text-5xl shadow-2xl mb-8">✓</div>
+                                <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Ödeme Başarılı</h4>
+                                <p className="text-emerald-500 font-black uppercase tracking-widest text-[10px]">İşlem onaylandı, iyzico kaydı oluşturuldu.</p>
+                            </div>
+                        )}
+
+                        {nfcState === 'ERROR' && (
+                            <div className="py-12 flex flex-col items-center">
+                                <div className="w-32 h-32 bg-red-500 rounded-full flex items-center justify-center text-5xl shadow-2xl mb-8">!</div>
+                                <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Ödeme Başarısız</h4>
+                                <p className="text-red-500 font-black uppercase tracking-widest text-[10px] mb-8">İşlem reddedildi veya hata oluştu.</p>
+                                <button onClick={() => setNfcState('IDLE')} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold text-xs uppercase">Tekrar Dene</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div >
     );
 }
