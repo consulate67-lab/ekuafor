@@ -412,17 +412,22 @@ class AppointmentService {
             }
             const updatedAppointment = result.rows[0];
 
-            if (updatedAppointment && status === 'approved') {
-                try {
-                    const phone = updatedAppointment.customer_phone;
-                    const name = updatedAppointment.customer_name || 'Değerli Müşterimiz';
+            if (updatedAppointment) {
+                const phone = updatedAppointment.customer_phone;
+                const name = updatedAppointment.customer_name || 'Değerli Müşterimiz';
+                const date = updatedAppointment.appointment_date;
+                const time = updatedAppointment.start_time;
 
-                    if (phone) {
-                        const message = `Sayın ${name}, randevunuz onaylanmıştır. Tarih: ${updatedAppointment.appointment_date} Saat: ${updatedAppointment.start_time}. Bekliyoruz!`;
+                try {
+                    if (phone && status === 'approved') {
+                        const message = `Sayın ${name}, randevunuz ONAYLANMIŞTIR. Tarih: ${date} Saat: ${time}. Bekliyoruz!`;
+                        await smsService.sendSms(updatedAppointment.company_id, phone, message);
+                    } else if (phone && status === 'cancelled') {
+                        const message = `Sayın ${name}, ${date} tarihli randevunuz maalesef İPTAL EDİLMİŞTİR. Detaylar için iletişime geçebilirsiniz.`;
                         await smsService.sendSms(updatedAppointment.company_id, phone, message);
                     }
                 } catch (smsError) {
-                    console.error('SMS notification failed during appointment approval:', smsError);
+                    console.error(`SMS notification failed for status ${status}:`, smsError);
                 }
             }
 
@@ -565,6 +570,20 @@ class AppointmentService {
             DO UPDATE SET customer_phone = $2, last_sync = CURRENT_TIMESTAMP
         `;
         await pool.query(query, [deviceId, phone]);
+
+        // Bilinen tüm randevuları da bu tele bağlayalım (Eski randevuların sahiplenilmesi)
+        await this.claimAppointmentsByDevice(deviceId, phone);
+    }
+
+    async claimAppointmentsByDevice(deviceId: string, phone: string, customerId?: number) {
+        console.log(`[Service] claimAppointmentsByDevice: Device=${deviceId}, Phone=${phone}`);
+        // Normalize phone for comparison or just use as is for storage
+        await pool.query(
+            `UPDATE appointments 
+             SET customer_phone = $1, customer_id = COALESCE(customer_id, $2)
+             WHERE device_id = $3 AND (customer_phone IS NULL OR customer_phone = '')`,
+            [phone, customerId || null, deviceId]
+        );
     }
 
     async rateAppointment(id: number, rating: number, comment?: string): Promise<Appointment | null> {

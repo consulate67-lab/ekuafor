@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import pool from '../config/database';
 import { z } from 'zod';
 import otpService from '../services/otp.service';
+import appointmentService from '../services/appointment.service';
 
 const router = Router();
 
@@ -145,6 +146,11 @@ router.post('/login', async (req: Request, res: Response) => {
                 token
             }
         });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Giriş sırasında hata oluştu'
+        });
     }
 });
 
@@ -172,7 +178,7 @@ router.post('/send-otp', async (req: Request, res: Response) => {
  */
 router.post('/verify-otp', async (req: Request, res: Response) => {
     try {
-        const { phone, code, first_name, last_name } = req.body;
+        const { phone, code, first_name, last_name, device_id } = req.body;
 
         if (!phone || !code) {
             return res.status(400).json({ success: false, error: 'Telefon ve kod gereklidir' });
@@ -217,6 +223,12 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
             user = registerResult.rows[0];
         } else {
             user = userResult.rows[0];
+        }
+
+        // Cihaz ve telefon eşleştirmesi (ve randevuların sahiplenilmesi)
+        if (device_id) {
+            await appointmentService.syncDeviceWithPhone(device_id, formattedPhone);
+            await appointmentService.claimAppointmentsByDevice(device_id, formattedPhone, user.id);
         }
 
         // JWT token oluştur

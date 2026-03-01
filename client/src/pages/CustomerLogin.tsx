@@ -58,11 +58,13 @@ export default function CustomerLogin() {
 
         setLoading(true);
         try {
+            const deviceId = localStorage.getItem('device_id');
             const response = await api.post('/auth/verify-otp', {
                 phone,
                 code,
                 first_name: firstName,
-                last_name: lastName
+                last_name: lastName,
+                device_id: deviceId
             });
 
             const { user, token } = response.data.data;
