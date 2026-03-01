@@ -11,6 +11,9 @@ export default function SalonBoard() {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [pendingAppointments, setPendingAppointments] = useState<Appointment[]>([]);
     const [staff, setStaff] = useState<any[]>([]);
+    const [departments, setDepartments] = useState<any[]>([]);
+    const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('all');
+    const [isOptionsOpen, setIsOptionsOpen] = useState(false);
     const [services, setServices] = useState<any[]>([]);
     const [packages, setPackages] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -82,12 +85,13 @@ export default function SalonBoard() {
         try {
             const dateToFetch = date || selectedDate;
 
-            const [appsRes, pendingRes, staffRes, servRes, pkgRes] = await Promise.all([
+            const [appsRes, pendingRes, staffRes, servRes, pkgRes, deptRes] = await Promise.all([
                 api.get('/appointments', { params: { company_id: compId, start_date: dateToFetch, end_date: dateToFetch } }),
                 api.get('/appointments', { params: { company_id: compId, status: 'pending' } }),
                 api.get(`/companies/${compId}/employees`),
                 api.get('/services', { params: { company_id: compId } }),
-                api.get('/packages', { params: { company_id: compId } })
+                api.get('/packages', { params: { company_id: compId } }),
+                api.get('/departments', { params: { company_id: compId } })
             ]);
 
             setAppointments(appsRes.data.data || []);
@@ -95,6 +99,7 @@ export default function SalonBoard() {
             setStaff(staffRes.data.data || []);
             setServices(servRes.data.data || []);
             setPackages(pkgRes.data.data || []);
+            setDepartments(deptRes.data.data || []);
         } catch (err) {
             console.error('Veri senkronizasyonu başarısız', err);
         }
@@ -164,10 +169,12 @@ export default function SalonBoard() {
         }
     }, [boardKey, fetchData]);
 
-    // In staff mode, filter staff list to only show the logged-in staff member
+    // In staff mode, filter staff list to only show the logged-in staff member, or filter by department
     const displayStaff = staffMode && staffInfo
         ? staff.filter(s => s.user_id === staffInfo.id || s.id === staffInfo.id)
-        : staff;
+        : selectedDepartmentId === 'all'
+            ? staff
+            : staff.filter(s => Number(s.department_id) === Number(selectedDepartmentId));
 
     const handleStaffLogout = () => {
         localStorage.removeItem('staff_board_code');
@@ -546,6 +553,61 @@ export default function SalonBoard() {
                                     </div>
                                 </button>
                             )}
+
+                            {/* Options Button with Department Filter */}
+                            <div className="relative">
+                                <button
+                                    onClick={() => setIsOptionsOpen(!isOptionsOpen)}
+                                    className="group w-12 h-12 rounded-2xl bg-white border-2 border-slate-50 text-slate-400 hover:bg-indigo-500 hover:text-white hover:border-indigo-500 transition-all duration-300 flex items-center justify-center shadow-lg shadow-slate-100/50 active:scale-90"
+                                    title="Seçenekler"
+                                >
+                                    <svg className="w-5 h-5 transition-transform group-hover:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 12h9.75M10.5 18h9.75M3 6h.008v.008H3V6zm0 12h.008v.008H3V18zm0-6h.008v.008H3V12z" />
+                                    </svg>
+                                </button>
+
+                                {isOptionsOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-[60]" onClick={() => setIsOptionsOpen(false)}></div>
+                                        <div className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 z-[70] p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                                            <div className="flex flex-col gap-4">
+                                                <div>
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Departman Filtresi</label>
+                                                    <select
+                                                        value={selectedDepartmentId}
+                                                        onChange={(e) => {
+                                                            setSelectedDepartmentId(e.target.value);
+                                                            setIsOptionsOpen(false);
+                                                        }}
+                                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all"
+                                                    >
+                                                        <option value="all">Tüm Departmanlar</option>
+                                                        {departments.map(dept => (
+                                                            <option key={dept.id} value={dept.id}>{dept.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div className="h-px bg-slate-100 w-full"></div>
+                                                <button
+                                                    onClick={() => {
+                                                        if (confirm('Sistemden çıkış yapılsın mı?')) {
+                                                            if (staffMode) handleStaffLogout();
+                                                            else { localStorage.removeItem('salon_board_key'); window.location.reload(); }
+                                                        }
+                                                    }}
+                                                    className="w-full flex items-center justify-between px-3 py-2 bg-rose-50 text-rose-600 rounded-xl text-sm font-bold hover:bg-rose-100 transition-all"
+                                                >
+                                                    <span>Güvenli Çıkış</span>
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
                             <button
                                 onClick={() => {
                                     setFastForm({
@@ -573,20 +635,6 @@ export default function SalonBoard() {
                                 <div className="absolute inset-0 bg-gradient-to-tr from-slate-800 to-slate-900 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                 <svg className="relative z-10 w-6 h-6 transform group-hover:rotate-90 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                                </svg>
-                            </button>
-                            <button
-                                onClick={() => {
-                                    if (confirm('Sistemden çıkış yapılsın mı?')) {
-                                        if (staffMode) handleStaffLogout();
-                                        else { localStorage.removeItem('salon_board_key'); window.location.reload(); }
-                                    }
-                                }}
-                                className="group w-12 h-12 rounded-2xl bg-white border-2 border-slate-50 text-slate-400 hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-all duration-300 flex items-center justify-center shadow-lg shadow-slate-100/50 active:scale-90"
-                                title="Güvenli Çıkış"
-                            >
-                                <svg className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
                                 </svg>
                             </button>
                         </div>
