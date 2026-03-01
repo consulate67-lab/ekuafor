@@ -960,7 +960,7 @@ export default function BookingPage() {
                                     <div className="mt-6 flex flex-col gap-3">
                                         <button
                                             type="button"
-                                            onClick={() => navigate('/ekuafor/login')}
+                                            onClick={() => navigate(`/customer-login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`)}
                                             className="w-full bg-indigo-600 text-white py-5 rounded-3xl font-black text-base uppercase tracking-widest shadow-2xl shadow-indigo-200 active:scale-95 transition-all"
                                         >
                                             Giriş Yap ve Onayla
