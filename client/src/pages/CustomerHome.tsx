@@ -111,9 +111,7 @@ export default function CustomerHome() {
     };
 
     useEffect(() => {
-        if (!isAuthenticated) {
-            navigate('/customer-login');
-        } else if (user?.role === 'staff' || user?.role === 'company_admin' || user?.role === 'super_admin') {
+        if (isAuthenticated && (user?.role === 'staff' || user?.role === 'company_admin' || user?.role === 'super_admin')) {
             navigate('/dashboard');
         }
     }, [isAuthenticated, user, navigate]);
@@ -126,9 +124,6 @@ export default function CustomerHome() {
         }
 
         const initialFetch = async () => {
-            // Seonndary check: If by any chance we are not logged in, stop here
-            if (!isAuthenticated) return;
-
             // Then try location using Capacitor for better mobile support
             try {
                 const position = await Geolocation.getCurrentPosition({
@@ -141,6 +136,7 @@ export default function CustomerHome() {
                 fetchData(searchQuery, newLoc, distanceLimit);
             } catch (err) {
                 console.log('Initial geolocation fail', err);
+                fetchData(searchQuery, null, distanceLimit);
             }
         };
         initialFetch();
@@ -697,6 +693,18 @@ export default function CustomerHome() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5-2V4l5 2m0 14l6-2V8l-6 2m6 8l5-2V7l-5 2m0 0v11" />
                                     </svg>
                                 </button>
+                                {c.phone && (
+                                    <a
+                                        href={`tel:${c.phone}`}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="p-2 bg-emerald-50/80 text-emerald-500 rounded-xl transition-all hover:bg-emerald-100 hover:scale-110 shadow-sm"
+                                        title="Ara"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                        </svg>
+                                    </a>
+                                )}
                             </div>
 
                             <div className="w-16 h-16 bg-gray-100 rounded-xl flex-shrink-0 flex items-center justify-center text-2xl">

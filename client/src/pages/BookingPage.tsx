@@ -18,6 +18,7 @@ interface SelectionState {
 }
 
 export default function BookingPage() {
+    const { isAuthenticated, user } = useAuthStore();
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -84,7 +85,6 @@ export default function BookingPage() {
         };
     }, [step, navigate, initialStaffId]);
 
-    const { user } = useAuthStore();
     const [selection, setSelection] = useState<SelectionState>({
         staffId: initialStaffId,
         serviceId: null,
@@ -952,9 +952,24 @@ export default function BookingPage() {
                                     </label>
                                 </div>
 
-                                <button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-5 rounded-3xl font-black text-base uppercase tracking-widest shadow-2xl shadow-orange-200 active:scale-95 transition-all mt-6">
-                                    Randevuyu Onayla
-                                </button>
+                                {isAuthenticated ? (
+                                    <button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-5 rounded-3xl font-black text-base uppercase tracking-widest shadow-2xl shadow-orange-200 active:scale-95 transition-all mt-6">
+                                        Randevuyu Onayla
+                                    </button>
+                                ) : (
+                                    <div className="mt-6 flex flex-col gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate('/ekuafor/login')}
+                                            className="w-full bg-indigo-600 text-white py-5 rounded-3xl font-black text-base uppercase tracking-widest shadow-2xl shadow-indigo-200 active:scale-95 transition-all"
+                                        >
+                                            Giriş Yap ve Onayla
+                                        </button>
+                                        <p className="text-[10px] text-slate-400 font-bold text-center uppercase tracking-widest">
+                                            Randevu oluşturmak için telefon numarası doğrulaması gereklidir.
+                                        </p>
+                                    </div>
+                                )}
                             </form>
                         </div>
                     </div>

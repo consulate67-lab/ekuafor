@@ -17,6 +17,7 @@ import reportRoutes from './routes/report.routes';
 import mainCompanyRoutes from './routes/mainCompany.routes';
 import financeRoutes from './routes/finance.routes';
 import generatorRoutes from './routes/generator.routes';
+import paymentRoutes from './routes/payment.routes';
 import cronService from './services/cron.service';
 
 
@@ -160,6 +161,9 @@ app.use('/ekuafor/api/finance', financeRoutes);
 app.use('/api/generator', generatorRoutes);
 app.use('/ekuafor/api/generator', generatorRoutes);
 
+app.use('/api/payments', paymentRoutes);
+app.use('/ekuafor/api/payments', paymentRoutes);
+
 
 // Setup Route (For DB Init)
 import setupRoutes from './routes/setup.routes';
@@ -230,6 +234,7 @@ const runMigrations = async () => {
                 department_id INTEGER,
                 photo TEXT,
                 is_active BOOLEAN DEFAULT true,
+                is_phone_verified BOOLEAN DEFAULT false,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -581,9 +586,12 @@ const runMigrations = async () => {
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS device_id VARCHAR(255)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS rating INTEGER CHECK (rating BETWEEN 1 AND 5)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS comment TEXT');
+        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS iyzico_token VARCHAR(255)');
+        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS payment_id VARCHAR(255)');
 
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS photo TEXT');
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS department_id INTEGER');
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_phone_verified BOOLEAN DEFAULT false');
 
         try {
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS genders TEXT[]');
