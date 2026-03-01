@@ -464,7 +464,10 @@ export default function SalonBoard() {
         const d = new Date(dateStr);
         const day = d.getDate();
         const month = d.getMonth() + 1;
+        const year = d.getFullYear();
+        const key = `${day}-${month}`;
 
+        // Sabit Milli Bayramlar
         const fixedDays: Record<string, string> = {
             '1-1': 'Yılbaşı',
             '23-4': 'Ulusal Egemenlik ve Çocuk Bayramı',
@@ -477,7 +480,44 @@ export default function SalonBoard() {
             '10-11': 'Atatürk\'ü Anma Günü'
         };
 
-        return fixedDays[`${day}-${month}`] || null;
+        // Dini Bayramlar (Her yıl değiştiği için yıla göre kontrol)
+        const religiousDays: Record<number, Record<string, string>> = {
+            2026: {
+                '19-3': 'Ramazan Bayramı Arifesi',
+                '20-3': 'Ramazan Bayramı',
+                '21-3': 'Ramazan Bayramı',
+                '22-3': 'Ramazan Bayramı',
+                '26-5': 'Kurban Bayramı Arifesi',
+                '27-5': 'Kurban Bayramı',
+                '28-5': 'Kurban Bayramı',
+                '29-5': 'Kurban Bayramı',
+                '30-5': 'Kurban Bayramı'
+            },
+            2027: {
+                '8-3': 'Ramazan Bayramı Arifesi',
+                '9-3': 'Ramazan Bayramı',
+                '10-3': 'Ramazan Bayramı',
+                '11-3': 'Ramazan Bayramı',
+                '15-5': 'Kurban Bayramı Arifesi',
+                '16-5': 'Kurban Bayramı',
+                '17-5': 'Kurban Bayramı',
+                '18-5': 'Kurban Bayramı',
+                '19-5': 'Kurban Bayramı / Gençlik ve Spor Bayramı'
+            },
+            2028: {
+                '25-2': 'Ramazan Bayramı Arifesi',
+                '26-2': 'Ramazan Bayramı',
+                '27-2': 'Ramazan Bayramı',
+                '28-2': 'Ramazan Bayramı',
+                '3-5': 'Kurban Bayramı Arifesi',
+                '4-5': 'Kurban Bayramı',
+                '5-5': 'Kurban Bayramı',
+                '6-5': 'Kurban Bayramı',
+                '7-5': 'Kurban Bayramı'
+            }
+        };
+
+        return religiousDays[year]?.[key] || fixedDays[key] || null;
     };
 
     const specialDay = getSpecialDay(selectedDate);
