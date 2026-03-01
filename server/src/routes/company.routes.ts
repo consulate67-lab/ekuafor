@@ -70,6 +70,8 @@ const companySchema = z.object({
     qnb_vkn: nullableString,
     efatura_test_mode: z.preprocess(v => (v === "" || v === null) ? null : v, z.boolean().nullable().optional()),
     invoice_prefix: z.string().max(3).nullable().optional(),
+    ubl_incoming_alias: nullableString,
+    ubl_outgoing_alias: nullableString,
 });
 
 /**

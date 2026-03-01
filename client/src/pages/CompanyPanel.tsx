@@ -914,22 +914,48 @@ export default function CompanyPanel() {
 
     const templates = {
         men: [
-            { name: 'Saç Kesimi', duration: 30, price: 200, description: 'Yıkama dahil saç kesimi' },
-            { name: 'Sakal Tıraşı', duration: 15, price: 100, description: 'Sakal düzeltme ve şekillendirme' },
-            { name: 'Saç & Sakal', duration: 45, price: 280, description: 'Komple bakım paketi' },
-            { name: 'Çocuk Tıraşı', duration: 20, price: 150, description: '12 yaş altı' },
-            { name: 'Saç Boyama', duration: 60, price: 500, description: 'Dip boya veya komple' },
-            { name: 'Fön', duration: 15, price: 80, description: 'Yıkama ve fön' }
+            { name: 'Erkek Saç Kesimi', duration: 30, price: 200, description: 'Yıkama dahil saç kesimi' },
+            { name: 'Sakal Tıraşı (Makine)', duration: 15, price: 100, description: 'Makine ile sakal düzeltme' },
+            { name: 'Sakal Tıraşı (Ustura)', duration: 25, price: 150, description: 'Geleneksel ustura tıraşı' },
+            { name: 'Yıkama & Şekillendirme', duration: 20, price: 100, description: 'Saç yıkama ve fön' },
+            { name: 'Çocuk Saç Kesimi', duration: 25, price: 150, description: '12 yaş altı çocuk kesimi' },
+            { name: 'Saç Boyama (Erkek)', duration: 60, price: 400, description: 'Erkek saç boyama işlemi' },
+            { name: 'Beyaz Kapatma', duration: 30, price: 300, description: 'Doğal beyaz kapatma işlemi' },
+            { name: 'Keratin / Bakım', duration: 45, price: 350, description: 'Erkek saç bakım uygulaması' },
+            { name: 'Damat Tıraşı Paketi', duration: 90, price: 1000, description: 'Damat özel bakım paketi' },
+            { name: 'Kaş Düzeltme', duration: 10, price: 50, description: 'Doğal kaş düzeltme' },
+            { name: 'Saç Tasarım (Fade)', duration: 45, price: 250, description: 'Fade ve modern kesimler' }
         ],
         women: [
-            { name: 'Saç Kesimi', duration: 45, price: 300, description: 'Yıkama ve şekillendirme dahil' },
-            { name: 'Fön', duration: 30, price: 150, description: 'Düz veya dalgalı fön' },
-            { name: 'Dip Boya', duration: 90, price: 600, description: 'Dip boyama işlemi' },
-            { name: 'Komple Boya', duration: 120, price: 1000, description: 'Tüm saç boyama' },
-            { name: 'Ombre / Balyaj', duration: 180, price: 2000, description: 'Açma boyama işlemleri' },
-            { name: 'Manikür', duration: 30, price: 200, description: 'Klasik manikür' },
-            { name: 'Pedikür', duration: 45, price: 300, description: 'Klasik pedikür' },
-            { name: 'Kaş Bıyık', duration: 15, price: 100, description: 'İple veya ağda ile' }
+            { name: 'Saç Kesimi', duration: 45, price: 300, description: 'Modern saç kesimi ve şekillendirme' },
+            { name: 'Fön ve Şekillendirme', duration: 30, price: 150, description: 'Fön ve günlük şekillendirme' },
+            { name: 'Topuz ve Özel Tasarım', duration: 60, price: 500, description: 'Özel gün ve davet saç tasarımı' },
+            { name: 'Saç Boyama (Dip)', duration: 90, price: 600, description: 'Dip boyama işlemi' },
+            { name: 'Saç Boyama (Komple)', duration: 120, price: 1000, description: 'Tüm saç boyama' },
+            { name: 'Röfle / Balyaj', duration: 180, price: 2000, description: 'Röfle, balyaj, ombre, sombre işlemleri' },
+            { name: 'Saç Açma İşlemleri', duration: 150, price: 1500, description: 'Saç rengi açma ve temizleme' },
+            { name: 'Keratin Bakım', duration: 90, price: 800, description: 'Saç düzleştirme ve bakım' },
+            { name: 'Saç Botoksu', duration: 60, price: 600, description: 'Yoğun nem ve dolgunluk veren bakım' },
+            { name: 'Perma', duration: 120, price: 1200, description: 'Kalıcı dalga işlemi' },
+            { name: 'Saç Kaynak', duration: 180, price: 3000, description: 'Mikro veya boncuk kaynak uygulaması' },
+            { name: 'Saç Bakım Kürleri', duration: 30, price: 250, description: 'Özel bakım maskeleri ve kürler' },
+            { name: 'Gelin Saçı & Prova', duration: 120, price: 2500, description: 'Gelin saç tasarımı ve prova' },
+            { name: 'Kaş Alma', duration: 15, price: 100, description: 'Kaş şekillendirme' }
+        ],
+        beauty: [
+            { name: 'Cilt Bakımı (Klasik)', duration: 60, price: 500, description: 'Derinlemesine gözenek temizliği' },
+            { name: 'Hydrafacial / Medikal', duration: 75, price: 1200, description: 'Cihazlı medikal cilt bakımı' },
+            { name: 'Lazer Epilasyon', duration: 60, price: 1500, description: 'Kalıcı tüy yok etme işlemi' },
+            { name: 'IPL Epilasyon', duration: 45, price: 1000, description: 'Işık bazlı tüy azaltma' },
+            { name: 'İğneli Epilasyon', duration: 30, price: 400, description: 'Tekli tüy yok etme işlemi' },
+            { name: 'Kalıcı Makyaj', duration: 120, price: 2500, description: 'Microblading, dudak renklendirme vb.' },
+            { name: 'Kirpik Lifting', duration: 45, price: 400, description: 'Doğal kirpik kaldırma işlemi' },
+            { name: 'Kirpik Uzatma / İpek', duration: 90, price: 800, description: 'İpek kirpik uygulaması' },
+            { name: 'Kaş Laminasyon', duration: 45, price: 450, description: 'Kaş şekillendirme ve sabitleme' },
+            { name: 'Bölgesel İncelme', duration: 45, price: 800, description: 'G5, kavitasyon vb. uygulamalar' },
+            { name: 'Masaj Hizmetleri', duration: 50, price: 750, description: 'Profesyonel vücut masajı' },
+            { name: 'Manikür', duration: 30, price: 200, description: 'Klasik el bakımı' },
+            { name: 'Pedikür', duration: 45, price: 300, description: 'Klasik ayak bakımı' }
         ]
     };
 
@@ -1154,6 +1180,7 @@ export default function CompanyPanel() {
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Hızlı İşlemler</p>
                                 {[
                                     { icon: '📅', label: 'Müşteri Randevu QR Kodu', desc: 'Müşterilerin randevu alması için', tab: 'booking' as TabKey },
+                                    { icon: '✂️', label: (company.service_label || 'Hizmet') + ' ve Paket Yönetimi', desc: 'Fiyat ve süre tanımlamaları', tab: 'services' as TabKey },
                                     { icon: '👤', label: 'Yeni Personel Ekle', desc: 'Board kodu ile giriş yapacak', tab: 'staff' as TabKey },
                                     { icon: '🏢', label: 'Departman Yönet', desc: 'Birimlerinizi düzenleyin', tab: 'dept' as TabKey },
                                 ].map((action, i) => (
@@ -1374,6 +1401,74 @@ export default function CompanyPanel() {
                                         </div>
                                     </div>
 
+                                    {/* Hizmet Verilenler - Yeni Eklendi */}
+                                    <div className="pt-4 border-t border-slate-100">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Hizmet Verilen Cinsiyetler</label>
+                                        <p className="text-xs text-slate-400 mb-4 ml-1">Hangi kitleye hizmet verdiğinizi seçin. Bu seçim müşteri arama sonuçlarını etkiler.</p>
+                                        <div className="flex gap-2">
+                                            {['Erkek', 'Kadın', 'Çocuk'].map(g => {
+                                                const isActive = (company.genders || []).includes(g);
+                                                return (
+                                                    <button
+                                                        key={g}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const current = company.genders || [];
+                                                            const next = current.includes(g)
+                                                                ? current.filter((item: string) => item !== g)
+                                                                : [...current, g];
+                                                            setCompany({ ...company, genders: next });
+                                                        }}
+                                                        className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all border-2 text-xs ${isActive
+                                                            ? 'bg-slate-900 border-slate-900 text-white shadow-lg'
+                                                            : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'
+                                                            }`}
+                                                    >
+                                                        {g}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Mesai Saatleri Bilgileri - Yeni Eklendi */}
+                                    <div className="pt-4 border-t border-slate-100">
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Mesai ve Randevu Ayarları</label>
+                                        <p className="text-xs text-slate-400 mb-4 ml-1">İşletmenizin çalışma saatlerini ve randevu sıklığını belirleyin.</p>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <div>
+                                                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Başlangıç</label>
+                                                <input
+                                                    type="time"
+                                                    className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900 text-sm"
+                                                    value={company.work_start_time || '09:00'}
+                                                    onChange={e => setCompany({ ...company, work_start_time: e.target.value })}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Bitiş</label>
+                                                <input
+                                                    type="time"
+                                                    className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900 text-sm"
+                                                    value={company.work_end_time || '20:00'}
+                                                    onChange={e => setCompany({ ...company, work_end_time: e.target.value })}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Aralık (Dk)</label>
+                                                <select
+                                                    className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900 text-sm appearance-none"
+                                                    value={company.slot_interval || 30}
+                                                    onChange={e => setCompany({ ...company, slot_interval: Number(e.target.value) })}
+                                                >
+                                                    {[15, 20, 30, 45, 60, 90, 120].map(m => (
+                                                        <option key={m} value={m}>{m} dk</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     {/* Randevu Akış Sırası Ayarı */}
                                     <div className="pt-4 border-t border-slate-100">
                                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Randevu Akış Sırası</label>
@@ -1566,6 +1661,29 @@ export default function CompanyPanel() {
                                                 onChange={e => setCompany({ ...company, invoice_prefix: e.target.value.toUpperCase() })}
                                             />
                                             <p className="text-[8px] text-slate-300 mt-1 ml-1">Örn: GIB, ABC, EFA</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Gelen Kutu Etiketi (UBL PK)</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900 text-xs"
+                                                value={company.ubl_incoming_alias || ''}
+                                                onChange={e => setCompany({ ...company, ubl_incoming_alias: e.target.value })}
+                                                placeholder="urn:mail:defaultpk@..."
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Giden Kutu Etiketi (UBL GB)</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900 text-xs"
+                                                value={company.ubl_outgoing_alias || ''}
+                                                onChange={e => setCompany({ ...company, ubl_outgoing_alias: e.target.value })}
+                                                placeholder="urn:mail:defaultgb@..."
+                                            />
                                         </div>
                                     </div>
 
@@ -3243,17 +3361,17 @@ export default function CompanyPanel() {
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Sık kullanılan hizmetleri hızlıca ekleyin</p>
                             </div>
                             <div className="p-10 overflow-y-auto">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                     <div>
-                                        <h4 className="text-indigo-600 font-black uppercase tracking-widest text-xs mb-6 flex items-center gap-2">
+                                        <h4 className="text-indigo-600 font-black uppercase tracking-widest text-[10px] mb-6 flex items-center gap-2">
                                             <span className="w-2 h-2 bg-indigo-600 rounded-full"></span>
-                                            Erkek Kuaförü
+                                            Berber & Erkek
                                         </h4>
                                         <div className="space-y-3">
                                             {templates.men.map((t, i) => (
                                                 <div key={i} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-indigo-100 hover:bg-indigo-50/30 transition-all group">
                                                     <div>
-                                                        <p className="font-bold text-sm text-slate-900">{t.name}</p>
+                                                        <p className="font-bold text-[11px] text-slate-900">{t.name}</p>
                                                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">{t.duration} dk • ₺{t.price}</p>
                                                     </div>
                                                     <button
@@ -3261,7 +3379,7 @@ export default function CompanyPanel() {
                                                             handleAddFromTemplate(t);
                                                             setShowTemplatesModal(false);
                                                         }}
-                                                        className="w-10 h-10 bg-white shadow-sm border border-slate-100 text-indigo-600 rounded-xl font-black flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all"
+                                                        className="w-8 h-8 bg-white shadow-sm border border-slate-100 text-indigo-600 rounded-lg font-black flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all"
                                                     >
                                                         +
                                                     </button>
@@ -3270,15 +3388,15 @@ export default function CompanyPanel() {
                                         </div>
                                     </div>
                                     <div>
-                                        <h4 className="text-pink-600 font-black uppercase tracking-widest text-xs mb-6 flex items-center gap-2">
+                                        <h4 className="text-pink-600 font-black uppercase tracking-widest text-[10px] mb-6 flex items-center gap-2">
                                             <span className="w-2 h-2 bg-pink-600 rounded-full"></span>
-                                            Kadın Kuaförü
+                                            Kuaför & Kadın
                                         </h4>
                                         <div className="space-y-3">
                                             {templates.women.map((t, i) => (
                                                 <div key={i} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-pink-100 hover:bg-pink-50/30 transition-all group">
                                                     <div>
-                                                        <p className="font-bold text-sm text-slate-900">{t.name}</p>
+                                                        <p className="font-bold text-[11px] text-slate-900">{t.name}</p>
                                                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">{t.duration} dk • ₺{t.price}</p>
                                                     </div>
                                                     <button
@@ -3286,7 +3404,32 @@ export default function CompanyPanel() {
                                                             handleAddFromTemplate(t);
                                                             setShowTemplatesModal(false);
                                                         }}
-                                                        className="w-10 h-10 bg-white shadow-sm border border-slate-100 text-pink-600 rounded-xl font-black flex items-center justify-center group-hover:bg-pink-600 group-hover:text-white transition-all"
+                                                        className="w-8 h-8 bg-white shadow-sm border border-slate-100 text-pink-600 rounded-lg font-black flex items-center justify-center group-hover:bg-pink-600 group-hover:text-white transition-all"
+                                                    >
+                                                        +
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-rose-600 font-black uppercase tracking-widest text-[10px] mb-6 flex items-center gap-2">
+                                            <span className="w-2 h-2 bg-rose-600 rounded-full"></span>
+                                            Güzellik Merkezi
+                                        </h4>
+                                        <div className="space-y-3">
+                                            {templates.beauty.map((t, i) => (
+                                                <div key={i} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-rose-100 hover:bg-rose-50/30 transition-all group">
+                                                    <div>
+                                                        <p className="font-bold text-[11px] text-slate-900">{t.name}</p>
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">{t.duration} dk • ₺{t.price}</p>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            handleAddFromTemplate(t);
+                                                            setShowTemplatesModal(false);
+                                                        }}
+                                                        className="w-8 h-8 bg-white shadow-sm border border-slate-100 text-rose-600 rounded-lg font-black flex items-center justify-center group-hover:bg-rose-600 group-hover:text-white transition-all"
                                                     >
                                                         +
                                                     </button>

@@ -58,6 +58,8 @@ export interface Company {
     qnb_vkn?: string | null;
     efatura_test_mode?: boolean | null;
     invoice_prefix?: string | null;
+    ubl_incoming_alias?: string | null;
+    ubl_outgoing_alias?: string | null;
 }
 
 class CompanyService {
@@ -94,8 +96,9 @@ class CompanyService {
           work_start_time, work_end_time, slot_interval, admin_key,
           genders, company_type, main_company_id,
           tax_number, tax_office, city, district,
-          qnb_username, qnb_password, qnb_vkn, efatura_test_mode, invoice_prefix
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41)
+          qnb_username, qnb_password, qnb_vkn, efatura_test_mode, invoice_prefix,
+          ubl_incoming_alias, ubl_outgoing_alias
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43)
         RETURNING *
       `;
 
@@ -140,7 +143,9 @@ class CompanyService {
                 company.qnb_password || null,
                 company.qnb_vkn || null,
                 company.efatura_test_mode !== false,
-                company.invoice_prefix || 'GIB'
+                company.invoice_prefix || 'GIB',
+                company.ubl_incoming_alias || 'default',
+                company.ubl_outgoing_alias || 'default'
             ];
 
             const result = await client.query(query, values);
@@ -272,8 +277,8 @@ class CompanyService {
         }
 
         if (filters?.gender) {
-            whereClauses.push(`$${paramIndex} = ANY(c.genders)`);
-            values.push(filters.gender);
+            whereClauses.push(`EXISTS (SELECT 1 FROM unnest(c.genders) g WHERE g ILIKE $${paramIndex})`);
+            values.push(`%${filters.gender}%`);
             paramIndex++;
         }
 

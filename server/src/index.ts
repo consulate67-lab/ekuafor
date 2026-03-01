@@ -637,6 +637,8 @@ const runMigrations = async () => {
         } catch (fkErr: any) {
             console.warn('⚠️ Company FK Migration warning (non-fatal):', fkErr.message);
         }
+        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS ubl_incoming_alias VARCHAR(255)');
+        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS ubl_outgoing_alias VARCHAR(255)');
         await pool.query("UPDATE companies SET genders = '{\"Erkek\", \"Kadın\", \"Çocuk\"}' WHERE genders IS NULL");
 
         await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS department_id INTEGER');
