@@ -1163,7 +1163,7 @@ export default function CompanyPanel() {
                                 <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
                                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/50 mb-2">Hoş Geldiniz</p>
                                 <h2 className="text-2xl font-black tracking-tight">{company.name}</h2>
-                                <p className="text-white/60 text-sm mt-1">{company.address_line || company.district_name || ''} {company.province_name || ''}</p>
+                                <p className="text-white/60 text-sm mt-1">{company.address_line || company.district || ''} {company.city || ''}</p>
                             </div>
 
                             {/* Stats Grid */}

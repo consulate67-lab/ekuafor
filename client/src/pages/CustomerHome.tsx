@@ -229,7 +229,7 @@ export default function CustomerHome() {
     const openMaps = (e: React.MouseEvent, c: Company) => {
         e.preventDefault();
         e.stopPropagation();
-        const addressParts = [c.name, c.address_line, c.district_name, c.province_name].filter(Boolean);
+        const addressParts = [c.name, c.address_line, c.district, c.city].filter(Boolean);
         const query = encodeURIComponent(addressParts.join(' '));
         const url = (c.latitude && c.longitude)
             ? `https://www.google.com/maps/dir/?api=1&destination=${c.latitude},${c.longitude}`
@@ -639,7 +639,7 @@ export default function CustomerHome() {
                                     💈
                                 </div>
                                 <h4 className="font-black text-slate-900 text-[10px] truncate">{c.name}</h4>
-                                <p className="text-slate-400 text-[8px] font-bold mt-0.5">{c.district_name || 'Merkez'}</p>
+                                <p className="text-slate-400 text-[8px] font-bold mt-0.5">{c.district || 'Merkez'}</p>
                             </Link>
                         ))}
                     </div>
@@ -711,7 +711,7 @@ export default function CustomerHome() {
                                     <div className="w-1 h-1 bg-slate-200 rounded-full" />
                                     <span className="text-[10px] font-bold text-slate-400">{c.review_count || 0} Yorum</span>
                                 </div>
-                                <p className="text-xs text-gray-500 truncate">{c.district_name || 'Merkez'}, {c.province_name || 'İstanbul'}</p>
+                                <p className="text-xs text-gray-500 truncate">{c.district || 'Merkez'}, {c.city || 'İstanbul'}</p>
                                 {c.distance !== undefined && (
                                     <p className="text-[10px] font-black text-[#1e1b4b] mt-1 uppercase tracking-tighter shadow-sm bg-indigo-50 inline-block px-1.5 py-0.5 rounded">{(c.distance).toFixed(1)} km mesafede</p>
                                 )}

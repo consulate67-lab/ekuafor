@@ -141,8 +141,8 @@ const initializeDB = () => {
             work_start_time: '09:00',
             work_end_time: '20:00',
             address_line: 'Örnek Mahallesi',
-            province_name: 'İstanbul',
-            district_name: 'Merkez'
+            city: 'İstanbul',
+            district: 'Merkez'
         });
         localStorage.setItem(KEYS.COMPANIES, JSON.stringify(companies));
     }
@@ -499,8 +499,8 @@ export const mockHandlers = {
                 work_start_time: '09:00',
                 work_end_time: '20:00',
                 address_line: 'Örnek Mahallesi',
-                province_name: 'İstanbul',
-                district_name: 'Merkez'
+                city: 'İstanbul',
+                district: 'Merkez'
             };
             companies.push(defaultComp);
             setTable(KEYS.COMPANIES, companies);
