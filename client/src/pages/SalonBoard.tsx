@@ -486,7 +486,7 @@ export default function SalonBoard() {
         <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans overflow-hidden selection:bg-indigo-100">
             {/* Ultra Modern Header */}
             {/* Premium Streamlined Header */}
-            <header className="bg-white px-6 lg:px-8 py-4 border-b border-slate-100 z-50 shadow-sm sticky top-0">
+            <header className="bg-white px-6 lg:px-8 py-4 border-b border-slate-100 z-[150] shadow-sm sticky top-0">
                 <div className="flex items-center justify-between gap-6">
                     {/* Left: Brand & Integrated Legend */}
                     <div className="flex items-center gap-10 flex-1 min-w-0">
