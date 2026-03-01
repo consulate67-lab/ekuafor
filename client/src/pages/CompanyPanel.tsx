@@ -1046,7 +1046,16 @@ export default function CompanyPanel() {
         if (!company) return;
         setLoading(true);
         try {
-            await api.put(`/companies/${company.id}`, company);
+            const data = { ...company };
+            // Remove legacy fields
+            delete (data as any).province_id;
+            delete (data as any).province_name;
+            delete (data as any).district_id;
+            delete (data as any).district_name;
+            delete (data as any).neighborhood_id;
+            delete (data as any).neighborhood_name;
+
+            await api.put(`/companies/${company.id}`, data);
             alert('Firma bilgileri başarıyla güncellendi.');
         } catch (err: any) {
             alert(err.response?.data?.error || 'Güncelleme sırasında hata oluştu');
@@ -1300,7 +1309,7 @@ export default function CompanyPanel() {
                                             onChange={e => setCompany({ ...company, address_line: e.target.value })}
                                         />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-3 gap-4">
                                         <div>
                                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">İl (Şehir)</label>
                                             <input
@@ -1317,6 +1326,15 @@ export default function CompanyPanel() {
                                                 className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
                                                 value={company.district || ''}
                                                 onChange={e => setCompany({ ...company, district: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Mahalle</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.neighborhood || ''}
+                                                onChange={e => setCompany({ ...company, neighborhood: e.target.value })}
                                             />
                                         </div>
                                     </div>
@@ -1597,7 +1615,7 @@ export default function CompanyPanel() {
                                         <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-xl">🏢</div>
                                         <div>
                                             <p className="font-black text-sm">{company.name}</p>
-                                            <p className="text-[10px] text-indigo-300 font-bold uppercase">{company.district_name || 'Şehir Belirtilmemiş'}</p>
+                                            <p className="text-[10px] text-indigo-300 font-bold uppercase">{company.district || company.city || 'Şehir Belirtilmemiş'}</p>
                                         </div>
                                     </div>
                                 </div>

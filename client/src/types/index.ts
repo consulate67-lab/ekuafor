@@ -24,12 +24,9 @@ export interface Company {
 
     // Adres
     address_line?: string;
-    province_id?: number;
-    province_name?: string;
-    district_id?: number;
-    district_name?: string;
-    neighborhood_id?: number;
-    neighborhood_name?: string;
+    city?: string;
+    district?: string;
+    neighborhood?: string;
     postal_code?: string;
 
     // Konum

@@ -5,8 +5,8 @@ export interface MainCompany {
     name: string;
     description?: string;
     address_line?: string;
-    province_id?: number;
-    province_name?: string;
+    city?: string;
+    district?: string;
     admin_code: string;
     board_key?: string;
     is_active?: boolean;
@@ -16,27 +16,27 @@ export interface MainCompany {
 class MainCompanyService {
     async create(data: any): Promise<MainCompany> {
         const query = `
-            INSERT INTO companies (name, description, address_line, province_id, province_name, admin_key, board_key, company_type)
+            INSERT INTO companies (name, description, address_line, city, district, admin_key, board_key, company_type)
             VALUES ($1, $2, $3, $4, $5, $6, $7, 'ÜST FİRMA')
-            RETURNING id, name, description, address_line, province_id, province_name, admin_key as admin_code, board_key, is_active, created_at
+            RETURNING id, name, description, address_line, city, district, admin_key as admin_code, board_key, is_active, created_at
         `;
-        const values = [data.name, data.description, data.address_line, data.province_id, data.province_name, data.admin_key || data.admin_code, data.board_key];
+        const values = [data.name, data.description, data.address_line, data.city, data.district, data.admin_key || data.admin_code, data.board_key];
         const result = await pool.query(query, values);
         return result.rows[0];
     }
 
     async getAll(): Promise<MainCompany[]> {
-        const result = await pool.query('SELECT id, name, description, address_line, province_id, province_name, admin_key as admin_code, is_active, created_at FROM companies WHERE company_type = \'ÜST FİRMA\' ORDER BY created_at DESC');
+        const result = await pool.query('SELECT id, name, description, address_line, city, district, admin_key as admin_code, is_active, created_at FROM companies WHERE company_type = \'ÜST FİRMA\' ORDER BY created_at DESC');
         return result.rows;
     }
 
     async getById(id: number): Promise<MainCompany | null> {
-        const result = await pool.query('SELECT id, name, description, address_line, province_id, province_name, admin_key as admin_code, is_active, created_at FROM companies WHERE id = $1 AND company_type = \'ÜST FİRMA\'', [id]);
+        const result = await pool.query('SELECT id, name, description, address_line, city, district, admin_key as admin_code, is_active, created_at FROM companies WHERE id = $1 AND company_type = \'ÜST FİRMA\'', [id]);
         return result.rows[0] || null;
     }
 
     async getByAdminCode(code: string): Promise<MainCompany | null> {
-        const result = await pool.query('SELECT id, name, description, address_line, province_id, province_name, admin_key as admin_code, is_active, created_at FROM companies WHERE admin_key = $1 AND company_type = \'ÜST FİRMA\'', [code]);
+        const result = await pool.query('SELECT id, name, description, address_line, city, district, admin_key as admin_code, is_active, created_at FROM companies WHERE admin_key = $1 AND company_type = \'ÜST FİRMA\'', [code]);
         return result.rows[0] || null;
     }
 
@@ -63,14 +63,14 @@ class MainCompanyService {
         if (fields.length === 0) return null;
 
         values.push(id);
-        const query = `UPDATE companies SET ${fields.join(', ')} WHERE id = $${i} AND company_type = 'ÜST FİRMA' RETURNING id, name, description, address_line, province_id, province_name, admin_key as admin_code, board_key, is_active, created_at`;
+        const query = `UPDATE companies SET ${fields.join(', ')} WHERE id = $${i} AND company_type = 'ÜST FİRMA' RETURNING id, name, description, address_line, city, district, admin_key as admin_code, board_key, is_active, created_at`;
         const result = await pool.query(query, values);
         return result.rows[0] || null;
     }
 
     async getBranches(mainCompanyId: number): Promise<any[]> {
         const query = `
-            SELECT id, name, province_name, district_name, latitude, longitude, is_active
+            SELECT id, name, city, district, latitude, longitude, is_active
             FROM companies
             WHERE main_company_id = $1
             ORDER BY name ASC
@@ -97,7 +97,7 @@ class MainCompanyService {
     }
 
     async getByBoardKey(key: string): Promise<MainCompany | null> {
-        const result = await pool.query('SELECT id, name, description, address_line, province_id, province_name, admin_key as admin_code, board_key, is_active, created_at FROM companies WHERE board_key = $1 AND company_type = \'ÜST FİRMA\'', [key]);
+        const result = await pool.query('SELECT id, name, description, address_line, city, district, admin_key as admin_code, board_key, is_active, created_at FROM companies WHERE board_key = $1 AND company_type = \'ÜST FİRMA\'', [key]);
         return result.rows[0] || null;
     }
 
@@ -106,7 +106,8 @@ class MainCompanyService {
             SELECT 
                 c.id as branch_id,
                 c.name as branch_name,
-                c.province_name,
+                c.city,
+                c.district,
                 c.latitude,
                 c.longitude,
                 COUNT(a.id) as appointment_count,
@@ -114,7 +115,7 @@ class MainCompanyService {
             FROM companies c
             LEFT JOIN appointments a ON a.company_id = c.id AND a.status != 'cancelled'
             WHERE c.main_company_id = $1
-            GROUP BY c.id, c.name, c.province_name, c.latitude, c.longitude
+            GROUP BY c.id, c.name, c.city, c.district, c.latitude, c.longitude
             ORDER BY revenue DESC
         `;
         const result = await pool.query(query, [mainCompanyId]);

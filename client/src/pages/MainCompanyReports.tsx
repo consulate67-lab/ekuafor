@@ -200,7 +200,7 @@ export default function MainCompanyReports() {
                                             </div>
                                             <div>
                                                 <h4 className="font-black text-sm uppercase tracking-tight group-hover:text-emerald-400 transition-colors">{br.branch_name}</h4>
-                                                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{br.province_name || 'Lokasyon Bilgisi Yok'}</p>
+                                                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{br.city || 'Lokasyon Bilgisi Yok'}</p>
                                             </div>
                                         </div>
                                         <div className="text-right">

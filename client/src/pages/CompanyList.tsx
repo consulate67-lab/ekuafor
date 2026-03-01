@@ -51,7 +51,8 @@ export default function CompanyList() {
     const filtered = companies.filter(c =>
         c.name?.toLowerCase().includes(search.toLowerCase()) ||
         c.email?.toLowerCase().includes(search.toLowerCase()) ||
-        c.province_name?.toLowerCase().includes(search.toLowerCase()) ||
+        c.city?.toLowerCase().includes(search.toLowerCase()) ||
+        c.district?.toLowerCase().includes(search.toLowerCase()) ||
         c.phone?.includes(search)
     );
 
@@ -196,7 +197,7 @@ export default function CompanyList() {
                                 {/* Şehir */}
                                 <div className="col-span-2">
                                     <p className="text-xs text-gray-500 font-medium">
-                                        {company.province_name ? `${company.province_name}${company.district_name ? `, ${company.district_name}` : ''}` : '—'}
+                                        {company.city ? `${company.city}${company.district ? `, ${company.district}` : ''}` : '—'}
                                     </p>
                                 </div>
 

@@ -244,12 +244,9 @@ const runMigrations = async () => {
                 email VARCHAR(255),
                 website VARCHAR(255),
                 address_line TEXT,
-                province_id INTEGER,
-                province_name VARCHAR(100),
-                district_id INTEGER,
-                district_name VARCHAR(100),
-                neighborhood_id INTEGER,
-                neighborhood_name VARCHAR(100),
+                city VARCHAR(100),
+                district VARCHAR(100),
+                neighborhood VARCHAR(100),
                 postal_code VARCHAR(10),
                 latitude DECIMAL(10, 8),
                 longitude DECIMAL(11, 8),
@@ -281,8 +278,8 @@ const runMigrations = async () => {
                 name VARCHAR(255) NOT NULL,
                 description TEXT,
                 address_line TEXT,
-                province_id INTEGER,
-                province_name VARCHAR(100),
+                city VARCHAR(100),
+                district VARCHAR(100),
                 admin_code VARCHAR(50) UNIQUE NOT NULL,
                 is_active BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -595,11 +592,11 @@ const runMigrations = async () => {
                 console.log('📦 Migrating legacy main_companies to companies table...');
                 await pool.query(`
                     INSERT INTO companies (
-                        name, description, address_line, province_id, province_name, 
+                        name, description, address_line, city, district, 
                         company_type, is_active, created_at, admin_key
                     )
                     SELECT 
-                        name, description, address_line, province_id, province_name, 
+                        name, description, address_line, city, district, 
                         'ÜST FİRMA', is_active, created_at, admin_code
                     FROM main_companies
                 `);

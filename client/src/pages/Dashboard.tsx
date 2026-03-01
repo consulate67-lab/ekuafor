@@ -1,10 +1,20 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
-import api from '../lib/api';
-import { Service } from '../types';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { Company, Service } from '../types';
 import { parseVoiceCommand } from '../lib/aiParser';
 import { Device } from '@capacitor/device';
+
+// Leaflet Icon Fix
+const DefaultIcon = L.icon({
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+});
+L.Marker.prototype.options.icon = DefaultIcon;
 
 export default function Dashboard() {
     const { user, logout } = useAuthStore();
@@ -33,6 +43,7 @@ export default function Dashboard() {
     const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'year'>('today');
     const [statsLoading, setStatsLoading] = useState(false);
     const [showReports, setShowReports] = useState(false);
+    const [allCompanies, setAllCompanies] = useState<Company[]>([]);
 
 
     const getLocalDateString = () => {
@@ -48,7 +59,9 @@ export default function Dashboard() {
             if (user?.role === 'super_admin') {
                 try {
                     const res = await api.get('/companies');
-                    setStats(prev => ({ ...prev, companyCount: res.data.data.length }));
+                    const companyList = res.data.data || [];
+                    setStats(prev => ({ ...prev, companyCount: companyList.length }));
+                    setAllCompanies(companyList);
                 } catch (e) {
                     console.error('Stats fetch error:', e);
                 }
@@ -390,48 +403,110 @@ export default function Dashboard() {
 
                 {/* Admin Quick Search & Actions (Super Admin Only) */}
                 {user?.role === 'super_admin' && (
-                    <div className="card bg-slate-900 border-none shadow-2xl mb-12 overflow-hidden relative group">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl group-hover:bg-indigo-500/20 transition-all duration-700"></div>
-                        <div className="relative z-10 flex flex-col lg:flex-row gap-10 items-center justify-between">
-                            <div className="space-y-6 max-w-xl">
-                                <div>
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(99,102,241,0.8)]"></span>
-                                        <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">{user?.email}</span>
+                    <>
+                        <div className="card bg-slate-900 border-none shadow-2xl mb-12 overflow-hidden relative group">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl group-hover:bg-indigo-500/20 transition-all duration-700"></div>
+                            <div className="relative z-10 flex flex-col lg:flex-row gap-10 items-center justify-between">
+                                <div className="space-y-6 max-w-xl">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(99,102,241,0.8)]"></span>
+                                            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">{user?.email}</span>
+                                        </div>
+                                        <h1 className="text-4xl font-black text-white leading-tight">
+                                            Firma Yönetim <span className="text-indigo-400">Merkezi</span>
+                                        </h1>
                                     </div>
-                                    <h1 className="text-4xl font-black text-white leading-tight">
-                                        Firma Yönetim <span className="text-indigo-400">Merkezi</span>
-                                    </h1>
+                                    <p className="text-slate-400 text-sm font-medium leading-relaxed">
+                                        Sisteme yeni salonlar tanımlayabilir, mevcut işletmelerin bilgilerini (isim, adres, telefon) güncelleyebilir ve şube yapılarını yönetebilirsiniz.
+                                    </p>
+                                    <div className="flex flex-wrap gap-4 pt-2">
+                                        <Link to="/companies/new" className="bg-indigo-500 hover:bg-indigo-600 text-white px-10 py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest transition-all shadow-2xl shadow-indigo-500/20 active:scale-95 flex items-center gap-3">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
+                                            YENİ FİRMA TANIMLA
+                                        </Link>
+                                        <Link to="/companies" className="bg-white/10 hover:bg-white/20 text-white px-10 py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest transition-all border border-white/10 active:scale-95">
+                                            FİRMALARI YÖNET
+                                        </Link>
+                                    </div>
                                 </div>
-                                <p className="text-slate-400 text-sm font-medium leading-relaxed">
-                                    Sisteme yeni salonlar tanımlayabilir, mevcut işletmelerin bilgilerini (isim, adres, telefon) güncelleyebilir ve şube yapılarını yönetebilirsiniz.
-                                </p>
-                                <div className="flex flex-wrap gap-4 pt-2">
-                                    <Link to="/companies/new" className="bg-indigo-500 hover:bg-indigo-600 text-white px-10 py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest transition-all shadow-2xl shadow-indigo-500/20 active:scale-95 flex items-center gap-3">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
-                                        YENİ FİRMA TANIMLA
+
+                                <div className="flex flex-col sm:flex-row gap-6 w-full lg:w-auto">
+                                    <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[3rem] border border-white/5 flex-1 lg:min-w-[180px] text-center group/item hover:bg-white/10 transition-colors">
+                                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 opacity-60">TOPLAM FİRMA</p>
+                                        <p className="text-6xl font-black text-white tracking-tighter group-hover/item:scale-110 transition-transform duration-500">{stats.companyCount}</p>
+                                    </div>
+                                    <Link to="/main-management" className="bg-emerald-500/5 backdrop-blur-xl p-8 rounded-[3rem] border border-emerald-500/10 flex-1 lg:min-w-[180px] text-center group/item hover:bg-emerald-500/20 transition-all">
+                                        <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-2 opacity-60">ÜST YÖNETİM</p>
+                                        <div className="flex items-center justify-center gap-2">
+                                            <svg className="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944" /></svg>
+                                            <span className="text-xl font-black text-white">YÖNET</span>
+                                        </div>
                                     </Link>
-                                    <Link to="/companies" className="bg-white/10 hover:bg-white/20 text-white px-10 py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest transition-all border border-white/10 active:scale-95">
-                                        FİRMALARI YÖNET
-                                    </Link>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* TÜRKİYE HARİTASI VE ŞEHİR DAĞILIMI */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+                            {/* Harita */}
+                            <div className="lg:col-span-2 bg-white rounded-[3rem] p-8 shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden relative">
+                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-6 flex items-center gap-2">
+                                    <span className="text-2xl">🇹🇷</span> Firma Dağılım Haritası
+                                </h3>
+                                <div className="h-[500px] w-full rounded-3xl overflow-hidden shadow-inner border border-slate-50">
+                                    <MapContainer
+                                        center={[38.9637, 35.2433] as any}
+                                        zoom={6}
+                                        style={{ height: '100%', width: '100%' }}
+                                        scrollWheelZoom={false}
+                                    >
+                                        <TileLayer
+                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                        />
+                                        {allCompanies.filter(c => c.latitude && c.longitude).map(c => (
+                                            <Marker key={c.id} position={[Number(c.latitude), Number(c.longitude)] as any}>
+                                                <Popup>
+                                                    <div className="p-1">
+                                                        <p className="font-black text-indigo-950 text-sm mb-0.5">{c.name}</p>
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase">{c.city || 'Belirsiz Şehir'}</p>
+                                                        <Link to={`/companies/${c.id}`} className="text-[9px] text-indigo-500 font-bold hover:underline mt-2 block">DETAYLARI GÖR</Link>
+                                                    </div>
+                                                </Popup>
+                                            </Marker>
+                                        ))}
+                                    </MapContainer>
                                 </div>
                             </div>
 
-                            <div className="flex flex-col sm:flex-row gap-6 w-full lg:w-auto">
-                                <div className="bg-white/5 backdrop-blur-xl p-8 rounded-[3rem] border border-white/5 flex-1 lg:min-w-[180px] text-center group/item hover:bg-white/10 transition-colors">
-                                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 opacity-60">TOPLAM FİRMA</p>
-                                    <p className="text-6xl font-black text-white tracking-tighter group-hover/item:scale-110 transition-transform duration-500">{stats.companyCount}</p>
+                            {/* Şehir Listesi */}
+                            <div className="bg-white rounded-[3rem] p-8 shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col">
+                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-6">Şehir Bazlı Kayıtlar</h3>
+                                <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-1">
+                                    {Object.entries(
+                                        allCompanies.reduce((acc: any, c) => {
+                                            const city = c.city || 'Belirtilmemiş';
+                                            acc[city] = (acc[city] || 0) + 1;
+                                            return acc;
+                                        }, {})
+                                    )
+                                        .sort((a: any, b: any) => b[1] - a[1])
+                                        .map(([city, count]: [string, any]) => (
+                                            <div key={city} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl hover:bg-indigo-50 transition-colors group">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full group-hover:scale-150 transition-transform"></div>
+                                                    <span className="text-sm font-bold text-slate-700">{city}</span>
+                                                </div>
+                                                <span className="bg-white px-3 py-1 rounded-full text-xs font-black text-slate-900 shadow-sm border border-slate-100">
+                                                    {count} Firma
+                                                </span>
+                                            </div>
+                                        ))}
                                 </div>
-                                <Link to="/main-management" className="bg-emerald-500/5 backdrop-blur-xl p-8 rounded-[3rem] border border-emerald-500/10 flex-1 lg:min-w-[180px] text-center group/item hover:bg-emerald-500/20 transition-all">
-                                    <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-2 opacity-60">ÜST YÖNETİM</p>
-                                    <div className="flex items-center justify-center gap-2">
-                                        <svg className="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944" /></svg>
-                                        <span className="text-xl font-black text-white">YÖNET</span>
-                                    </div>
-                                </Link>
                             </div>
                         </div>
-                    </div>
+                    </>
                 )}
 
                 {/* Raporlama Bölümü - Modal Olarak Güncellendi */}

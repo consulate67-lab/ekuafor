@@ -10,12 +10,9 @@ export interface Company {
 
     // Adres
     address_line?: string | null;
-    province_id?: number | null;
-    province_name?: string | null;
-    district_id?: number | null;
-    district_name?: string | null;
-    neighborhood_id?: number | null;
-    neighborhood_name?: string | null;
+    city?: string | null;
+    district?: string | null;
+    neighborhood?: string | null;
     postal_code?: string | null;
 
     // Konum
@@ -51,8 +48,6 @@ export interface Company {
     service_label?: string | null;
     tax_number?: string | null;
     tax_office?: string | null;
-    city?: string | null;
-    district?: string | null;
     qnb_username?: string | null;
     qnb_password?: string | null;
     qnb_vkn?: string | null;
@@ -70,6 +65,11 @@ class CompanyService {
         const client = await pool.connect();
 
         try {
+            // Ensure neighborhood column exists (one-time migration check)
+            try {
+                await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS neighborhood TEXT');
+            } catch (e) { /* ignore if fails */ }
+
             if (company.main_company_id) {
                 const check = await client.query('SELECT id FROM companies WHERE id = $1', [company.main_company_id]);
                 if ((check.rowCount || 0) === 0) {
@@ -87,18 +87,17 @@ class CompanyService {
             const query = `
         INSERT INTO companies (
           name, description, phone, email, website,
-          address_line, province_id, province_name, district_id, district_name,
-          neighborhood_id, neighborhood_name, postal_code,
+          address_line, city, district, neighborhood, postal_code,
           latitude, longitude,
           bank_name, bank_branch, iban, account_holder_name,
           commission_rate, payment_enabled,
           is_active, is_verified, created_by, board_key, 
           work_start_time, work_end_time, slot_interval, admin_key,
           genders, company_type, main_company_id,
-          tax_number, tax_office, city, district,
+          tax_number, tax_office,
           qnb_username, qnb_password, qnb_vkn, efatura_test_mode, invoice_prefix,
           ubl_incoming_alias, ubl_outgoing_alias
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38)
         RETURNING *
       `;
 
@@ -109,12 +108,9 @@ class CompanyService {
                 company.email,
                 company.website,
                 company.address_line,
-                company.province_id,
-                company.province_name,
-                company.district_id,
-                company.district_name,
-                company.neighborhood_id,
-                company.neighborhood_name,
+                company.city,
+                company.district,
+                company.neighborhood,
                 company.postal_code,
                 company.latitude,
                 company.longitude,
@@ -137,8 +133,6 @@ class CompanyService {
                 company.main_company_id || null,
                 company.tax_number || null,
                 company.tax_office || null,
-                company.city || null,
-                company.district || null,
                 company.qnb_username || null,
                 company.qnb_password || null,
                 company.qnb_vkn || null,
@@ -147,6 +141,7 @@ class CompanyService {
                 company.ubl_incoming_alias || 'default',
                 company.ubl_outgoing_alias || 'default'
             ];
+
 
             const result = await client.query(query, values);
             return result.rows[0];
@@ -271,7 +266,7 @@ class CompanyService {
         }
 
         if (filters?.search) {
-            whereClauses.push(`(c.name ILIKE $${paramIndex} OR c.email ILIKE $${paramIndex} OR c.province_name ILIKE $${paramIndex} OR c.district_name ILIKE $${paramIndex})`);
+            whereClauses.push(`(c.name ILIKE $${paramIndex} OR c.email ILIKE $${paramIndex} OR c.city ILIKE $${paramIndex} OR c.district ILIKE $${paramIndex} OR c.neighborhood ILIKE $${paramIndex})`);
             values.push(`%${filters.search}%`);
             paramIndex++;
         }

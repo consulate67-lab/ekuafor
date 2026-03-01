@@ -59,6 +59,9 @@ export default function CompanyForm() {
         website: '',
         address_line: '',
         postal_code: '',
+        city: '',
+        district: '',
+        neighborhood: '',
         bank_name: '',
         bank_branch: '',
         iban: '',
@@ -263,9 +266,32 @@ export default function CompanyForm() {
                 genders: Array.isArray(company.genders) ? company.genders : []
             });
 
-            if (company.province_id) setSelectedProvince(company.province_id);
-            if (company.district_id) setSelectedDistrict(company.district_id);
-            if (company.neighborhood_id) setSelectedNeighborhood(company.neighborhood_id);
+            if (company.city) {
+                const province = provinces.find(p => p.name === company.city);
+                if (province) {
+                    setSelectedProvince(province.id);
+                    // Force districts fetch
+                    const distRes = await api.get(`/address/provinces/${province.id}/districts`);
+                    const districtsArr = distRes.data.data || [];
+                    setDistricts(districtsArr);
+
+                    if (company.district) {
+                        const district = districtsArr.find((d: any) => d.name === company.district);
+                        if (district) {
+                            setSelectedDistrict(district.id);
+                            // Force neighborhoods fetch
+                            const neighRes = await api.get(`/address/provinces/${province.id}/districts/${district.id}/neighborhoods`);
+                            const neighborhoodsArr = neighRes.data.data || [];
+                            setNeighborhoods(neighborhoodsArr);
+
+                            if (company.neighborhood) {
+                                const neighborhood = neighborhoodsArr.find((n: any) => n.name === company.neighborhood);
+                                if (neighborhood) setSelectedNeighborhood(neighborhood.id);
+                            }
+                        }
+                    }
+                }
+            }
 
             if (company.latitude && company.longitude) {
                 const newPos = new LatLng(company.latitude, company.longitude);
@@ -299,15 +325,19 @@ export default function CompanyForm() {
 
             const data: Partial<Company> = {
                 ...formData,
-                province_id: selectedProvince || undefined,
-                province_name: province?.name,
-                district_id: selectedDistrict || undefined,
-                district_name: district?.name,
-                neighborhood_id: selectedNeighborhood || undefined,
-                neighborhood_name: neighborhood?.name,
+                city: province?.name,
+                district: district?.name,
+                neighborhood: neighborhood?.name,
                 latitude: mapPosition?.lat,
                 longitude: mapPosition?.lng,
             };
+            // Remove legacy fields if they accidentally snuck in
+            delete (data as any).province_id;
+            delete (data as any).province_name;
+            delete (data as any).district_id;
+            delete (data as any).district_name;
+            delete (data as any).neighborhood_id;
+            delete (data as any).neighborhood_name;
 
             if (isEdit) {
                 await api.put(`/companies/${id}`, data);

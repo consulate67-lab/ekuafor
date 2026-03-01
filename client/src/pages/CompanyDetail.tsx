@@ -128,7 +128,7 @@ export default function CompanyDetail() {
                         <div className="space-y-3 text-sm">
                             <p><span className="font-medium">Telefon:</span> {company.phone || '-'}</p>
                             <p><span className="font-medium">E-posta:</span> {company.email || '-'}</p>
-                            <p><span className="font-medium">Adres:</span> {company.address_line} {company.neighborhood_name} {company.district_name}/{company.province_name}</p>
+                            <p><span className="font-medium">Adres:</span> {company.address_line} {company.neighborhood ? `${company.neighborhood} ` : ''}{company.district ? `${company.district}/` : ''}{company.city}</p>
                             <p><span className="font-medium">Banka:</span> {company.bank_name}</p>
                             <p><span className="font-medium">IBAN:</span> {company.iban}</p>
                         </div>
