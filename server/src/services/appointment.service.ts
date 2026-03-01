@@ -396,12 +396,20 @@ class AppointmentService {
         }
     }
 
-    async updateAppointmentStatus(id: number, status: string): Promise<Appointment | null> {
+    async updateAppointmentStatus(id: number, status: string, price?: number): Promise<Appointment | null> {
         try {
-            const result = await pool.query(
-                'UPDATE appointments SET status = $1 WHERE id = $2 RETURNING *',
-                [status, id]
-            );
+            let result;
+            if (price !== undefined && price !== null) {
+                result = await pool.query(
+                    'UPDATE appointments SET status = $1, price = $2 WHERE id = $3 RETURNING *',
+                    [status, price, id]
+                );
+            } else {
+                result = await pool.query(
+                    'UPDATE appointments SET status = $1 WHERE id = $2 RETURNING *',
+                    [status, id]
+                );
+            }
             const updatedAppointment = result.rows[0];
 
             if (updatedAppointment && status === 'approved') {

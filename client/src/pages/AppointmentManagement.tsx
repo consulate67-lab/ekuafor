@@ -349,14 +349,27 @@ export default function AppointmentManagement() {
         window.open(waUrl, '_blank');
     };
 
-    const handleStatusUpdate = async (id: number, status: string) => {
+    const handleStatusUpdate = async (id: number, status: string, currentPrice?: number) => {
         let msg = '';
+        let finalPrice = currentPrice;
+
         if (status === 'cancelled') msg = 'Bu randevuyu iptal etmek istediğinize emin misiniz?';
         if (status === 'approved') msg = 'Bu randevuyu onaylamak istiyor musunuz?';
+
+        if (status === 'completed') {
+            const priceInput = window.prompt('Hizmet tamamlandı. Son tutarı onaylıyor musunuz?', currentPrice?.toString() || '0');
+            if (priceInput === null) return;
+            finalPrice = Number(priceInput);
+            msg = `Bu randevuyu ${finalPrice} ₺ tutarıyla tamamlandı olarak işaretlemek istiyor musunuz?`;
+        }
+
         if (msg && !window.confirm(msg)) return;
 
         try {
-            await api.patch(`/appointments/${id}/status`, { status });
+            await api.patch(`/appointments/${id}/status`, {
+                status,
+                price: finalPrice
+            });
             fetchData();
         } catch (err: any) {
             const serverError = err.response?.data?.error;
@@ -1080,7 +1093,7 @@ export default function AppointmentManagement() {
                                     {selectedAppointment.status === 'approved' && (
                                         <button
                                             onClick={() => {
-                                                handleStatusUpdate(selectedAppointment.id!, 'completed');
+                                                handleStatusUpdate(selectedAppointment.id!, 'completed', selectedAppointment.price);
                                                 setSelectedAppointment(null);
                                             }}
                                             className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
@@ -1096,7 +1109,7 @@ export default function AppointmentManagement() {
                                     </button>
                                     <button
                                         onClick={() => {
-                                            handleStatusUpdate(selectedAppointment.id!, 'cancelled');
+                                            handleStatusUpdate(selectedAppointment.id!, 'cancelled', selectedAppointment.price);
                                             setSelectedAppointment(null);
                                         }}
                                         className="w-full bg-slate-50 text-red-500 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-50 transition-all"

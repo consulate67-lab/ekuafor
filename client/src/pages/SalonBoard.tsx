@@ -351,21 +351,31 @@ export default function SalonBoard() {
         }
     };
 
-    const handleUpdateStatus = async (id: number, newStatus: string) => {
+    const handleUpdateStatus = async (id: number, newStatus: string, currentPrice?: number) => {
         let msg = '';
+        let finalPrice = currentPrice;
+
         if (newStatus === 'cancelled') msg = 'Bu randevuyu iptal etmek istediğinize emin misiniz?';
         if (newStatus === 'approved') msg = 'Bu randevuyu onaylamak istiyor musunuz?';
-        if (newStatus === 'completed') msg = 'Bu randevuyu tamamlandı olarak işaretlemek istiyor musunuz?';
+        if (newStatus === 'completed') {
+            const priceInput = prompt('Hizmet tamamlandı. Son tutarı onaylıyor musunuz?', currentPrice?.toString() || '0');
+            if (priceInput === null) return;
+            finalPrice = Number(priceInput);
+            msg = `Bu randevuyu ${finalPrice} ₺ tutarıyla tamamlandı olarak işaretlemek istiyor musunuz?`;
+        }
 
         if (msg && !confirm(msg)) return;
 
         try {
             setLoading(true);
-            await api.patch(`/appointments/${id}/status`, { status: newStatus });
+            await api.patch(`/appointments/${id}/status`, {
+                status: newStatus,
+                price: finalPrice
+            });
             setIsDetailModalOpen(false);
             setIsPendingListModalOpen(false);
             if (company?.id) await fetchData(company.id);
-            window.location.reload();
+            window.location.assign(window.location.href); // Hard refresh for state consistency
         } catch (err: any) {
             alert(err.response?.data?.error || 'İşlem başarısız oldu');
         } finally {
@@ -1279,7 +1289,7 @@ export default function SalonBoard() {
                                     <div className="flex gap-4">
                                         {selectedAppointment.status === 'pending' && (
                                             <button
-                                                onClick={() => handleUpdateStatus(selectedAppointment.id!, 'approved')}
+                                                onClick={() => handleUpdateStatus(selectedAppointment.id!, 'approved', selectedAppointment.price)}
                                                 disabled={loading}
                                                 className="flex-1 bg-emerald-500 text-white py-6 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-emerald-200 hover:bg-emerald-600 transition-all disabled:opacity-50"
                                             >
@@ -1289,7 +1299,7 @@ export default function SalonBoard() {
 
                                         {selectedAppointment.status === 'approved' && (
                                             <button
-                                                onClick={() => handleUpdateStatus(selectedAppointment.id!, 'completed')}
+                                                onClick={() => handleUpdateStatus(selectedAppointment.id!, 'completed', selectedAppointment.price)}
                                                 disabled={loading}
                                                 className="flex-1 bg-indigo-600 text-white py-6 rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all disabled:opacity-50"
                                             >
@@ -1301,7 +1311,7 @@ export default function SalonBoard() {
                                     <div className="flex gap-4">
                                         {selectedAppointment.status !== 'cancelled' && selectedAppointment.status !== 'completed' && (
                                             <button
-                                                onClick={() => handleUpdateStatus(selectedAppointment.id!, 'cancelled')}
+                                                onClick={() => handleUpdateStatus(selectedAppointment.id!, 'cancelled', selectedAppointment.price)}
                                                 disabled={loading}
                                                 className="flex-1 bg-red-50 text-red-600 py-6 rounded-[2rem] font-black uppercase tracking-widest hover:bg-red-100 transition-all disabled:opacity-50"
                                             >
@@ -1382,13 +1392,13 @@ export default function SalonBoard() {
                                                     Detaylar
                                                 </button>
                                                 <button
-                                                    onClick={() => handleUpdateStatus(app.id!, 'approved')}
+                                                    onClick={() => handleUpdateStatus(app.id!, 'approved', app.price)}
                                                     className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition-all"
                                                 >
                                                     Hemen Onayla
                                                 </button>
                                                 <button
-                                                    onClick={() => handleUpdateStatus(app.id!, 'cancelled')}
+                                                    onClick={() => handleUpdateStatus(app.id!, 'cancelled', app.price)}
                                                     className="w-14 py-4 bg-rose-50 text-rose-500 rounded-2xl font-black flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all"
                                                 >
                                                     ✕

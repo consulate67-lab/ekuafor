@@ -172,6 +172,7 @@ export default function CompanyPanel() {
         tax_office: '',
         vat_rate: 20,
         discount_rate: 0,
+        price: 0,
         type: 'e-arsiv',
         customer_name: '',
         customer_phone: '',
@@ -392,7 +393,7 @@ export default function CompanyPanel() {
                 ...invoiceForm,
                 payment_method,
                 appointment_id: selectedAppointment.id,
-                amount: selectedAppointment.price,
+                amount: invoiceForm.price || selectedAppointment.price,
                 customer_name: invoiceForm.customer_name || selectedAppointment.customer_name,
                 customer_tax_number: invoiceForm.vkn,
                 customer_tax_office: invoiceForm.tax_office,
@@ -406,6 +407,7 @@ export default function CompanyPanel() {
                     tax_office: '',
                     vat_rate: 20,
                     discount_rate: 0,
+                    price: 0,
                     type: 'e-arsiv',
                     customer_name: '',
                     customer_phone: '',
@@ -2420,7 +2422,8 @@ export default function CompanyPanel() {
                                                                             ...prev,
                                                                             customer_name: apt.customer_name || '',
                                                                             customer_phone: apt.customer_phone || '',
-                                                                            customer_id: apt.customer_id || null
+                                                                            customer_id: apt.customer_id || null,
+                                                                            price: apt.price || 0
                                                                         }));
                                                                         setShowInvoiceModal(true);
                                                                     }}
@@ -3724,6 +3727,30 @@ export default function CompanyPanel() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Hizmet Tutarı (₺)</label>
+                                    <input
+                                        type="number"
+                                        value={invoiceForm.price}
+                                        onChange={(e) => setInvoiceForm(prev => ({ ...prev, price: Number(e.target.value) }))}
+                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all font-mono text-lg"
+                                        placeholder="0.00"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">İskonto Oranı (%)</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        value={invoiceForm.discount_rate}
+                                        onChange={(e) => setInvoiceForm(prev => ({ ...prev, discount_rate: Number(e.target.value) }))}
+                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4">
+                                <div>
                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">KDV Oranı (%)</label>
                                     <select
                                         value={invoiceForm.vat_rate}
@@ -3735,17 +3762,6 @@ export default function CompanyPanel() {
                                         <option value={1}>%1 (Gıda vb.)</option>
                                         <option value={0}>%0 (İstisna)</option>
                                     </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">İskonto Oranı (%)</label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        max="100"
-                                        value={invoiceForm.discount_rate}
-                                        onChange={(e) => setInvoiceForm(prev => ({ ...prev, discount_rate: Number(e.target.value) }))}
-                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none"
-                                    />
                                 </div>
                             </div>
 
@@ -3778,6 +3794,7 @@ export default function CompanyPanel() {
                                         tax_office: '',
                                         vat_rate: 20,
                                         discount_rate: 0,
+                                        price: 0,
                                         type: 'e-arsiv',
                                         customer_name: '',
                                         customer_phone: '',
