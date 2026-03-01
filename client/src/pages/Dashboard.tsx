@@ -1,9 +1,13 @@
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Company, Service } from '../types';
 import { parseVoiceCommand } from '../lib/aiParser';
 import { Device } from '@capacitor/device';
+import { useAuthStore } from '../store/authStore';
+import api from '../lib/api';
 
 // Leaflet Icon Fix
 const DefaultIcon = L.icon({
@@ -483,26 +487,40 @@ export default function Dashboard() {
                             {/* Şehir Listesi */}
                             <div className="bg-white rounded-[3rem] p-8 shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col">
                                 <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-6">Şehir Bazlı Kayıtlar</h3>
-                                <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-1">
-                                    {Object.entries(
-                                        allCompanies.reduce((acc: any, c) => {
-                                            const city = c.city || 'Belirtilmemiş';
-                                            acc[city] = (acc[city] || 0) + 1;
-                                            return acc;
-                                        }, {})
-                                    )
-                                        .sort((a: any, b: any) => b[1] - a[1])
-                                        .map(([city, count]: [string, any]) => (
-                                            <div key={city} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl hover:bg-indigo-50 transition-colors group">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full group-hover:scale-150 transition-transform"></div>
-                                                    <span className="text-sm font-bold text-slate-700">{city}</span>
-                                                </div>
-                                                <span className="bg-white px-3 py-1 rounded-full text-xs font-black text-slate-900 shadow-sm border border-slate-100">
-                                                    {count} Firma
-                                                </span>
-                                            </div>
-                                        ))}
+                                <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1 max-h-[500px]">
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="border-b border-slate-100">
+                                                <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Şehir</th>
+                                                <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right pr-2">Kayıtlı Firma</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {Object.entries(
+                                                allCompanies.reduce((acc: any, c) => {
+                                                    const city = c.city || 'Belirtilmemiş';
+                                                    acc[city] = (acc[city] || 0) + 1;
+                                                    return acc;
+                                                }, {})
+                                            )
+                                                .sort((a: any, b: any) => b[1] - a[1])
+                                                .map(([city, count]: [string, any]) => (
+                                                    <tr key={city} className="hover:bg-slate-50 transition-colors group">
+                                                        <td className="py-4 pl-2">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full group-hover:scale-150 transition-transform"></div>
+                                                                <span className="text-sm font-bold text-slate-700">{city}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-4 text-right pr-2">
+                                                            <span className="bg-indigo-50 px-4 py-1.5 rounded-full text-xs font-black text-indigo-700">
+                                                                {count}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
