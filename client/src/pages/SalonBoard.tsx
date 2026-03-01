@@ -46,6 +46,11 @@ export default function SalonBoard() {
         serviceDurationOverrides: {} as Record<number, number> // {serviceId: duration}
     });
 
+    // Payment States
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [paymentApp, setPaymentApp] = useState<Appointment | null>(null);
+    const [nfcState, setNfcState] = useState<'IDLE' | 'SCANNING' | 'SUCCESS' | 'ERROR'>('IDLE');
+
     // Helper to generate consistent color for staff
     const getStaffColor = (name: string) => {
         const colors = [
@@ -368,6 +373,15 @@ export default function SalonBoard() {
             const priceInput = prompt('Hizmet tamamlandı. Son tutarı onaylıyor musunuz?', currentPrice?.toString() || '0');
             if (priceInput === null) return;
             finalPrice = Number(priceInput);
+
+            // Re-fetch app to get full data
+            const app = appointments.find(a => a.id === id) || pendingAppointments.find(a => a.id === id);
+            if (app && finalPrice > 0) {
+                setPaymentApp({ ...app, price: finalPrice });
+                setShowPaymentModal(true);
+                return; // Wait for payment modal to proceed
+            }
+
             msg = `Bu randevuyu ${finalPrice} ₺ tutarıyla tamamlandı olarak işaretlemek istiyor musunuz?`;
         }
 
@@ -1509,6 +1523,120 @@ export default function SalonBoard() {
             <div className="fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-slate-900/80 backdrop-blur-md rounded-full border border-white/10 shadow-2xl z-[150] pointer-events-none">
                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap">Ekuafor Salon Board Edition <span className="text-white opacity-100 ml-1">v1.80.0</span></p>
             </div>
-        </div >
+            {/* Payment Modal (NFC / SoftPOS Simulation) */}
+            {showPaymentModal && paymentApp && (
+                <div className="fixed inset-0 z-[300] flex items-end justify-center bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-500">
+                        <div className="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mb-8" />
+
+                        <div className="text-center mb-8">
+                            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">Ödeme Al</h3>
+                            <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">
+                                {paymentApp.customer_name || 'Müşteri'} | <span className="text-indigo-600">₺{paymentApp.price}</span>
+                            </p>
+                        </div>
+
+                        {nfcState === 'IDLE' && (
+                            <div className="grid grid-cols-1 gap-4">
+                                <button
+                                    onClick={async () => {
+                                        setNfcState('SCANNING');
+                                        setTimeout(async () => {
+                                            try {
+                                                const res = await api.post('/payments/ceppos/initialize', {
+                                                    appointment_id: paymentApp.id,
+                                                    amount: paymentApp.price
+                                                });
+                                                if (res.data.success) {
+                                                    setNfcState('SUCCESS');
+                                                    setTimeout(() => {
+                                                        // Proceed with status update after success
+                                                        api.patch(`/appointments/${paymentApp.id}/status`, {
+                                                            status: 'completed',
+                                                            price: paymentApp.price
+                                                        }).then(() => {
+                                                            if (company?.id) fetchData(company.id);
+                                                            setShowPaymentModal(false);
+                                                            setNfcState('IDLE');
+                                                        });
+                                                    }, 1500);
+                                                } else {
+                                                    setNfcState('ERROR');
+                                                }
+                                            } catch (e) {
+                                                setNfcState('ERROR');
+                                            }
+                                        }, 3000);
+                                    }}
+                                    className="p-6 bg-slate-900 text-white rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all shadow-xl shadow-slate-200"
+                                >
+                                    <div className="flex items-center gap-4 text-left">
+                                        <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">📱</div>
+                                        <div>
+                                            <p className="text-xs font-black uppercase tracking-widest text-indigo-400">Temassız Ödeme</p>
+                                            <p className="text-lg font-black leading-tight">SoftPOS / NFC</p>
+                                        </div>
+                                    </div>
+                                    <svg className="w-6 h-6 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        handleUpdateStatus(paymentApp.id!, 'completed', paymentApp.price);
+                                        setShowPaymentModal(false);
+                                    }}
+                                    className="p-6 bg-slate-50 text-slate-900 rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all"
+                                >
+                                    <div className="flex items-center gap-4 text-left">
+                                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">💵</div>
+                                        <div>
+                                            <p className="text-xs font-black uppercase tracking-widest text-slate-400">Nakit Ödeme</p>
+                                            <p className="text-lg font-black leading-tight">Elden Tahsilat</p>
+                                        </div>
+                                    </div>
+                                    <svg className="w-6 h-6 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
+                                </button>
+
+                                <button
+                                    onClick={() => setShowPaymentModal(false)}
+                                    className="w-full py-4 text-slate-400 text-xs font-black uppercase tracking-widest mt-4"
+                                >
+                                    İptal
+                                </button>
+                            </div>
+                        )}
+
+                        {nfcState === 'SCANNING' && (
+                            <div className="py-12 flex flex-col items-center">
+                                <div className="relative mb-12">
+                                    <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-20 scale-150"></div>
+                                    <div className="absolute inset-0 bg-indigo-400 rounded-full animate-pulse opacity-40 scale-125"></div>
+                                    <div className="relative w-32 h-32 bg-slate-900 rounded-full flex items-center justify-center text-4xl shadow-2xl">⚡</div>
+                                </div>
+                                <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Kartı Yaklaştırın</h4>
+                                <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] animate-pulse">Temassız ödeme bekleniyor...</p>
+                            </div>
+                        )}
+
+                        {nfcState === 'SUCCESS' && (
+                            <div className="py-12 flex flex-col items-center animate-in zoom-in duration-500">
+                                <div className="w-32 h-32 bg-emerald-500 rounded-full flex items-center justify-center text-5xl shadow-2xl mb-8">✓</div>
+                                <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Ödeme Başarılı</h4>
+                                <p className="text-emerald-500 font-black uppercase tracking-widest text-[10px]">İşlem onaylandı, iyzico kaydı oluşturuldu.</p>
+                            </div>
+                        )}
+
+                        {nfcState === 'ERROR' && (
+                            <div className="py-12 flex flex-col items-center">
+                                <div className="w-32 h-32 bg-red-500 rounded-full flex items-center justify-center text-5xl shadow-2xl mb-8">!</div>
+                                <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Ödeme Başarısız</h4>
+                                <p className="text-red-500 font-black uppercase tracking-widest text-[10px] mb-8">İşlem reddedildi veya hata oluştu.</p>
+                                <button onClick={() => setNfcState('IDLE')} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold text-xs uppercase">Tekrar Dene</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }

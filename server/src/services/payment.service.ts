@@ -86,6 +86,47 @@ class PaymentService {
 
         return { success: true, appointmentId: appointment.id };
     }
+
+    async initializeCepPos(appointmentId: number, companyId: number, staffId: number, amount: number) {
+        try {
+            // Fetch appointment details
+            const appointmentResult = await pool.query(
+                'SELECT a.*, c.name as company_name FROM appointments a JOIN companies c ON a.company_id = c.id WHERE a.id = $1',
+                [appointmentId]
+            );
+
+            if (appointmentResult.rows.length === 0) {
+                throw new Error('Appointment not found');
+            }
+
+            const appointment = appointmentResult.rows[0];
+
+            // In real world, we would call Iyzico Cep POS API here.
+            // Documentation for Iyzico Cep POS (SoftPOS) usually involves 
+            // creating a payment session and getting a token to use with their SDK or a specific page.
+
+            // Mocking the result for now
+            const mockToken = `ceppos_${Math.random().toString(36).substring(7)}`;
+
+            await pool.query(
+                'UPDATE appointments SET iyzico_token = $1, payment_status = $2, payment_method = $3 WHERE id = $4',
+                [mockToken, 'pending', 'card_ceppos', appointmentId]
+            );
+
+            return {
+                success: true,
+                data: {
+                    token: mockToken,
+                    amount,
+                    customer_name: appointment.customer_name,
+                    payment_url: `https://www.iyzico.com/ceppos-pay?token=${mockToken}` // Simulated URL
+                }
+            };
+        } catch (error: any) {
+            console.error('Iyzico Cep POS Init Error:', error);
+            throw error;
+        }
+    }
 }
 
 export default new PaymentService();

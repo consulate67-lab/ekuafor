@@ -54,4 +54,29 @@ router.post('/callback', async (req: Request, res: Response) => {
     }
 });
 
+/**
+ * POST /api/payments/ceppos/initialize
+ * Initialize SoftPOS (Cep POS) payment for staff
+ */
+router.post('/ceppos/initialize', authMiddleware, async (req: any, res: Response) => {
+    try {
+        const { appointment_id, amount } = req.body;
+        const companyId = req.user.company_id;
+        const staffId = req.user.id;
+
+        if (!appointment_id || !amount) {
+            return res.status(400).json({ success: false, error: 'Eksik bilgi: appointment_id ve amount gereklidir' });
+        }
+
+        const result = await paymentService.initializeCepPos(appointment_id, companyId, staffId, amount);
+
+        res.json(result);
+    } catch (error: any) {
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Cep POS başlatılamadı'
+        });
+    }
+});
+
 export default router;

@@ -15,5 +15,8 @@
         "deploy:all": "npm run deploy --workspace=client && git push",
         "install:all": "npm install && npm install --workspaces",
         "start": "npm start --workspace=server"
+    },
+    "dependencies": {
+        "iyzipay": "^2.0.65"
     }
 }
