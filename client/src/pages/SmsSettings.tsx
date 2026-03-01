@@ -68,7 +68,7 @@ export default function SmsSettingsPage() {
         try {
             await api.post('/sms/settings', {
                 ...settings,
-                company_id: user?.company_id
+                company_id: user?.company_id || null
             });
             setMessage({ type: 'success', text: 'Ayarlar başarıyla kaydedildi.' });
             setTimeout(() => setMessage(null), 3000);
@@ -143,31 +143,60 @@ export default function SmsSettingsPage() {
                                     onChange={e => setSettings({ ...settings, provider: e.target.value })}
                                 >
                                     <option value="local_gateway">Yerel Gateway (Vodafone SIM/Android)</option>
+                                    <option value="netgsm">Netgsm OTP Servisi</option>
                                     <option value="vodafone_official">Vodafone Resmi API (Yakında)</option>
                                 </select>
                             </div>
 
+                            {settings.provider === 'netgsm' && (
+                                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-4">
+                                    <p className="text-[10px] text-blue-700 font-bold leading-relaxed">
+                                        💡 Netgsm için API Anahtarı kısmına <span className="underline">kullaniciadi:sifre</span> formatında giriş yapın.
+                                        Varsayılan OTP URL'i otomatik kullanılır.
+                                    </p>
+                                </div>
+                            )}
+
                             <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Gateway URL</label>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
+                                    {settings.provider === 'netgsm' ? 'API URL (Opsiyonel)' : 'Gateway URL'}
+                                </label>
                                 <input
                                     type="url"
-                                    placeholder="http://192.168.1.100:8080/send"
+                                    placeholder={settings.provider === 'netgsm' ? 'https://api.netgsm.com.tr/otp/send/get' : 'http://192.168.1.100:8080/send'}
                                     className="input-field"
                                     value={settings.api_url}
                                     onChange={e => setSettings({ ...settings, api_url: e.target.value })}
-                                    required
+                                    required={settings.provider !== 'netgsm'}
                                 />
-                                <p className="mt-1 text-[10px] text-gray-400 font-medium">Telefonunuzdaki Gateway uygulamasının verdiği adresi girin.</p>
+                                <p className="mt-1 text-[10px] text-gray-400 font-medium">
+                                    {settings.provider === 'netgsm'
+                                        ? 'Boş bırakırsanız varsayılan Netgsm OTP adresi kullanılır.'
+                                        : 'Telefonunuzdaki Gateway uygulamasının verdiği adresi girin.'}
+                                </p>
                             </div>
 
                             <div>
                                 <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">API Anahtarı / Şifre</label>
                                 <input
-                                    type="password"
+                                    type="text"
+                                    placeholder={settings.provider === 'netgsm' ? 'kullaniciadi:sifre' : 'API Key...'}
                                     className="input-field"
                                     value={settings.api_key}
                                     onChange={e => setSettings({ ...settings, api_key: e.target.value })}
                                 />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Mesaj Başlığı (Sender ID)</label>
+                                <input
+                                    type="text"
+                                    placeholder="Örn: SALOON"
+                                    className="input-field"
+                                    value={settings.sender_id}
+                                    onChange={e => setSettings({ ...settings, sender_id: e.target.value })}
+                                />
+                                <p className="mt-1 text-[10px] text-gray-400 font-medium">Netgsm panelinizde onaylı olan SMS başlığını girin.</p>
                             </div>
 
                             <div className="flex items-center gap-3 py-2">
@@ -262,24 +291,30 @@ export default function SmsSettingsPage() {
 
                 {/* Instructions */}
                 <div className="mt-10 card bg-gradient-to-br from-violet-600 to-pink-600 text-white border-none shadow-2xl shadow-violet-500/20">
-                    <h3 className="text-xl font-bold mb-4">Nasıl Kurulur? 📱</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <div className="space-y-2">
-                            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center font-bold">1</div>
-                            <p className="text-xs font-semibold text-white/90 leading-relaxed">
-                                Android telefonunuza "SMS Gateway API" veya benzeri bir uygulama indirin.
-                            </p>
+                    <h3 className="text-xl font-bold mb-4">Kurulum Rehberi 📱</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-4">
+                            <h4 className="text-sm font-black uppercase tracking-widest opacity-80">Netgsm Kullanımı</h4>
+                            <ul className="space-y-3">
+                                <li className="flex gap-3 text-xs font-semibold">
+                                    <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">1</span>
+                                    <span>Sağlayıcıyı "Netgsm OTP Servisi" olarak seçin.</span>
+                                </li>
+                                <li className="flex gap-3 text-xs font-semibold">
+                                    <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">2</span>
+                                    <span>API Anahtarı kısmına <code className="bg-black/20 px-1 rounded">kullaniciadi:sifre</code> yazın.</span>
+                                </li>
+                                <li className="flex gap-3 text-xs font-semibold">
+                                    <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">3</span>
+                                    <span>Mesaj Başlığı kısmına onaylı başlığınızı (örn: FIRMA_ADI) girin.</span>
+                                </li>
+                            </ul>
                         </div>
-                        <div className="space-y-2">
-                            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center font-bold">2</div>
-                            <p className="text-xs font-semibold text-white/90 leading-relaxed">
-                                Uygulamayı Vodafone hattınızın takılı olduğu telefonda başlatın ve verilen IP adresini not edin.
-                            </p>
-                        </div>
-                        <div className="space-y-2">
-                            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center font-bold">3</div>
-                            <p className="text-xs font-semibold text-white/90 leading-relaxed">
-                                Yukarıdaki formda Gateway URL kısmına bu adresi girin ve kaydedin. Artık SMS'ler bu hat üzerinden gider!
+                        <div className="space-y-4">
+                            <h4 className="text-sm font-black uppercase tracking-widest opacity-80">Yerel Gateway Kullanımı</h4>
+                            <p className="text-[10px] font-medium opacity-90 leading-relaxed">
+                                Android telefonunuza "SMS Gateway API" indirip Vodafone hattınız üzerinden ücretsiz SMS gönderebilirsiniz.
+                                Gateway URL kısmına telefonun verdiği IP adresini yazmanız yeterlidir.
                             </p>
                         </div>
                     </div>

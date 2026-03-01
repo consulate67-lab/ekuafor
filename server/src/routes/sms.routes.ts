@@ -36,7 +36,7 @@ router.post('/settings', async (req: Request, res: Response) => {
 router.post('/send', async (req: Request, res: Response) => {
     try {
         const { companyId, phoneNumber, message } = req.body;
-        if (!companyId || !phoneNumber || !message) {
+        if (companyId === undefined || !phoneNumber || !message) {
             return res.status(400).json({ success: false, message: 'Missing required fields' });
         }
 

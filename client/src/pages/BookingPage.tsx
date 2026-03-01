@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import { Appointment, Service, Company, User } from '../types';
+import { useAuthStore } from '../store/authStore';
 import { App } from '@capacitor/app';
 import { Device } from '@capacitor/device';
 
@@ -83,6 +84,7 @@ export default function BookingPage() {
         };
     }, [step, navigate, initialStaffId]);
 
+    const { user } = useAuthStore();
     const [selection, setSelection] = useState<SelectionState>({
         staffId: initialStaffId,
         serviceId: null,
@@ -90,9 +92,19 @@ export default function BookingPage() {
         packageId: null as number | null,
         date: null,
         time: null,
-        customerName: '',
-        customerPhone: ''
+        customerName: user ? `${user.first_name} ${user.last_name || ''}`.trim() : '',
+        customerPhone: user?.phone || ''
     });
+
+    useEffect(() => {
+        if (user) {
+            setSelection(prev => ({
+                ...prev,
+                customerName: prev.customerName || `${user.first_name} ${user.last_name || ''}`.trim(),
+                customerPhone: prev.customerPhone || user.phone || ''
+            }));
+        }
+    }, [user]);
 
     const dateInputRef = useRef<HTMLInputElement>(null);
     const firstAvailableTimeRef = useRef<HTMLButtonElement>(null);

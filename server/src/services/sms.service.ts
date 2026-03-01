@@ -3,8 +3,8 @@ import pool from '../config/database';
 
 export interface SmsSettings {
     id?: number;
-    company_id: number;
-    provider: 'local_gateway' | 'vodafone_official' | 'others';
+    company_id: number | null;
+    provider: 'local_gateway' | 'vodafone_official' | 'netgsm' | 'others';
     api_url: string;
     api_key?: string;
     is_active: boolean;
@@ -13,7 +13,7 @@ export interface SmsSettings {
 
 export interface SmsLog {
     id?: number;
-    company_id: number;
+    company_id: number | null;
     phone_number: string;
     message: string;
     status: 'sent' | 'failed' | 'pending';
@@ -25,12 +25,13 @@ class SmsService {
     /**
      * Firma için SMS ayarlarını getir
      */
-    async getSettings(companyId: number): Promise<SmsSettings | null> {
+    async getSettings(companyId: number | null): Promise<SmsSettings | null> {
         try {
-            const result = await pool.query(
-                'SELECT * FROM sms_settings WHERE company_id = $1 LIMIT 1',
-                [companyId]
-            );
+            const query = companyId
+                ? 'SELECT * FROM sms_settings WHERE company_id = $1 LIMIT 1'
+                : 'SELECT * FROM sms_settings WHERE company_id IS NULL LIMIT 1';
+            const values = companyId ? [companyId] : [];
+            const result = await pool.query(query, values);
             return result.rows[0] || null;
         } catch (error) {
             console.error('Error fetching SMS settings:', error);
@@ -48,7 +49,7 @@ class SmsService {
             const query = `
                 UPDATE sms_settings 
                 SET provider = $1, api_url = $2, api_key = $3, is_active = $4, sender_id = $5, updated_at = CURRENT_TIMESTAMP
-                WHERE company_id = $6
+                WHERE ${settings.company_id ? 'company_id = $6' : 'company_id IS NULL'}
                 RETURNING *
             `;
             const values = [
@@ -57,7 +58,7 @@ class SmsService {
                 settings.api_key,
                 settings.is_active,
                 settings.sender_id,
-                settings.company_id
+                ...(settings.company_id ? [settings.company_id] : [])
             ];
             const result = await pool.query(query, values);
             return result.rows[0];
@@ -83,7 +84,7 @@ class SmsService {
     /**
      * SMS Gönder
      */
-    async sendSms(companyId: number, phoneNumber: string, message: string): Promise<boolean> {
+    async sendSms(companyId: number | null, phoneNumber: string, message: string): Promise<boolean> {
         const settings = await this.getSettings(companyId);
 
         if (!settings || !settings.is_active) {
@@ -117,6 +118,34 @@ class SmsService {
                 // Vodafone Official API (Turkey) usually uses SOAP or different REST structure
                 // Placeholder for official integration
                 throw new Error('Vodafone official API integration not implemented yet');
+            } else if (settings.provider === 'netgsm') {
+                // Netgsm OTP API Integration
+                // api_key format should be "usercode:password"
+                const [usercode, password] = (settings.api_key || '').split(':');
+
+                if (!usercode || !password) {
+                    throw new Error('Netgsm API key should be in "usercode:password" format');
+                }
+
+                // Default Netgsm OTP URL if not provided: https://api.netgsm.com.tr/otp/send/get
+                const apiUrl = settings.api_url || 'https://api.netgsm.com.tr/otp/send/get';
+
+                response = await axios.get(apiUrl, {
+                    params: {
+                        usercode,
+                        password,
+                        gsmno: formattedPhone,
+                        message: message,
+                        msgheader: settings.sender_id || '',
+                        dil: 'TR'
+                    },
+                    timeout: 10000
+                });
+
+                // Netgsm usually returns a status code in the body, e.g., "00" for success
+                if (typeof response.data === 'string' && !response.data.startsWith('00')) {
+                    throw new Error(`Netgsm Error: ${response.data}`);
+                }
             } else {
                 // Generic GET/POST support can be added
                 throw new Error(`Provider ${settings.provider} not supported`);

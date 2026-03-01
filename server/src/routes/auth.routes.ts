@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../config/database';
 import { z } from 'zod';
+import otpService from '../services/otp.service';
 
 const router = Router();
 
@@ -144,20 +145,98 @@ router.post('/login', async (req: Request, res: Response) => {
                 token
             }
         });
-    } catch (error) {
-        if (error instanceof z.ZodError) {
-            return res.status(400).json({
-                success: false,
-                error: 'Validasyon hatası',
-                details: error.errors
-            });
+    }
+});
+
+/**
+ * POST /api/auth/send-otp
+ * Telefon numarasına OTP gönder
+ */
+router.post('/send-otp', async (req: Request, res: Response) => {
+    try {
+        const { phone } = req.body;
+        if (!phone) {
+            return res.status(400).json({ success: false, error: 'Telefon numarası gereklidir' });
         }
 
-        console.error('Login Error:', error); // Detaylı log
-        res.status(500).json({
-            success: false,
-            error: error instanceof Error ? error.message : 'Giriş sırasında hata oluştu'
+        const result = await otpService.sendOtp(phone);
+        res.json(result);
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/auth/verify-otp
+ * OTP kodunu doğrula ve giriş yap
+ */
+router.post('/verify-otp', async (req: Request, res: Response) => {
+    try {
+        const { phone, code, first_name, last_name } = req.body;
+
+        if (!phone || !code) {
+            return res.status(400).json({ success: false, error: 'Telefon ve kod gereklidir' });
+        }
+
+        const isValid = await otpService.verifyOtp(phone, code);
+        if (!isValid) {
+            return res.status(400).json({ success: false, error: 'Geçersiz veya süresi dolmuş kod' });
+        }
+
+        // Formata getir (905...)
+        let formattedPhone = phone.replace(/\D/g, '');
+        if (formattedPhone.startsWith('0')) {
+            formattedPhone = '90' + formattedPhone.substring(1);
+        } else if (!formattedPhone.startsWith('90')) {
+            formattedPhone = '90' + formattedPhone;
+        }
+
+        // Kullanıcıyı bul veya oluştur
+        let userResult = await pool.query(
+            'SELECT * FROM users WHERE phone = $1 OR email = $2',
+            [formattedPhone, `${formattedPhone}@saloon.com`]
+        );
+
+        let user;
+        if (userResult.rows.length === 0) {
+            // Yeni müşteri oluştur
+            const passwordHash = await bcrypt.hash(Math.random().toString(36), 10);
+            const registerResult = await pool.query(
+                `INSERT INTO users (email, password, first_name, last_name, phone, role)
+                 VALUES ($1, $2, $3, $4, $5, $6)
+                 RETURNING id, email, first_name, last_name, phone, role, created_at`,
+                [
+                    `${formattedPhone}@saloon.com`,
+                    passwordHash,
+                    first_name || 'Müşteri',
+                    last_name || 'Yeni',
+                    formattedPhone,
+                    'customer'
+                ]
+            );
+            user = registerResult.rows[0];
+        } else {
+            user = userResult.rows[0];
+        }
+
+        // JWT token oluştur
+        const token = jwt.sign(
+            { userId: user.id, email: user.email, role: user.role, companyId: user.company_id },
+            process.env.JWT_SECRET || 'your-secret-key',
+            { expiresIn: '30d' } // Mobilde daha uzun süre
+        );
+
+        const { password, ...userWithoutPassword } = user;
+
+        res.json({
+            success: true,
+            data: {
+                user: userWithoutPassword,
+                token
+            }
         });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

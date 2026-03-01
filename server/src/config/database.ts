@@ -19,7 +19,7 @@ const pool = new Pool({
     database: process.env.DATABASE_URL ? undefined : (process.env.DB_NAME || 'saloon_db'),
     user: process.env.DATABASE_URL ? undefined : (process.env.DB_USER || 'postgres'),
     password: process.env.DATABASE_URL ? undefined : process.env.DB_PASSWORD,
-    ssl: { rejectUnauthorized: false }, // Force SSL for Railway/Render
+    ssl: (process.env.DATABASE_URL || isProduction) ? { rejectUnauthorized: false } : false,
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000, // Increased timeout

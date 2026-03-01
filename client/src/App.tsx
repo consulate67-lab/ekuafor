@@ -19,6 +19,7 @@ import MyAppointments from './pages/MyAppointments';
 import MainCompanyPanel from './pages/MainCompanyPanel';
 import MainCompanyReports from './pages/MainCompanyReports';
 import SalonDataGenerator from './pages/SalonDataGenerator';
+import CustomerLogin from './pages/CustomerLogin';
 import { useAppointmentSync } from './hooks/useAppointmentSync';
 
 
@@ -78,6 +79,7 @@ function App() {
                     <Route path="/book/:id" element={<BookingPage />} />
                     <Route path="/my-appointments" element={<MyAppointments />} />
                     <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
+                    <Route path="/customer-login" element={isAuthenticated ? <Navigate to="/" replace /> : <CustomerLogin />} />
                     <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />} />
                     <Route path="/board" element={<SalonBoard />} />
                     <Route path="/company-panel" element={<CompanyPanel />} />

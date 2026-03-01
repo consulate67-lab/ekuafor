@@ -20,7 +20,7 @@ export default function CustomerHome() {
     const [locating, setLocating] = useState(false);
     const [selectedGender, setSelectedGender] = useState<string | null>(null);
     const [sort, setSort] = useState<'rating' | 'reviews'>('rating');
-    const { login: setLogin } = useAuthStore();
+    const { login: setLogin, isAuthenticated, user } = useAuthStore();
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [permissions, setPermissions] = useState<any>({
         location: 'unknown',
@@ -111,6 +111,14 @@ export default function CustomerHome() {
     };
 
     useEffect(() => {
+        if (!isAuthenticated) {
+            navigate('/customer-login');
+        } else if (user?.role === 'staff' || user?.role === 'company_admin' || user?.role === 'super_admin') {
+            navigate('/dashboard');
+        }
+    }, [isAuthenticated, user, navigate]);
+
+    useEffect(() => {
         checkPermissions();
         const savedFavs = localStorage.getItem('saloon_favorites');
         if (savedFavs) {
@@ -118,13 +126,8 @@ export default function CustomerHome() {
         }
 
         const initialFetch = async () => {
-            // Request notification permission early
-            if ("Notification" in window && Notification.permission === "default") {
-                Notification.requestPermission();
-            }
-
-            // First display all
-            await fetchData();
+            // Seonndary check: If by any chance we are not logged in, stop here
+            if (!isAuthenticated) return;
 
             // Then try location using Capacitor for better mobile support
             try {

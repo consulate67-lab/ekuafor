@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { Appointment } from '../types';
 import { Device } from '@capacitor/device';
+import { useAuthStore } from '../store/authStore';
 
 // Unique device fingerprint generator for web browsers (persistent across sessions)
 const getOrCreateWebFingerprint = (): string => {
@@ -43,6 +44,7 @@ export default function MyAppointments() {
     const [error, setError] = useState('');
     const [activeTab, setActiveTab] = useState<'active' | 'past'>('active');
     const [deviceId, setDeviceId] = useState<string>('');
+    const { user } = useAuthStore();
 
     // Rating states
     const [ratingModal, setRatingModal] = useState<{ open: boolean; app: Appointment | null }>({ open: false, app: null });
@@ -72,7 +74,7 @@ export default function MyAppointments() {
     }, []);
 
     const fetchMyAppointments = async () => {
-        if (!deviceId) return;
+        if (!deviceId && !user?.phone) return;
 
         try {
             setLoading(true);
@@ -98,8 +100,8 @@ export default function MyAppointments() {
                 }
             }
 
-            // Also check by phone if saved (backward compatibility)
-            const savedPhone = localStorage.getItem('customer_phone');
+            // Also check by phone if saved (backward compatibility) or from auth
+            const savedPhone = user?.phone || localStorage.getItem('customer_phone');
             if (savedPhone) {
                 try {
                     const phoneRes = await api.get('/appointments', { params: { customer_phone: savedPhone } });
@@ -135,10 +137,10 @@ export default function MyAppointments() {
     };
 
     useEffect(() => {
-        if (deviceId) {
+        if (deviceId || user?.phone) {
             fetchMyAppointments();
         }
-    }, [deviceId]);
+    }, [deviceId, user?.phone]);
 
     const handleRate = async () => {
         if (!ratingModal.app?.id) return;

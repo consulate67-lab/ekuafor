@@ -423,6 +423,9 @@ const runMigrations = async () => {
             )
         `);
 
+        // Migration: Make company_id nullable if it's already created
+        await pool.query('ALTER TABLE sms_settings ALTER COLUMN company_id DROP NOT NULL');
+
         await pool.query(`
             CREATE TABLE IF NOT EXISTS customer_devices (
                 id SERIAL PRIMARY KEY,
@@ -441,6 +444,17 @@ const runMigrations = async () => {
                 is_active BOOLEAN DEFAULT true,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(company_id, user_id)
+            )
+        `);
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS otp_codes (
+                id SERIAL PRIMARY KEY,
+                phone VARCHAR(20) NOT NULL,
+                code VARCHAR(6) NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                is_used BOOLEAN DEFAULT false,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
 
@@ -480,6 +494,11 @@ const runMigrations = async () => {
 
             CREATE INDEX IF NOT EXISTS idx_curr_acc_company ON current_accounts(company_id);
             CREATE INDEX IF NOT EXISTS idx_curr_acc_code ON current_accounts(code);
+
+            -- Ensure current_accounts has standardized address fields
+            ALTER TABLE current_accounts ADD COLUMN IF NOT EXISTS city VARCHAR(100);
+            ALTER TABLE current_accounts ADD COLUMN IF NOT EXISTS district VARCHAR(100);
+            ALTER TABLE current_accounts ADD COLUMN IF NOT EXISTS neighborhood VARCHAR(100);
         `);
 
         // Finance Module Tables
@@ -570,6 +589,26 @@ const runMigrations = async () => {
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS genders TEXT[]');
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_type VARCHAR(20) DEFAULT \'ASIL\'');
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS main_company_id INTEGER');
+            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS city VARCHAR(100)');
+            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS district VARCHAR(100)');
+            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS neighborhood VARCHAR(100)');
+
+            // Migrate existing address data if new columns are empty
+            await pool.query(`
+                UPDATE companies 
+                SET city = province_name 
+                WHERE (city IS NULL OR city = '') AND province_name IS NOT NULL AND province_name != ''
+            `);
+            await pool.query(`
+                UPDATE companies 
+                SET district = district_name 
+                WHERE (district IS NULL OR district = '') AND district_name IS NOT NULL AND district_name != ''
+            `);
+            await pool.query(`
+                UPDATE companies 
+                SET neighborhood = neighborhood_name 
+                WHERE (neighborhood IS NULL OR neighborhood = '') AND neighborhood_name IS NOT NULL AND neighborhood_name != ''
+            `);
 
             // Drop ANY and ALL existing constraints on main_company_id column
             await pool.query(`
