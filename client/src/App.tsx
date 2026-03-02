@@ -82,7 +82,7 @@ function App() {
                         element={
                             isAuthenticated
                                 ? <Navigate to="/dashboard" replace />
-                                : (isNative ? <Navigate to="/app" replace /> : <Navigate to="/saloontr-web" replace />)
+                                : (isNative ? <CustomerHome /> : <LandingPage />)
                         }
                     />
                     <Route
