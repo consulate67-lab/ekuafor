@@ -178,35 +178,38 @@ class SmsService {
                         throw new Error(`Netgsm XML Error: ${errMsg} (Raw: ${resStr})`);
                     }
                 } else {
-                    // Option 2: GET (Default & Highly Recommended)
-                    const getUrl = settings.api_url || 'https://api.netgsm.com.tr/sms/send/get/';
-                    console.log(`[SMS] Sending via Netgsm GET to: ${getUrl}`);
+                    // Option 2: Parametric POST (Default & Highly Recommended)
+                    // Note: Netgsm documentation (2022) states that GET is deprecated 
+                    // and requests must be sent via POST with form parameters.
+                    const postUrl = settings.api_url || 'https://api.netgsm.com.tr/sms/send/get/';
+                    console.log(`[SMS] Sending via Netgsm Parametric POST to: ${postUrl}`);
 
-                    response = await axios.get(getUrl, {
-                        params: {
-                            usercode,
-                            password,
-                            gsmno: phone10,
-                            message: formattedMessage,
-                            msgheader: senderId,
-                            dil: 'TR'
-                        },
+                    const params = new URLSearchParams();
+                    params.append('usercode', usercode);
+                    params.append('password', password);
+                    params.append('gsmno', phone10);
+                    params.append('message', formattedMessage);
+                    params.append('msgheader', senderId);
+                    params.append('dil', 'TR');
+
+                    response = await axios.post(postUrl, params, {
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         timeout: 10000
                     });
 
                     const resStr = String(response.data).trim();
                     console.log(`[SMS] Netgsm Raw Response: ${resStr}`);
 
-                    // Netgsm GET sends "00 JobID" or a numeric JobID on success
+                    // Netgsm sends "00 JobID" or a numeric JobID on success
                     if (!resStr.startsWith('00') && (resStr.length < 5 || isNaN(Number(resStr.split(' ')[0])))) {
                         const errorMap: any = {
-                            '20': 'Mesaj basligi bulunamadi.',
-                            '30': 'Gecersiz kullanici adi veya sifre.',
-                            '40': 'Yetersiz bakiye.',
-                            '70': 'Parametre hatasi veya Sistem hatasi.',
+                            '20': 'Mesaj metni cok uzun veya gecersiz karakter.',
+                            '30': 'Gecersiz kullanici adi, sifre veya IP yetkisi yok.',
+                            '40': 'Mesaj basligi (sender_id) gecersiz veya onayli degil.',
+                            '70': 'Eksik veya hatali parametre (Sistem hatasi).',
                         };
                         const errMsg = errorMap[resStr] || `Hata Kodu: ${resStr}`;
-                        throw new Error(`Netgsm GET Error: ${errMsg} (Raw: ${resStr})`);
+                        throw new Error(`Netgsm Error: ${errMsg} (Raw: ${resStr})`);
                     }
                 }
             } else {
