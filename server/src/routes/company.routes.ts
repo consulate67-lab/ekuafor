@@ -149,11 +149,22 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
             const email = `personel_${Date.now()}_${boardCode}@saloontr.com`;
             const fakePw = '$2b$10$wI5uJmO/P8/1rFzFqI2f/e./6K67UHT71YmQdG5H73A7z241/O6lO'; // "123456" hash edilmiş hali (temsili)
 
-            // Setup the board code in db
+            // Setup the staff member in db
             const insertRes = await pool.query(
                 `INSERT INTO users (first_name, last_name, phone, company_id, role, title, is_active, board_code, email, password)
-                 VALUES ($1, $2, $3, $4, 'staff', 'Personel', true, $5, $6, $7) RETURNING id`,
-                [staff.first_name, staff.last_name, staff.phone, id, boardCode, email, fakePw]
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+                [
+                    staff.first_name,
+                    staff.last_name,
+                    staff.phone,
+                    parseInt(id as string),
+                    'staff',
+                    'Personel',
+                    true,
+                    boardCode,
+                    email,
+                    fakePw
+                ]
             );
 
             // Send SMS to staff

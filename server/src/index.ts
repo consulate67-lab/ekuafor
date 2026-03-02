@@ -217,7 +217,12 @@ const runMigrations = async () => {
             DO $$
             BEGIN
                 IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
-                    CREATE TYPE user_role AS ENUM ('super_admin', 'company_admin', 'customer');
+                    CREATE TYPE user_role AS ENUM ('super_admin', 'company_admin', 'customer', 'staff');
+                ELSE
+                    -- Add staff if not exists in enum
+                    IF NOT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid WHERE t.typname = 'user_role' AND e.enumlabel = 'staff') THEN
+                        ALTER TYPE user_role ADD VALUE 'staff';
+                    END IF;
                 END IF;
             END $$;
         `);
