@@ -144,7 +144,6 @@ class SmsService {
                 const senderId = settings.sender_id || '';
 
                 // Option 1: XML POST (Recommended for standard SMS)
-                // If API URL is the general one or not provided, we use XML
                 if (!settings.api_url || settings.api_url.includes('xml')) {
                     const xmlData = `<?xml version="1.0" encoding="UTF-8"?>
                         <mainbody>
@@ -165,10 +164,19 @@ class SmsService {
                         timeout: 10000
                     });
 
-                    // XML response check: Successful if starts with numeric code (job id)
-                    const resStr = String(response.data);
-                    if (resStr.includes('error') || resStr.length < 2) {
-                        throw new Error(`Netgsm XML Error: ${resStr}`);
+                    const resStr = String(response.data).trim();
+                    const netgsmErrors = ['20', '30', '40', '50', '51', '70', '00', '01', '02'];
+
+                    if (resStr.includes('error') || netgsmErrors.includes(resStr) || resStr.length < 5) {
+                        const errorMap: any = {
+                            '20': 'Mesaj basligi (sender_id) gecersiz veya onayli degil.',
+                            '30': 'Gecersiz kullanici adi veya sifre.',
+                            '40': 'Mesaj metni bos veya gecersiz karakterler iceriyor.',
+                            '50': 'Gecersiz telefon numarasi.',
+                            '70': 'Netgsm sistem hatasi.',
+                        };
+                        const errMsg = errorMap[resStr] || `Hata Kodu: ${resStr}`;
+                        throw new Error(`Netgsm XML Error: ${errMsg} (Raw: ${resStr})`);
                     }
                 } else {
                     // Option 2: GET (Legacy/OTP support)
@@ -184,8 +192,9 @@ class SmsService {
                         timeout: 10000
                     });
 
-                    if (typeof response.data === 'string' && !response.data.startsWith('00') && response.data.length > 5) {
-                        throw new Error(`Netgsm GET Error: ${response.data}`);
+                    const resStr = String(response.data).trim();
+                    if (!resStr.startsWith('00')) {
+                        throw new Error(`Netgsm GET Error: ${resStr}`);
                     }
                 }
             } else {
