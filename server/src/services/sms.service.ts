@@ -108,11 +108,20 @@ class SmsService {
 
         // Phone number formatting (Turkish numbers)
         let formattedPhone = phoneNumber.replace(/\D/g, '');
-        if (formattedPhone.startsWith('0')) {
+        // Normalize Turkish numbers
+        if (formattedPhone.startsWith('90') && formattedPhone.length === 12) {
+            // Already 905XXXXXXXXX, keep it
+        } else if (formattedPhone.startsWith('0') && formattedPhone.length === 11) {
+            // 05XXXXXXXXX -> 905XXXXXXXXX
             formattedPhone = '90' + formattedPhone.substring(1);
-        } else if (!formattedPhone.startsWith('90')) {
+        } else if (formattedPhone.length === 10 && formattedPhone.startsWith('5')) {
+            // 5XXXXXXXXX -> 905XXXXXXXXX
             formattedPhone = '90' + formattedPhone;
         }
+
+        // Netgsm standard is often 10 digits for some endpoints, but XML accepts 12 with 90.
+        // Let's create a 10-digit version for GET and 12-digit for XML
+        const phone10 = formattedPhone.startsWith('90') ? formattedPhone.substring(2) : formattedPhone;
 
         try {
             let response;
@@ -184,7 +193,7 @@ class SmsService {
                         params: {
                             usercode,
                             password,
-                            gsmno: formattedPhone,
+                            gsmno: phone10,
                             message: formattedMessage,
                             msgheader: senderId,
                             dil: 'TR'
