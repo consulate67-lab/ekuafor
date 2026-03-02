@@ -614,6 +614,8 @@ const runMigrations = async () => {
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS iyzico_commission_rate DECIMAL(5, 2) DEFAULT 0.00');
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS bank_iban VARCHAR(34)');
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100)');
+            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS license_end_date TIMESTAMP WITH TIME ZONE');
+            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS license_status VARCHAR(20) DEFAULT \'active\'');
 
             await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS original_price DECIMAL(10, 2)');
             await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS collected_price DECIMAL(10, 2)');
