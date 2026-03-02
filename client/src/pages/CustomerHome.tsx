@@ -696,56 +696,66 @@ export default function CustomerHome() {
                             key={c.id}
                             className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-shadow active:scale-[0.98] relative group"
                         >
-                            <div className="absolute top-2 right-2 flex flex-col items-center gap-1 z-10">
-                                <button
-                                    onClick={(e) => toggleFavorite(e, c.id)}
-                                    className="p-2 text-gray-300 hover:text-red-500 transition-colors"
-                                >
-                                    <svg className={`w-6 h-6 ${favorites.includes(c.id) ? 'text-red-500 fill-current' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                                    </svg>
-                                </button>
-                                <button
-                                    onClick={(e) => openMaps(e, c)}
-                                    className="p-2 bg-blue-50/80 text-blue-500 rounded-xl transition-all hover:bg-blue-100 hover:scale-110 shadow-sm"
-                                    title="Haritada Gör"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5-2V4l5 2m0 14l6-2V8l-6 2m6 8l5-2V7l-5 2m0 0v11" />
-                                    </svg>
-                                </button>
+                            {/* Aksiyon Butonları */}
+                            <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
                                 {c.phone && (
                                     <a
                                         href={`tel:${c.phone}`}
                                         onClick={(e) => e.stopPropagation()}
-                                        className="p-2 bg-emerald-50/80 text-emerald-500 rounded-xl transition-all hover:bg-emerald-100 hover:scale-110 shadow-sm"
+                                        className="w-8 h-8 flex items-center justify-center bg-emerald-50 text-emerald-600 rounded-lg transition-all hover:bg-emerald-600 hover:text-white shadow-sm active:scale-90"
                                         title="Ara"
                                     >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                                         </svg>
                                     </a>
                                 )}
+                                <a
+                                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${c.name} ${c.address_line || ''} ${c.district || ''} ${c.city || ''}`)}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg transition-all hover:bg-blue-600 hover:text-white shadow-sm active:scale-90"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="Yol Tarifi"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                </a>
+                                <button
+                                    onClick={(e) => toggleFavorite(e, c.id)}
+                                    className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all shadow-sm active:scale-90 ${favorites.includes(c.id) ? 'bg-pink-100 text-pink-600 ring-2 ring-pink-50' : 'bg-gray-50 text-gray-400 hover:text-pink-600'}`}
+                                >
+                                    <svg className={`w-4 h-4 ${favorites.includes(c.id) ? 'fill-current' : 'fill-none'}`} stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                                    </svg>
+                                </button>
                             </div>
 
-                            <div className="w-16 h-16 bg-gray-100 rounded-xl flex-shrink-0 flex items-center justify-center text-2xl">
+                            <div className="w-16 h-16 bg-gradient-to-tr from-slate-50 to-slate-100 rounded-2xl flex-shrink-0 flex items-center justify-center text-3xl shadow-inner border border-slate-200/50">
                                 🏢
                             </div>
-                            <div className="flex-1 min-w-0 pr-10">
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                    <h4 className="font-bold text-gray-900 truncate">{c.name}</h4>
+                            <div className="flex-1 min-w-0 pr-32">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <h4 className="font-black text-slate-900 truncate uppercase tracking-tighter text-sm">{c.name}</h4>
                                 </div>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <div className="flex items-center gap-0.5 text-amber-500">
+                                <div className="flex items-center gap-2 mb-1.5">
+                                    <div className="flex items-center gap-1 text-amber-500">
                                         <span className="text-xs">★</span>
                                         <span className="text-[10px] font-black">{parseFloat(c.rating_avg || 0).toFixed(1)}</span>
                                     </div>
                                     <div className="w-1 h-1 bg-slate-200 rounded-full" />
-                                    <span className="text-[10px] font-bold text-slate-400">{c.review_count || 0} Yorum</span>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{c.review_count || 0} Yorum</span>
                                 </div>
-                                <p className="text-xs text-gray-500 truncate">{c.district || 'Merkez'}, {c.city || 'İstanbul'}</p>
+                                <p className="text-[10px] font-bold text-slate-500 truncate uppercase tracking-tight opacity-70">
+                                    <span className="text-indigo-600">{c.district || 'Merkez'}</span>, {c.city || 'İSTANBUL'}
+                                </p>
                                 {c.distance !== undefined && (
-                                    <p className="text-[10px] font-black text-[#1e1b4b] mt-1 uppercase tracking-tighter shadow-sm bg-indigo-50 inline-block px-1.5 py-0.5 rounded">{(c.distance).toFixed(1)} km mesafede</p>
+                                    <div className="mt-2.5 flex items-center gap-2">
+                                        <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        <p className="text-[10px] font-black text-slate-900 uppercase tracking-tighter bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100/50 shadow-sm">{(c.distance).toFixed(1)} km mesafede</p>
+                                    </div>
                                 )}
                             </div>
                         </Link>
