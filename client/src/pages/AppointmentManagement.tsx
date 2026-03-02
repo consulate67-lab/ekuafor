@@ -1257,9 +1257,19 @@ export default function AppointmentManagement() {
                                 </button>
 
                                 <button
-                                    onClick={() => {
-                                        handleStatusUpdate(paymentApp.id!, 'completed', editableAmount);
-                                        setShowPaymentModal(false);
+                                    onClick={async () => {
+                                        try {
+                                            setLoading(true);
+                                            await api.patch(`/appointments/${paymentApp.id}/status`, {
+                                                status: 'completed',
+                                                price: editableAmount
+                                            });
+                                            fetchData();
+                                            setShowPaymentModal(false);
+                                        } catch (e) {
+                                            alert('Hata oluştu');
+                                            setLoading(false);
+                                        }
                                     }}
                                     disabled={loading}
                                     className="p-6 bg-slate-50 text-slate-900 rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all disabled:opacity-50"
