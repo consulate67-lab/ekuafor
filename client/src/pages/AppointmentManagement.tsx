@@ -1234,6 +1234,7 @@ export default function AppointmentManagement() {
                                                         fetchData();
                                                         setShowPaymentModal(false);
                                                         setNfcState('IDLE');
+                                                        setSelectedAppointment(null);
                                                     }, 1500);
                                                 } else {
                                                     setNfcState('ERROR');
@@ -1266,6 +1267,7 @@ export default function AppointmentManagement() {
                                             });
                                             fetchData();
                                             setShowPaymentModal(false);
+                                            setSelectedAppointment(null);
                                         } catch (e) {
                                             alert('Hata oluştu');
                                             setLoading(false);
