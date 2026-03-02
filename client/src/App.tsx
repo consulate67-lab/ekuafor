@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { HashRouter, BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { App as CapApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useAuthStore } from './store/authStore';
@@ -33,14 +33,11 @@ function App() {
     // Global appointment status sync & notifications
     useAppointmentSync();
 
-    // Determine platform-specific router
-    const isGithubPages = window.location.hostname.includes('github.io');
     const isNative = Capacitor.isNativePlatform();
-    // Use HashRouter for static hosts (GitHub Pages) and Mobile APK to avoid 404s/White pages
-    // Use standard BrowserRouter for the actual domain (saloontr.com) for clean URLs
-    const Router: any = (isGithubPages || isNative) ? HashRouter : BrowserRouter;
-    // BaseName is needed for BrowserRouter if deployed in an environment with base url, but on saloontr.com it's root
-    const routerProps = (isGithubPages || isNative) ? {} : { basename: '/' };
+
+    // Use HashRouter universally to ensure GitHub Pages, Native APKs, and PWAs all function flawlessly without 404 rewrite hacks.
+    const Router: any = HashRouter;
+    const routerProps = {};
 
     useEffect(() => {
         const checkAuth = async () => {

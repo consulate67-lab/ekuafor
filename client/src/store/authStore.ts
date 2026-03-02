@@ -26,7 +26,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     logout: () => {
         localStorage.removeItem('token');
         set({ user: null, token: null, isAuthenticated: false, initialized: true });
-        window.location.href = '/ekuafor/';
+        window.location.href = '/';
     },
 
     setUser: (user) => {

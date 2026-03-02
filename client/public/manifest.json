@@ -3,24 +3,24 @@
     "name": "Saloon - Randevu Sistemi",
     "icons": [
         {
-            "src": "/ekuafor/vite.svg",
+            "src": "/vite.svg",
             "sizes": "64x64 32x32 24x24 16x16",
             "type": "image/svg+xml"
         },
         {
-            "src": "/ekuafor/vite.svg",
+            "src": "/vite.svg",
             "type": "image/svg+xml",
             "sizes": "192x192",
             "purpose": "any maskable"
         },
         {
-            "src": "/ekuafor/vite.svg",
+            "src": "/vite.svg",
             "type": "image/svg+xml",
             "sizes": "512x512"
         }
     ],
-    "start_url": "/ekuafor/",
-    "scope": "/ekuafor/",
+    "start_url": "/",
+    "scope": "/",
     "display": "standalone",
     "theme_color": "#db2777",
     "background_color": "#ffffff",

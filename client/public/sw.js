@@ -4,7 +4,7 @@ self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
             // Minimal catch-all for PWA requirements
-            return cache.addAll(['/ekuafor/']);
+            return cache.addAll(['/']);
         })
     );
 });
