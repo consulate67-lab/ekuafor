@@ -143,27 +143,30 @@ export default function SmsSettingsPage() {
                                     onChange={e => setSettings({ ...settings, provider: e.target.value })}
                                 >
                                     <option value="local_gateway">Yerel Gateway (Vodafone SIM/Android)</option>
-                                    <option value="netgsm">Netgsm OTP Servisi</option>
+                                    <option value="netgsm">Netgsm (XML POST / OTP)</option>
                                     <option value="vodafone_official">Vodafone Resmi API (Yakında)</option>
                                 </select>
                             </div>
 
                             {settings.provider === 'netgsm' && (
                                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-4">
-                                    <p className="text-[10px] text-blue-700 font-bold leading-relaxed">
+                                    <p className="text-[10px] text-blue-700 font-bold leading-relaxed mb-2">
                                         💡 Netgsm için API Anahtarı kısmına <span className="underline">kullaniciadi:sifre</span> formatında giriş yapın.
-                                        Varsayılan OTP URL'i otomatik kullanılır.
+                                    </p>
+                                    <p className="text-[9px] text-blue-600 font-medium">
+                                        • <strong>Standart SMS (XML):</strong> Boş bırakın veya sonu <code className="bg-blue-100 px-1 rounded">/xml</code> biten URL girin.<br />
+                                        • <strong>OTP SMS (Hızlı):</strong> URL kısmına <code className="bg-blue-100 px-1 rounded">https://api.netgsm.com.tr/otp/send/get</code> girin.
                                     </p>
                                 </div>
                             )}
 
                             <div>
                                 <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
-                                    {settings.provider === 'netgsm' ? 'API URL (Opsiyonel)' : 'Gateway URL'}
+                                    {settings.provider === 'netgsm' ? 'API URL (Standart için boş bırakın)' : 'Gateway URL'}
                                 </label>
                                 <input
                                     type="url"
-                                    placeholder={settings.provider === 'netgsm' ? 'https://api.netgsm.com.tr/otp/send/get' : 'http://192.168.1.100:8080/send'}
+                                    placeholder={settings.provider === 'netgsm' ? 'https://api.netgsm.com.tr/sms/send/xml' : 'http://192.168.1.100:8080/send'}
                                     className="input-field"
                                     value={settings.api_url}
                                     onChange={e => setSettings({ ...settings, api_url: e.target.value })}
@@ -171,7 +174,7 @@ export default function SmsSettingsPage() {
                                 />
                                 <p className="mt-1 text-[10px] text-gray-400 font-medium">
                                     {settings.provider === 'netgsm'
-                                        ? 'Boş bırakırsanız varsayılan Netgsm OTP adresi kullanılır.'
+                                        ? 'Boş bırakırsanız Netgsm Standart XML servisi kullanılır.'
                                         : 'Telefonunuzdaki Gateway uygulamasının verdiği adresi girin.'}
                                 </p>
                             </div>

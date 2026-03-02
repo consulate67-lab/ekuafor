@@ -119,32 +119,60 @@ class SmsService {
                 // Placeholder for official integration
                 throw new Error('Vodafone official API integration not implemented yet');
             } else if (settings.provider === 'netgsm') {
-                // Netgsm OTP API Integration
-                // api_key format should be "usercode:password"
+                // Netgsm API Integration
                 const [usercode, password] = (settings.api_key || '').split(':');
 
                 if (!usercode || !password) {
                     throw new Error('Netgsm API key should be in "usercode:password" format');
                 }
 
-                // Default Netgsm OTP URL if not provided: https://api.netgsm.com.tr/otp/send/get
-                const apiUrl = settings.api_url || 'https://api.netgsm.com.tr/otp/send/get';
+                const formattedMessage = message.trim();
+                const senderId = settings.sender_id || '';
 
-                response = await axios.get(apiUrl, {
-                    params: {
-                        usercode,
-                        password,
-                        gsmno: formattedPhone,
-                        message: message,
-                        msgheader: settings.sender_id || '',
-                        dil: 'TR'
-                    },
-                    timeout: 10000
-                });
+                // Option 1: XML POST (Recommended for standard SMS)
+                // If API URL is the general one or not provided, we use XML
+                if (!settings.api_url || settings.api_url.includes('xml')) {
+                    const xmlData = `<?xml version="1.0" encoding="UTF-8"?>
+                        <mainbody>
+                            <header>
+                                <usercode>${usercode}</usercode>
+                                <password>${password}</password>
+                                <msgheader>${senderId}</msgheader>
+                            </header>
+                            <body>
+                                <msg><![CDATA[${formattedMessage}]]></msg>
+                                <no>${formattedPhone}</no>
+                            </body>
+                        </mainbody>`;
 
-                // Netgsm usually returns a status code in the body, e.g., "00" for success
-                if (typeof response.data === 'string' && !response.data.startsWith('00')) {
-                    throw new Error(`Netgsm Error: ${response.data}`);
+                    const xmlUrl = settings.api_url || 'https://api.netgsm.com.tr/sms/send/xml';
+                    response = await axios.post(xmlUrl, xmlData, {
+                        headers: { 'Content-Type': 'application/xml' },
+                        timeout: 10000
+                    });
+
+                    // XML response check: Successful if starts with numeric code (job id)
+                    const resStr = String(response.data);
+                    if (resStr.includes('error') || resStr.length < 2) {
+                        throw new Error(`Netgsm XML Error: ${resStr}`);
+                    }
+                } else {
+                    // Option 2: GET (Legacy/OTP support)
+                    response = await axios.get(settings.api_url, {
+                        params: {
+                            usercode,
+                            password,
+                            gsmno: formattedPhone,
+                            message: formattedMessage,
+                            msgheader: senderId,
+                            dil: 'TR'
+                        },
+                        timeout: 10000
+                    });
+
+                    if (typeof response.data === 'string' && !response.data.startsWith('00') && response.data.length > 5) {
+                        throw new Error(`Netgsm GET Error: ${response.data}`);
+                    }
                 }
             } else {
                 // Generic GET/POST support can be added
