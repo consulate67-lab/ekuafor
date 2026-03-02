@@ -1,4 +1,6 @@
 import pool from '../config/database';
+import iyzicoService from './iyzico.service';
+
 
 export interface Company {
     id?: number;
@@ -22,7 +24,9 @@ export interface Company {
     // Banka
     bank_name?: string | null;
     bank_branch?: string | null;
-    iban?: string | null;
+    iban?: string | null; // Used as fallback or old data
+    bank_iban?: string | null; // matches db
+    sub_merchant_key?: string | null;
     account_holder_name?: string | null;
 
     // Ödeme
@@ -174,6 +178,30 @@ class CompanyService {
             const fields: string[] = [];
             const values: any[] = [];
             let paramIndex = 1;
+
+            // --- IYZICO SUB-MERCHANT INTEGRATION ---
+            // If the firm provides an IBAN and Name, let's create or update their sub-merchant key
+            // This allows splitting the checkout natively directly to their account
+            if (company.bank_iban) {
+                try {
+                    const existingCompanyRes = await client.query('SELECT sub_merchant_key FROM companies WHERE id = $1', [id]);
+                    const existingSubMerchantKey = existingCompanyRes.rows[0]?.sub_merchant_key;
+
+                    if (!existingSubMerchantKey) {
+                        const newKey = await iyzicoService.createSubMerchant({ ...company, id });
+                        if (newKey) company.sub_merchant_key = newKey;
+                    } else {
+                        await iyzicoService.updateSubMerchant(existingSubMerchantKey, { ...company, id });
+                        company.sub_merchant_key = existingSubMerchantKey;
+                    }
+                } catch (err: any) {
+                    console.error('[CompanyService] SubMerchant Sync Failed:', err.message);
+                    // Decide if we throw or just continue gracefully:
+                    // Usually you don't want to block them from saving just because iyzico sandbox is down,
+                    // but they should know. For now, we continue but log error.
+                }
+            }
+            // ---------------------------------------
 
             // Dinamik olarak güncelleme alanlarını oluştur
             Object.entries(company).forEach(([key, value]) => {

@@ -404,7 +404,7 @@ class AppointmentService {
                 const paymentMethod = (status === 'completed') ? 'cash' : null;
 
                 result = await pool.query(
-                    'UPDATE appointments SET status = $1, price = $2, payment_status = $3, payment_method = COALESCE(payment_method, $4) WHERE id = $5 RETURNING *',
+                    'UPDATE appointments SET status = $1, price = $2, payment_status = $3, payment_method = COALESCE(payment_method, $4), collected_price = COALESCE(collected_price, $2) WHERE id = $5 RETURNING *',
                     [status, price, paymentStatus, paymentMethod, id]
                 );
             } else {

@@ -1390,6 +1390,28 @@ export default function CompanyPanel() {
                                             />
                                         </div>
                                     </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Banka Adı</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.bank_name || ''}
+                                                onChange={e => setCompany({ ...company, bank_name: e.target.value })}
+                                                placeholder="Örn: Garanti BBVA"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">IBAN Numarası</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.bank_iban || ''}
+                                                onChange={e => setCompany({ ...company, bank_iban: e.target.value })}
+                                                placeholder="TR00..."
+                                            />
+                                        </div>
+                                    </div>
 
                                     {/* Terminoloji Ayarları */}
                                     <div className="pt-4 border-t border-slate-100">

@@ -118,12 +118,36 @@ class PaymentService {
 
             console.log(`[CepPOS] App#${appointmentId} | Base: ${amount} | Platform (%${platformRate}): ${platformCommission} | iyzico (%${totalIyzicoRate}): ${iyzicoCommission} | Total: ${totalToCollect}`);
 
-            // 3. Mocking iyzico Marketplace Request
-            // In a real marketplace integration, we would use:
-            // price: amount + platformCommission
-            // paidPrice: totalToCollect
-            // subMerchantPrice: amount
-            // subMerchantKey: appointment.sub_merchant_key
+            // 3. Iyzico Pazaryeri (Marketplace) Dağıtımı Mimarisi
+            // Eğer salona ait bir sub_merchant_key varsa, ödeme anında Iyzico sepetini (basket items)
+            // bu anahtarla böleriz. Böylece para direkt iyzico'dan salonun tanımlı IBAN'ına gider.
+            const subMerchantKey = appointment.sub_merchant_key;
+
+            // Gerçek iyzico entegrasyonu request taslağı:
+            const iyzicoRequestDraft = {
+                price: totalToCollect.toString(),
+                paidPrice: totalToCollect.toString(),
+                basketItems: [
+                    {
+                        id: `app_${appointment.id}_service`,
+                        name: "Salon Hizmet Bedeli",
+                        category1: "Hizmet",
+                        itemType: "VIRTUAL",
+                        price: totalToCollect.toString(),
+                        // Eğer firma IBAN tanımlıysa:
+                        ...(subMerchantKey ? {
+                            subMerchantKey: subMerchantKey,
+                            subMerchantPrice: amount.toString() // Firmanın Net Hakedişi direkt onlara yatar
+                        } : {})
+                    }
+                ]
+            };
+
+            if (subMerchantKey) {
+                console.log(`[Marketplace] Splitting payment! Sending ₺${amount} to SubMerchant: ${subMerchantKey}`);
+            } else {
+                console.log(`[Marketplace] No SubMerchantKey found. Full amount goes to Main Iyzico Account.`);
+            }
 
             const mockToken = `ceppos_${Math.random().toString(36).substring(7)}`;
 

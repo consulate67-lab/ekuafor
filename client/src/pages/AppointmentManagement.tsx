@@ -1124,9 +1124,9 @@ export default function AppointmentManagement() {
                                         <button
                                             onClick={() => {
                                                 handleStatusUpdate(selectedAppointment.id!, 'completed', selectedAppointment.price);
-                                                setSelectedAppointment(null);
                                             }}
-                                            className={`w-full ${selectedAppointment.payment_status === 'paid' ? 'bg-emerald-600 shadow-emerald-100' : 'bg-indigo-600 shadow-indigo-100'} text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl hover:opacity-90 transition-all`}
+                                            disabled={loading}
+                                            className={`w-full ${selectedAppointment.payment_status === 'paid' ? 'bg-emerald-600 shadow-emerald-100' : 'bg-indigo-600 shadow-indigo-100'} text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl hover:opacity-90 transition-all disabled:opacity-50`}
                                         >
                                             {selectedAppointment.payment_status === 'paid' ? '✓ Hizmeti Tamamla' : 'Tamamla & Ödeme Al'}
                                         </button>
@@ -1185,13 +1185,18 @@ export default function AppointmentManagement() {
                         {/* Commission Breakdown */}
                         {(() => {
                             const platformRate = Number(company?.commission_rate) || 5;
-                            const iyzicoRate = Number(company?.iyzico_commission_rate) || 1;
+                            let iyzicoRate = Number(company?.iyzico_commission_rate) || 1;
+                            if (iyzicoRate <= 0) iyzicoRate = 1;
                             const platformComm = (editableAmount * platformRate) / 100;
                             const iyzicoComm = (editableAmount * iyzicoRate) / 100;
                             const totalToCollect = editableAmount + platformComm + iyzicoComm;
 
                             return (
                                 <div className="bg-slate-50 rounded-3xl p-6 mb-8 space-y-3 border border-slate-100">
+                                    <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
+                                        <span>Firma Hakediş (Net)</span>
+                                        <span className="text-slate-600">₺{editableAmount.toFixed(2)}</span>
+                                    </div>
                                     <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
                                         <span>Platform Komisyonu ({platformRate.toFixed(2)}%)</span>
                                         <span className="text-slate-600">₺{platformComm.toFixed(2)}</span>
@@ -1238,7 +1243,8 @@ export default function AppointmentManagement() {
                                             }
                                         }, 3000);
                                     }}
-                                    className="p-6 bg-slate-900 text-white rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all shadow-xl shadow-slate-200"
+                                    disabled={loading}
+                                    className="p-6 bg-slate-900 text-white rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all shadow-xl shadow-slate-200 disabled:opacity-50"
                                 >
                                     <div className="flex items-center gap-4 text-left">
                                         <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">📱</div>
@@ -1255,7 +1261,8 @@ export default function AppointmentManagement() {
                                         handleStatusUpdate(paymentApp.id!, 'completed', editableAmount);
                                         setShowPaymentModal(false);
                                     }}
-                                    className="p-6 bg-slate-50 text-slate-900 rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all"
+                                    disabled={loading}
+                                    className="p-6 bg-slate-50 text-slate-900 rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all disabled:opacity-50"
                                 >
                                     <div className="flex items-center gap-4 text-left">
                                         <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">💵</div>
