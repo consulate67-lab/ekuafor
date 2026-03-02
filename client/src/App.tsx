@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { useAuthStore } from './store/authStore';
 import api from './lib/api';
 import Login from './pages/Login';
@@ -30,6 +31,15 @@ function App() {
     const { isAuthenticated, initialized, setUser, setInitialized } = useAuthStore();
     // Global appointment status sync & notifications
     useAppointmentSync();
+
+    // Determine platform-specific router
+    const isGithubPages = window.location.hostname.includes('github.io');
+    const isNative = Capacitor.isNativePlatform();
+    // Use HashRouter for static hosts (GitHub Pages) and Mobile APK to avoid 404s/White pages
+    // Use standard BrowserRouter for the actual domain (saloontr.com) for clean URLs
+    const Router: any = (isGithubPages || isNative) ? HashRouter : BrowserRouter;
+    // BaseName is needed for BrowserRouter if deployed in an environment with base url, but on saloontr.com it's root
+    const routerProps = (isGithubPages || isNative) ? {} : { basename: import.meta.env.BASE_URL };
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -71,7 +81,7 @@ function App() {
 
     return (
         <div className="relative min-h-screen">
-            <Router>
+            <Router {...routerProps}>
                 <Routes>
                     {/* Public Routes */}
                     <Route
