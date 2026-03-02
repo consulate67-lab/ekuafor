@@ -681,74 +681,89 @@ export default function CustomerHome() {
                     <div className="text-center py-10 text-gray-400 font-bold animate-pulse">Yükleniyor...</div>
                 ) : (
                     filteredCompanies.map((c: any) => (
-                        <Link
-                            to={`/book/${c.id}`}
+                        <div
                             key={c.id}
-                            className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-shadow active:scale-[0.98] relative group"
+                            className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-xl transition-all active:scale-[0.98] relative group overflow-hidden"
+                            onClick={() => navigate(`/book/${c.id}`)}
                         >
-                            {/* Aksiyon Butonları */}
-                            <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
-                                {c.phone && (
-                                    <a
-                                        href={`tel:${c.phone}`}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="w-8 h-8 flex items-center justify-center bg-emerald-50 text-emerald-600 rounded-lg transition-all hover:bg-emerald-600 hover:text-white shadow-sm active:scale-90"
-                                        title="Ara"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                        </svg>
-                                    </a>
-                                )}
+                            {/* Premium Shadow & Reflection Layer */}
+                            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-50" />
+
+                            {/* Vertical Action Stack - Right Side */}
+                            <div className="absolute top-4 right-4 flex flex-col items-center gap-3 z-10">
+                                <button
+                                    onClick={(e) => toggleFavorite(e, c.id)}
+                                    className={`w-10 h-10 flex items-center justify-center rounded-2xl transition-all shadow-lg active:scale-90 ${favorites.includes(c.id) ? 'bg-rose-500 text-white shadow-rose-200 ring-4 ring-rose-50' : 'bg-white text-slate-300 hover:text-rose-500 border border-slate-100'}`}
+                                >
+                                    <svg className={`w-5 h-5 ${favorites.includes(c.id) ? 'fill-current' : 'fill-none'}`} stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                                    </svg>
+                                </button>
+
                                 <a
                                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${c.name} ${c.address_line || ''} ${c.district || ''} ${c.city || ''}`)}`}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg transition-all hover:bg-blue-600 hover:text-white shadow-sm active:scale-90"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); window.open(e.currentTarget.href, '_blank'); }}
+                                    className="w-10 h-10 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-2xl transition-all hover:bg-indigo-600 hover:text-white shadow-md shadow-indigo-100 border border-indigo-100 active:scale-90"
                                     title="Yol Tarifi"
                                 >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                     </svg>
                                 </a>
-                                <button
-                                    onClick={(e) => toggleFavorite(e, c.id)}
-                                    className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all shadow-sm active:scale-90 ${favorites.includes(c.id) ? 'bg-pink-100 text-pink-600 ring-2 ring-pink-50' : 'bg-gray-50 text-gray-400 hover:text-pink-600'}`}
-                                >
-                                    <svg className={`w-4 h-4 ${favorites.includes(c.id) ? 'fill-current' : 'fill-none'}`} stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                                    </svg>
-                                </button>
-                            </div>
 
-                            <div className="w-16 h-16 bg-gradient-to-tr from-slate-50 to-slate-100 rounded-2xl flex-shrink-0 flex items-center justify-center text-3xl shadow-inner border border-slate-200/50">
-                                🏢
-                            </div>
-                            <div className="flex-1 min-w-0 pr-32">
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <h4 className="font-black text-slate-900 truncate uppercase tracking-tighter text-sm">{c.name}</h4>
-                                </div>
-                                <div className="flex items-center gap-2 mb-1.5">
-                                    <div className="flex items-center gap-1 text-amber-500">
-                                        <span className="text-xs">★</span>
-                                        <span className="text-[10px] font-black">{parseFloat(c.rating_avg || 0).toFixed(1)}</span>
-                                    </div>
-                                    <div className="w-1 h-1 bg-slate-200 rounded-full" />
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{c.review_count || 0} Yorum</span>
-                                </div>
-                                <p className="text-[10px] font-bold text-slate-500 truncate uppercase tracking-tight opacity-70">
-                                    <span className="text-indigo-600">{c.district || 'Merkez'}</span>, {c.city || 'İSTANBUL'}
-                                </p>
-                                {c.distance !== undefined && (
-                                    <div className="mt-2.5 flex items-center gap-2">
-                                        <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                        <p className="text-[10px] font-black text-slate-900 uppercase tracking-tighter bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100/50 shadow-sm">{(c.distance).toFixed(1)} km mesafede</p>
-                                    </div>
+                                {c.phone && (
+                                    <a
+                                        href={`tel:${c.phone}`}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="w-10 h-10 flex items-center justify-center bg-emerald-50 text-emerald-600 rounded-2xl transition-all hover:bg-emerald-600 hover:text-white shadow-md shadow-emerald-100 border border-emerald-100 active:scale-90"
+                                        title="Ara"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                        </svg>
+                                    </a>
                                 )}
                             </div>
-                        </Link>
+
+                            {/* Company Branding */}
+                            <div className="w-20 h-20 bg-gradient-to-tr from-slate-50 to-slate-100 rounded-[1.5rem] flex-shrink-0 flex items-center justify-center text-4xl shadow-inner border border-slate-200/50 group-hover:scale-105 transition-transform">
+                                {c.gender === 'Kadın' ? '👩‍🦰' : (c.gender === 'Erkek' ? '🧔' : '💈')}
+                            </div>
+
+                            {/* Content */}
+                            <div className="flex-1 min-w-0 pr-12">
+                                <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-500 rounded-lg text-[8px] font-black uppercase tracking-widest mb-1.5">{c.type || 'Hizmet Noktası'}</span>
+                                <div className="flex items-center gap-1.5 mb-1.5">
+                                    <h4 className="font-black text-slate-900 truncate uppercase tracking-tighter text-base leading-tight">{c.name}</h4>
+                                </div>
+
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="flex items-center gap-1 text-[#b45309]">
+                                        <span className="text-xs">★</span>
+                                        <span className="text-[11px] font-black">{parseFloat(c.rating_avg || 0).toFixed(1)}</span>
+                                    </div>
+                                    <div className="w-1 h-1 bg-slate-300 rounded-full" />
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{c.review_count || 0} Yorum</span>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <p className="text-[10px] font-bold text-slate-500 truncate uppercase tracking-tight opacity-70 flex items-center gap-1">
+                                        <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                        <span className="text-indigo-600 font-black">{c.district || 'Merkez'}</span>, {c.city || 'İSTANBUL'}
+                                    </p>
+
+                                    {c.distance !== undefined && (
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-xl text-[9px] font-black uppercase tracking-tighter border border-emerald-100/50 flex items-center gap-1 shadow-sm">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                                {(c.distance).toFixed(1)} km mesafede
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     ))
                 )}
             </main>
