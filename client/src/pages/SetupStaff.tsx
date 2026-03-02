@@ -39,10 +39,20 @@ export default function SetupStaff() {
         });
     };
 
+    const handleNextStep = () => {
+        const index = step - 2;
+        const current = staffList[index];
+        if (!current.first_name.trim() || !current.last_name.trim() || !current.phone.trim()) {
+            alert('Lütfen bu personelin bilgilerini eksiksiz doldurun.');
+            return;
+        }
+        setStep(step + 1);
+    };
+
     const handleStaffSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Validation check
+        // Final Validation check
         const isValid = staffList.every(s => s.first_name.trim() && s.last_name.trim() && s.phone.trim());
         if (!isValid) {
             alert('Lütfen tüm personellerin bilgilerini eksiksiz doldurun.');
@@ -96,17 +106,21 @@ export default function SetupStaff() {
         );
     }
 
+    const currentStaffIndex = step - 2;
+
     return (
         <div className="min-h-screen bg-[#020817] flex items-center justify-center p-4 relative overflow-hidden">
             {/* Background decorative elements */}
             <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-pink-600/10 blur-[120px] pointer-events-none animate-pulse" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-600/10 blur-[120px] pointer-events-none animate-pulse" animation-delay-1000 />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-600/10 blur-[120px] pointer-events-none animate-pulse" />
 
             <div className="relative bg-[#0b1120]/80 backdrop-blur-2xl border border-white/10 w-full max-w-2xl rounded-[3rem] shadow-2xl p-8 sm:p-12 z-10">
                 {/* Step Progress */}
-                <div className="flex items-center gap-3 mb-10">
+                <div className="flex items-center gap-1.5 mb-10 overflow-hidden">
                     <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${step >= 1 ? 'bg-gradient-to-r from-pink-500 to-purple-500' : 'bg-white/10'}`} />
-                    <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${step >= 2 ? 'bg-gradient-to-r from-purple-500 to-indigo-500' : 'bg-white/10'}`} />
+                    {Array.from({ length: staffCount }).map((_, i) => (
+                        <div key={i} className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${step >= (i + 2) ? 'bg-gradient-to-r from-purple-500 to-indigo-500' : 'bg-white/10'}`} />
+                    ))}
                 </div>
 
                 <div className="flex justify-center mb-8">
@@ -149,17 +163,17 @@ export default function SetupStaff() {
                         </button>
                     </form>
                 ) : (
-                    <form onSubmit={handleStaffSubmit} className="animate-in fade-in slide-in-from-right-10 duration-500">
+                    <div className="animate-in fade-in slide-in-from-right-10 duration-500">
                         <div className="flex items-center justify-between mb-10">
                             <div>
                                 <h2 className="text-3xl font-black text-white tracking-tight">Uzman Kadronuz</h2>
                                 <p className="text-xs text-indigo-400 font-black uppercase tracking-widest mt-2 bg-indigo-500/10 px-3 py-1.5 rounded-full inline-block">
-                                    {staffCount} Personel Tanımlanıyor
+                                    PERSONEL #{currentStaffIndex + 1} / {staffCount}
                                 </p>
                             </div>
                             <button
                                 type="button"
-                                onClick={() => setStep(1)}
+                                onClick={() => setStep(step - 1)}
                                 className="h-10 px-4 flex items-center gap-2 rounded-xl text-xs font-black uppercase tracking-widest text-slate-500 hover:text-white hover:bg-white/5 transition-all"
                             >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path d="M15 19l-7-7 7-7" /></svg>
@@ -167,83 +181,77 @@ export default function SetupStaff() {
                             </button>
                         </div>
 
-                        <div className="space-y-6 max-h-[45vh] overflow-y-auto pr-4 custom-scrollbar mb-10">
-                            {staffList.map((staff, index) => (
-                                <div key={index} className="group bg-white/[0.03] hover:bg-white/[0.05] border border-white/5 rounded-3xl p-8 transition-all duration-300 relative overflow-hidden">
-                                    <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-pink-500 to-indigo-500 opacity-20 group-hover:opacity-100 transition-opacity" />
-                                    <div className="flex items-center gap-4 mb-6">
-                                        <div className="w-10 h-10 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center text-sm font-black text-slate-400">
-                                            #{index + 1}
-                                        </div>
-                                        <div className="h-px flex-1 bg-white/5" />
+                        <div className="space-y-6 mb-10">
+                            <div className="group bg-white/[0.03] border border-white/5 rounded-3xl p-8 relative overflow-hidden transition-all duration-500">
+                                <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-pink-500 to-indigo-500" />
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Adı</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={staffList[currentStaffIndex]?.first_name || ''}
+                                            onChange={e => handleStaffChange(currentStaffIndex, 'first_name', e.target.value)}
+                                            className="w-full bg-slate-950/50 border border-white/10 rounded-xl px-5 py-4 text-white text-sm focus:border-indigo-500/50 outline-none transition-all"
+                                            placeholder="Örn: Sibel"
+                                        />
                                     </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                        <div className="space-y-2">
-                                            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Adı</label>
+                                    <div className="space-y-2">
+                                        <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Soyadı</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={staffList[currentStaffIndex]?.last_name || ''}
+                                            onChange={e => handleStaffChange(currentStaffIndex, 'last_name', e.target.value)}
+                                            className="w-full bg-slate-950/50 border border-white/10 rounded-xl px-5 py-4 text-white text-sm focus:border-indigo-500/50 outline-none transition-all"
+                                            placeholder="Örn: Kaya"
+                                        />
+                                    </div>
+                                    <div className="sm:col-span-2 space-y-2">
+                                        <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Telefon Numarası</label>
+                                        <div className="relative">
+                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 text-xs font-bold border-r border-white/10 pr-3">+90</div>
                                             <input
-                                                type="text"
+                                                type="tel"
                                                 required
-                                                value={staff.first_name}
-                                                onChange={e => handleStaffChange(index, 'first_name', e.target.value)}
-                                                className="w-full bg-slate-950/50 border border-white/10 rounded-xl px-5 py-4 text-white text-sm focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 outline-none transition-all placeholder:text-slate-700"
-                                                placeholder="Örn: Sibel"
+                                                value={staffList[currentStaffIndex]?.phone || ''}
+                                                onChange={e => handleStaffChange(currentStaffIndex, 'phone', e.target.value)}
+                                                className="w-full bg-slate-950/50 border border-white/10 rounded-xl px-4 py-4 pl-16 text-white text-sm focus:border-indigo-500/50 outline-none transition-all"
+                                                placeholder="5XX XXX XX XX"
                                             />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Soyadı</label>
-                                            <input
-                                                type="text"
-                                                required
-                                                value={staff.last_name}
-                                                onChange={e => handleStaffChange(index, 'last_name', e.target.value)}
-                                                className="w-full bg-slate-950/50 border border-white/10 rounded-xl px-5 py-4 text-white text-sm focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 outline-none transition-all placeholder:text-slate-700"
-                                                placeholder="Örn: Kaya"
-                                            />
-                                        </div>
-                                        <div className="sm:col-span-2 space-y-2">
-                                            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Telefon Numarası</label>
-                                            <div className="relative">
-                                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 text-xs font-bold border-r border-white/10 pr-3">+90</div>
-                                                <input
-                                                    type="tel"
-                                                    required
-                                                    value={staff.phone}
-                                                    onChange={e => handleStaffChange(index, 'phone', e.target.value)}
-                                                    className="w-full bg-slate-950/50 border border-white/10 rounded-xl px-4 py-4 pl-16 text-white text-sm focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 outline-none transition-all"
-                                                    placeholder="5XX XXX XX XX"
-                                                />
-                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            ))}
+                            </div>
                         </div>
 
                         <div className="flex flex-col sm:flex-row gap-4">
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="flex-1 relative group px-10 py-5 bg-gradient-to-r from-pink-600 to-indigo-600 text-white rounded-2xl font-black text-lg transition-all shadow-[0_15px_30px_-10px_rgba(79,70,229,0.3)] hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:scale-100 overflow-hidden"
-                            >
-                                <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity" />
-                                {loading ? (
-                                    <div className="flex items-center justify-center gap-3">
-                                        <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                                        Kaydediliyor...
-                                    </div>
-                                ) : 'Tüm Personelleri Kaydet ve Tamamla'}
-                            </button>
+                            {currentStaffIndex < staffCount - 1 ? (
+                                <button
+                                    type="button"
+                                    onClick={handleNextStep}
+                                    className="flex-1 px-10 py-5 bg-white text-slate-900 rounded-2xl font-black text-lg transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3"
+                                >
+                                    İleri
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                                    </svg>
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleStaffSubmit}
+                                    disabled={loading}
+                                    className="flex-1 px-10 py-5 bg-gradient-to-r from-pink-600 to-indigo-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-indigo-600/20 hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+                                >
+                                    {loading ? 'Kaydediliyor...' : 'Tüm Personelleri Kaydet ve Tamamla'}
+                                </button>
+                            )}
                         </div>
-                    </form>
+                    </div>
                 )}
             </div>
 
             <style>{`
-                .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-                .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); border-radius: 10px; }
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
-                
                 @keyframes scale-in-center {
                     0% { transform: scale(0); opacity: 0; }
                     100% { transform: scale(1); opacity: 1; }
