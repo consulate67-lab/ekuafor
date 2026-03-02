@@ -3,16 +3,19 @@ import axios from 'axios';
 let baseUrl = import.meta.env.VITE_API_URL;
 
 // Akıllı Otomatik Bağlantı: Neredeyiz?
-const isGitHubPages = window.location.hostname.includes('github.io');
-const isMobile = window.location.protocol === 'capacitor:' || window.location.hostname === 'localhost' && !isGitHubPages;
+const isProdDomain = window.location.hostname.includes('saloontr.com') || window.location.hostname.includes('github.io');
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
 if (!baseUrl) {
-    if (isGitHubPages || isMobile) {
-        // Canlıda veya Mobilde üretim sunucusunu kullan
-        baseUrl = 'https://web-production-db847.up.railway.app/api';
-    } else {
+    if (isProdDomain) {
+        // Canlıda (Saloontr veya GitHub) yeni üretim sunucusunu kullan
+        baseUrl = 'https://ekuafor-production-344a.up.railway.app/api';
+    } else if (isLocal) {
         // Sadece yerel geliştirmede localhost
         baseUrl = 'http://localhost:3000/api';
+    } else {
+        // Diğer durumlar (IP vb.) için de üretim sunucusu güvenli tercihtir
+        baseUrl = 'https://ekuafor-production-344a.up.railway.app/api';
     }
 }
 
