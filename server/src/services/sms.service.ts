@@ -154,7 +154,7 @@ class SmsService {
 
                 // Option 1: XML POST (Recommended for standard SMS)
                 if (!settings.api_url || settings.api_url.includes('xml')) {
-                    const xmlData = `<?xml version="1.0" encoding="UTF-8"?><mainbody><header><usercode>${usercode}</usercode><password>${password}</password><msgheader>${senderId}</msgheader></header><body><msg><![CDATA[${formattedMessage}]]></msg><no>${formattedPhone}</no></body></mainbody>`;
+                    const xmlData = `<?xml version="1.0" encoding="UTF-8"?><mainbody><header><usercode>${usercode}</usercode><password>${password}</password><msgheader>${senderId}</msgheader></header><body><msg><![CDATA[${formattedMessage}]]></msg><no>${phone10}</no></body></mainbody>`;
 
                     const xmlUrl = settings.api_url || 'https://api.netgsm.com.tr/sms/send/xml';
                     response = await axios.post(xmlUrl, xmlData, {
