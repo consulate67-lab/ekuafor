@@ -1558,6 +1558,7 @@ export default function SalonBoard() {
                                                             if (company?.id) fetchData(company.id);
                                                             setShowPaymentModal(false);
                                                             setNfcState('IDLE');
+                                                            setSelectedAppointment(null);
                                                         });
                                                     }, 1500);
                                                 } else {
@@ -1581,9 +1582,21 @@ export default function SalonBoard() {
                                 </button>
 
                                 <button
-                                    onClick={() => {
-                                        handleUpdateStatus(paymentApp.id!, 'completed', paymentApp.price);
-                                        setShowPaymentModal(false);
+                                    onClick={async () => {
+                                        try {
+                                            setLoading(true);
+                                            await api.patch(`/appointments/${paymentApp.id}/status`, {
+                                                status: 'completed',
+                                                price: paymentApp.price
+                                            });
+                                            if (company?.id) fetchData(company.id);
+                                            setShowPaymentModal(false);
+                                            setSelectedAppointment(null);
+                                        } catch (e) {
+                                            alert('Hata oluştu');
+                                        } finally {
+                                            setLoading(false);
+                                        }
                                     }}
                                     className="p-6 bg-slate-50 text-slate-900 rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all"
                                 >
