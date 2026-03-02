@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -11,6 +11,8 @@ import api from '../lib/api';
 import { Appointment } from '../types';
 
 // Leaflet Icon Fix
+import Tesseract from 'tesseract.js';
+
 const DefaultIcon = L.icon({
     iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
     shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
@@ -65,6 +67,12 @@ export default function Dashboard() {
         date: ''
     });
     const [renewingLicense, setRenewingLicense] = useState(false);
+
+    // OCR States
+    const [isScanningReceipt, setIsScanningReceipt] = useState(false);
+    const [ocrLoading, setOcrLoading] = useState(false);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
 
     const handleRenewLicense = async () => {
         try {
@@ -210,6 +218,73 @@ export default function Dashboard() {
             fetchEmployeeStats(selectedPeriod);
         }
     }, [user, selectedPeriod]);
+
+    const startScanner = async () => {
+        setIsScanningReceipt(true);
+        setOcrLoading(false);
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }
+            });
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                videoRef.current.setAttribute("playsinline", "true");
+                videoRef.current.play();
+            }
+        } catch (e: any) {
+            alert('Kamera açılamadı: ' + e.message);
+            setIsScanningReceipt(false);
+        }
+    };
+
+    const stopScanner = () => {
+        if (videoRef.current && videoRef.current.srcObject) {
+            const stream = videoRef.current.srcObject as MediaStream;
+            stream.getTracks().forEach(track => track.stop());
+        }
+        setIsScanningReceipt(false);
+    };
+
+    const captureReceipt = async () => {
+        if (!videoRef.current || !canvasRef.current) return;
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        setOcrLoading(true);
+        try {
+            const worker = await Tesseract.createWorker('tur');
+            const ret = await worker.recognize(canvas.toDataURL('image/jpeg'));
+            const text = ret.data.text;
+            await worker.terminate();
+
+            // Sadece sayı ve virgül/notaları al (fiyata benzeyenleri)
+            const amounts = text.match(/\b\d+([.,]\d{1,2})?\b/g);
+            if (amounts && amounts.length > 0) {
+                const values = amounts.map(a => parseFloat(a.replace(',', '.')));
+                const total = Math.max(...values);
+                if (total > 0 && total < 1000000) {
+                    setExpenseForm(prev => ({ ...prev, amount: total.toString() }));
+                    stopScanner();
+                } else {
+                    alert('Geçerli bir tutar okunamadı (Sonuç: ' + total + ')');
+                }
+            } else {
+                alert('Fişte tutar metni anlaşılamadı. Tekrar deneyin veya elle girin.');
+            }
+        } catch (e) {
+            console.error('OCR Error', e);
+            alert('Fiş okunamadı.');
+        } finally {
+            setOcrLoading(false);
+        }
+    };
 
     const handleExpenseSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -1044,19 +1119,53 @@ export default function Dashboard() {
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
-                            <form onSubmit={handleExpenseSubmit} className="p-8 space-y-5">
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-1">Tarih</label>
-                                    <input
-                                        type="date"
-                                        required
-                                        value={expenseForm.date}
-                                        onChange={e => setExpenseForm(prev => ({ ...prev, date: e.target.value }))}
-                                        className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-slate-900 font-bold focus:ring-2 focus:ring-rose-500 outline-none"
-                                    />
+
+                            {isScanningReceipt ? (
+                                <div className="p-6">
+                                    <div className="relative rounded-3xl overflow-hidden bg-black aspect-[3/4] shadow-inner mb-4">
+                                        <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                                        <canvas ref={canvasRef} className="hidden" />
+
+                                        {ocrLoading && (
+                                            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-10">
+                                                <div className="w-12 h-12 border-4 border-rose-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                                                <p className="text-white font-black text-xs uppercase tracking-widest">Fiş Okunuyor...</p>
+                                            </div>
+                                        )}
+
+                                        <div className="absolute inset-x-8 inset-y-8 border-2 border-white/30 rounded-2xl pointer-events-none"></div>
+                                        <div className="absolute bottom-6 left-0 right-0 text-center pointer-events-none">
+                                            <p className="text-[10px] text-white/80 font-black uppercase tracking-[0.2em] px-4 py-1.5 bg-black/50 rounded-full inline-block backdrop-blur-md">Toplam Tutarı Hizalayın</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <button type="button" onClick={stopScanner} disabled={ocrLoading} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all">İptal</button>
+                                        <button type="button" onClick={captureReceipt} disabled={ocrLoading} className="flex-1 py-4 bg-rose-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-rose-600/30 active:scale-95 transition-all">Fotoğraf Çek</button>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-1">Tutar (₺)</label>
+                            ) : (
+                                <form onSubmit={handleExpenseSubmit} className="p-8 space-y-5">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-1">Tarih</label>
+                                        <input
+                                            type="date"
+                                            required
+                                            value={expenseForm.date}
+                                            onChange={e => setExpenseForm(prev => ({ ...prev, date: e.target.value }))}
+                                            className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-slate-900 font-bold focus:ring-2 focus:ring-rose-500 outline-none"
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-between mb-1 pl-1">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Tutar (₺)</label>
+                                        <button
+                                            type="button"
+                                            onClick={startScanner}
+                                            className="text-[10px] bg-rose-100 text-rose-600 px-2 py-0.5 rounded-lg font-black uppercase tracking-wider flex items-center gap-1 hover:bg-rose-200 active:scale-95 transition-all"
+                                        >
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                            Fiş Tarat (OCR)
+                                        </button>
+                                    </div>
                                     <input
                                         type="number"
                                         required
@@ -1067,26 +1176,26 @@ export default function Dashboard() {
                                         placeholder="0.00"
                                         className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-slate-900 font-black focus:ring-2 focus:ring-rose-500 outline-none text-2xl"
                                     />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-1">Açıklama</label>
-                                    <textarea
-                                        required
-                                        value={expenseForm.description}
-                                        onChange={e => setExpenseForm(prev => ({ ...prev, description: e.target.value }))}
-                                        placeholder="Masraf detayı..."
-                                        rows={3}
-                                        className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-rose-500 outline-none resize-none"
-                                    />
-                                </div>
-                                <button
-                                    type="submit"
-                                    disabled={loading}
-                                    className="w-full py-4 mt-2 bg-rose-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-rose-500/20 hover:bg-rose-600 active:scale-95 transition-all disabled:opacity-50"
-                                >
-                                    {loading ? 'Kaydediliyor...' : 'Masrafı Kaydet'}
-                                </button>
-                            </form>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-1">Açıklama</label>
+                                        <textarea
+                                            required
+                                            value={expenseForm.description}
+                                            onChange={e => setExpenseForm(prev => ({ ...prev, description: e.target.value }))}
+                                            placeholder="Masraf detayı..."
+                                            rows={3}
+                                            className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-rose-500 outline-none resize-none"
+                                        />
+                                    </div>
+                                    <button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="w-full py-4 mt-2 bg-rose-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-rose-500/20 hover:bg-rose-600 active:scale-95 transition-all disabled:opacity-50"
+                                    >
+                                        {loading ? 'Kaydediliyor...' : 'Masrafı Kaydet'}
+                                    </button>
+                                </form>
+                            )}
                         </div>
                     </div>
                 )

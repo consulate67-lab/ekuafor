@@ -48,8 +48,34 @@ function App() {
             if (code) {
                 try {
                     const res = await api.post('/companies/check-code', { code });
-                    if (res.data?.success && res.data?.data?.token) {
-                        localStorage.setItem('token', res.data.data.token);
+                    if (res.data?.success) {
+                        const data = res.data.data;
+                        if (data.type === 'staff') {
+                            if (!data.is_license_expired) {
+                                if (data.token) {
+                                    localStorage.setItem('token', data.token);
+                                    localStorage.setItem('staff_board_code', data.board_code);
+                                    const userPayload = {
+                                        id: data.user_id,
+                                        email: `${data.board_code}@staff.local`,
+                                        first_name: data.staff_name.split(' ')[0],
+                                        last_name: data.staff_name.split(' ').slice(1).join(' '),
+                                        role: 'company_admin',
+                                        company_id: data.company_id,
+                                        photo: data.photo
+                                    };
+                                    useAuthStore.getState().login(userPayload as any, data.token);
+                                }
+                                window.location.hash = '#/dashboard';
+                            }
+                        } else if (data.type === 'board') {
+                            localStorage.setItem('salon_board_key', data.board_key);
+                            window.location.hash = '#/board';
+                        } else if (data.type === 'admin') {
+                            if (!data.is_license_expired) {
+                                window.location.hash = '#' + data.redirect;
+                            }
+                        }
 
                         // Clean up URL safely
                         try {
