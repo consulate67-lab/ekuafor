@@ -252,14 +252,13 @@ export default function CustomerHome() {
                             setCodeError('Firmanın lisans süresi dolmuştur.');
                             setCodeResult(null);
                         } else {
-                            // JWT token'ı kaydet ve store'u güncelle - Dashboard'a erişim için
                             if (data.token) {
                                 setLogin({
                                     id: data.user_id,
                                     email: `${data.board_code}@staff.local`,
                                     first_name: data.staff_name.split(' ')[0],
                                     last_name: data.staff_name.split(' ').slice(1).join(' '),
-                                    role: 'company_admin',
+                                    role: 'staff',
                                     company_id: data.company_id,
                                     photo: data.photo
                                 } as any, data.token);

@@ -1,42 +1,52 @@
 import pool from '../config/database';
 
 class ReportService {
-    async getEmployeeStats(companyId: number, staffId: number, period: 'today' | 'week' | 'month' | 'year') {
+    async getEmployeeStats(companyId: number, staffId: number, period: 'today' | 'week' | 'month' | 'year', localDate?: string) {
         let dateFilter = '';
         let dateFilterExp = '';
+        const todayStr = localDate ? `'${localDate}'::date` : 'CURRENT_DATE';
 
         switch (period) {
             case 'today':
-                dateFilter = "appointment_date = CURRENT_DATE";
-                dateFilterExp = "expense_date = CURRENT_DATE";
+                dateFilter = `appointment_date = ${todayStr}`;
+                dateFilterExp = `expense_date = ${todayStr}`;
                 break;
             case 'week':
-                dateFilter = "appointment_date >= date_trunc('week', CURRENT_DATE)";
-                dateFilterExp = "expense_date >= date_trunc('week', CURRENT_DATE)";
+                dateFilter = `appointment_date >= date_trunc('week', ${todayStr})`;
+                dateFilterExp = `expense_date >= date_trunc('week', ${todayStr})`;
                 break;
             case 'month':
-                dateFilter = "appointment_date >= date_trunc('month', CURRENT_DATE)";
-                dateFilterExp = "expense_date >= date_trunc('month', CURRENT_DATE)";
+                dateFilter = `appointment_date >= date_trunc('month', ${todayStr})`;
+                dateFilterExp = `expense_date >= date_trunc('month', ${todayStr})`;
                 break;
             case 'year':
-                dateFilter = "appointment_date >= date_trunc('year', CURRENT_DATE)";
-                dateFilterExp = "expense_date >= date_trunc('year', CURRENT_DATE)";
+                dateFilter = `appointment_date >= date_trunc('year', ${todayStr})`;
+                dateFilterExp = `expense_date >= date_trunc('year', ${todayStr})`;
                 break;
+        }
+
+        const params: any[] = [companyId];
+        let staffFilter = '';
+        let staffFilterExp = '';
+
+        if (staffId) {
+            staffFilter = 'AND (a.staff_id = $2 OR EXISTS (SELECT 1 FROM appointment_services WHERE appointment_id = a.id AND staff_id = $2))';
+            staffFilterExp = 'AND created_by = $2';
+            params.push(staffId);
         }
 
         const query = `
             SELECT 
-                COUNT(*) as total_appointments,
+                COUNT(DISTINCT a.id) as total_appointments,
                 SUM(COALESCE(a.price, s.price, 0)) as total_revenue
             FROM appointments a
             LEFT JOIN services s ON a.service_id = s.id
             WHERE a.company_id = $1 
-            ${staffId ? 'AND a.staff_id = $2' : ''}
+            ${staffFilter}
             AND a.status != 'cancelled'
             AND ${dateFilter}
         `;
 
-        const params = staffId ? [companyId, staffId] : [companyId];
         const result = await pool.query(query, params);
 
         const expQuery = `
@@ -44,7 +54,7 @@ class ReportService {
             FROM expenses
             WHERE company_id = $1
             AND ${dateFilterExp}
-            ${staffId ? 'AND created_by = $2' : ''}
+            ${staffFilterExp}
         `;
         const expResult = await pool.query(expQuery, params);
 

@@ -653,7 +653,7 @@ router.post('/check-code', async (req: Request, res: Response) => {
 
             // JWT token oluştur - personel dashboard'a erişsin
             const token = jwt.sign(
-                { userId: sr.id, email: `${sr.board_code}@staff.local`, role: 'company_admin', companyId: sr.company_id },
+                { userId: sr.id, email: `${sr.board_code}@staff.local`, role: 'staff', companyId: sr.company_id },
                 process.env.JWT_SECRET || 'your-secret-key',
                 { expiresIn: '7d' }
             );

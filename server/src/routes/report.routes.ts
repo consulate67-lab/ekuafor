@@ -20,7 +20,8 @@ router.get('/employee-stats', authMiddleware, async (req: Request, res: Response
             return res.status(403).json({ success: false, error: 'Firma bilgisi eksik' });
         }
 
-        const stats = await reportService.getEmployeeStats(companyId, staffId as any, period);
+        const localDate = req.query.local_date as string;
+        const stats = await reportService.getEmployeeStats(companyId, staffId as any, period, localDate);
 
         res.json({
             success: true,

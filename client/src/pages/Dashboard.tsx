@@ -202,7 +202,7 @@ export default function Dashboard() {
         if (user?.role !== 'staff' && user?.role !== 'company_admin') return;
         setStatsLoading(true);
         try {
-            const res = await api.get('/reports/employee-stats', { params: { period } });
+            const res = await api.get('/reports/employee-stats', { params: { period, local_date: getLocalDateString() } });
             if (res.data.success) {
                 setEmployeeStats(res.data.data);
             }

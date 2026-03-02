@@ -60,7 +60,7 @@ function App() {
                                         email: `${data.board_code}@staff.local`,
                                         first_name: data.staff_name.split(' ')[0],
                                         last_name: data.staff_name.split(' ').slice(1).join(' '),
-                                        role: 'company_admin',
+                                        role: 'staff',
                                         company_id: data.company_id,
                                         photo: data.photo
                                     };
