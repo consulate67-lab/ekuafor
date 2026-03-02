@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Capacitor } from '@capacitor/core';
 import { useAuthStore } from './store/authStore';
 import api from './lib/api';
 import Login from './pages/Login';
@@ -29,8 +28,6 @@ import { useAppointmentSync } from './hooks/useAppointmentSync';
 
 function App() {
     const { isAuthenticated, initialized, setUser, setInitialized } = useAuthStore();
-    const isNative = Capacitor.isNativePlatform();
-
     // Global appointment status sync & notifications
     useAppointmentSync();
 
@@ -82,7 +79,7 @@ function App() {
                         element={
                             isAuthenticated
                                 ? <Navigate to="/dashboard" replace />
-                                : (isNative ? <CustomerHome /> : <LandingPage />)
+                                : <CustomerHome />
                         }
                     />
                     <Route
