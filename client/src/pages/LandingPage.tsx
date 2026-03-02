@@ -1,9 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 
 export default function LandingPage() {
-    const navigate = useNavigate();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [locating, setLocating] = useState(false);
@@ -79,18 +77,7 @@ export default function LandingPage() {
                     <span className="text-2xl font-black tracking-tight text-white">saloontr.com</span>
                 </div>
                 <div className="flex items-center gap-4">
-                    <button
-                        onClick={() => navigate('/app')}
-                        className="text-sm font-bold text-slate-300 hover:text-white transition-colors uppercase tracking-widest hidden sm:block"
-                    >
-                        Uygulamaya Git
-                    </button>
-                    <button
-                        onClick={() => navigate('/login')}
-                        className="px-6 py-2.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-sm font-bold transition-all backdrop-blur-md"
-                    >
-                        Giriş Yap
-                    </button>
+                    {/* Auth actions removed per request */}
                 </div>
             </nav>
 
@@ -122,13 +109,6 @@ export default function LandingPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                             </svg>
                         </span>
-                    </button>
-
-                    <button
-                        onClick={() => navigate('/app')}
-                        className="px-8 py-4 bg-white/5 text-white border border-white/10 rounded-full font-bold text-lg hover:bg-white/10 active:scale-95 transition-all w-full sm:w-auto backdrop-blur-sm"
-                    >
-                        Müşteri Olarak Keşfet
                     </button>
                 </div>
 

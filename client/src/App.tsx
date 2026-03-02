@@ -75,11 +75,11 @@ function App() {
                     {/* Public Routes */}
                     <Route
                         path="/"
-                        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />}
+                        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <CustomerHome />}
                     />
                     <Route
-                        path="/app"
-                        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <CustomerHome />}
+                        path="/saloontr-web"
+                        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />}
                     />
                     <Route path="/book/:id" element={<BookingPage />} />
                     <Route path="/my-appointments" element={<MyAppointments />} />
