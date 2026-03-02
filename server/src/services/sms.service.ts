@@ -46,7 +46,17 @@ class SmsService {
      */
     async saveSettings(settings: SmsSettings): Promise<SmsSettings> {
         // Handle 0 as null
-        const cid = (settings.company_id === 0 || !settings.company_id) ? null : settings.company_id;
+        let cid = (settings.company_id === 0 || !settings.company_id) ? null : settings.company_id;
+
+        // Extra safety check: verify if company exists in target DB
+        if (cid) {
+            const checkRes = await pool.query('SELECT id FROM companies WHERE id = $1', [cid]);
+            if (checkRes.rows.length === 0) {
+                console.warn(`Company ID ${cid} not found, falling back to system-wide (null) settings.`);
+                cid = null;
+            }
+        }
+
         const existing = await this.getSettings(cid);
 
         if (existing) {
