@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 
 export default function LandingPage() {
+    const navigate = useNavigate();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [locating, setLocating] = useState(false);
@@ -109,6 +111,13 @@ export default function LandingPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                             </svg>
                         </span>
+                    </button>
+
+                    <button
+                        onClick={() => navigate('/')}
+                        className="px-8 py-4 bg-white/5 text-white border border-white/10 rounded-full font-bold text-lg hover:bg-white/10 active:scale-95 transition-all w-full sm:w-auto backdrop-blur-sm"
+                    >
+                        Uygulamaya Git
                     </button>
                 </div>
 
