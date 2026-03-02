@@ -225,16 +225,6 @@ export default function CustomerHome() {
         fetchData(searchQuery, location, distanceLimit);
     }, [selectedGender, sort]);
 
-    const openMaps = (e: React.MouseEvent, c: Company) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const addressParts = [c.name, c.address_line, c.district, c.city].filter(Boolean);
-        const query = encodeURIComponent(addressParts.join(' '));
-        const url = (c.latitude && c.longitude)
-            ? `https://www.google.com/maps/dir/?api=1&destination=${c.latitude},${c.longitude}`
-            : `https://www.google.com/maps/search/?api=1&query=${query}`;
-        window.open(url, '_blank');
-    };
 
     const favoriteCompanies = companies.filter(c => favorites.includes(c.id!));
 

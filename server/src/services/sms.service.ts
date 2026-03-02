@@ -27,10 +27,12 @@ class SmsService {
      */
     async getSettings(companyId: number | null): Promise<SmsSettings | null> {
         try {
-            const query = companyId
+            // Handle 0 as null (system-wide settings)
+            const cid = (companyId === 0 || !companyId) ? null : companyId;
+            const query = cid
                 ? 'SELECT * FROM sms_settings WHERE company_id = $1 LIMIT 1'
                 : 'SELECT * FROM sms_settings WHERE company_id IS NULL LIMIT 1';
-            const values = companyId ? [companyId] : [];
+            const values = cid ? [cid] : [];
             const result = await pool.query(query, values);
             return result.rows[0] || null;
         } catch (error) {
@@ -43,13 +45,15 @@ class SmsService {
      * SMS Ayarlarını kaydet veya güncelle
      */
     async saveSettings(settings: SmsSettings): Promise<SmsSettings> {
-        const existing = await this.getSettings(settings.company_id);
+        // Handle 0 as null
+        const cid = (settings.company_id === 0 || !settings.company_id) ? null : settings.company_id;
+        const existing = await this.getSettings(cid);
 
         if (existing) {
             const query = `
                 UPDATE sms_settings 
                 SET provider = $1, api_url = $2, api_key = $3, is_active = $4, sender_id = $5, updated_at = CURRENT_TIMESTAMP
-                WHERE ${settings.company_id ? 'company_id = $6' : 'company_id IS NULL'}
+                WHERE ${cid ? 'company_id = $6' : 'company_id IS NULL'}
                 RETURNING *
             `;
             const values = [
@@ -58,7 +62,7 @@ class SmsService {
                 settings.api_key,
                 settings.is_active,
                 settings.sender_id,
-                ...(settings.company_id ? [settings.company_id] : [])
+                ...(cid ? [cid] : [])
             ];
             const result = await pool.query(query, values);
             return result.rows[0];
@@ -69,7 +73,7 @@ class SmsService {
                 RETURNING *
             `;
             const values = [
-                settings.company_id,
+                cid,
                 settings.provider,
                 settings.api_url,
                 settings.api_key,
@@ -226,10 +230,11 @@ class SmsService {
      */
     async getLogs(companyId: number | null): Promise<SmsLog[]> {
         try {
-            const query = companyId
+            const cid = (companyId === 0 || !companyId) ? null : companyId;
+            const query = cid
                 ? 'SELECT * FROM sms_logs WHERE company_id = $1 ORDER BY created_at DESC LIMIT 100'
                 : 'SELECT * FROM sms_logs WHERE company_id IS NULL ORDER BY created_at DESC LIMIT 100';
-            const values = companyId ? [companyId] : [];
+            const values = cid ? [cid] : [];
             const result = await pool.query(query, values);
             return result.rows;
         } catch (error) {
