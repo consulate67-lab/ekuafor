@@ -17,6 +17,7 @@ export default function LandingPage() {
         district: '',
         latitude: null as number | null,
         longitude: null as number | null,
+        target_genders: [] as string[],
     });
 
     const handleGetLocation = () => {
@@ -54,7 +55,7 @@ export default function LandingPage() {
                 setTimeout(() => {
                     setIsModalOpen(false);
                     setSuccess(false);
-                    setFormData({ name: '', phone: '', address_line: '', city: '', district: '', latitude: null, longitude: null });
+                    setFormData({ name: '', phone: '', address_line: '', city: '', district: '', latitude: null, longitude: null, target_genders: [] });
                 }, 4000);
             }
         } catch (err: any) {
@@ -202,6 +203,31 @@ export default function LandingPage() {
                                             className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all outline-none"
                                             placeholder="053X XXX XX XX"
                                         />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">Hizmet Verilen Müşteri Tipi (Cinsiyet)</label>
+                                        <div className="flex flex-wrap gap-3">
+                                            {['Kadın', 'Erkek', 'Unisex'].map((gender) => (
+                                                <label key={gender} className="relative flex items-center justify-center cursor-pointer group">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="peer sr-only"
+                                                        checked={formData.target_genders.includes(gender)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setFormData(prev => ({ ...prev, target_genders: [...prev.target_genders, gender] }));
+                                                            } else {
+                                                                setFormData(prev => ({ ...prev, target_genders: prev.target_genders.filter(g => g !== gender) }));
+                                                            }
+                                                        }}
+                                                    />
+                                                    <div className="px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold text-slate-400 peer-checked:bg-indigo-500/20 peer-checked:border-indigo-500 peer-checked:text-indigo-400 transition-all select-none group-hover:bg-slate-800">
+                                                        {gender}
+                                                    </div>
+                                                </label>
+                                            ))}
+                                        </div>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4">

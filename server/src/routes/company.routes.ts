@@ -82,18 +82,21 @@ router.post('/register', async (req: Request, res: Response) => {
             city: nullableString,
             district: nullableString,
             latitude: nullableNumber,
-            longitude: nullableNumber
+            longitude: nullableNumber,
+            target_genders: z.array(z.string()).optional()
         });
 
         const validatedData = publicSchema.parse(req.body);
 
         const companyData: any = {
             ...validatedData,
+            genders: validatedData.target_genders,
             is_active: false,
             is_verified: false,
             payment_enabled: false,
             commission_rate: 0
         };
+        delete companyData.target_genders;
 
         // created_by = null for public self-registration
         const company = await companyService.createCompany(companyData, null as any);
@@ -112,6 +115,63 @@ router.post('/register', async (req: Request, res: Response) => {
             });
         }
         res.status(500).json({ success: false, error: 'Kayıt sırasında sunucu hatası oluştu' });
+    }
+});
+
+/**
+ * POST /api/companies/:id/setup-staff
+ * Gerekli: admin_key, staffList (array of {first_name, last_name, phone})
+ */
+router.post('/:id/setup-staff', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { admin_key, staffList } = req.body;
+
+        if (!admin_key || !Array.isArray(staffList) || staffList.length === 0) {
+            return res.status(400).json({ success: false, error: 'Geçersiz parametreler' });
+        }
+
+        // Validate company and admin_key
+        const compRes = await pool.query('SELECT name, board_key FROM companies WHERE id = $1 AND admin_key = $2 AND is_active = true', [id, admin_key]);
+        if (compRes.rowCount === 0) {
+            return res.status(403).json({ success: false, error: 'Yetkisiz erişim veya kapalı firma' });
+        }
+
+        const companyName = compRes.rows[0].name;
+
+        const results = [];
+        for (const staff of staffList) {
+            if (!staff.first_name || !staff.last_name || !staff.phone) continue;
+
+            // Benzersiz code ve bcrypt şifre üretimi (basit)
+            const boardCode = Array.from({ length: 4 }, () => Math.floor(Math.random() * 10)).join('');
+            const email = `personel_${Date.now()}_${boardCode}@saloontr.com`;
+            const fakePw = '$2b$10$wI5uJmO/P8/1rFzFqI2f/e./6K67UHT71YmQdG5H73A7z241/O6lO'; // "123456" hash edilmiş hali (temsili)
+
+            // Setup the board code in db
+            const insertRes = await pool.query(
+                `INSERT INTO users (first_name, last_name, phone, company_id, role, title, is_active, board_code, email, password)
+                 VALUES ($1, $2, $3, $4, 'staff', 'Personel', true, $5, $6, $7) RETURNING id`,
+                [staff.first_name, staff.last_name, staff.phone, id, boardCode, email, fakePw]
+            );
+
+            // Send SMS to staff
+            const smsMsg = `Sayin ${staff.first_name}, ${companyName} personeli olarak sisteme eklendiniz. Yonetim paneli: www.saloontr.com/board Personel Kodunuz: ${boardCode}`;
+            import('../services/sms.service').then(m => {
+                m.default.sendSms(null as any, staff.phone, smsMsg).catch(() => { });
+            });
+
+            results.push(insertRes.rows[0]);
+        }
+
+        res.json({
+            success: true,
+            data: results,
+            message: `${results.length} personel basariyla olusturuldu ve SMS gönderildi.`
+        });
+    } catch (err) {
+        console.error('setup-staff error:', err);
+        res.status(500).json({ success: false, error: 'Personel kurulum hatası' });
     }
 });
 

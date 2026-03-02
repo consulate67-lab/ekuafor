@@ -385,14 +385,46 @@ class CompanyService {
         );
         const company = result.rows[0] || null;
 
-        if (company && company.phone) {
+        if (company) {
+            // Hizmet Cinsiyetine Göre Şablon Hizmet Ekleme
             try {
-                const message = `Sayin ${company.name}, sistem basvurunuz onaylanmistir. Yonetim panelinize 'www.saloontr.com' adresinden giris yapabilirsiniz. Sifreniz: ${company.admin_key}`;
-                // Firma id'si yerine null gönderiyoruz çünkü genel sistem SMS hesabı kullanılacak
-                await smsService.sendSms(null, company.phone, message);
-                console.log(`[CompanyService] Onay SMS gonderildi: ${company.phone}`);
+                const genders = company.genders || [];
+                const defaultServices: any[] = [];
+
+                if (genders.includes('Kadın')) {
+                    defaultServices.push({ name: 'Kadın Saç Kesim', duration: 30, price: 0 });
+                    defaultServices.push({ name: 'Kadın Fön', duration: 30, price: 0 });
+                }
+                if (genders.includes('Erkek')) {
+                    defaultServices.push({ name: 'Erkek Saç Sakal Kesim', duration: 30, price: 0 });
+                    defaultServices.push({ name: 'Sakal Tıraşı', duration: 15, price: 0 });
+                }
+                if (genders.includes('Unisex')) {
+                    defaultServices.push({ name: 'Cilt Bakımı', duration: 45, price: 0 });
+                }
+
+                if (defaultServices.length > 0) {
+                    for (const s of defaultServices) {
+                        await pool.query(
+                            'INSERT INTO services (company_id, name, duration, price) VALUES ($1, $2, $3, $4)',
+                            [id, s.name, s.duration, s.price]
+                        );
+                    }
+                }
             } catch (err) {
-                console.error(`[CompanyService] Onay SMS gonderilemedi: ${company.phone}`, err);
+                console.error(`[CompanyService] Varsayılan hizmetler eklenemedi`, err);
+            }
+
+            if (company.phone) {
+                try {
+                    const baseUrl = 'www.saloontr.com';
+                    const message = `Sayın ${company.name}, başvurunuz onaylanmıştır. Firma Yönetim Paneliniz: ${baseUrl}/company-panel?key=${company.admin_key} Çalışanlarınızı Tanıtmak İçin: ${baseUrl}/setup-staff/${company.id}?key=${company.admin_key}`;
+
+                    await smsService.sendSms(null, company.phone, message);
+                    console.log(`[CompanyService] Onay SMS gonderildi: ${company.phone}`);
+                } catch (err) {
+                    console.error(`[CompanyService] Onay SMS gonderilemedi: ${company.phone}`, err);
+                }
             }
         }
 
