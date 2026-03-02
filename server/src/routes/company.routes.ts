@@ -70,8 +70,54 @@ const companySchema = z.object({
 });
 
 /**
+ * POST /api/companies/register
+ * Herkese açık (Public) yeni firma kayıt isteği (Onaysız/Beklemede düşer)
+ */
+router.post('/register', async (req: Request, res: Response) => {
+    try {
+        const publicSchema = z.object({
+            name: z.string().min(2, 'Firma adı en az 2 karakter olmalıdır'),
+            phone: z.string().min(10, 'Geçerli bir telefon numarası giriniz'),
+            address_line: nullableString,
+            city: nullableString,
+            district: nullableString,
+            latitude: nullableNumber,
+            longitude: nullableNumber
+        });
+
+        const validatedData = publicSchema.parse(req.body);
+
+        const companyData: any = {
+            ...validatedData,
+            is_active: false,
+            is_verified: false,
+            payment_enabled: false,
+            commission_rate: 0
+        };
+
+        // created_by = null for public self-registration
+        const company = await companyService.createCompany(companyData, null as any);
+
+        res.status(201).json({
+            success: true,
+            data: company,
+            message: 'Kayıt başvurunuz alındı. Onaylandıktan sonra SMS ile bilgilendirileceksiniz.'
+        });
+    } catch (error) {
+        if (error instanceof z.ZodError) {
+            return res.status(400).json({
+                success: false,
+                error: 'Validasyon hatası',
+                details: error.errors
+            });
+        }
+        res.status(500).json({ success: false, error: 'Kayıt sırasında sunucu hatası oluştu' });
+    }
+});
+
+/**
  * POST /api/companies
- * Yeni firma oluştur
+ * Yeni firma oluştur (Super Admin)
  */
 router.post('/', authMiddleware, roleCheck(['super_admin']), async (req: Request, res: Response) => {
     try {

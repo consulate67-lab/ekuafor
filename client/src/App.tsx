@@ -11,6 +11,7 @@ import CompanyDetail from './pages/CompanyDetail';
 import ServiceManagement from './pages/ServiceManagement';
 import AppointmentManagement from './pages/AppointmentManagement';
 import CustomerHome from './pages/CustomerHome';
+import LandingPage from './pages/LandingPage';
 import BookingPage from './pages/BookingPage';
 import SmsSettings from './pages/SmsSettings';
 import SalonBoard from './pages/SalonBoard';
@@ -74,6 +75,10 @@ function App() {
                     {/* Public Routes */}
                     <Route
                         path="/"
+                        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />}
+                    />
+                    <Route
+                        path="/app"
                         element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <CustomerHome />}
                     />
                     <Route path="/book/:id" element={<BookingPage />} />

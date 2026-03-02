@@ -1,5 +1,6 @@
 import pool from '../config/database';
 import iyzicoService from './iyzico.service';
+import smsService from './sms.service';
 
 
 export interface Company {
@@ -379,10 +380,23 @@ class CompanyService {
      */
     async verifyCompany(id: number): Promise<Company | null> {
         const result = await pool.query(
-            'UPDATE companies SET is_verified = true WHERE id = $1 RETURNING *',
+            'UPDATE companies SET is_verified = true, is_active = true WHERE id = $1 RETURNING *',
             [id]
         );
-        return result.rows[0] || null;
+        const company = result.rows[0] || null;
+
+        if (company && company.phone) {
+            try {
+                const message = `Sayin ${company.name}, sistem basvurunuz onaylanmistir. Yonetim panelinize 'www.saloontr.com' adresinden giris yapabilirsiniz. Sifreniz: ${company.admin_key}`;
+                // Firma id'si yerine null gönderiyoruz çünkü genel sistem SMS hesabı kullanılacak
+                await smsService.sendSms(null, company.phone, message);
+                console.log(`[CompanyService] Onay SMS gonderildi: ${company.phone}`);
+            } catch (err) {
+                console.error(`[CompanyService] Onay SMS gonderilemedi: ${company.phone}`, err);
+            }
+        }
+
+        return company;
     }
 }
 
