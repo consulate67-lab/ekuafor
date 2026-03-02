@@ -44,10 +44,9 @@ function App() {
 
     useEffect(() => {
         const checkAuth = async () => {
-            // Check for code in URL for auto-login (e.g. from SMS)
-            const urlParams = new URLSearchParams(window.location.search);
-            const hashParamsStr = window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '';
-            const code = urlParams.get('code') || new URLSearchParams(hashParamsStr).get('code');
+            // Extract code correctly regardless of HashRouter / spa-github-pages param mutation
+            const codeMatch = window.location.href.match(/[?&]code=([^&#]+)/);
+            const code = codeMatch ? codeMatch[1] : null;
 
             if (code) {
                 try {
@@ -55,15 +54,24 @@ function App() {
                     if (res.data?.success && res.data?.data?.token) {
                         localStorage.setItem('token', res.data.data.token);
 
-                        // Clean up URL safely for both History and Hash routers
-                        if (window.location.hash.includes('?code=')) {
-                            const newHash = window.location.hash.split('?')[0];
-                            window.history.replaceState({}, document.title, window.location.pathname + window.location.search + newHash);
-                        } else if (window.location.search.includes('code=')) {
-                            const params = new URLSearchParams(window.location.search);
-                            params.delete('code');
-                            const newSearch = params.toString() ? '?' + params.toString() : '';
-                            window.history.replaceState({}, document.title, window.location.pathname + newSearch + window.location.hash);
+                        // Clean up URL safely
+                        try {
+                            const urlObj = new URL(window.location.href);
+                            ['code', '/?code', '?code'].forEach(k => urlObj.searchParams.delete(k));
+
+                            if (urlObj.hash.includes('code=')) {
+                                const [p, q] = urlObj.hash.split('?');
+                                if (q) {
+                                    const hp = new URLSearchParams(q);
+                                    hp.delete('code');
+                                    urlObj.hash = p + (hp.toString() ? '?' + hp.toString() : '');
+                                }
+                            }
+
+                            const finalUrl = urlObj.toString().replace(/\/\?=$/, '/').replace(/\?$/, '');
+                            window.history.replaceState({}, document.title, finalUrl);
+                        } catch (e) {
+                            console.error('URL cleanup failed', e);
                         }
                     }
                 } catch (e) {
