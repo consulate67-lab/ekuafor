@@ -152,8 +152,9 @@ class SmsService {
                 const formattedMessage = message.trim();
                 const senderId = settings.sender_id || '';
 
-                // Option 1: XML POST (Recommended for standard SMS)
-                if (!settings.api_url || settings.api_url.includes('xml')) {
+                // DEFAULT: Use GET method unless URL explicitly contains 'xml'
+                // GET is far more reliable and avoids "70 System Errors"
+                if (settings.api_url && settings.api_url.includes('xml')) {
                     const xmlData = `<?xml version="1.0" encoding="UTF-8"?><mainbody><header><usercode>${usercode}</usercode><password>${password}</password><msgheader>${senderId}</msgheader></header><body><msg><![CDATA[${formattedMessage}]]></msg><no>${phone10}</no></body></mainbody>`;
 
                     const xmlUrl = settings.api_url || 'https://api.netgsm.com.tr/sms/send/xml';
@@ -177,8 +178,9 @@ class SmsService {
                         throw new Error(`Netgsm XML Error: ${errMsg} (Raw: ${resStr})`);
                     }
                 } else {
-                    // Option 2: GET (Legacy/OTP support)
-                    response = await axios.get(settings.api_url, {
+                    // Option 2: GET (Default & Highly Recommended)
+                    const getUrl = settings.api_url || 'https://api.netgsm.com.tr/sms/send/get/';
+                    response = await axios.get(getUrl, {
                         params: {
                             usercode,
                             password,
@@ -191,8 +193,16 @@ class SmsService {
                     });
 
                     const resStr = String(response.data).trim();
-                    if (!resStr.startsWith('00')) {
-                        throw new Error(`Netgsm GET Error: ${resStr}`);
+                    // Netgsm GET sends "00 JobID" or a numeric JobID on success
+                    if (!resStr.startsWith('00') && (resStr.length < 5 || isNaN(Number(resStr.split(' ')[0])))) {
+                        const errorMap: any = {
+                            '20': 'Mesaj basligi bulunamadi.',
+                            '30': 'Gecersiz kullanici adi veya sifre.',
+                            '40': 'Yetersiz bakiye.',
+                            '70': 'Parametre hatasi veya Sistem hatasi.',
+                        };
+                        const errMsg = errorMap[resStr] || `Hata Kodu: ${resStr}`;
+                        throw new Error(`Netgsm GET Error: ${errMsg}`);
                     }
                 }
             } else {
