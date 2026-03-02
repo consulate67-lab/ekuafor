@@ -147,13 +147,13 @@ export default function LandingPage() {
             {isModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl" onClick={() => !loading && setIsModalOpen(false)}></div>
-                    <div className="relative bg-[#0b1120] border border-white/10 w-full max-w-lg max-h-[95vh] overflow-y-auto scrollbar-hide rounded-[2.5rem] shadow-2xl p-6 sm:p-10 animate-in zoom-in-95 duration-300">
+                    <div className="relative bg-[#0b1120] border border-white/10 w-full max-w-lg max-h-[95vh] overflow-y-auto scrollbar-hide rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl p-5 sm:p-10 animate-in zoom-in-95 duration-300">
                         {/* Close button */}
                         <button
                             onClick={() => setIsModalOpen(false)}
-                            className="absolute top-6 right-6 w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+                            className="absolute top-4 right-4 sm:top-6 sm:right-6 w-8 h-8 sm:w-10 sm:h-10 bg-white/5 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all"
                         >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
@@ -170,17 +170,17 @@ export default function LandingPage() {
                             </div>
                         ) : (
                             <>
-                                <div className="mb-8">
-                                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-pink-500 to-indigo-500 flex items-center justify-center mb-6 shadow-lg shadow-pink-500/20">
+                                <div className="mb-4 sm:mb-8">
+                                    <div className="hidden sm:flex w-12 h-12 rounded-2xl bg-gradient-to-tr from-pink-500 to-indigo-500 items-center justify-center mb-6 shadow-lg shadow-pink-500/20">
                                         <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                         </svg>
                                     </div>
-                                    <h2 className="text-3xl font-black text-white tracking-tight mb-2">Firmamızı Kaydet</h2>
-                                    <p className="text-sm text-slate-400 font-medium">Saloontr platformunda yerinizi almak için formu doldurun.</p>
+                                    <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight mb-1 sm:mb-2 pt-2 sm:pt-0">Firmamızı Kaydet</h2>
+                                    <p className="text-xs sm:text-sm text-slate-400 font-medium leading-tight mb-2 sm:mb-0">Saloontr'da yerinizi almak için formu doldurun.</p>
                                 </div>
 
-                                <form onSubmit={handleSubmit} className="space-y-5">
+                                <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-5">
                                     <div>
                                         <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 ml-1">Firma Adı</label>
                                         <input
@@ -188,7 +188,7 @@ export default function LandingPage() {
                                             required
                                             value={formData.name}
                                             onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all outline-none"
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg sm:rounded-xl px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base text-white placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all outline-none"
                                             placeholder="Örn: Saloon Güzellik Merkezi"
                                         />
                                     </div>
@@ -200,14 +200,14 @@ export default function LandingPage() {
                                             required
                                             value={formData.phone}
                                             onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all outline-none"
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg sm:rounded-xl px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base text-white placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all outline-none"
                                             placeholder="053X XXX XX XX"
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">Hizmet Verilen Müşteri Tipi (Cinsiyet)</label>
-                                        <div className="flex flex-wrap gap-3">
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 sm:mb-2 ml-1">Hizmet Verilen Müşteri Tipi</label>
+                                        <div className="flex flex-wrap gap-2 sm:gap-3">
                                             {['Kadın', 'Erkek', 'Çocuk', 'Güzellik Merkezi'].map((gender) => (
                                                 <label key={gender} className="relative flex items-center justify-center cursor-pointer group">
                                                     <input
@@ -222,7 +222,7 @@ export default function LandingPage() {
                                                             }
                                                         }}
                                                     />
-                                                    <div className="px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold text-slate-400 peer-checked:bg-indigo-500/20 peer-checked:border-indigo-500 peer-checked:text-indigo-400 transition-all select-none group-hover:bg-slate-800">
+                                                    <div className="px-3 py-1.5 sm:px-4 sm:py-2 bg-slate-900 border border-slate-800 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold text-slate-400 peer-checked:bg-indigo-500/20 peer-checked:border-indigo-500 peer-checked:text-indigo-400 transition-all select-none group-hover:bg-slate-800">
                                                         {gender}
                                                     </div>
                                                 </label>
@@ -230,14 +230,14 @@ export default function LandingPage() {
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
                                         <div>
                                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5 ml-1">İl</label>
                                             <input
                                                 type="text"
                                                 value={formData.city}
                                                 onChange={e => setFormData({ ...formData, city: e.target.value })}
-                                                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:border-indigo-500 transition-all outline-none"
+                                                className="w-full bg-slate-900 border border-slate-800 rounded-lg sm:rounded-xl px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base text-white placeholder:text-slate-600 focus:border-indigo-500 transition-all outline-none"
                                                 placeholder="İstanbul"
                                             />
                                         </div>
@@ -247,7 +247,7 @@ export default function LandingPage() {
                                                 type="text"
                                                 value={formData.district}
                                                 onChange={e => setFormData({ ...formData, district: e.target.value })}
-                                                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:border-indigo-500 transition-all outline-none"
+                                                className="w-full bg-slate-900 border border-slate-800 rounded-lg sm:rounded-xl px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base text-white placeholder:text-slate-600 focus:border-indigo-500 transition-all outline-none"
                                                 placeholder="Şişli"
                                             />
                                         </div>
@@ -259,41 +259,41 @@ export default function LandingPage() {
                                             rows={2}
                                             value={formData.address_line}
                                             onChange={e => setFormData({ ...formData, address_line: e.target.value })}
-                                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:border-indigo-500 outline-none resize-none"
+                                            className="w-full bg-slate-900 border border-slate-800 rounded-lg sm:rounded-xl px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base text-white placeholder:text-slate-600 focus:border-indigo-500 outline-none resize-none"
                                             placeholder="Cadde, Sokak, No..."
                                         />
                                     </div>
 
-                                    <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
+                                    <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-3 sm:p-4">
                                         <div className="flex items-center justify-between mb-2">
                                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Harita Konumu</label>
                                             {(formData.latitude && formData.longitude) ? (
-                                                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded">Alındı</span>
+                                                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded">Alındı</span>
                                             ) : (
-                                                <span className="text-[10px] stroke-amber-400 font-black uppercase tracking-widest text-amber-500">Gerekli</span>
+                                                <span className="text-[9px] sm:text-[10px] stroke-amber-400 font-black uppercase tracking-widest text-amber-500">Gerekli</span>
                                             )}
                                         </div>
                                         <button
                                             type="button"
                                             onClick={handleGetLocation}
                                             disabled={locating || (formData.latitude !== null && formData.longitude !== null)}
-                                            className="w-full py-2.5 rounded-lg border border-indigo-500/30 text-indigo-400 hover:bg-indigo-500 hover:text-white text-xs font-black uppercase tracking-widest transition-all focus:outline-none flex items-center justify-center gap-2 disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-indigo-400"
+                                            className="w-full py-2 sm:py-2.5 rounded-lg border border-indigo-500/30 text-indigo-400 hover:bg-indigo-500 hover:text-white text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all focus:outline-none flex items-center justify-center gap-2 disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-indigo-400"
                                         >
-                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                             </svg>
                                             {locating ? 'Konum Aranıyor...' : ((formData.latitude && formData.longitude) ? 'Konum Tanımlandı' : 'Konumu Al (GPS)')}
                                         </button>
-                                        <p className="text-[9px] text-slate-500 font-medium mt-2 text-center">
-                                            Salonunuzun haritada bulunabilmesi için konumunuzu izin vererek onayı tamamlayın.
+                                        <p className="text-[8px] sm:text-[9px] text-slate-500 font-medium mt-1.5 sm:mt-2 text-center leading-tight">
+                                            Haritada bulunabilmek için konum onayı zorunludur.
                                         </p>
                                     </div>
 
                                     <button
                                         type="submit"
                                         disabled={loading || !formData.latitude}
-                                        className="w-full py-4 mt-2 bg-gradient-to-r from-pink-600 to-indigo-600 text-white rounded-xl font-black text-sm uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95 transition-all disabled:opacity-50"
+                                        className="w-full py-3 sm:py-4 mt-1 sm:mt-2 bg-gradient-to-r from-pink-600 to-indigo-600 text-white rounded-xl font-black text-xs sm:text-sm uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95 transition-all disabled:opacity-50"
                                     >
                                         {loading ? 'Gönderiliyor...' : 'Başvuruyu Tamamla'}
                                     </button>
