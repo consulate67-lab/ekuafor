@@ -147,7 +147,7 @@ export default function LandingPage() {
             {isModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl" onClick={() => !loading && setIsModalOpen(false)}></div>
-                    <div className="relative bg-[#0b1120] border border-white/10 w-full max-w-lg rounded-[2.5rem] shadow-2xl p-8 sm:p-10 animate-in zoom-in-95 duration-300">
+                    <div className="relative bg-[#0b1120] border border-white/10 w-full max-w-lg max-h-[95vh] overflow-y-auto scrollbar-hide rounded-[2.5rem] shadow-2xl p-6 sm:p-10 animate-in zoom-in-95 duration-300">
                         {/* Close button */}
                         <button
                             onClick={() => setIsModalOpen(false)}
