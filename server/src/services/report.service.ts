@@ -3,19 +3,24 @@ import pool from '../config/database';
 class ReportService {
     async getEmployeeStats(companyId: number, staffId: number, period: 'today' | 'week' | 'month' | 'year') {
         let dateFilter = '';
+        let dateFilterExp = '';
 
         switch (period) {
             case 'today':
                 dateFilter = "appointment_date = CURRENT_DATE";
+                dateFilterExp = "expense_date = CURRENT_DATE";
                 break;
             case 'week':
                 dateFilter = "appointment_date >= date_trunc('week', CURRENT_DATE)";
+                dateFilterExp = "expense_date >= date_trunc('week', CURRENT_DATE)";
                 break;
             case 'month':
                 dateFilter = "appointment_date >= date_trunc('month', CURRENT_DATE)";
+                dateFilterExp = "expense_date >= date_trunc('month', CURRENT_DATE)";
                 break;
             case 'year':
                 dateFilter = "appointment_date >= date_trunc('year', CURRENT_DATE)";
+                dateFilterExp = "expense_date >= date_trunc('year', CURRENT_DATE)";
                 break;
         }
 
@@ -33,9 +38,20 @@ class ReportService {
 
         const params = staffId ? [companyId, staffId] : [companyId];
         const result = await pool.query(query, params);
+
+        const expQuery = `
+            SELECT SUM(amount) as total_expenses
+            FROM expenses
+            WHERE company_id = $1
+            AND ${dateFilterExp}
+            ${staffId ? 'AND created_by = $2' : ''}
+        `;
+        const expResult = await pool.query(expQuery, params);
+
         return {
             total_appointments: parseInt(result.rows[0].total_appointments) || 0,
-            total_revenue: parseFloat(result.rows[0].total_revenue) || 0
+            total_revenue: parseFloat(result.rows[0].total_revenue) || 0,
+            total_expenses: parseFloat(expResult.rows[0].total_expenses) || 0
         };
     }
 

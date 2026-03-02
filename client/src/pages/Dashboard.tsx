@@ -43,7 +43,8 @@ export default function Dashboard() {
     });
     const [employeeStats, setEmployeeStats] = useState({
         total_appointments: 0,
-        total_revenue: 0
+        total_revenue: 0,
+        total_expenses: 0
     });
     const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'year'>('today');
     const [statsLoading, setStatsLoading] = useState(false);
@@ -56,7 +57,12 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(false);
     const [editableAmount, setEditableAmount] = useState<number>(0);
     const [companyInfo, setCompanyInfo] = useState<any>(null);
-
+    const [showExpenseModal, setShowExpenseModal] = useState(false);
+    const [expenseForm, setExpenseForm] = useState({
+        amount: '',
+        description: '',
+        date: ''
+    });
 
     const getLocalDateString = () => {
         const d = new Date();
@@ -183,6 +189,29 @@ export default function Dashboard() {
             fetchEmployeeStats(selectedPeriod);
         }
     }, [user, selectedPeriod]);
+
+    const handleExpenseSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            const res = await api.post('/expenses', {
+                amount: Number(expenseForm.amount),
+                description: expenseForm.description,
+                date: expenseForm.date || getLocalDateString()
+            });
+            if (res.data.success) {
+                alert('Masraf başarıyla eklendi');
+                setShowExpenseModal(false);
+                setExpenseForm({ amount: '', description: '', date: getLocalDateString() });
+                fetchEmployeeStats(selectedPeriod);
+            }
+        } catch (error) {
+            console.error('Expense add error:', error);
+            alert('Masraf eklenemedi');
+        } finally {
+            setLoading(false);
+        }
+    };
 
 
     const speak = (text: string) => {
@@ -646,21 +675,29 @@ export default function Dashboard() {
                                     ))}
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pb-4">
-                                    <div className="bg-indigo-50/50 p-8 rounded-[2rem] border border-indigo-100 flex flex-col items-center text-center">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pb-4">
+                                    <div className="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100 flex flex-col items-center text-center">
                                         <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm mb-4">
                                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                                         </div>
-                                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Toplam Randevu</p>
+                                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Randevu</p>
                                         <p className={`text-4xl font-black text-indigo-900 ${statsLoading ? 'animate-pulse' : ''}`}>{employeeStats.total_appointments}</p>
                                     </div>
 
-                                    <div className="bg-amber-50/50 p-8 rounded-[2rem] border border-amber-100 flex flex-col items-center text-center">
+                                    <div className="bg-amber-50/50 p-6 rounded-[2rem] border border-amber-100 flex flex-col items-center text-center">
                                         <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-amber-600 shadow-sm mb-4">
                                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3z" /><path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zM7.001 11a1 1 0 011-1h8a1 1 0 110 2h-8a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
                                         </div>
                                         <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1">Toplam Gelir</p>
                                         <p className={`text-4xl font-black text-amber-900 ${statsLoading ? 'animate-pulse' : ''}`}>₺{employeeStats.total_revenue.toLocaleString()}</p>
+                                    </div>
+
+                                    <div className="bg-rose-50/50 p-6 rounded-[2rem] border border-rose-100 flex flex-col items-center text-center">
+                                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-rose-600 shadow-sm mb-4">
+                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>
+                                        </div>
+                                        <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">Gider/Masraf</p>
+                                        <p className={`text-4xl font-black text-rose-900 ${statsLoading ? 'animate-pulse' : ''}`}>₺{employeeStats.total_expenses.toLocaleString()}</p>
                                     </div>
                                 </div>
                             </div>
@@ -689,11 +726,12 @@ export default function Dashboard() {
                     {/* 2. Sesli Randevu */}
                     {(user?.role === 'company_admin' || user?.role === 'staff') && (
                         <button
-                            onClick={startVoiceCommand}
-                            className={`card group hover:scale-[1.02] transition-all duration-300 border-indigo-100 text-left relative overflow-hidden ${isListening ? 'ring-2 ring-indigo-500 ring-offset-2' : ''}`}
+                            disabled
+                            onClick={() => false && startVoiceCommand()}
+                            className={`card group border-indigo-100 text-left relative overflow-hidden opacity-50 cursor-not-allowed`}
                         >
                             <div className="flex items-center gap-5 relative z-10">
-                                <div className="p-4 rounded-2xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
+                                <div className="p-4 rounded-2xl bg-indigo-50 text-indigo-600">
                                     <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m8 0h-8m4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                                     </svg>
@@ -722,6 +760,29 @@ export default function Dashboard() {
                                 <div>
                                     <h3 className="text-xl font-bold text-gray-900 mb-1">Çalışan Raporu</h3>
                                     <p className="text-sm text-gray-500 font-medium leading-relaxed">Kazanç ve randevu istatistiklerini gör.</p>
+                                </div>
+                            </div>
+                        </button>
+                    )}
+
+                    {/* Masraf Girme */}
+                    {(user?.role === 'company_admin' || user?.role === 'staff') && (
+                        <button
+                            onClick={() => {
+                                setExpenseForm(prev => ({ ...prev, date: getLocalDateString() }));
+                                setShowExpenseModal(true);
+                            }}
+                            className="card group hover:scale-[1.02] transition-all duration-300 border-rose-100 text-left"
+                        >
+                            <div className="flex items-center gap-5">
+                                <div className="bg-rose-50 p-4 rounded-2xl group-hover:bg-rose-600 group-hover:text-white transition-colors duration-300">
+                                    <svg className="w-8 h-8 text-rose-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-gray-900 mb-1">Masraf Gir</h3>
+                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Yeni bir gider veya masraf kalemi ekle.</p>
                                 </div>
                             </div>
                         </button>
@@ -810,6 +871,14 @@ export default function Dashboard() {
                                         <span className="text-[9px] font-black text-amber-700 uppercase tracking-widest">Hakediş</span>
                                     </div>
                                 </div>
+
+                                <div className="col-span-1 sm:col-span-2 card group relative overflow-hidden flex flex-col items-center justify-center border-none bg-gradient-to-br from-rose-50/50 to-white hover:shadow-2xl hover:shadow-rose-500/10 transition-all duration-500 py-6">
+                                    <p className="text-[10px] font-bold text-rose-600 uppercase tracking-[0.2em] mb-2 relative z-10">Gider / Masraf Toplamı</p>
+                                    <p className={`text-4xl font-black text-slate-900 tracking-tight relative z-10 ${statsLoading ? 'animate-pulse opacity-50' : ''}`}>
+                                        <span className="text-2xl text-rose-600 mr-1">₺</span>
+                                        {employeeStats.total_expenses.toLocaleString()}
+                                    </p>
+                                </div>
                                 {/* Today's Appointments List for Staff */}
                                 <div className="mt-12 bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/50 border border-slate-100 text-left">
                                     <div className="flex items-center justify-between mb-8">
@@ -890,6 +959,67 @@ export default function Dashboard() {
                     </button>
                 </div>
             </main>
+
+            {/* Expense Modal */}
+            {showExpenseModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !loading && setShowExpenseModal(false)}></div>
+                    <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-rose-50">
+                            <div>
+                                <h3 className="text-xl font-black text-rose-900 uppercase tracking-tight">Yeni Masraf Ekle</h3>
+                                <p className="text-[10px] font-bold text-rose-600 opacity-70 uppercase tracking-widest mt-1">Harcamalarınızı kayıt altına alın</p>
+                            </div>
+                            <button onClick={() => setShowExpenseModal(false)} className="w-8 h-8 bg-white rounded-full flex items-center justify-center text-rose-500 shadow-sm hover:scale-110 transition-transform">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <form onSubmit={handleExpenseSubmit} className="p-8 space-y-5">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-1">Tarih</label>
+                                <input
+                                    type="date"
+                                    required
+                                    value={expenseForm.date}
+                                    onChange={e => setExpenseForm(prev => ({ ...prev, date: e.target.value }))}
+                                    className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-slate-900 font-bold focus:ring-2 focus:ring-rose-500 outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-1">Tutar (₺)</label>
+                                <input
+                                    type="number"
+                                    required
+                                    min="0"
+                                    step="0.01"
+                                    value={expenseForm.amount}
+                                    onChange={e => setExpenseForm(prev => ({ ...prev, amount: e.target.value }))}
+                                    placeholder="0.00"
+                                    className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-slate-900 font-black focus:ring-2 focus:ring-rose-500 outline-none text-2xl"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-1">Açıklama</label>
+                                <textarea
+                                    required
+                                    value={expenseForm.description}
+                                    onChange={e => setExpenseForm(prev => ({ ...prev, description: e.target.value }))}
+                                    placeholder="Masraf detayı..."
+                                    rows={3}
+                                    className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-rose-500 outline-none resize-none"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full py-4 mt-2 bg-rose-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-rose-500/20 hover:bg-rose-600 active:scale-95 transition-all disabled:opacity-50"
+                            >
+                                {loading ? 'Kaydediliyor...' : 'Masrafı Kaydet'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Ses Dinleme Overlay (Yönlendirmeli) */}
             {
