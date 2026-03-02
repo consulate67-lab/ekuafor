@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { useAuthStore } from './store/authStore';
 import api from './lib/api';
@@ -74,7 +74,7 @@ function App() {
 
     return (
         <div className="relative min-h-screen">
-            <Router basename={import.meta.env.BASE_URL}>
+            <Router>
                 <Routes>
                     {/* Public Routes */}
                     <Route
