@@ -60,6 +60,7 @@ export interface Company {
     invoice_prefix?: string | null;
     ubl_incoming_alias?: string | null;
     ubl_outgoing_alias?: string | null;
+    license_end_date?: string | Date | null;
 }
 
 class CompanyService {
@@ -379,9 +380,13 @@ class CompanyService {
      * Firma onayla
      */
     async verifyCompany(id: number): Promise<Company | null> {
+        // İlk onayda bugünden itibaren 90 günlük (3 ay) lisans süresi veriyoruz
+        const licenseEndDate = new Date();
+        licenseEndDate.setDate(licenseEndDate.getDate() + 90);
+
         const result = await pool.query(
-            'UPDATE companies SET is_verified = true, is_active = true WHERE id = $1 RETURNING *',
-            [id]
+            'UPDATE companies SET is_verified = true, is_active = true, license_end_date = $1 WHERE id = $2 RETURNING *',
+            [licenseEndDate, id]
         );
         const company = result.rows[0] || null;
 
@@ -392,22 +397,43 @@ class CompanyService {
                 const defaultServices: any[] = [];
 
                 if (genders.includes('Kadın')) {
-                    defaultServices.push({ name: 'Kadın Saç Kesim', duration: 30, price: 0 });
-                    defaultServices.push({ name: 'Kadın Fön', duration: 30, price: 0 });
+                    defaultServices.push({ name: 'Kadın Saç Kesimi', duration_minutes: 45, price: 0 });
+                    defaultServices.push({ name: 'Fön (Kısa)', duration_minutes: 30, price: 0 });
+                    defaultServices.push({ name: 'Fön (Uzun)', duration_minutes: 45, price: 0 });
+                    defaultServices.push({ name: 'Boya (Dip)', duration_minutes: 60, price: 0 });
+                    defaultServices.push({ name: 'Boya (Tüm)', duration_minutes: 90, price: 0 });
+                    defaultServices.push({ name: 'Manikür', duration_minutes: 30, price: 0 });
+                    defaultServices.push({ name: 'Pedikür', duration_minutes: 45, price: 0 });
+                    defaultServices.push({ name: 'Kaş Alımı', duration_minutes: 15, price: 0 });
                 }
                 if (genders.includes('Erkek')) {
-                    defaultServices.push({ name: 'Erkek Saç Sakal Kesim', duration: 30, price: 0 });
-                    defaultServices.push({ name: 'Sakal Tıraşı', duration: 15, price: 0 });
+                    defaultServices.push({ name: 'Erkek Saç Kesimi', duration_minutes: 30, price: 0 });
+                    defaultServices.push({ name: 'Sakal Tıraşı (Modern)', duration_minutes: 20, price: 0 });
+                    defaultServices.push({ name: 'Sakal Tıraşı (Klasik)', duration_minutes: 15, price: 0 });
+                    defaultServices.push({ name: 'Saç & Sakal Kesimi', duration_minutes: 50, price: 0 });
+                    defaultServices.push({ name: 'Yıkama & Fön', duration_minutes: 15, price: 0 });
+                    defaultServices.push({ name: 'Cilt Bakımı (Express)', duration_minutes: 20, price: 0 });
+                    defaultServices.push({ name: 'Ense Düzeltme', duration_minutes: 10, price: 0 });
                 }
-                if (genders.includes('Unisex')) {
-                    defaultServices.push({ name: 'Cilt Bakımı', duration: 45, price: 0 });
+                if (genders.includes('Çocuk')) {
+                    defaultServices.push({ name: 'Çocuk Saç Kesimi (Erkek)', duration_minutes: 20, price: 0 });
+                    defaultServices.push({ name: 'Çocuk Saç Kesimi (Kız)', duration_minutes: 30, price: 0 });
+                }
+                if (genders.includes('Güzellik Merkezi')) {
+                    defaultServices.push({ name: 'Lazer Epilasyon (Tüm Vücut)', duration_minutes: 90, price: 0 });
+                    defaultServices.push({ name: 'Cilt Bakımı (Profesyonel)', duration_minutes: 60, price: 0 });
+                    defaultServices.push({ name: 'Hydrafacial', duration_minutes: 45, price: 0 });
+                    defaultServices.push({ name: 'Microblading', duration_minutes: 120, price: 0 });
+                    defaultServices.push({ name: 'Dermapen', duration_minutes: 45, price: 0 });
+                    defaultServices.push({ name: 'İpek Kirpik', duration_minutes: 90, price: 0 });
+                    defaultServices.push({ name: 'Vücut Şekillendirme', duration_minutes: 60, price: 0 });
                 }
 
                 if (defaultServices.length > 0) {
                     for (const s of defaultServices) {
                         await pool.query(
-                            'INSERT INTO services (company_id, name, duration, price) VALUES ($1, $2, $3, $4)',
-                            [id, s.name, s.duration, s.price]
+                            'INSERT INTO services (company_id, name, duration_minutes, price) VALUES ($1, $2, $3, $4)',
+                            [id, s.name, s.duration_minutes, s.price]
                         );
                     }
                 }

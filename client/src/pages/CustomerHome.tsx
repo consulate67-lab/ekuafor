@@ -251,22 +251,32 @@ export default function CustomerHome() {
                 setTimeout(() => {
                     const data = res.data.data;
                     if (data.type === 'admin') {
-                        navigate(data.redirect, { replace: true });
-                    } else if (data.type === 'staff') {
-                        // JWT token'ı kaydet ve store'u güncelle - Dashboard'a erişim için
-                        if (data.token) {
-                            setLogin({
-                                id: data.user_id,
-                                email: `${data.board_code}@staff.local`,
-                                first_name: data.staff_name.split(' ')[0],
-                                last_name: data.staff_name.split(' ').slice(1).join(' '),
-                                role: 'company_admin',
-                                company_id: data.company_id,
-                                photo: data.photo
-                            } as any, data.token);
+                        if (data.is_license_expired) {
+                            setCodeError('Lisans süreniz dolmuştur. Lütfen ödeme yapın.');
+                            setCodeResult(null);
+                        } else {
+                            navigate(data.redirect, { replace: true });
                         }
-                        localStorage.setItem('staff_board_code', data.board_code);
-                        navigate('/dashboard', { replace: true });
+                    } else if (data.type === 'staff') {
+                        if (data.is_license_expired) {
+                            setCodeError('Firmanın lisans süresi dolmuştur.');
+                            setCodeResult(null);
+                        } else {
+                            // JWT token'ı kaydet ve store'u güncelle - Dashboard'a erişim için
+                            if (data.token) {
+                                setLogin({
+                                    id: data.user_id,
+                                    email: `${data.board_code}@staff.local`,
+                                    first_name: data.staff_name.split(' ')[0],
+                                    last_name: data.staff_name.split(' ').slice(1).join(' '),
+                                    role: 'company_admin',
+                                    company_id: data.company_id,
+                                    photo: data.photo
+                                } as any, data.token);
+                            }
+                            localStorage.setItem('staff_board_code', data.board_code);
+                            navigate('/dashboard', { replace: true });
+                        }
                     } else if (data.type === 'board') {
                         localStorage.setItem('salon_board_key', data.board_key);
                         navigate(data.redirect, { replace: true });
@@ -458,21 +468,32 @@ export default function CustomerHome() {
                 setCodeResult(res.data.data);
                 setTimeout(() => {
                     const data = res.data.data;
-                    if (data.type === 'admin') navigate(data.redirect, { replace: true });
-                    else if (data.type === 'staff') {
-                        if (data.token) {
-                            setLogin({
-                                id: data.user_id,
-                                email: `${data.board_code}@staff.local`,
-                                first_name: data.staff_name.split(' ')[0],
-                                last_name: data.staff_name.split(' ').slice(1).join(' '),
-                                role: 'company_admin',
-                                company_id: data.company_id,
-                                photo: data.photo
-                            } as any, data.token);
+                    if (data.type === 'admin') {
+                        if (data.is_license_expired) {
+                            setCodeError('Lisans süreniz dolmuştur.');
+                            setCodeResult(null);
+                        } else {
+                            navigate(data.redirect, { replace: true });
                         }
-                        localStorage.setItem('staff_board_code', data.board_code);
-                        navigate('/dashboard', { replace: true });
+                    } else if (data.type === 'staff') {
+                        if (data.is_license_expired) {
+                            setCodeError('Lisans süresi dolmuştur.');
+                            setCodeResult(null);
+                        } else {
+                            if (data.token) {
+                                setLogin({
+                                    id: data.user_id,
+                                    email: `${data.board_code}@staff.local`,
+                                    first_name: data.staff_name.split(' ')[0],
+                                    last_name: data.staff_name.split(' ').slice(1).join(' '),
+                                    role: 'company_admin',
+                                    company_id: data.company_id,
+                                    photo: data.photo
+                                } as any, data.token);
+                            }
+                            localStorage.setItem('staff_board_code', data.board_code);
+                            navigate('/dashboard', { replace: true });
+                        }
                     } else if (data.type === 'board') {
                         localStorage.setItem('salon_board_key', data.board_key);
                         navigate(data.redirect, { replace: true });

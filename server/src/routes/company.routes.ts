@@ -67,6 +67,7 @@ const companySchema = z.object({
     invoice_prefix: z.string().max(3).nullable().optional(),
     ubl_incoming_alias: nullableString,
     ubl_outgoing_alias: nullableString,
+    license_end_date: z.any().nullable().optional(),
 });
 
 /**
@@ -384,9 +385,14 @@ router.post('/board-login', async (req: Request, res: Response) => {
             return res.status(401).json({ success: false, error: 'Geçersiz Board Key' });
         }
 
+        const isLicenseExpired = company.license_end_date && new Date(company.license_end_date) < new Date();
+
         res.json({
             success: true,
-            data: company
+            data: {
+                ...company,
+                is_license_expired: isLicenseExpired
+            }
         });
     } catch (error) {
         res.status(500).json({
@@ -423,11 +429,14 @@ router.post('/admin-login', async (req: Request, res: Response) => {
             { expiresIn: '7d' }
         );
 
+        const isLicenseExpired = company.license_end_date && new Date(company.license_end_date) < new Date();
+
         res.json({
             success: true,
             data: {
                 company: company,
-                token: token
+                token: token,
+                is_license_expired: isLicenseExpired
             }
         });
     } catch (error) {
@@ -561,11 +570,14 @@ router.post('/staff-login', async (req: Request, res: Response) => {
             return res.status(404).json({ success: false, error: 'Firma bulunamadı' });
         }
 
+        const isLicenseExpired = companyResult.rows[0].license_end_date && new Date(companyResult.rows[0].license_end_date) < new Date();
+
         res.json({
             success: true,
             data: {
                 user: user,
-                company: companyResult.rows[0]
+                company: companyResult.rows[0],
+                is_license_expired: isLicenseExpired
             }
         });
     } catch (error) {
@@ -600,21 +612,25 @@ router.post('/check-code', async (req: Request, res: Response) => {
         }
 
         // Önce admin_key mi kontrol et
-        const adminResult = await pool.query('SELECT id, name, admin_key FROM companies WHERE UPPER(admin_key) = UPPER($1)', [code]);
+        const adminResult = await pool.query('SELECT id, name, admin_key, license_end_date FROM companies WHERE UPPER(admin_key) = UPPER($1)', [code]);
         if (adminResult.rows.length > 0) {
+            const comp = adminResult.rows[0];
+            const isLicenseExpired = comp.license_end_date && new Date(comp.license_end_date) < new Date();
+
             return res.json({
                 success: true,
                 data: {
                     type: 'admin',
-                    redirect: `/company-panel?key=${adminResult.rows[0].admin_key}`,
-                    company_name: adminResult.rows[0].name
+                    redirect: `/company-panel?key=${comp.admin_key}`,
+                    company_name: comp.name,
+                    is_license_expired: isLicenseExpired
                 }
             });
         }
 
         // Sonra board_code mu kontrol et
         const staffResult = await pool.query(
-            `SELECT u.id, u.first_name, u.last_name, u.board_code, u.company_id, u.photo, c.name as company_name
+            `SELECT u.id, u.first_name, u.last_name, u.board_code, u.company_id, u.photo, c.name as company_name, c.license_end_date
              FROM users u
              JOIN companies c ON u.company_id = c.id
              WHERE UPPER(u.board_code) = UPPER($1)`,
@@ -622,6 +638,7 @@ router.post('/check-code', async (req: Request, res: Response) => {
         );
         if (staffResult.rows.length > 0) {
             const sr = staffResult.rows[0];
+            const isLicenseExpired = sr.license_end_date && new Date(sr.license_end_date) < new Date();
 
             // JWT token oluştur - personel dashboard'a erişsin
             const token = jwt.sign(
@@ -641,7 +658,8 @@ router.post('/check-code', async (req: Request, res: Response) => {
                     company_id: sr.company_id,
                     user_id: sr.id,
                     photo: sr.photo,
-                    token: token
+                    token: token,
+                    is_license_expired: isLicenseExpired
                 }
             });
         }

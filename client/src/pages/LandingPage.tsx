@@ -208,7 +208,7 @@ export default function LandingPage() {
                                     <div>
                                         <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">Hizmet Verilen Müşteri Tipi (Cinsiyet)</label>
                                         <div className="flex flex-wrap gap-3">
-                                            {['Kadın', 'Erkek', 'Unisex'].map((gender) => (
+                                            {['Kadın', 'Erkek', 'Çocuk', 'Güzellik Merkezi'].map((gender) => (
                                                 <label key={gender} className="relative flex items-center justify-center cursor-pointer group">
                                                     <input
                                                         type="checkbox"

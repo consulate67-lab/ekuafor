@@ -187,6 +187,22 @@ export default function CompanyPanel() {
     const [geoDistricts, setGeoDistricts] = useState<any[]>([]);
     const [geoNeighborhoods, setGeoNeighborhoods] = useState<any[]>([]);
     const [loadingGeo, setLoadingGeo] = useState({ provinces: false, districts: false, neighborhoods: false });
+    const [isLicenseExpired, setIsLicenseExpired] = useState(false);
+    const [renewingLicense, setRenewingLicense] = useState(false);
+
+    const handleRenewLicense = async () => {
+        try {
+            setRenewingLicense(true);
+            const res = await api.post('/payments/license/initialize', { months: 12 });
+            if (res.data.success && res.data.data.paymentPageUrl) {
+                window.location.href = res.data.data.paymentPageUrl;
+            }
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Ödeme başlatılamadı');
+        } finally {
+            setRenewingLicense(false);
+        }
+    };
 
     const handleLogin = async (keyToUse?: string) => {
         const key = keyToUse || inputKey.trim();
@@ -195,20 +211,21 @@ export default function CompanyPanel() {
         setError('');
         try {
             const res = await api.post('/companies/admin-login', { admin_key: key });
-            if (res.data?.success && res.data.data) {
-                const { company: comp, token } = res.data.data;
-                setCompany(comp);
-                localStorage.setItem('company_admin_key', key);
-                if (token) {
-                    localStorage.setItem('token', token);
-                }
-                setInputKey(key);
-                fetchData(comp.id);
-
-                // Load AI rules from localStorage for specific company
-                const savedRules = localStorage.getItem(`ai_rules_${comp.id}`);
-                setAiRules(savedRules || 'Varsayılan randevu kuralları aktiftir.');
+            const { company: comp, token, is_license_expired } = res.data.data;
+            setCompany(comp);
+            setIsLicenseExpired(!!is_license_expired);
+            localStorage.setItem('company_admin_key', key);
+            if (token) {
+                localStorage.setItem('token', token);
             }
+            setInputKey(key);
+            if (!is_license_expired) {
+                fetchData(comp.id);
+            }
+
+            // Load AI rules from localStorage for specific company
+            const savedRules = localStorage.getItem(`ai_rules_${comp.id}`);
+            setAiRules(savedRules || 'Varsayılan randevu kuralları aktiftir.');
         } catch (err: any) {
             setError(err.response?.data?.error || 'Geçersiz anahtar');
         } finally {
@@ -1158,6 +1175,51 @@ export default function CompanyPanel() {
                     {/* HOME TAB */}
                     {activeTab === 'home' && (
                         <div className="space-y-6">
+                            {isLicenseExpired && (
+                                <div className="bg-rose-50 border-2 border-rose-100 p-6 rounded-[2.5rem] flex flex-col md:flex-row items-center gap-6 shadow-xl shadow-rose-200/20">
+                                    <div className="w-16 h-16 bg-rose-500 rounded-3xl flex items-center justify-center text-3xl shadow-lg shadow-rose-500/20 flex-shrink-0 animate-bounce">
+                                        💳
+                                    </div>
+                                    <div className="flex-1 text-center md:text-left">
+                                        <h3 className="text-xl font-black text-rose-900 uppercase tracking-tighter">Lisans Süreniz Doldu</h3>
+                                        <p className="text-sm text-rose-600 font-bold mt-1 uppercase tracking-widest opacity-70">İşlemlere devam etmek için ödeme yapmanız gerekmektedir.</p>
+                                    </div>
+                                    <button
+                                        onClick={handleRenewLicense}
+                                        disabled={renewingLicense}
+                                        className="px-10 py-5 bg-rose-500 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-500/30 active:scale-95 transition-all disabled:opacity-50"
+                                    >
+                                        {renewingLicense ? 'Bekleyiniz...' : 'ÖDEME YAP'}
+                                    </button>
+                                </div>
+                            )}
+
+                            {!isLicenseExpired && company.license_end_date && (() => {
+                                const diff = new Date(company.license_end_date).getTime() - new Date().getTime();
+                                const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+                                if (days <= 15) {
+                                    return (
+                                        <div className="bg-amber-50 border-2 border-amber-100 p-6 rounded-[2.5rem] flex flex-col md:flex-row items-center gap-6 shadow-xl shadow-amber-200/20">
+                                            <div className="w-16 h-16 bg-amber-500 rounded-3xl flex items-center justify-center text-3xl shadow-lg shadow-amber-500/20 flex-shrink-0">
+                                                ⚠️
+                                            </div>
+                                            <div className="flex-1 text-center md:text-left">
+                                                <h3 className="text-xl font-black text-amber-900 uppercase tracking-tighter">Lisans Süresi Yaklaşıyor</h3>
+                                                <p className="text-sm text-amber-600 font-bold mt-1 uppercase tracking-widest opacity-70">Lisansınızın bitmesine {days} gün kaldı.</p>
+                                            </div>
+                                            <button
+                                                onClick={handleRenewLicense}
+                                                disabled={renewingLicense}
+                                                className="px-10 py-5 bg-amber-500 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-500/30 active:scale-95 transition-all disabled:opacity-50"
+                                            >
+                                                {renewingLicense ? 'Bekleyiniz...' : 'YENİLE'}
+                                            </button>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
+
                             {/* Welcome Card */}
                             <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl p-7 text-white relative overflow-hidden shadow-2xl shadow-indigo-200">
                                 <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>

@@ -58,11 +58,27 @@ export default function Dashboard() {
     const [editableAmount, setEditableAmount] = useState<number>(0);
     const [companyInfo, setCompanyInfo] = useState<any>(null);
     const [showExpenseModal, setShowExpenseModal] = useState(false);
+    const [isLicenseExpired, setIsLicenseExpired] = useState(false);
     const [expenseForm, setExpenseForm] = useState({
         amount: '',
         description: '',
         date: ''
     });
+    const [renewingLicense, setRenewingLicense] = useState(false);
+
+    const handleRenewLicense = async () => {
+        try {
+            setRenewingLicense(true);
+            const res = await api.post('/payments/license/initialize', { months: 12 });
+            if (res.data.success && res.data.data.paymentPageUrl) {
+                window.location.href = res.data.data.paymentPageUrl;
+            }
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Ödeme başlatılamadı');
+        } finally {
+            setRenewingLicense(false);
+        }
+    };
 
     const getLocalDateString = () => {
         const d = new Date();
@@ -156,7 +172,12 @@ export default function Dashboard() {
                     // Fetch company details for commission rates
                     try {
                         const compRes = await api.get(`/companies/${user.company_id}`);
-                        setCompanyInfo(compRes.data?.data);
+                        const comp = compRes.data?.data;
+                        setCompanyInfo(comp);
+                        if (comp?.license_end_date) {
+                            const isExpired = new Date(comp.license_end_date) < new Date();
+                            setIsLicenseExpired(isExpired);
+                        }
                     } catch (e) {
                         console.warn('Company info fetch failed', e);
                     }
@@ -506,204 +527,249 @@ export default function Dashboard() {
                             {user?.first_name?.[0]}-{user?.last_name?.[0]}
                         </div>
                     )}
-                    <div>
-                        <h2 className="text-xl font-black text-gray-900 mb-1">Merhaba, {user?.first_name}! 👋</h2>
-                        <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest leading-loose">
-                            {user?.role === 'super_admin' ? 'Saloon Sistem Yönetim Paneline Hoş Geldiniz' : 'İşletmenizi yönetmek için ihtiyacınız olan her şey burada.'}
-                        </p>
-                    </div>
                 </div>
 
+                {
+                    isLicenseExpired && (
+                        <div className="mb-10 bg-rose-50 border-2 border-rose-100 p-6 rounded-[2.5rem] flex flex-col md:flex-row items-center gap-6 shadow-xl shadow-rose-200/20">
+                            <div className="w-16 h-16 bg-rose-500 rounded-3xl flex items-center justify-center text-3xl shadow-lg shadow-rose-500/20 flex-shrink-0 animate-bounce">
+                                💳
+                            </div>
+                            <div className="flex-1 text-center md:text-left">
+                                <h3 className="text-xl font-black text-rose-900 uppercase tracking-tighter">İşletme Lisans Süresi Doldu</h3>
+                                <p className="text-sm text-rose-600 font-bold mt-1 uppercase tracking-widest opacity-70">Sistemi kullanmaya devam etmek için işletme yöneticisinin ödeme yapması gerekmektedir.</p>
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <button
+                                    onClick={handleRenewLicense}
+                                    disabled={renewingLicense}
+                                    className="px-8 py-4 bg-rose-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-rose-200 hover:bg-rose-700 transition-all disabled:opacity-50"
+                                >
+                                    {renewingLicense ? 'Bekleyiniz...' : 'Lisansı Yenile'}
+                                </button>
+                                <div className="px-6 py-2 bg-rose-100 text-rose-600 rounded-xl font-black text-[9px] uppercase tracking-widest text-center">
+                                    ERİŞİM KISITLANDI
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
+
+                {
+                    !isLicenseExpired && companyInfo?.license_end_date && (() => {
+                        const diff = new Date(companyInfo.license_end_date).getTime() - new Date().getTime();
+                        const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+                        if (days <= 15) {
+                            return (
+                                <div className="mb-10 bg-amber-50 border-2 border-amber-100 p-6 rounded-[2.5rem] flex flex-col md:flex-row items-center gap-6 shadow-xl shadow-amber-200/20">
+                                    <div className="w-16 h-16 bg-amber-500 rounded-3xl flex items-center justify-center text-3xl shadow-lg shadow-amber-500/20 flex-shrink-0">
+                                        ⚠️
+                                    </div>
+                                    <div className="flex-1 text-center md:text-left">
+                                        <h3 className="text-xl font-black text-amber-900 uppercase tracking-tighter">Lisans Süresi Yaklaşıyor</h3>
+                                        <p className="text-sm text-amber-600 font-bold mt-1 uppercase tracking-widest opacity-70">İşletme lisansının bitmesine {days} gün kaldı. Lütfen yöneticinize bildirin.</p>
+                                    </div>
+                                </div>
+                            );
+                        }
+                        return null;
+                    })()
+                }
+
                 {/* Admin Quick Search & Actions (Super Admin Only) */}
-                {user?.role === 'super_admin' && (
-                    <>
-                        <div className="card bg-slate-900 border-none shadow-2xl mb-12 overflow-hidden relative group">
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl group-hover:bg-indigo-500/20 transition-all duration-700"></div>
-                            <div className="relative z-10 flex flex-col lg:flex-row gap-10 items-center justify-between">
-                                <div className="space-y-6 max-w-xl">
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(99,102,241,0.8)]"></span>
-                                            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">{user?.email}</span>
+                {
+                    user?.role === 'super_admin' && (
+                        <>
+                            <div className="card bg-slate-900 border-none shadow-2xl mb-12 overflow-hidden relative group">
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl group-hover:bg-indigo-500/20 transition-all duration-700"></div>
+                                <div className="relative z-10 flex flex-col lg:flex-row gap-10 items-center justify-between">
+                                    <div className="space-y-6 max-w-xl">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(99,102,241,0.8)]"></span>
+                                                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">{user?.email}</span>
+                                            </div>
+                                            <h1 className="text-4xl font-black text-white leading-tight">
+                                                Firma Yönetim <span className="text-indigo-400">Merkezi</span>
+                                            </h1>
                                         </div>
-                                        <h1 className="text-4xl font-black text-white leading-tight">
-                                            Firma Yönetim <span className="text-indigo-400">Merkezi</span>
-                                        </h1>
+                                        <p className="text-slate-400 text-sm font-medium leading-relaxed">
+                                            Sisteme yeni salonlar tanımlayabilir, mevcut işletmelerin bilgilerini (isim, adres, telefon) güncelleyebilir ve şube yapılarını yönetebilirsiniz.
+                                        </p>
+                                        <div className="flex flex-wrap gap-4 pt-2">
+                                            <Link to="/companies/new" className="bg-indigo-500 hover:bg-indigo-600 text-white px-10 py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest transition-all shadow-2xl shadow-indigo-500/20 active:scale-95 flex items-center gap-3">
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
+                                                YENİ FİRMA TANIMLA
+                                            </Link>
+                                            <Link to="/companies" className="bg-white/10 hover:bg-white/20 text-white px-10 py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest transition-all border border-white/10 active:scale-95">
+                                                FİRMALARI YÖNET
+                                            </Link>
+                                        </div>
                                     </div>
-                                    <p className="text-slate-400 text-sm font-medium leading-relaxed">
-                                        Sisteme yeni salonlar tanımlayabilir, mevcut işletmelerin bilgilerini (isim, adres, telefon) güncelleyebilir ve şube yapılarını yönetebilirsiniz.
-                                    </p>
-                                    <div className="flex flex-wrap gap-4 pt-2">
-                                        <Link to="/companies/new" className="bg-indigo-500 hover:bg-indigo-600 text-white px-10 py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest transition-all shadow-2xl shadow-indigo-500/20 active:scale-95 flex items-center gap-3">
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
-                                            YENİ FİRMA TANIMLA
+
+                                    <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
+                                        <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/5 flex-1 lg:min-w-[150px] text-center group/item hover:bg-white/10 transition-colors">
+                                            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2 opacity-60">TOPLAM FİRMA</p>
+                                            <p className="text-5xl font-black text-white tracking-tighter group-hover/item:scale-110 transition-transform duration-500">{stats.companyCount}</p>
+                                        </div>
+                                        <Link to="/main-management" className="bg-emerald-500/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-emerald-500/10 flex-1 lg:min-w-[150px] text-center group/item hover:bg-emerald-500/20 transition-all">
+                                            <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-2 opacity-60">ÜST YÖNETİM</p>
+                                            <div className="flex items-center justify-center gap-2">
+                                                <svg className="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944" /></svg>
+                                                <span className="text-lg font-black text-white uppercase">YÖNET</span>
+                                            </div>
                                         </Link>
-                                        <Link to="/companies" className="bg-white/10 hover:bg-white/20 text-white px-10 py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest transition-all border border-white/10 active:scale-95">
-                                            FİRMALARI YÖNET
+                                        <Link to="/sms-settings" className="bg-indigo-500/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-indigo-500/10 flex-1 lg:min-w-[150px] text-center group/item hover:bg-indigo-500/20 transition-all">
+                                            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2 opacity-60">SMS / OTP</p>
+                                            <div className="flex items-center justify-center gap-2">
+                                                <svg className="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                                                <span className="text-lg font-black text-white uppercase">AYARLA</span>
+                                            </div>
                                         </Link>
                                     </div>
                                 </div>
+                            </div>
 
-                                <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
-                                    <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/5 flex-1 lg:min-w-[150px] text-center group/item hover:bg-white/10 transition-colors">
-                                        <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2 opacity-60">TOPLAM FİRMA</p>
-                                        <p className="text-5xl font-black text-white tracking-tighter group-hover/item:scale-110 transition-transform duration-500">{stats.companyCount}</p>
+                            {/* TÜRKİYE HARİTASI VE ŞEHİR DAĞILIMI */}
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+                                {/* Harita */}
+                                <div className="lg:col-span-2 bg-white rounded-[3rem] p-8 shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden relative">
+                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-6 flex items-center gap-2">
+                                        <span className="text-2xl">🇹🇷</span> Firma Dağılım Haritası
+                                    </h3>
+                                    <div className="h-[500px] w-full rounded-3xl overflow-hidden shadow-inner border border-slate-50">
+                                        <MapContainer
+                                            center={[38.9637, 35.2433] as any}
+                                            zoom={6}
+                                            style={{ height: '100%', width: '100%' }}
+                                            scrollWheelZoom={false}
+                                        >
+                                            <TileLayer
+                                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                            />
+                                            {allCompanies.filter(c => c.latitude && c.longitude).map(c => (
+                                                <Marker key={c.id} position={[Number(c.latitude), Number(c.longitude)] as any}>
+                                                    <Popup>
+                                                        <div className="p-1">
+                                                            <p className="font-black text-indigo-950 text-sm mb-0.5">{c.name}</p>
+                                                            <p className="text-[10px] font-bold text-slate-400 uppercase">{c.city || 'Belirsiz Şehir'}</p>
+                                                            <Link to={`/companies/${c.id}`} className="text-[9px] text-indigo-500 font-bold hover:underline mt-2 block">DETAYLARI GÖR</Link>
+                                                        </div>
+                                                    </Popup>
+                                                </Marker>
+                                            ))}
+                                        </MapContainer>
                                     </div>
-                                    <Link to="/main-management" className="bg-emerald-500/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-emerald-500/10 flex-1 lg:min-w-[150px] text-center group/item hover:bg-emerald-500/20 transition-all">
-                                        <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-2 opacity-60">ÜST YÖNETİM</p>
-                                        <div className="flex items-center justify-center gap-2">
-                                            <svg className="w-6 h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944" /></svg>
-                                            <span className="text-lg font-black text-white uppercase">YÖNET</span>
-                                        </div>
-                                    </Link>
-                                    <Link to="/sms-settings" className="bg-indigo-500/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-indigo-500/10 flex-1 lg:min-w-[150px] text-center group/item hover:bg-indigo-500/20 transition-all">
-                                        <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2 opacity-60">SMS / OTP</p>
-                                        <div className="flex items-center justify-center gap-2">
-                                            <svg className="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-                                            <span className="text-lg font-black text-white uppercase">AYARLA</span>
-                                        </div>
-                                    </Link>
                                 </div>
-                            </div>
-                        </div>
 
-                        {/* TÜRKİYE HARİTASI VE ŞEHİR DAĞILIMI */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
-                            {/* Harita */}
-                            <div className="lg:col-span-2 bg-white rounded-[3rem] p-8 shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden relative">
-                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-6 flex items-center gap-2">
-                                    <span className="text-2xl">🇹🇷</span> Firma Dağılım Haritası
-                                </h3>
-                                <div className="h-[500px] w-full rounded-3xl overflow-hidden shadow-inner border border-slate-50">
-                                    <MapContainer
-                                        center={[38.9637, 35.2433] as any}
-                                        zoom={6}
-                                        style={{ height: '100%', width: '100%' }}
-                                        scrollWheelZoom={false}
-                                    >
-                                        <TileLayer
-                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                                        />
-                                        {allCompanies.filter(c => c.latitude && c.longitude).map(c => (
-                                            <Marker key={c.id} position={[Number(c.latitude), Number(c.longitude)] as any}>
-                                                <Popup>
-                                                    <div className="p-1">
-                                                        <p className="font-black text-indigo-950 text-sm mb-0.5">{c.name}</p>
-                                                        <p className="text-[10px] font-bold text-slate-400 uppercase">{c.city || 'Belirsiz Şehir'}</p>
-                                                        <Link to={`/companies/${c.id}`} className="text-[9px] text-indigo-500 font-bold hover:underline mt-2 block">DETAYLARI GÖR</Link>
-                                                    </div>
-                                                </Popup>
-                                            </Marker>
-                                        ))}
-                                    </MapContainer>
+                                {/* Şehir Listesi */}
+                                <div className="bg-white rounded-[3rem] p-8 shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col">
+                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-6">Şehir Bazlı Kayıtlar</h3>
+                                    <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1 max-h-[500px]">
+                                        <table className="w-full text-left">
+                                            <thead>
+                                                <tr className="border-b border-slate-100">
+                                                    <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Şehir</th>
+                                                    <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right pr-2">Kayıtlı Firma</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-50">
+                                                {Object.entries(
+                                                    allCompanies.reduce((acc: any, c) => {
+                                                        const city = c.city || 'Belirtilmemiş';
+                                                        acc[city] = (acc[city] || 0) + 1;
+                                                        return acc;
+                                                    }, {})
+                                                )
+                                                    .sort((a: any, b: any) => b[1] - a[1])
+                                                    .map(([city, count]: [string, any]) => (
+                                                        <tr key={city} className="hover:bg-slate-50 transition-colors group">
+                                                            <td className="py-4 pl-2">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full group-hover:scale-150 transition-transform"></div>
+                                                                    <span className="text-sm font-bold text-slate-700">{city}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-4 text-right pr-2">
+                                                                <span className="bg-indigo-50 px-4 py-1.5 rounded-full text-xs font-black text-indigo-700">
+                                                                    {count}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
-
-                            {/* Şehir Listesi */}
-                            <div className="bg-white rounded-[3rem] p-8 shadow-xl shadow-slate-200/50 border border-slate-100 flex flex-col">
-                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-6">Şehir Bazlı Kayıtlar</h3>
-                                <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1 max-h-[500px]">
-                                    <table className="w-full text-left">
-                                        <thead>
-                                            <tr className="border-b border-slate-100">
-                                                <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Şehir</th>
-                                                <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right pr-2">Kayıtlı Firma</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-50">
-                                            {Object.entries(
-                                                allCompanies.reduce((acc: any, c) => {
-                                                    const city = c.city || 'Belirtilmemiş';
-                                                    acc[city] = (acc[city] || 0) + 1;
-                                                    return acc;
-                                                }, {})
-                                            )
-                                                .sort((a: any, b: any) => b[1] - a[1])
-                                                .map(([city, count]: [string, any]) => (
-                                                    <tr key={city} className="hover:bg-slate-50 transition-colors group">
-                                                        <td className="py-4 pl-2">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full group-hover:scale-150 transition-transform"></div>
-                                                                <span className="text-sm font-bold text-slate-700">{city}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-4 text-right pr-2">
-                                                            <span className="bg-indigo-50 px-4 py-1.5 rounded-full text-xs font-black text-indigo-700">
-                                                                {count}
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </>
-                )}
+                        </>
+                    )
+                }
 
                 {/* Raporlama Bölümü - Modal Olarak Güncellendi */}
-                {showReports && (user?.role === 'staff' || user?.role === 'company_admin') && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
-                        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowReports(false)}></div>
+                {
+                    showReports && (user?.role === 'staff' || user?.role === 'company_admin') && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+                            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowReports(false)}></div>
 
-                        <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
-                            <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
-                                <div>
-                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Çalışan Raporu</h3>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">İstatistiki veriler ve kazanç özeti</p>
-                                </div>
-                                <button onClick={() => setShowReports(false)} className="p-2 bg-white rounded-full shadow-sm text-slate-400 hover:text-slate-600">
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
-                            </div>
-
-                            <div className="p-8 space-y-8">
-                                <div className="flex bg-slate-100 p-1 rounded-2xl w-fit mx-auto">
-                                    {(['today', 'week', 'month', 'year'] as const).map((p) => (
-                                        <button
-                                            key={p}
-                                            onClick={() => setSelectedPeriod(p)}
-                                            className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${selectedPeriod === p
-                                                ? 'bg-white text-slate-900 shadow-sm'
-                                                : 'text-gray-400 hover:text-slate-600'
-                                                }`}
-                                        >
-                                            {p === 'today' ? 'Bugün' : p === 'week' ? 'Hafta' : p === 'month' ? 'Ay' : 'Yıl'}
-                                        </button>
-                                    ))}
+                            <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+                                <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                                    <div>
+                                        <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Çalışan Raporu</h3>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">İstatistiki veriler ve kazanç özeti</p>
+                                    </div>
+                                    <button onClick={() => setShowReports(false)} className="p-2 bg-white rounded-full shadow-sm text-slate-400 hover:text-slate-600">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pb-4">
-                                    <div className="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100 flex flex-col items-center text-center">
-                                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm mb-4">
-                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                        </div>
-                                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Randevu</p>
-                                        <p className={`text-4xl font-black text-indigo-900 ${statsLoading ? 'animate-pulse' : ''}`}>{employeeStats.total_appointments}</p>
+                                <div className="p-8 space-y-8">
+                                    <div className="flex bg-slate-100 p-1 rounded-2xl w-fit mx-auto">
+                                        {(['today', 'week', 'month', 'year'] as const).map((p) => (
+                                            <button
+                                                key={p}
+                                                onClick={() => setSelectedPeriod(p)}
+                                                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${selectedPeriod === p
+                                                    ? 'bg-white text-slate-900 shadow-sm'
+                                                    : 'text-gray-400 hover:text-slate-600'
+                                                    }`}
+                                            >
+                                                {p === 'today' ? 'Bugün' : p === 'week' ? 'Hafta' : p === 'month' ? 'Ay' : 'Yıl'}
+                                            </button>
+                                        ))}
                                     </div>
 
-                                    <div className="bg-amber-50/50 p-6 rounded-[2rem] border border-amber-100 flex flex-col items-center text-center">
-                                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-amber-600 shadow-sm mb-4">
-                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3z" /><path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zM7.001 11a1 1 0 011-1h8a1 1 0 110 2h-8a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pb-4">
+                                        <div className="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100 flex flex-col items-center text-center">
+                                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm mb-4">
+                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                            </div>
+                                            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Randevu</p>
+                                            <p className={`text-4xl font-black text-indigo-900 ${statsLoading ? 'animate-pulse' : ''}`}>{employeeStats.total_appointments}</p>
                                         </div>
-                                        <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1">Toplam Gelir</p>
-                                        <p className={`text-4xl font-black text-amber-900 ${statsLoading ? 'animate-pulse' : ''}`}>₺{employeeStats.total_revenue.toLocaleString()}</p>
-                                    </div>
 
-                                    <div className="bg-rose-50/50 p-6 rounded-[2rem] border border-rose-100 flex flex-col items-center text-center">
-                                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-rose-600 shadow-sm mb-4">
-                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>
+                                        <div className="bg-amber-50/50 p-6 rounded-[2rem] border border-amber-100 flex flex-col items-center text-center">
+                                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-amber-600 shadow-sm mb-4">
+                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3z" /><path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zM7.001 11a1 1 0 011-1h8a1 1 0 110 2h-8a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
+                                            </div>
+                                            <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1">Toplam Gelir</p>
+                                            <p className={`text-4xl font-black text-amber-900 ${statsLoading ? 'animate-pulse' : ''}`}>₺{employeeStats.total_revenue.toLocaleString()}</p>
                                         </div>
-                                        <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">Gider/Masraf</p>
-                                        <p className={`text-4xl font-black text-rose-900 ${statsLoading ? 'animate-pulse' : ''}`}>₺{employeeStats.total_expenses.toLocaleString()}</p>
+
+                                        <div className="bg-rose-50/50 p-6 rounded-[2rem] border border-rose-100 flex flex-col items-center text-center">
+                                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-rose-600 shadow-sm mb-4">
+                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>
+                                            </div>
+                                            <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">Gider/Masraf</p>
+                                            <p className={`text-4xl font-black text-rose-900 ${statsLoading ? 'animate-pulse' : ''}`}>₺{employeeStats.total_expenses.toLocaleString()}</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )
+                }
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {/* 1. Randevu Yönetimi */}
@@ -726,12 +792,12 @@ export default function Dashboard() {
                     {/* 2. Sesli Randevu */}
                     {(user?.role === 'company_admin' || user?.role === 'staff') && (
                         <button
-                            disabled
-                            onClick={() => false && startVoiceCommand()}
-                            className={`card group border-indigo-100 text-left relative overflow-hidden opacity-50 cursor-not-allowed`}
+                            disabled={isLicenseExpired}
+                            onClick={() => !isLicenseExpired && startVoiceCommand()}
+                            className={`card group border-indigo-100 text-left relative overflow-hidden ${isLicenseExpired ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02] transition-all duration-300'}`}
                         >
                             <div className="flex items-center gap-5 relative z-10">
-                                <div className="p-4 rounded-2xl bg-indigo-50 text-indigo-600">
+                                <div className="p-4 rounded-2xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
                                     <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m8 0h-8m4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                                     </svg>
@@ -748,8 +814,9 @@ export default function Dashboard() {
                     {/* 4. Çalışan Raporu */}
                     {(user?.role === 'company_admin' || user?.role === 'staff') && (
                         <button
-                            onClick={() => setShowReports(true)}
-                            className="card group hover:scale-[1.02] transition-all duration-300 border-amber-100 text-left"
+                            disabled={isLicenseExpired}
+                            onClick={() => !isLicenseExpired && setShowReports(true)}
+                            className={`card group border-amber-100 text-left ${isLicenseExpired ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02] transition-all duration-300'}`}
                         >
                             <div className="flex items-center gap-5">
                                 <div className="bg-amber-50 p-4 rounded-2xl group-hover:bg-amber-600 group-hover:text-white transition-colors duration-300">
@@ -768,11 +835,13 @@ export default function Dashboard() {
                     {/* Masraf Girme */}
                     {(user?.role === 'company_admin' || user?.role === 'staff') && (
                         <button
+                            disabled={isLicenseExpired}
                             onClick={() => {
+                                if (isLicenseExpired) return;
                                 setExpenseForm(prev => ({ ...prev, date: getLocalDateString() }));
                                 setShowExpenseModal(true);
                             }}
-                            className="card group hover:scale-[1.02] transition-all duration-300 border-rose-100 text-left"
+                            className={`card group border-rose-100 text-left ${isLicenseExpired ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02] transition-all duration-300'}`}
                         >
                             <div className="flex items-center gap-5">
                                 <div className="bg-rose-50 p-4 rounded-2xl group-hover:bg-rose-600 group-hover:text-white transition-colors duration-300">
@@ -958,68 +1027,70 @@ export default function Dashboard() {
                         Sistemi Sıfırla
                     </button>
                 </div>
-            </main>
+            </main >
 
             {/* Expense Modal */}
-            {showExpenseModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !loading && setShowExpenseModal(false)}></div>
-                    <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-rose-50">
-                            <div>
-                                <h3 className="text-xl font-black text-rose-900 uppercase tracking-tight">Yeni Masraf Ekle</h3>
-                                <p className="text-[10px] font-bold text-rose-600 opacity-70 uppercase tracking-widest mt-1">Harcamalarınızı kayıt altına alın</p>
+            {
+                showExpenseModal && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !loading && setShowExpenseModal(false)}></div>
+                        <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+                            <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-rose-50">
+                                <div>
+                                    <h3 className="text-xl font-black text-rose-900 uppercase tracking-tight">Yeni Masraf Ekle</h3>
+                                    <p className="text-[10px] font-bold text-rose-600 opacity-70 uppercase tracking-widest mt-1">Harcamalarınızı kayıt altına alın</p>
+                                </div>
+                                <button onClick={() => setShowExpenseModal(false)} className="w-8 h-8 bg-white rounded-full flex items-center justify-center text-rose-500 shadow-sm hover:scale-110 transition-transform">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
                             </div>
-                            <button onClick={() => setShowExpenseModal(false)} className="w-8 h-8 bg-white rounded-full flex items-center justify-center text-rose-500 shadow-sm hover:scale-110 transition-transform">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
+                            <form onSubmit={handleExpenseSubmit} className="p-8 space-y-5">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-1">Tarih</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={expenseForm.date}
+                                        onChange={e => setExpenseForm(prev => ({ ...prev, date: e.target.value }))}
+                                        className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-slate-900 font-bold focus:ring-2 focus:ring-rose-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-1">Tutar (₺)</label>
+                                    <input
+                                        type="number"
+                                        required
+                                        min="0"
+                                        step="0.01"
+                                        value={expenseForm.amount}
+                                        onChange={e => setExpenseForm(prev => ({ ...prev, amount: e.target.value }))}
+                                        placeholder="0.00"
+                                        className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-slate-900 font-black focus:ring-2 focus:ring-rose-500 outline-none text-2xl"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-1">Açıklama</label>
+                                    <textarea
+                                        required
+                                        value={expenseForm.description}
+                                        onChange={e => setExpenseForm(prev => ({ ...prev, description: e.target.value }))}
+                                        placeholder="Masraf detayı..."
+                                        rows={3}
+                                        className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-rose-500 outline-none resize-none"
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full py-4 mt-2 bg-rose-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-rose-500/20 hover:bg-rose-600 active:scale-95 transition-all disabled:opacity-50"
+                                >
+                                    {loading ? 'Kaydediliyor...' : 'Masrafı Kaydet'}
+                                </button>
+                            </form>
                         </div>
-                        <form onSubmit={handleExpenseSubmit} className="p-8 space-y-5">
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-1">Tarih</label>
-                                <input
-                                    type="date"
-                                    required
-                                    value={expenseForm.date}
-                                    onChange={e => setExpenseForm(prev => ({ ...prev, date: e.target.value }))}
-                                    className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-slate-900 font-bold focus:ring-2 focus:ring-rose-500 outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-1">Tutar (₺)</label>
-                                <input
-                                    type="number"
-                                    required
-                                    min="0"
-                                    step="0.01"
-                                    value={expenseForm.amount}
-                                    onChange={e => setExpenseForm(prev => ({ ...prev, amount: e.target.value }))}
-                                    placeholder="0.00"
-                                    className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-slate-900 font-black focus:ring-2 focus:ring-rose-500 outline-none text-2xl"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-1">Açıklama</label>
-                                <textarea
-                                    required
-                                    value={expenseForm.description}
-                                    onChange={e => setExpenseForm(prev => ({ ...prev, description: e.target.value }))}
-                                    placeholder="Masraf detayı..."
-                                    rows={3}
-                                    className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-rose-500 outline-none resize-none"
-                                />
-                            </div>
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="w-full py-4 mt-2 bg-rose-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-rose-500/20 hover:bg-rose-600 active:scale-95 transition-all disabled:opacity-50"
-                            >
-                                {loading ? 'Kaydediliyor...' : 'Masrafı Kaydet'}
-                            </button>
-                        </form>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Ses Dinleme Overlay (Yönlendirmeli) */}
             {
@@ -1108,167 +1179,169 @@ export default function Dashboard() {
             }
 
             {/* Payment Modal (NFC / SoftPOS Simulation) */}
-            {showPaymentModal && paymentApp && (
-                <div className="fixed inset-0 z-[150] flex items-end justify-center bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-500">
-                        <div className="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mb-8" />
+            {
+                showPaymentModal && paymentApp && (
+                    <div className="fixed inset-0 z-[150] flex items-end justify-center bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
+                        <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-500">
+                            <div className="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mb-8" />
 
-                        <div className="text-center mb-8">
-                            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">Ödeme Al</h3>
-                            <div className="flex flex-col items-center gap-1">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hizmet Bedeli</label>
-                                <div className="relative">
-                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-black text-slate-300">₺</span>
-                                    <input
-                                        type="number"
-                                        value={editableAmount}
-                                        onChange={(e) => setEditableAmount(Number(e.target.value))}
-                                        className="w-40 text-center text-3xl font-black text-indigo-600 bg-slate-50 border-none rounded-2xl py-3 pl-8 focus:ring-2 focus:ring-indigo-500 transition-all"
-                                    />
+                            <div className="text-center mb-8">
+                                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">Ödeme Al</h3>
+                                <div className="flex flex-col items-center gap-1">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hizmet Bedeli</label>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-black text-slate-300">₺</span>
+                                        <input
+                                            type="number"
+                                            value={editableAmount}
+                                            onChange={(e) => setEditableAmount(Number(e.target.value))}
+                                            className="w-40 text-center text-3xl font-black text-indigo-600 bg-slate-50 border-none rounded-2xl py-3 pl-8 focus:ring-2 focus:ring-indigo-500 transition-all"
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Commission Breakdown */}
-                        {(() => {
-                            const platformRate = Number(companyInfo?.commission_rate) || 5;
-                            let iyzicoRate = Number(companyInfo?.iyzico_commission_rate) || 1;
-                            if (iyzicoRate <= 0) iyzicoRate = 1;
-                            const platformComm = (editableAmount * platformRate) / 100;
-                            const iyzicoComm = (editableAmount * iyzicoRate) / 100;
-                            const totalToCollect = editableAmount + platformComm + iyzicoComm;
+                            {/* Commission Breakdown */}
+                            {(() => {
+                                const platformRate = Number(companyInfo?.commission_rate) || 5;
+                                let iyzicoRate = Number(companyInfo?.iyzico_commission_rate) || 1;
+                                if (iyzicoRate <= 0) iyzicoRate = 1;
+                                const platformComm = (editableAmount * platformRate) / 100;
+                                const iyzicoComm = (editableAmount * iyzicoRate) / 100;
+                                const totalToCollect = editableAmount + platformComm + iyzicoComm;
 
-                            return (
-                                <div className="bg-slate-50 rounded-3xl p-6 mb-8 space-y-3 border border-slate-100">
-                                    <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
-                                        <span>Firma Hakediş (Net)</span>
-                                        <span className="text-slate-600">₺{editableAmount.toFixed(2)}</span>
+                                return (
+                                    <div className="bg-slate-50 rounded-3xl p-6 mb-8 space-y-3 border border-slate-100">
+                                        <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
+                                            <span>Firma Hakediş (Net)</span>
+                                            <span className="text-slate-600">₺{editableAmount.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
+                                            <span>Platform Komisyonu ({platformRate.toFixed(2)}%)</span>
+                                            <span className="text-slate-600">₺{platformComm.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
+                                            <span>Iyzico Komisyonu ({iyzicoRate.toFixed(2)}%)</span>
+                                            <span className="text-slate-600">₺{iyzicoComm.toFixed(2)}</span>
+                                        </div>
+                                        <div className="h-px bg-slate-200 mt-2" />
+                                        <div className="flex justify-between items-center pt-1">
+                                            <span className="text-sm font-black text-slate-900 uppercase tracking-tight">Tahsil Edilecek Toplam</span>
+                                            <span className="text-2xl font-black text-indigo-600">
+                                                ₺{totalToCollect.toFixed(2)}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
-                                        <span>Platform Komisyonu ({platformRate.toFixed(2)}%)</span>
-                                        <span className="text-slate-600">₺{platformComm.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
-                                        <span>Iyzico Komisyonu ({iyzicoRate.toFixed(2)}%)</span>
-                                        <span className="text-slate-600">₺{iyzicoComm.toFixed(2)}</span>
-                                    </div>
-                                    <div className="h-px bg-slate-200 mt-2" />
-                                    <div className="flex justify-between items-center pt-1">
-                                        <span className="text-sm font-black text-slate-900 uppercase tracking-tight">Tahsil Edilecek Toplam</span>
-                                        <span className="text-2xl font-black text-indigo-600">
-                                            ₺{totalToCollect.toFixed(2)}
-                                        </span>
-                                    </div>
-                                </div>
-                            );
-                        })()}
+                                );
+                            })()}
 
-                        {nfcState === 'IDLE' && (
-                            <div className="grid grid-cols-1 gap-4">
-                                <button
-                                    onClick={async () => {
-                                        setNfcState('SCANNING');
-                                        setTimeout(async () => {
-                                            try {
-                                                const res = await api.post('/payments/ceppos/initialize', {
-                                                    appointment_id: paymentApp.id,
-                                                    amount: editableAmount // Send the confirmed base amount
-                                                });
-                                                if (res.data.success) {
-                                                    setNfcState('SUCCESS');
-                                                    setTimeout(() => {
-                                                        // After successful payment, the status and collected price are already set by backend
-                                                        // We just need to reload
-                                                        window.location.reload();
-                                                    }, 1500);
-                                                } else {
+                            {nfcState === 'IDLE' && (
+                                <div className="grid grid-cols-1 gap-4">
+                                    <button
+                                        onClick={async () => {
+                                            setNfcState('SCANNING');
+                                            setTimeout(async () => {
+                                                try {
+                                                    const res = await api.post('/payments/ceppos/initialize', {
+                                                        appointment_id: paymentApp.id,
+                                                        amount: editableAmount // Send the confirmed base amount
+                                                    });
+                                                    if (res.data.success) {
+                                                        setNfcState('SUCCESS');
+                                                        setTimeout(() => {
+                                                            // After successful payment, the status and collected price are already set by backend
+                                                            // We just need to reload
+                                                            window.location.reload();
+                                                        }, 1500);
+                                                    } else {
+                                                        setNfcState('ERROR');
+                                                    }
+                                                } catch (e) {
                                                     setNfcState('ERROR');
                                                 }
+                                            }, 3000);
+                                        }}
+                                        disabled={loading}
+                                        className="p-6 bg-slate-900 text-white rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all shadow-xl shadow-slate-200 disabled:opacity-50"
+                                    >
+                                        <div className="flex items-center gap-4 text-left">
+                                            <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">📱</div>
+                                            <div>
+                                                <p className="text-xs font-black uppercase tracking-widest text-indigo-400">Temassız Ödeme</p>
+                                                <p className="text-lg font-black leading-tight">SoftPOS / NFC</p>
+                                            </div>
+                                        </div>
+                                        <svg className="w-6 h-6 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
+                                    </button>
+
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                setLoading(true);
+                                                await api.patch(`/appointments/${paymentApp.id}/status`, {
+                                                    status: 'completed',
+                                                    price: editableAmount
+                                                });
+                                                window.location.reload();
                                             } catch (e) {
-                                                setNfcState('ERROR');
+                                                alert('Hata oluştu');
+                                                setLoading(false);
                                             }
-                                        }, 3000);
-                                    }}
-                                    disabled={loading}
-                                    className="p-6 bg-slate-900 text-white rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all shadow-xl shadow-slate-200 disabled:opacity-50"
-                                >
-                                    <div className="flex items-center gap-4 text-left">
-                                        <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">📱</div>
-                                        <div>
-                                            <p className="text-xs font-black uppercase tracking-widest text-indigo-400">Temassız Ödeme</p>
-                                            <p className="text-lg font-black leading-tight">SoftPOS / NFC</p>
+                                        }}
+                                        disabled={loading}
+                                        className="p-6 bg-slate-50 text-slate-900 rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all disabled:opacity-50"
+                                    >
+                                        <div className="flex items-center gap-4 text-left">
+                                            <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">💵</div>
+                                            <div>
+                                                <p className="text-xs font-black uppercase tracking-widest text-slate-400">Nakit Ödeme</p>
+                                                <p className="text-lg font-black leading-tight">Elden Tahsilat</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <svg className="w-6 h-6 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
-                                </button>
+                                        <svg className="w-6 h-6 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
+                                    </button>
 
-                                <button
-                                    onClick={async () => {
-                                        try {
-                                            setLoading(true);
-                                            await api.patch(`/appointments/${paymentApp.id}/status`, {
-                                                status: 'completed',
-                                                price: editableAmount
-                                            });
-                                            window.location.reload();
-                                        } catch (e) {
-                                            alert('Hata oluştu');
-                                            setLoading(false);
-                                        }
-                                    }}
-                                    disabled={loading}
-                                    className="p-6 bg-slate-50 text-slate-900 rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all disabled:opacity-50"
-                                >
-                                    <div className="flex items-center gap-4 text-left">
-                                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">💵</div>
-                                        <div>
-                                            <p className="text-xs font-black uppercase tracking-widest text-slate-400">Nakit Ödeme</p>
-                                            <p className="text-lg font-black leading-tight">Elden Tahsilat</p>
-                                        </div>
-                                    </div>
-                                    <svg className="w-6 h-6 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
-                                </button>
-
-                                <button
-                                    onClick={() => setShowPaymentModal(false)}
-                                    className="w-full py-4 text-slate-400 text-xs font-black uppercase tracking-widest mt-4"
-                                >
-                                    İptal
-                                </button>
-                            </div>
-                        )}
-
-                        {nfcState === 'SCANNING' && (
-                            <div className="py-12 flex flex-col items-center">
-                                <div className="relative mb-12">
-                                    <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-20 scale-150"></div>
-                                    <div className="absolute inset-0 bg-indigo-400 rounded-full animate-pulse opacity-40 scale-125"></div>
-                                    <div className="relative w-32 h-32 bg-slate-900 rounded-full flex items-center justify-center text-4xl shadow-2xl">⚡</div>
+                                    <button
+                                        onClick={() => setShowPaymentModal(false)}
+                                        className="w-full py-4 text-slate-400 text-xs font-black uppercase tracking-widest mt-4"
+                                    >
+                                        İptal
+                                    </button>
                                 </div>
-                                <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Kartı Yaklaştırın</h4>
-                                <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] animate-pulse">Temassız ödeme bekleniyor...</p>
-                            </div>
-                        )}
+                            )}
 
-                        {nfcState === 'SUCCESS' && (
-                            <div className="py-12 flex flex-col items-center animate-in zoom-in duration-500">
-                                <div className="w-32 h-32 bg-emerald-500 rounded-full flex items-center justify-center text-5xl shadow-2xl mb-8">✓</div>
-                                <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Ödeme Başarılı</h4>
-                                <p className="text-emerald-500 font-black uppercase tracking-widest text-[10px]">İşlem onaylandı, iyzico kaydı oluşturuldu.</p>
-                            </div>
-                        )}
+                            {nfcState === 'SCANNING' && (
+                                <div className="py-12 flex flex-col items-center">
+                                    <div className="relative mb-12">
+                                        <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-20 scale-150"></div>
+                                        <div className="absolute inset-0 bg-indigo-400 rounded-full animate-pulse opacity-40 scale-125"></div>
+                                        <div className="relative w-32 h-32 bg-slate-900 rounded-full flex items-center justify-center text-4xl shadow-2xl">⚡</div>
+                                    </div>
+                                    <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Kartı Yaklaştırın</h4>
+                                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] animate-pulse">Temassız ödeme bekleniyor...</p>
+                                </div>
+                            )}
 
-                        {nfcState === 'ERROR' && (
-                            <div className="py-12 flex flex-col items-center">
-                                <div className="w-32 h-32 bg-red-500 rounded-full flex items-center justify-center text-5xl shadow-2xl mb-8">!</div>
-                                <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Ödeme Başarısız</h4>
-                                <p className="text-red-500 font-black uppercase tracking-widest text-[10px] mb-8">İşlem reddedildi veya hata oluştu.</p>
-                                <button onClick={() => setNfcState('IDLE')} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold text-xs uppercase">Tekrar Dene</button>
-                            </div>
-                        )}
+                            {nfcState === 'SUCCESS' && (
+                                <div className="py-12 flex flex-col items-center animate-in zoom-in duration-500">
+                                    <div className="w-32 h-32 bg-emerald-500 rounded-full flex items-center justify-center text-5xl shadow-2xl mb-8">✓</div>
+                                    <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Ödeme Başarılı</h4>
+                                    <p className="text-emerald-500 font-black uppercase tracking-widest text-[10px]">İşlem onaylandı, iyzico kaydı oluşturuldu.</p>
+                                </div>
+                            )}
+
+                            {nfcState === 'ERROR' && (
+                                <div className="py-12 flex flex-col items-center">
+                                    <div className="w-32 h-32 bg-red-500 rounded-full flex items-center justify-center text-5xl shadow-2xl mb-8">!</div>
+                                    <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Ödeme Başarısız</h4>
+                                    <p className="text-red-500 font-black uppercase tracking-widest text-[10px] mb-8">İşlem reddedildi veya hata oluştu.</p>
+                                    <button onClick={() => setNfcState('IDLE')} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold text-xs uppercase">Tekrar Dene</button>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
         </div >
     );
 }

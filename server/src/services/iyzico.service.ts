@@ -99,6 +99,105 @@ class IyzicoService {
             });
         });
     }
+    /**
+     * Checkout Form Başlatma (Genel Ödeme)
+     */
+    async initializeCheckoutForm(params: {
+        company: any;
+        price: string;
+        paidPrice: string;
+        basketId: string;
+        callbackUrl: string;
+        basketItems: any[];
+    }): Promise<{ token: string; checkoutFormContent: string; paymentPageUrl: string }> {
+        return new Promise((resolve, reject) => {
+            const request = {
+                locale: Iyzipay.LOCALE.TR,
+                conversationId: `renew-${params.company.id}-${Date.now()}`,
+                price: params.price,
+                paidPrice: params.paidPrice,
+                currency: Iyzipay.CURRENCY.TRY,
+                basketId: params.basketId,
+                paymentGroup: Iyzipay.PAYMENT_GROUP.PRODUCT,
+                callbackUrl: params.callbackUrl,
+                enabledInstallments: [1, 2, 3, 6, 9],
+                buyer: {
+                    id: params.company.id.toString(),
+                    name: params.company.name.split(' ')[0] || "Firma",
+                    surname: params.company.name.split(' ').slice(1).join(' ') || "Yetkilisi",
+                    gsmNumber: params.company.phone || "+905555555555",
+                    email: params.company.email || `iletisim@firma${params.company.id}.com`,
+                    identityNumber: "11111111111",
+                    lastLoginDate: "2024-01-01 12:00:00",
+                    registrationDate: "2024-01-01 12:00:00",
+                    registrationAddress: params.company.address_line || "Belirtilmemiş",
+                    ip: "127.0.0.1",
+                    city: params.company.city || "İstanbul",
+                    country: "Turkey",
+                    zipCode: params.company.postal_code || "34000"
+                },
+                shippingAddress: {
+                    contactName: params.company.name,
+                    city: params.company.city || "İstanbul",
+                    country: "Turkey",
+                    address: params.company.address_line || "Belirtilmemiş",
+                    zipCode: params.company.postal_code || "34000"
+                },
+                billingAddress: {
+                    contactName: params.company.name,
+                    city: params.company.city || "İstanbul",
+                    country: "Turkey",
+                    address: params.company.address_line || "Belirtilmemiş",
+                    zipCode: params.company.postal_code || "34000"
+                },
+                basketItems: params.basketItems
+            };
+
+            if (!process.env.IYZICO_API_KEY || process.env.IYZICO_API_KEY === 'sandbox-api-key') {
+                const mockToken = `iyzi-form-mock-${Math.random().toString(36).substring(7)}`;
+                console.log(`[IyzicoService] (Mock Mode) Checkout Form Token: ${mockToken}`);
+                return resolve({
+                    token: mockToken,
+                    checkoutFormContent: `<script>window.location.href = "${params.callbackUrl}?token=${mockToken}";</script>`,
+                    paymentPageUrl: `https://sandbox-checkout.iyzipay.com/pay/${mockToken}`
+                });
+            }
+
+            this.iyzipay.checkoutFormInitialize.create(request, function (err: any, result: any) {
+                if (err) return reject(err);
+                if (result.status === 'success') {
+                    resolve({
+                        token: result.token,
+                        checkoutFormContent: result.checkoutFormContent,
+                        paymentPageUrl: result.paymentPageUrl
+                    });
+                } else {
+                    reject(new Error(result.errorMessage));
+                }
+            });
+        });
+    }
+
+    /**
+     * Checkout Form Sonucunu Sorgulama
+     */
+    async getCheckoutFormResult(token: string): Promise<any> {
+        return new Promise((resolve, reject) => {
+            if (!process.env.IYZICO_API_KEY || process.env.IYZICO_API_KEY === 'sandbox-api-key') {
+                console.log(`[IyzicoService] (Mock Mode) Returning Success for token: ${token}`);
+                return resolve({ status: 'success', paymentId: `payment_${token}` });
+            }
+
+            this.iyzipay.checkoutForm.retrieve({
+                locale: Iyzipay.LOCALE.TR,
+                conversationId: `check-${token}`,
+                token: token
+            }, function (err: any, result: any) {
+                if (err) return reject(err);
+                resolve(result);
+            });
+        });
+    }
 }
 
 export default new IyzicoService();
