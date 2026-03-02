@@ -40,7 +40,7 @@ function App() {
     // Use standard BrowserRouter for the actual domain (saloontr.com) for clean URLs
     const Router: any = (isGithubPages || isNative) ? HashRouter : BrowserRouter;
     // BaseName is needed for BrowserRouter if deployed in an environment with base url, but on saloontr.com it's root
-    const routerProps = (isGithubPages || isNative) ? {} : { basename: import.meta.env.BASE_URL };
+    const routerProps = (isGithubPages || isNative) ? {} : { basename: '/' };
 
     useEffect(() => {
         const checkAuth = async () => {
