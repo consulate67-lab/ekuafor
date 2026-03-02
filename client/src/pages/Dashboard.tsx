@@ -965,122 +965,63 @@ export default function Dashboard() {
                     {/* Çalışan İstatistikleri */}
                     {user?.role === 'staff' && (
                         <div className="col-span-full space-y-8">
-                            {/* Rapor Filtreleri */}
-                            <div className="flex bg-white/50 backdrop-blur-sm p-1.5 rounded-2xl border border-gray-100 w-fit mx-auto sm:mx-0">
-                                {(['today', 'week', 'month', 'year'] as const).map((p) => (
-                                    <button
-                                        key={p}
-                                        onClick={() => setSelectedPeriod(p)}
-                                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${selectedPeriod === p
-                                            ? 'bg-slate-900 text-white shadow-lg'
-                                            : 'text-gray-400 hover:text-slate-600 hover:bg-white'
-                                            }`}
-                                    >
-                                        {p === 'today' ? 'Bugün' : p === 'week' ? 'Bu Hafta' : p === 'month' ? 'Bu Ay' : 'Bu Yıl'}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                <div className="card group relative overflow-hidden flex flex-col items-center justify-center border-none bg-gradient-to-br from-indigo-50/50 to-white hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-500 py-10">
-                                    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                                        <svg className="w-24 h-24 text-indigo-900" fill="currentColor" viewBox="0 0 24 24">
-                                            <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                    </div>
-                                    <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] mb-3 relative z-10">Toplam Randevu</p>
-                                    <p className={`text-6xl font-black text-slate-900 tracking-tight relative z-10 ${statsLoading ? 'animate-pulse opacity-50' : ''}`}>
-                                        {employeeStats.total_appointments}
-                                    </p>
-                                    <div className="mt-4 flex items-center gap-2 px-3 py-1 bg-indigo-100/50 rounded-full">
-                                        <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></div>
-                                        <span className="text-[9px] font-black text-indigo-700 uppercase tracking-widest">Performans</span>
+                            {/* Today's Appointments List for Staff */}
+                            <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/50 border border-slate-100 text-left">
+                                <div className="flex items-center justify-between mb-8">
+                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Bugünkü Programım</h3>
+                                    <div className="bg-emerald-50 text-emerald-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100">
+                                        CANLI
                                     </div>
                                 </div>
 
-                                <div className="card group relative overflow-hidden flex flex-col items-center justify-center border-none bg-gradient-to-br from-amber-50/50 to-white hover:shadow-2xl hover:shadow-amber-500/10 transition-all duration-500 py-10">
-                                    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                                        <svg className="w-24 h-24 text-amber-900" fill="currentColor" viewBox="0 0 24 24">
-                                            <path d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3z" />
-                                            <path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zM7.001 11a1 1 0 011-1h8a1 1 0 110 2h-8a1 1 0 01-1-1z" clipRule="evenodd" />
-                                        </svg>
-                                    </div>
-                                    <p className="text-[10px] font-bold text-amber-600 uppercase tracking-[0.2em] mb-3 relative z-10">Toplam Gelir</p>
-                                    <p className={`text-6xl font-black text-slate-900 tracking-tight relative z-10 ${statsLoading ? 'animate-pulse opacity-50' : ''}`}>
-                                        <span className="text-3xl text-amber-600 mr-1">₺</span>
-                                        {employeeStats.total_revenue.toLocaleString()}
-                                    </p>
-                                    <div className="mt-4 flex items-center gap-2 px-3 py-1 bg-amber-100/50 rounded-full">
-                                        <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></div>
-                                        <span className="text-[9px] font-black text-amber-700 uppercase tracking-widest">Hakediş</span>
-                                    </div>
-                                </div>
-
-                                <div className="col-span-1 sm:col-span-2 card group relative overflow-hidden flex flex-col items-center justify-center border-none bg-gradient-to-br from-rose-50/50 to-white hover:shadow-2xl hover:shadow-rose-500/10 transition-all duration-500 py-6">
-                                    <p className="text-[10px] font-bold text-rose-600 uppercase tracking-[0.2em] mb-2 relative z-10">Gider / Masraf Toplamı</p>
-                                    <p className={`text-4xl font-black text-slate-900 tracking-tight relative z-10 ${statsLoading ? 'animate-pulse opacity-50' : ''}`}>
-                                        <span className="text-2xl text-rose-600 mr-1">₺</span>
-                                        {employeeStats.total_expenses.toLocaleString()}
-                                    </p>
-                                </div>
-                                {/* Today's Appointments List for Staff */}
-                                <div className="mt-12 bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/50 border border-slate-100 text-left">
-                                    <div className="flex items-center justify-between mb-8">
-                                        <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Bugünkü Programım</h3>
-                                        <div className="bg-emerald-50 text-emerald-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100">
-                                            CANLI
+                                <div className="space-y-4">
+                                    {appointments.length === 0 ? (
+                                        <div className="py-12 text-center bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">
+                                            <p className="text-3xl mb-3">☕</p>
+                                            <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Bugün için randevunuz bulunmuyor</p>
                                         </div>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        {appointments.length === 0 ? (
-                                            <div className="py-12 text-center bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">
-                                                <p className="text-3xl mb-3">☕</p>
-                                                <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Bugün için randevunuz bulunmuyor</p>
-                                            </div>
-                                        ) : (
-                                            appointments.map((app) => (
-                                                <div key={app.id} className="group bg-white p-6 rounded-[2rem] border border-slate-100 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-300">
-                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-                                                        <div className="flex items-center gap-6">
-                                                            <div className="w-16 h-16 bg-slate-900 text-white rounded-2xl flex flex-col items-center justify-center shadow-lg">
-                                                                <span className="text-xs font-black uppercase text-indigo-400">{app.start_time.split(':')[0]}</span>
-                                                                <span className="text-xs font-black opacity-50">{app.start_time.split(':')[1]}</span>
-                                                            </div>
-                                                            <div>
-                                                                <h4 className="text-lg font-black text-slate-900">{app.customer_name || 'Misafir'}</h4>
-                                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                                                                    {services.find(s => s.id === app.service_id)?.name || 'Hizmet'} | {app.start_time} - {app.end_time}
-                                                                </p>
-                                                            </div>
+                                    ) : (
+                                        appointments.map((app) => (
+                                            <div key={app.id} className="group bg-white p-6 rounded-[2rem] border border-slate-100 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-300">
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                                                    <div className="flex items-center gap-6">
+                                                        <div className="w-16 h-16 bg-slate-900 text-white rounded-2xl flex flex-col items-center justify-center shadow-lg">
+                                                            <span className="text-xs font-black uppercase text-indigo-400">{app.start_time.split(':')[0]}</span>
+                                                            <span className="text-xs font-black opacity-50">{app.start_time.split(':')[1]}</span>
                                                         </div>
-
-                                                        <div className="flex items-center gap-3">
-                                                            {app.status === 'approved' && (
-                                                                <button
-                                                                    onClick={() => handleStatusUpdate(app.id!, 'completed', app.price)}
-                                                                    disabled={loading}
-                                                                    className={`px-8 py-4 ${app.payment_status === 'paid' ? 'bg-emerald-600 shadow-emerald-200' : 'bg-indigo-600 shadow-indigo-200'} text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:opacity-90 active:scale-95 transition-all disabled:opacity-50`}
-                                                                >
-                                                                    {app.payment_status === 'paid' ? 'Hizmeti Tamamla' : 'Tamamla & Ödeme Al'}
-                                                                </button>
-                                                            )}
-                                                            {app.status === 'completed' && (
-                                                                <span className="px-6 py-4 bg-emerald-50 text-emerald-600 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-emerald-100">
-                                                                    ✓ Tamamlandı
-                                                                </span>
-                                                            )}
-                                                            {app.status === 'pending' && (
-                                                                <span className="px-6 py-4 bg-amber-50 text-amber-600 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-amber-100">
-                                                                    ⏳ Onay Bekliyor
-                                                                </span>
-                                                            )}
+                                                        <div>
+                                                            <h4 className="text-lg font-black text-slate-900">{app.customer_name || 'Misafir'}</h4>
+                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                                                {services.find(s => s.id === app.service_id)?.name || 'Hizmet'} | {app.start_time} - {app.end_time}
+                                                            </p>
                                                         </div>
                                                     </div>
+
+                                                    <div className="flex items-center gap-3">
+                                                        {app.status === 'approved' && (
+                                                            <button
+                                                                onClick={() => handleStatusUpdate(app.id!, 'completed', app.price)}
+                                                                disabled={loading}
+                                                                className={`px-8 py-4 ${app.payment_status === 'paid' ? 'bg-emerald-600 shadow-emerald-200' : 'bg-indigo-600 shadow-indigo-200'} text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:opacity-90 active:scale-95 transition-all disabled:opacity-50`}
+                                                            >
+                                                                {app.payment_status === 'paid' ? 'Hizmeti Tamamla' : 'Tamamla & Ödeme Al'}
+                                                            </button>
+                                                        )}
+                                                        {app.status === 'completed' && (
+                                                            <span className="px-6 py-4 bg-emerald-50 text-emerald-600 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-emerald-100">
+                                                                ✓ Tamamlandı
+                                                            </span>
+                                                        )}
+                                                        {app.status === 'pending' && (
+                                                            <span className="px-6 py-4 bg-amber-50 text-amber-600 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-amber-100">
+                                                                ⏳ Onay Bekliyor
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            ))
-                                        )}
-                                    </div>
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
                             </div>
                         </div>
