@@ -180,6 +180,8 @@ class SmsService {
                 } else {
                     // Option 2: GET (Default & Highly Recommended)
                     const getUrl = settings.api_url || 'https://api.netgsm.com.tr/sms/send/get/';
+                    console.log(`[SMS] Sending via Netgsm GET to: ${getUrl}`);
+
                     response = await axios.get(getUrl, {
                         params: {
                             usercode,
@@ -193,6 +195,8 @@ class SmsService {
                     });
 
                     const resStr = String(response.data).trim();
+                    console.log(`[SMS] Netgsm Raw Response: ${resStr}`);
+
                     // Netgsm GET sends "00 JobID" or a numeric JobID on success
                     if (!resStr.startsWith('00') && (resStr.length < 5 || isNaN(Number(resStr.split(' ')[0])))) {
                         const errorMap: any = {
@@ -202,7 +206,7 @@ class SmsService {
                             '70': 'Parametre hatasi veya Sistem hatasi.',
                         };
                         const errMsg = errorMap[resStr] || `Hata Kodu: ${resStr}`;
-                        throw new Error(`Netgsm GET Error: ${errMsg}`);
+                        throw new Error(`Netgsm GET Error: ${errMsg} (Raw: ${resStr})`);
                     }
                 }
             } else {
