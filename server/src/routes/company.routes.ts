@@ -168,7 +168,7 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
             );
 
             // Send SMS to staff
-            const smsMsg = `Sayin ${staff.first_name}, ${companyName} personeli olarak sisteme eklendiniz. Yonetim paneli: www.saloontr.com/board Personel Kodunuz: ${boardCode}`;
+            const smsMsg = `Sayin ${staff.first_name}, ${companyName} personeli olarak sisteme eklendiniz. Yonetim paneli: https://www.saloontr.com/dashboard?code=${boardCode}`;
             import('../services/sms.service').then(m => {
                 m.default.sendSms(null as any, staff.phone, smsMsg).catch(() => { });
             });

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { HashRouter, BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { App as CapApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useAuthStore } from './store/authStore';
 import api from './lib/api';
@@ -43,6 +44,33 @@ function App() {
 
     useEffect(() => {
         const checkAuth = async () => {
+            // Check for code in URL for auto-login (e.g. from SMS)
+            const urlParams = new URLSearchParams(window.location.search);
+            const hashParamsStr = window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '';
+            const code = urlParams.get('code') || new URLSearchParams(hashParamsStr).get('code');
+
+            if (code) {
+                try {
+                    const res = await api.post('/companies/check-code', { code });
+                    if (res.data?.success && res.data?.data?.token) {
+                        localStorage.setItem('token', res.data.data.token);
+
+                        // Clean up URL safely for both History and Hash routers
+                        if (window.location.hash.includes('?code=')) {
+                            const newHash = window.location.hash.split('?')[0];
+                            window.history.replaceState({}, document.title, window.location.pathname + window.location.search + newHash);
+                        } else if (window.location.search.includes('code=')) {
+                            const params = new URLSearchParams(window.location.search);
+                            params.delete('code');
+                            const newSearch = params.toString() ? '?' + params.toString() : '';
+                            window.history.replaceState({}, document.title, window.location.pathname + newSearch + window.location.hash);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Auto login check failed:', e);
+                }
+            }
+
             const token = localStorage.getItem('token');
             if (!token) {
                 setInitialized(true);
@@ -66,7 +94,43 @@ function App() {
         };
 
         checkAuth();
-    }, [setUser, setInitialized]);
+
+        // Listen for deep links in Capacitor App
+        if (isNative) {
+            const listener = CapApp.addListener('appUrlOpen', async (data) => {
+                const url = data.url;
+
+                // Example URL: saloontr://dashboard?code=ABCD or https://www.saloontr.com/dashboard?code=ABCD
+                if (url.includes('code=')) {
+                    try {
+                        const urlObj = new URL(url);
+                        const code = urlObj.searchParams.get('code');
+
+                        if (code) {
+                            setInitialized(false); // Show loading spinner
+                            const res = await api.post('/companies/check-code', { code });
+                            if (res.data?.success && res.data?.data?.token) {
+                                localStorage.setItem('token', res.data.data.token);
+                                // Refresh user session
+                                const meRes = await api.get('/auth/me');
+                                if (meRes.data.success) {
+                                    useAuthStore.getState().login(meRes.data.data, res.data.data.token);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Deep link login failed:', e);
+                    } finally {
+                        setInitialized(true);
+                    }
+                }
+            });
+
+            return () => {
+                listener.then(l => l.remove());
+            };
+        }
+    }, [setUser, setInitialized, isNative]);
 
     if (!initialized) {
         return (
