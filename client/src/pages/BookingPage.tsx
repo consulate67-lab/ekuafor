@@ -498,7 +498,7 @@ export default function BookingPage() {
             }
 
             alert('Randevu talebiniz alındı! Talebiniz onaylandığında size bildirim gönderilecektir. "Randevularım" sayfasından takip edebilirsiniz.');
-            navigate('/my-appointments');
+            navigate('/my-appointments', { replace: true });
         } catch (err: any) {
             console.error('Booking failed', err);
             const serverMsg = err.response?.data?.error || err.message;

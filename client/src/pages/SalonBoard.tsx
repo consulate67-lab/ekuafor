@@ -415,8 +415,11 @@ export default function SalonBoard() {
                         const dateStr = !isNaN(dateObj.getTime()) ? dateObj.toLocaleDateString('tr-TR') : app.appointment_date;
                         const message = `Merhaba ${customerName}, ${company?.name || 'Firmamız'} bünyesindeki randevunuz ${dateStr} günü saat ${app.start_time} - ${app.end_time} için onaylanmıştır. İyi günler dileriz.`;
 
-                        const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-                        window.open(waUrl, '_blank');
+                        // "sms:905xxxxxxxxx?body=..."
+                        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                        const separator = isIOS ? '&' : '?';
+                        const smsUrl = `sms:+${phone}${separator}body=${encodeURIComponent(message)}`;
+                        window.location.href = smsUrl;
                     }
                 }
             }

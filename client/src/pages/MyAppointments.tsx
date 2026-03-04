@@ -361,7 +361,7 @@ export default function MyAppointments() {
             <header className="bg-white sticky top-0 z-30 shadow-sm border-b border-slate-100"
                 style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
                 <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
-                    <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-gray-400 hover:text-indigo-600 transition-colors">
+                    <button onClick={() => navigate('/')} className="p-2 -ml-2 text-gray-400 hover:text-indigo-600 transition-colors">
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                         </svg>
