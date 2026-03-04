@@ -29,7 +29,7 @@ import { useAppointmentSync } from './hooks/useAppointmentSync';
 
 
 function App() {
-    const { isAuthenticated, initialized, setUser, setInitialized } = useAuthStore();
+    const { isAuthenticated, initialized, setUser, setInitialized, user } = useAuthStore();
     // Global appointment status sync & notifications
     useAppointmentSync();
 
@@ -183,17 +183,17 @@ function App() {
                         path="/"
                         element={
                             isAuthenticated
-                                ? <Navigate to="/dashboard" replace />
+                                ? (user?.role === 'customer' ? <CustomerHome /> : <Navigate to="/dashboard" replace />)
                                 : (isNative ? <CustomerHome /> : <Navigate to="/saloontr-web" replace />)
                         }
                     />
                     <Route
                         path="/app"
-                        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <CustomerHome />}
+                        element={isAuthenticated ? (user?.role === 'customer' ? <CustomerHome /> : <Navigate to="/dashboard" replace />) : <CustomerHome />}
                     />
                     <Route
                         path="/saloontr-web"
-                        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />}
+                        element={isAuthenticated ? (user?.role === 'customer' ? <CustomerHome /> : <Navigate to="/dashboard" replace />) : <LandingPage />}
                     />
                     <Route path="/book/:id" element={<BookingPage />} />
                     <Route path="/my-appointments" element={<MyAppointments />} />
