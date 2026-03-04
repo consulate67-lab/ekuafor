@@ -184,7 +184,7 @@ function App() {
                         element={
                             isAuthenticated
                                 ? <Navigate to="/dashboard" replace />
-                                : <CustomerHome />
+                                : (isNative ? <CustomerHome /> : <Navigate to="/saloontr-web" replace />)
                         }
                     />
                     <Route

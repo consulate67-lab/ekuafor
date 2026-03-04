@@ -34,7 +34,7 @@ jobs:
         run: npm run build
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
-          VITE_BASE: "/"
+          VITE_BASE: "/ekuafor/"
 
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4
