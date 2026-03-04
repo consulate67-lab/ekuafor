@@ -124,6 +124,11 @@ export default function CustomerHome() {
         }
 
         const initialFetch = async () => {
+            // Push Notification Permission Check for first load
+            if ("Notification" in window && Notification.permission === "default") {
+                Notification.requestPermission();
+            }
+
             // Then try location using Capacitor for better mobile support
             try {
                 const position = await Geolocation.getCurrentPosition({

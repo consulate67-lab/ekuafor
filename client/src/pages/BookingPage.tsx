@@ -471,8 +471,8 @@ export default function BookingPage() {
                 start_time: selection.time,
                 end_time: endTime,
                 customer_name: selection.customerName,
-                customer_phone: selection.customerPhone,
-                notes: `Müşteri: ${selection.customerName} | Tel: ${selection.customerPhone} | ${serviceNames}`,
+                customer_phone: user?.phone || selection.customerPhone,
+                notes: `Müşteri: ${selection.customerName} | Tel: ${user?.phone || selection.customerPhone} | ${serviceNames}`,
                 price: totalPrice,
                 device_id: deviceId,
                 status: 'pending',
@@ -953,15 +953,6 @@ export default function BookingPage() {
                                             onChange={e => setSelection({ ...selection, customerName: e.target.value })}
                                             className="w-full p-4 bg-white rounded-2xl border-2 border-slate-100 font-bold text-slate-900 focus:outline-none focus:border-indigo-500 shadow-sm transition-all text-sm"
                                             placeholder="Adınız Soyadınız (Opsiyonel)"
-                                        />
-                                    </div>
-                                    <div className="relative">
-                                        <input
-                                            type="tel"
-                                            value={selection.customerPhone}
-                                            onChange={e => setSelection({ ...selection, customerPhone: e.target.value })}
-                                            className="w-full p-4 bg-white rounded-2xl border-2 border-slate-100 font-bold text-slate-900 focus:outline-none focus:border-indigo-500 shadow-sm transition-all text-sm"
-                                            placeholder="Telefon Numaranız (Opsiyonel)"
                                         />
                                     </div>
                                 </div>

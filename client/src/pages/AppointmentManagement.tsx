@@ -401,34 +401,6 @@ export default function AppointmentManagement() {
                 price: finalPrice
             });
             fetchData();
-
-            // Eğer randevu onaylandıysa ve numara varsa WhatsApp mesajı gönder
-            if (status === 'approved') {
-                const app = appointments.find(a => a.id === id) || pendingAppointments.find(a => a.id === id);
-                if (app) {
-                    let phone = app.customer_phone || '';
-                    if (!phone) {
-                        const phoneMatch = app.notes?.match(/Tel:\s*([\d\s+-]+)/);
-                        if (phoneMatch) phone = phoneMatch[1].replace(/\s+/g, '');
-                    }
-                    if (phone) {
-                        if (phone.startsWith('0')) phone = '90' + phone.substring(1);
-                        else if (phone.length === 10) phone = '90' + phone;
-
-                        const customerName = app.customer_name || 'Değerli Müşterimiz';
-                        const dateObj = new Date(app.appointment_date);
-                        const dateStr = !isNaN(dateObj.getTime()) ? dateObj.toLocaleDateString('tr-TR') : app.appointment_date;
-                        const message = `Merhaba ${customerName}, ${company?.name || 'Firmamız'} bünyesindeki randevunuz ${dateStr} günü saat ${app.start_time} - ${app.end_time} için onaylanmıştır. İyi günler dileriz.`;
-
-                        // "sms:905xxxxxxxxx?body=..."
-                        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                        const separator = isIOS ? '&' : '?';
-                        const smsUrl = `sms:+${phone}${separator}body=${encodeURIComponent(message)}`;
-                        window.location.href = smsUrl;
-                    }
-                }
-            }
-
         } catch (err: any) {
             const serverError = err.response?.data?.error;
             const message = serverError ? `Sunucu Hatası: ${serverError}` : (err.message || 'Bilinmeyen hata');
