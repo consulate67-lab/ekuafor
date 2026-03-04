@@ -203,7 +203,7 @@ function App() {
                     <Route path="/book/:id" element={<BookingPage />} />
                     <Route path="/my-appointments" element={<MyAppointments />} />
                     <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
-                    <Route path="/customer-login" element={isAuthenticated ? <Navigate to="/" replace /> : <CustomerLogin />} />
+                    <Route path="/customer-login" element={<CustomerLogin />} />
                     <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />} />
                     <Route path="/board" element={<SalonBoard />} />
                     <Route path="/company-panel" element={<CompanyPanel />} />
