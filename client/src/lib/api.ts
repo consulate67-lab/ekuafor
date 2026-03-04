@@ -6,15 +6,18 @@ let baseUrl = import.meta.env.VITE_API_URL;
 const isProdDomain = window.location.hostname.includes('saloontr.com') || window.location.hostname.includes('github.io');
 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
+import { Capacitor } from '@capacitor/core';
+const isNative = Capacitor.isNativePlatform();
+
 if (!baseUrl) {
     if (isProdDomain) {
         // Canlıda (Saloontr veya GitHub) yeni üretim sunucusunu kullan
         baseUrl = 'https://ekuafor-production-344a.up.railway.app/api';
-    } else if (isLocal) {
-        // Sadece yerel geliştirmede localhost
+    } else if (isLocal && !isNative) {
+        // Sadece yerel geliştirmede (ve native değilse) localhost
         baseUrl = 'http://localhost:3000/api';
     } else {
-        // Diğer durumlar (IP vb.) için de üretim sunucusu güvenli tercihtir
+        // Diğer durumlar (IP mobil vb.) için de üretim sunucusu güvenli tercihtir
         baseUrl = 'https://ekuafor-production-344a.up.railway.app/api';
     }
 }
