@@ -115,10 +115,15 @@ function App() {
                 } else {
                     setUser(null);
                 }
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Auth check failed:', error);
-                localStorage.removeItem('token');
-                setUser(null);
+
+                // Only wipe tokens if it's explicitly explicitly unauthorized
+                if (error.response?.status === 401) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user_data');
+                    setUser(null);
+                }
             } finally {
                 setInitialized(true);
             }

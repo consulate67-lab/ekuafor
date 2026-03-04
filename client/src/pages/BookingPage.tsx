@@ -106,6 +106,25 @@ export default function BookingPage() {
         }
     }, [user]);
 
+    useEffect(() => {
+        const checkPendingBooking = () => {
+            const pendingStr = localStorage.getItem('pending_booking');
+            if (pendingStr && isAuthenticated) {
+                try {
+                    const pendingData = JSON.parse(pendingStr);
+                    if (pendingData.companyId === id && pendingData.selection) {
+                        setSelection(pendingData.selection);
+                        setStep(5); // Set directly to Confirm Step
+                        localStorage.removeItem('pending_booking');
+                    }
+                } catch (e) {
+                    console.error('Failed to parse pending booking', e);
+                }
+            }
+        };
+        checkPendingBooking();
+    }, [isAuthenticated, id]);
+
     const dateInputRef = useRef<HTMLInputElement>(null);
     const firstAvailableTimeRef = useRef<HTMLButtonElement>(null);
 
@@ -960,7 +979,10 @@ export default function BookingPage() {
                                     <div className="mt-6 flex flex-col gap-3">
                                         <button
                                             type="button"
-                                            onClick={() => navigate(`/customer-login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`)}
+                                            onClick={() => {
+                                                localStorage.setItem('pending_booking', JSON.stringify({ selection, companyId: id }));
+                                                navigate(`/customer-login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+                                            }}
                                             className="w-full bg-indigo-600 text-white py-5 rounded-3xl font-black text-base uppercase tracking-widest shadow-2xl shadow-indigo-200 active:scale-95 transition-all"
                                         >
                                             Giriş Yap ve Onayla

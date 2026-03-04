@@ -135,8 +135,8 @@ api.interceptors.response.use(
         if (!config || config.__isRetryRequest || error.response?.status === 401) {
             if (error.response?.status === 401) {
                 localStorage.removeItem('token');
-                const basename = import.meta.env.BASE_URL || '/';
-                window.location.href = `${basename}login`.replace(/\/+/g, '/');
+                // Removed forced redirection to /login to safely handle Customer / Staff flows
+                // Components will rely on useAuthStore.initialized/isAuthenticated or react-router Navigate components
             }
             return Promise.reject(error);
         }
