@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import api from '../lib/api';
 import { Appointment, Service, Company, User } from '../types';
 import { useAuthStore } from '../store/authStore';
@@ -21,6 +21,7 @@ export default function BookingPage() {
     const { isAuthenticated, user } = useAuthStore();
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams] = useSearchParams();
     const [company, setCompany] = useState<Company | null>(null);
     const [staff, setStaff] = useState<User[]>([]);
@@ -107,15 +108,23 @@ export default function BookingPage() {
     }, [user]);
 
     useEffect(() => {
-        const checkPendingBooking = () => {
+        const checkPendingBooking = async () => {
             const pendingStr = localStorage.getItem('pending_booking');
             if (pendingStr && isAuthenticated) {
                 try {
                     const pendingData = JSON.parse(pendingStr);
                     if (pendingData.companyId === id && pendingData.selection) {
-                        setSelection(pendingData.selection);
-                        setStep(5); // Set directly to Confirm Step
+                        // Immediately clear to prevent loops
                         localStorage.removeItem('pending_booking');
+
+                        setSelection(pendingData.selection);
+                        setStep(5); // Set to Confirm Step
+
+                        // Simulate a brief delay to allow React state to settle, then submit
+                        setTimeout(() => {
+                            const submitBtn = document.getElementById('final-confirm-btn');
+                            if (submitBtn) submitBtn.click();
+                        }, 500);
                     }
                 } catch (e) {
                     console.error('Failed to parse pending booking', e);
@@ -489,7 +498,7 @@ export default function BookingPage() {
             }
 
             alert('Randevu talebiniz alındı! Talebiniz onaylandığında size bildirim gönderilecektir. "Randevularım" sayfasından takip edebilirsiniz.');
-            navigate('/ekuafor/my-appointments');
+            navigate('/my-appointments');
         } catch (err: any) {
             console.error('Booking failed', err);
             const serverMsg = err.response?.data?.error || err.message;
@@ -972,7 +981,10 @@ export default function BookingPage() {
                                 </div>
 
                                 {isAuthenticated ? (
-                                    <button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-5 rounded-3xl font-black text-base uppercase tracking-widest shadow-2xl shadow-orange-200 active:scale-95 transition-all mt-6">
+                                    <button
+                                        id="final-confirm-btn"
+                                        className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-5 rounded-3xl font-black text-base uppercase tracking-widest shadow-2xl shadow-orange-200 active:scale-95 transition-all mt-6"
+                                    >
                                         Randevuyu Onayla
                                     </button>
                                 ) : (
@@ -981,7 +993,8 @@ export default function BookingPage() {
                                             type="button"
                                             onClick={() => {
                                                 localStorage.setItem('pending_booking', JSON.stringify({ selection, companyId: id }));
-                                                navigate(`/customer-login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+                                                // We must use location.pathname and location.search for HashRouter to get the real route
+                                                navigate(`/customer-login?redirect=${encodeURIComponent(location.pathname + location.search)}`);
                                             }}
                                             className="w-full bg-indigo-600 text-white py-5 rounded-3xl font-black text-base uppercase tracking-widest shadow-2xl shadow-indigo-200 active:scale-95 transition-all"
                                         >
