@@ -74,7 +74,7 @@ export default function MyAppointments() {
     }, []);
 
     const fetchMyAppointments = async () => {
-        if (!deviceId && !user?.phone) return;
+        if (!deviceId) return; // Prevent 403 Forbidden from empty query device_id
 
         try {
             setLoading(true);
@@ -203,7 +203,8 @@ export default function MyAppointments() {
 
     // Split appointments into active and past
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    // use en-CA to avoid UTC offset issues bridging midnight locally
+    const todayStr = now.toLocaleDateString('en-CA');
     const nowMins = now.getHours() * 60 + now.getMinutes();
 
     const activeAppointments = appointments.filter(app => {
