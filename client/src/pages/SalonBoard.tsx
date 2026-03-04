@@ -396,7 +396,30 @@ export default function SalonBoard() {
             setIsDetailModalOpen(false);
             setIsPendingListModalOpen(false);
             if (company?.id) await fetchData(company.id);
-            window.location.assign(window.location.href); // Hard refresh for state consistency
+
+            // Eğer randevu onaylandıysa ve numara varsa WhatsApp mesajı gönder
+            if (newStatus === 'approved') {
+                const app = appointments.find(a => a.id === id) || pendingAppointments.find(a => a.id === id);
+                if (app) {
+                    let phone = app.customer_phone || '';
+                    if (!phone) {
+                        const phoneMatch = app.notes?.match(/Tel:\s*([\d\s+-]+)/);
+                        if (phoneMatch) phone = phoneMatch[1].replace(/\s+/g, '');
+                    }
+                    if (phone) {
+                        if (phone.startsWith('0')) phone = '90' + phone.substring(1);
+                        else if (phone.length === 10) phone = '90' + phone;
+
+                        const customerName = app.customer_name || 'Değerli Müşterimiz';
+                        const dateObj = new Date(app.appointment_date);
+                        const dateStr = !isNaN(dateObj.getTime()) ? dateObj.toLocaleDateString('tr-TR') : app.appointment_date;
+                        const message = `Merhaba ${customerName}, ${company?.name || 'Firmamız'} bünyesindeki randevunuz ${dateStr} günü saat ${app.start_time} - ${app.end_time} için onaylanmıştır. İyi günler dileriz.`;
+
+                        const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+                        window.open(waUrl, '_blank');
+                    }
+                }
+            }
         } catch (err: any) {
             alert(err.response?.data?.error || 'İşlem başarısız oldu');
         } finally {
