@@ -729,16 +729,23 @@ export default function CustomerHome() {
                             <div className="w-20 h-20 rounded-[1.5rem] flex-shrink-0 flex items-center justify-center shadow-inner border border-slate-200/50 group-hover:scale-105 transition-transform overflow-hidden relative bg-slate-100">
                                 <img
                                     src={
-                                        c.gender === 'Kadın'
-                                            ? 'https://images.unsplash.com/photo-1522337660859-02fbefca4702?auto=format&fit=crop&w=200&q=80'
-                                            : (c.gender === 'Erkek'
-                                                ? 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=200&q=80'
-                                                : 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?auto=format&fit=crop&w=200&q=80')
+                                        (c.genders && c.genders.includes('Kadın'))
+                                            ? 'https://images.pexels.com/photos/3993472/pexels-photo-3993472.jpeg?auto=compress&cs=tinysrgb&w=400'
+                                            : ((c.genders && c.genders.includes('Erkek'))
+                                                ? 'https://images.pexels.com/photos/1813272/pexels-photo-1813272.jpeg?auto=compress&cs=tinysrgb&w=400'
+                                                : 'https://images.pexels.com/photos/705255/pexels-photo-705255.jpeg?auto=compress&cs=tinysrgb&w=400')
                                     }
                                     alt={c.name}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-cover absolute inset-0 z-10"
+                                    onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                    }}
                                 />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                                {/* Fallback Emoji if image fails */}
+                                <div className="absolute inset-0 flex items-center justify-center text-4xl z-0">
+                                    {(c.genders && c.genders.includes('Kadın')) ? '👩‍🦰' : ((c.genders && c.genders.includes('Erkek')) ? '🧔' : '💈')}
+                                </div>
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent z-20 pointer-events-none"></div>
                             </div>
 
                             {/* Content */}
