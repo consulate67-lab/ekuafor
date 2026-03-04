@@ -115,7 +115,7 @@ export default function LandingPage() {
                     </button>
 
                     <button
-                        onClick={() => navigate('/')}
+                        onClick={() => navigate('/app')}
                         className="px-8 py-4 bg-white/5 text-white border border-white/10 rounded-full font-bold text-lg hover:bg-white/10 active:scale-95 transition-all w-full sm:w-auto backdrop-blur-sm"
                     >
                         Uygulamaya Git
