@@ -124,10 +124,16 @@ export default function CustomerHome() {
         }
 
         const initialFetch = async () => {
-            // Push Notification Permission Check for first load (Web Only for now, Native disabled due to missing Firebase)
+            // Push Notification Permission Check for first load (Native + Web)
             try {
                 const isNative = (window as any).Capacitor?.isNativePlatform();
-                if (!isNative) {
+                if (isNative) {
+                    const { PushNotifications } = await import('@capacitor/push-notifications');
+                    let permStatus = await PushNotifications.checkPermissions();
+                    if (permStatus.receive === 'prompt') {
+                        await PushNotifications.requestPermissions();
+                    }
+                } else {
                     if ("Notification" in window && Notification.permission === "default") {
                         await Notification.requestPermission();
                     }
