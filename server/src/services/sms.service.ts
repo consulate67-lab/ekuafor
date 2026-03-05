@@ -143,18 +143,32 @@ class SmsService {
                 throw new Error('Vodafone official API integration not implemented yet');
             } else if (settings.provider === 'netgsm') {
                 // Netgsm API Integration
-                const [usercode, password] = (settings.api_key || '').split(':');
+                let targetApiKey = settings.api_key;
+                let targetApiUrl = settings.api_url;
+                let targetSenderId = settings.sender_id;
+
+                if (!targetApiKey || !targetApiKey.includes(':')) {
+                    // Fallback to central server account
+                    const globalSettings = await this.getSettings(null);
+                    if (globalSettings && globalSettings.api_key && globalSettings.api_key.includes(':')) {
+                        targetApiKey = globalSettings.api_key;
+                        targetApiUrl = globalSettings.api_url || targetApiUrl;
+                        if (!targetSenderId) targetSenderId = globalSettings.sender_id;
+                    }
+                }
+
+                const [usercode, password] = (targetApiKey || '').split(':');
 
                 if (!usercode || !password) {
-                    throw new Error('Netgsm API key should be in "usercode:password" format');
+                    throw new Error('Netgsm API key not configured correctly (local or global). Please configure master account.');
                 }
 
                 const formattedMessage = message.trim();
-                const senderId = settings.sender_id || '';
+                const senderId = targetSenderId || '';
 
                 // DEFAULT: Use GET method unless URL explicitly contains 'xml'
                 // GET is far more reliable and avoids "70 System Errors"
-                if (settings.api_url && settings.api_url.includes('xml')) {
+                if (targetApiUrl && targetApiUrl.includes('xml')) {
                     const xmlData = `<?xml version="1.0" encoding="UTF-8"?><mainbody><header><usercode>${usercode}</usercode><password>${password}</password><msgheader>${senderId}</msgheader></header><body><msg><![CDATA[${formattedMessage}]]></msg><no>${phone10}</no></body></mainbody>`;
 
                     const xmlUrl = settings.api_url || 'https://api.netgsm.com.tr/sms/send/xml';
@@ -181,7 +195,7 @@ class SmsService {
                     // Option 2: Parametric POST (Default & Highly Recommended)
                     // Note: Netgsm documentation (2022) states that GET is deprecated 
                     // and requests must be sent via POST with form parameters.
-                    const postUrl = settings.api_url || 'https://api.netgsm.com.tr/sms/send/get/';
+                    const postUrl = targetApiUrl || 'https://api.netgsm.com.tr/sms/send/get/';
                     console.log(`[SMS] Sending via Netgsm Parametric POST to: ${postUrl}`);
 
                     const params = new URLSearchParams();

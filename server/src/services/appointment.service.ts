@@ -422,12 +422,39 @@ class AppointmentService {
                 const time = updatedAppointment.start_time;
 
                 try {
+                    let smsSent = false;
+
                     if (phone && status === 'approved') {
                         const message = `Sayın ${name}, randevunuz ONAYLANMIŞTIR. Tarih: ${date} Saat: ${time}. Bekliyoruz!`;
-                        await smsService.sendSms(updatedAppointment.company_id, phone, message);
+                        smsSent = await smsService.sendSms(updatedAppointment.company_id, phone, message);
                     } else if (phone && status === 'cancelled') {
                         const message = `Sayın ${name}, ${date} tarihli randevunuz maalesef İPTAL EDİLMİŞTİR. Detaylar için iletişime geçebilirsiniz.`;
-                        await smsService.sendSms(updatedAppointment.company_id, phone, message);
+                        smsSent = await smsService.sendSms(updatedAppointment.company_id, phone, message);
+                    }
+
+                    // PUSH NOTIFICATION FALLBACK
+                    if (!smsSent && phone && (status === 'approved' || status === 'cancelled')) {
+                        console.log(`[Service] SMS not sent, checking for push token for phone: ${phone}`);
+
+                        // Dynamically import pushService to avoid circular dependency just in case, or just require
+                        // I'll import it at the top of the file normally in a moment, but since I'm editing a block, I'll use require inline or just call it if imported at top.
+                        // I need to add import at the top of the file later.
+                        const pushService = require('./push.service').default;
+
+                        const token = await pushService.getPushTokenByPhone(phone);
+                        if (token) {
+                            const title = status === 'approved' ? 'Randevunuz Onaylandı' : 'Randevunuz İptal Edildi';
+                            const body = status === 'approved'
+                                ? `Sayın ${name}, ${date} ${time} randevunuz onaylanmıştır. Bekliyoruz!`
+                                : `Sayın ${name}, ${date} ${time} randevunuz iptal edilmiştir.`;
+
+                            await pushService.sendNotification(token, title, body, {
+                                appointmentId: id,
+                                type: status
+                            });
+                        } else {
+                            console.log(`[Service] No push token found for phone: ${phone}`);
+                        }
                     }
                 } catch (smsError) {
                     console.error(`SMS notification failed for status ${status}:`, smsError);
@@ -564,15 +591,26 @@ class AppointmentService {
         }
     }
 
-    async syncDeviceWithPhone(deviceId: string, phone: string) {
-        console.log(`[Service] syncDeviceWithPhone: Device=${deviceId}, Phone=${phone}`);
-        const query = `
-            INSERT INTO customer_devices (device_id, customer_phone, last_sync)
-            VALUES ($1, $2, CURRENT_TIMESTAMP)
-            ON CONFLICT (device_id) 
-            DO UPDATE SET customer_phone = $2, last_sync = CURRENT_TIMESTAMP
-        `;
-        await pool.query(query, [deviceId, phone]);
+    async syncDeviceWithPhone(deviceId: string, phone: string, pushToken?: string) {
+        console.log(`[Service] syncDeviceWithPhone: Device=${deviceId}, Phone=${phone}, pushToken=${pushToken}`);
+
+        if (pushToken) {
+            const query = `
+                INSERT INTO customer_devices (device_id, customer_phone, push_token, last_sync)
+                VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+                ON CONFLICT (device_id) 
+                DO UPDATE SET customer_phone = $2, push_token = $3, last_sync = CURRENT_TIMESTAMP
+            `;
+            await pool.query(query, [deviceId, phone, pushToken]);
+        } else {
+            const query = `
+                INSERT INTO customer_devices (device_id, customer_phone, last_sync)
+                VALUES ($1, $2, CURRENT_TIMESTAMP)
+                ON CONFLICT (device_id) 
+                DO UPDATE SET customer_phone = $2, last_sync = CURRENT_TIMESTAMP
+            `;
+            await pool.query(query, [deviceId, phone]);
+        }
 
         // Bilinen tüm randevuları da bu tele bağlayalım (Eski randevuların sahiplenilmesi)
         await this.claimAppointmentsByDevice(deviceId, phone);

@@ -445,6 +445,7 @@ const runMigrations = async () => {
                 id SERIAL PRIMARY KEY,
                 device_id VARCHAR(255) UNIQUE NOT NULL,
                 customer_phone VARCHAR(20) NOT NULL,
+                push_token VARCHAR(255),
                 last_sync TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
@@ -602,6 +603,7 @@ const runMigrations = async () => {
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS department_id INTEGER');
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS title VARCHAR(100) DEFAULT \'Personel\'');
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_phone_verified BOOLEAN DEFAULT false');
+        await pool.query('ALTER TABLE customer_devices ADD COLUMN IF NOT EXISTS push_token VARCHAR(255)');
 
         try {
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS genders TEXT[]');

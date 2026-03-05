@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import { Appointment, Service, Company, User } from '../types';
 import { useAuthStore } from '../store/authStore';
@@ -21,7 +21,6 @@ export default function BookingPage() {
     const { isAuthenticated, user } = useAuthStore();
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const location = useLocation();
     const [searchParams] = useSearchParams();
     const [company, setCompany] = useState<Company | null>(null);
     const [staff, setStaff] = useState<User[]>([]);
@@ -120,10 +119,11 @@ export default function BookingPage() {
                         setSelection(pendingData.selection);
                         setStep(5); // Set to Confirm Step
 
-                        // Simulate a brief delay to allow React state to settle, then submit
+                        // Direct logic: wait for data to be loaded, then submit
+                        setSelection(pendingData.selection);
+                        setStep(5);
                         setTimeout(() => {
-                            const submitBtn = document.getElementById('final-confirm-btn');
-                            if (submitBtn) submitBtn.click();
+                            handleSubmit(undefined, pendingData.selection);
                         }, 500);
                     }
                 } catch (e) {
@@ -384,18 +384,20 @@ export default function BookingPage() {
         return slots;
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = async (e?: React.FormEvent, customSelection?: SelectionState) => {
+        if (e) e.preventDefault();
+        const currentSel = customSelection || selection;
+
         try {
             let duration = 0;
             let totalPrice = 0;
             let finalServices: any[] = [];
-            const pkg = selection.packageId ? packages.find(p => p.id === selection.packageId) : null;
-            const [h, m] = (selection.time || '00:00').split(':').map(Number);
+            const pkg = currentSel.packageId ? packages.find(p => p.id === currentSel.packageId) : null;
+            const [h, m] = (currentSel.time || '00:00').split(':').map(Number);
             const startTimeMins = h * 60 + m;
 
             // Pre-parse today's appointments for conflict checking
-            const dayApps = appointments.filter(a => (a.appointment_date || '').substring(0, 10) === selection.date && a.status !== 'cancelled');
+            const dayApps = appointments.filter(a => (a.appointment_date || '').substring(0, 10) === currentSel.date && a.status !== 'cancelled');
 
             if (pkg) {
                 duration = pkg.duration_minutes;
@@ -416,7 +418,7 @@ export default function BookingPage() {
                     });
 
                     // 2. Find first available candidate
-                    let bestStaffId = svc.staff_id || selection.staffId; // Fallback to provided staff or selection
+                    let bestStaffId = svc.staff_id || currentSel.staffId; // Fallback to provided staff or selection
                     for (const candidate of candidates) {
                         const isBusy = dayApps.some(app => {
                             if (Number(app.staff_id) !== Number(candidate.id)) return false;
@@ -439,12 +441,12 @@ export default function BookingPage() {
                     currentOffset += svc.duration_minutes;
                 }
             } else {
-                const selectedServices = services.filter(s => selection.serviceIds.includes(s.id!));
+                const selectedServices = services.filter(s => currentSel.serviceIds.includes(s.id!));
                 duration = selectedServices.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
                 totalPrice = selectedServices.reduce((sum, s) => sum + Number(s.price), 0);
-                finalServices = selection.serviceIds.map(sid => ({
+                finalServices = currentSel.serviceIds.map(sid => ({
                     service_id: sid,
-                    staff_id: selection.staffId
+                    staff_id: currentSel.staffId
                 }));
             }
 
@@ -452,7 +454,7 @@ export default function BookingPage() {
             const endTime = `${String(Math.floor(newEnd / 60)).padStart(2, '0')}:${String(newEnd % 60).padStart(2, '0')}`;
             const serviceNames = pkg
                 ? pkg.name
-                : services.filter(s => selection.serviceIds.includes(s.id!)).map(s => s.name).join(', ');
+                : services.filter(s => currentSel.serviceIds.includes(s.id!)).map(s => s.name).join(', ');
 
             // Get Device ID
             let deviceId = undefined;
@@ -461,18 +463,21 @@ export default function BookingPage() {
                 deviceId = info.identifier;
             } catch (e) { }
 
+            const cachedPhone = localStorage.getItem('customer_phone');
+            const finalPhone = user?.phone || cachedPhone || currentSel.customerPhone;
+
             const res = await api.post('/appointments', {
                 company_id: Number(id),
-                staff_id: finalServices[0]?.staff_id || selection.staffId, // Principal staff
+                staff_id: finalServices[0]?.staff_id || currentSel.staffId, // Principal staff
                 service_id: finalServices[0]?.service_id,
                 service_ids: finalServices.map(s => s.service_id),
-                package_id: selection.packageId,
-                appointment_date: selection.date,
-                start_time: selection.time,
+                package_id: currentSel.packageId,
+                appointment_date: currentSel.date,
+                start_time: currentSel.time,
                 end_time: endTime,
-                customer_name: selection.customerName,
-                customer_phone: user?.phone || selection.customerPhone,
-                notes: `Müşteri: ${selection.customerName} | Tel: ${user?.phone || selection.customerPhone} | ${serviceNames}`,
+                customer_name: currentSel.customerName,
+                customer_phone: finalPhone,
+                notes: `Müşteri: ${currentSel.customerName} | Tel: ${finalPhone} | ${serviceNames}`,
                 price: totalPrice,
                 device_id: deviceId,
                 status: 'pending',
@@ -487,18 +492,36 @@ export default function BookingPage() {
                 }
             }
 
-            // Phone is optional - if provided, save for backward compatibility only
-            if (selection.customerPhone) {
-                localStorage.setItem('customer_phone', selection.customerPhone);
-            }
+            if (res.data.success) {
+                // İlk defa telefon girdiyse bunu sakla
+                if (finalPhone && !cachedPhone) {
+                    localStorage.setItem('customer_phone', finalPhone);
+                }
 
-            // Request notification permission if not already granted
-            if ("Notification" in window && Notification.permission === "default") {
-                Notification.requestPermission();
-            }
+                // Senkronize et (Device <-> Phone)
+                if (deviceId && finalPhone) {
+                    try {
+                        await api.post('/appointments/customers/sync', {
+                            device_id: deviceId,
+                            customer_phone: finalPhone,
+                            push_token: localStorage.getItem('push_token')
+                        });
+                    } catch (syncErr) {
+                        console.warn('Device sync failed', syncErr);
+                    }
+                }
 
-            alert('Randevu talebiniz alındı! Talebiniz onaylandığında size bildirim gönderilecektir. "Randevularım" sayfasından takip edebilirsiniz.');
-            navigate('/my-appointments', { replace: true });
+                // Request notification permission if not already granted
+                if ("Notification" in window && Notification.permission === "default") {
+                    Notification.requestPermission();
+                }
+
+                // Başarılı olduğunda storage'ı temizle
+                localStorage.removeItem('pending_booking');
+
+                // Removed alert here so it seamlessly transitions without asking the user
+                navigate('/my-appointments', { replace: true });
+            }
         } catch (err: any) {
             console.error('Booking failed', err);
             const serverMsg = err.response?.data?.error || err.message;
@@ -955,6 +978,20 @@ export default function BookingPage() {
                                             placeholder="Adınız Soyadınız (Opsiyonel)"
                                         />
                                     </div>
+
+                                    {!isAuthenticated && !localStorage.getItem('customer_phone') && (
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-400 text-sm p-0">+90</span>
+                                            <input
+                                                type="tel"
+                                                value={selection.customerPhone}
+                                                onChange={e => setSelection({ ...selection, customerPhone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                                                className="w-full p-4 pl-12 bg-white rounded-2xl border-2 border-slate-100 font-bold text-slate-900 focus:outline-none focus:border-indigo-500 shadow-sm transition-all text-sm tracking-widest"
+                                                placeholder="5XX XXX XX XX"
+                                                required
+                                            />
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="space-y-3 px-2">
@@ -971,31 +1008,14 @@ export default function BookingPage() {
                                     </label>
                                 </div>
 
-                                {isAuthenticated ? (
-                                    <button
-                                        id="final-confirm-btn"
-                                        className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-5 rounded-3xl font-black text-base uppercase tracking-widest shadow-2xl shadow-orange-200 active:scale-95 transition-all mt-6"
-                                    >
-                                        Randevuyu Onayla
-                                    </button>
-                                ) : (
-                                    <div className="mt-6 flex flex-col gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                localStorage.setItem('pending_booking', JSON.stringify({ selection, companyId: id }));
-                                                // We must use location.pathname and location.search for HashRouter to get the real route
-                                                navigate(`/customer-login?redirect=${encodeURIComponent(location.pathname + location.search)}`);
-                                            }}
-                                            className="w-full bg-indigo-600 text-white py-5 rounded-3xl font-black text-base uppercase tracking-widest shadow-2xl shadow-indigo-200 active:scale-95 transition-all"
-                                        >
-                                            Giriş Yap ve Onayla
-                                        </button>
-                                        <p className="text-[10px] text-slate-400 font-bold text-center uppercase tracking-widest">
-                                            Randevu oluşturmak için telefon numarası doğrulaması gereklidir.
-                                        </p>
-                                    </div>
-                                )}
+                                <button
+                                    id="final-confirm-btn"
+                                    type="submit"
+                                    disabled={!isAuthenticated && !localStorage.getItem('customer_phone') && selection.customerPhone.length < 10}
+                                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-5 rounded-3xl font-black text-base uppercase tracking-widest shadow-2xl shadow-orange-200 active:scale-95 transition-all mt-6 disabled:opacity-50"
+                                >
+                                    Randevuyu Onayla
+                                </button>
                             </form>
                         </div>
                     </div>

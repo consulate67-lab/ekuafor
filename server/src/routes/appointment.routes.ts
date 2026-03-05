@@ -342,11 +342,11 @@ router.patch('/:id', async (req: Request, res: Response) => {
 // Cihaz ve Telefonu eşleştir
 router.post('/customers/sync', async (req: Request, res: Response) => {
     try {
-        const { device_id, customer_phone } = req.body;
+        const { device_id, customer_phone, push_token } = req.body;
         if (!device_id || !customer_phone) {
             return res.status(400).json({ success: false, error: 'Device ID ve Telefon gereklidir' });
         }
-        await appointmentService.syncDeviceWithPhone(device_id, customer_phone);
+        await appointmentService.syncDeviceWithPhone(device_id, customer_phone, push_token);
         res.json({ success: true, message: 'Senkronizasyon başarılı' });
     } catch (err) {
         console.error('Sync Error:', err);

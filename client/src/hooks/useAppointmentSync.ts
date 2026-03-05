@@ -118,16 +118,75 @@ export function useAppointmentSync() {
             }
         };
 
-        initDevice().then(() => {
+        initDevice().then(async () => {
             syncAppointments();
+
+            // Push Notification Setup
+            try {
+                const isNative = (window as any).Capacitor?.isNativePlatform();
+                if (isNative) {
+                    const { PushNotifications } = await import('@capacitor/push-notifications');
+
+                    let permStatus = await PushNotifications.checkPermissions();
+
+                    if (permStatus.receive === 'prompt') {
+                        permStatus = await PushNotifications.requestPermissions();
+                    }
+
+                    if (permStatus.receive === 'granted') {
+                        await PushNotifications.register();
+
+                        PushNotifications.addListener('registration', (token) => {
+                            console.log('[Push] Registration token: ', token.value);
+                            localStorage.setItem('push_token', token.value);
+
+                            // Immediately sync if we have a phone number already
+                            const phone = localStorage.getItem('customer_phone');
+                            const deviceId = localStorage.getItem('device_id');
+                            if (phone && deviceId) {
+                                api.post('/appointments/customers/sync', {
+                                    device_id: deviceId,
+                                    customer_phone: phone,
+                                    push_token: token.value
+                                }).catch(err => console.error('Push sync error:', err));
+                            }
+                        });
+
+                        PushNotifications.addListener('registrationError', (error: any) => {
+                            console.error('[Push] Registration error: ', error);
+                        });
+
+                        PushNotifications.addListener('pushNotificationReceived', (notification) => {
+                            console.log('[Push] Notification received: ', notification);
+                        });
+                    }
+                } else {
+                    // Web push - Service Worker would handle this in a real PWA
+                    if ("Notification" in window && Notification.permission !== "denied") {
+                        const permission = await Notification.requestPermission();
+                        if (permission === 'granted') {
+                            // Dummy push token for Web until VAPID is implemented
+                            localStorage.setItem('push_token', 'web-push-allowed');
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('[Push] Setup failed:', e);
+            }
         });
 
         const interval = setInterval(syncAppointments, 30000);
 
-        if ("Notification" in window && Notification.permission === "default") {
-            Notification.requestPermission();
-        }
-
-        return () => clearInterval(interval);
+        return () => {
+            clearInterval(interval);
+            try {
+                const isNative = (window as any).Capacitor?.isNativePlatform();
+                if (isNative) {
+                    import('@capacitor/push-notifications').then(({ PushNotifications }) => {
+                        PushNotifications.removeAllListeners();
+                    });
+                }
+            } catch (e) { }
+        };
     }, [syncAppointments]);
 }

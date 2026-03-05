@@ -87,8 +87,8 @@ export default function CompanyForm() {
 
     // SMS Settings
     const [smsSettings, setSmsSettings] = useState({
-        provider: 'local_gateway',
-        api_url: '',
+        provider: 'netgsm',
+        api_url: 'https://api.netgsm.com.tr/sms/send/get',
         api_key: '',
         is_active: false,
     });
