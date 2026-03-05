@@ -912,38 +912,9 @@ export default function CompanyForm() {
                             </div>
 
                             {smsSettings.is_active && (
-                                <>
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Sağlayıcı</label>
-                                        <select
-                                            className="input-field"
-                                            value={smsSettings.provider}
-                                            onChange={e => setSmsSettings(prev => ({ ...prev, provider: e.target.value as any }))}
-                                        >
-                                            <option value="local_gateway">Yerel Gateway (Vodafone SIM/Android)</option>
-                                            <option value="vodafone_official">Vodafone Resmi API</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Gateway URL</label>
-                                        <input
-                                            type="url"
-                                            placeholder="http://192.168...:8080/send-sms"
-                                            className="input-field"
-                                            value={smsSettings.api_url}
-                                            onChange={e => setSmsSettings(prev => ({ ...prev, api_url: e.target.value }))}
-                                        />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">API/Gateway Şifresi (Opsiyonel)</label>
-                                        <input
-                                            type="password"
-                                            className="input-field"
-                                            value={smsSettings.api_key}
-                                            onChange={e => setSmsSettings(prev => ({ ...prev, api_key: e.target.value }))}
-                                        />
-                                    </div>
-                                </>
+                                <div className="md:col-span-2 p-4 bg-violet-100 rounded-xl border border-violet-200">
+                                    <p className="text-sm text-violet-800 font-medium">Sistem merkezi NetGSM altyapısını kullanmaktadır. Bu firmaya ait randevular onaylandığında veya iptal edildiğinde, arka planda otomatik olarak müşteriye SMS gönderilecektir. Ekstra bir ayar yapmanıza gerek yoktur.</p>
+                                </div>
                             )}
                         </div>
                     </div>
