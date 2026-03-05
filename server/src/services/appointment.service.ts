@@ -194,20 +194,8 @@ class AppointmentService {
 
             await client.query('COMMIT');
 
-            // SMS Notification (Async)
-            try {
-                if (newAppointment.customer_id || newAppointment.customer_phone) {
-                    const phone = newAppointment.customer_phone;
-                    const name = newAppointment.customer_name || 'Değerli Müşterimiz';
-                    if (phone) {
-                        const message = `Merhaba ${name}, randevunuz alınmıştır. Tarih: ${newAppointment.appointment_date} Saat: ${newAppointment.start_time}. Bizi tercih ettiğiniz için teşekkür ederiz!`;
-                        await smsService.sendSms(newAppointment.company_id, phone, message);
-                    }
-                }
-            } catch (smsError) {
-                console.error('SMS notification failed during appointment creation:', smsError);
-            }
-
+            // Appointment creation notification is skipped as per user request. 
+            // Notifications will be sent upon employee approval.
             return newAppointment;
         } catch (dbError) {
             await client.query('ROLLBACK');
@@ -422,13 +410,25 @@ class AppointmentService {
                 const time = updatedAppointment.start_time;
 
                 try {
+                    // Fetch company and staff details for the notification text
+                    const detailsRes = await pool.query(`
+                        SELECT c.name as company_name, u.first_name, u.last_name
+                        FROM appointments a
+                        LEFT JOIN companies c ON a.company_id = c.id
+                        LEFT JOIN users u ON a.staff_id = u.id
+                        WHERE a.id = $1
+                    `, [id]);
+                    const details = detailsRes.rows[0];
+                    const companyName = details?.company_name || 'İşletme';
+                    const staffName = (details?.first_name || details?.last_name) ? `${details.first_name || ''} ${details.last_name || ''}`.trim() : 'Uzman personelimiz';
+
                     let smsSent = false;
 
                     if (phone && status === 'approved') {
-                        const message = `Sayın ${name}, randevunuz ONAYLANMIŞTIR. Tarih: ${date} Saat: ${time}. Bekliyoruz!`;
+                        const message = `Sayın ${name}, ${companyName} işletmesinde ${staffName} ile ${date} Tarihli, Saat: ${time} randevunuz ONAYLANMIŞTIR. Bekliyoruz!`;
                         smsSent = await smsService.sendSms(updatedAppointment.company_id, phone, message);
                     } else if (phone && status === 'cancelled') {
-                        const message = `Sayın ${name}, ${date} tarihli randevunuz maalesef İPTAL EDİLMİŞTİR. Detaylar için iletişime geçebilirsiniz.`;
+                        const message = `Sayın ${name}, ${companyName} işletmesindeki ${date} tarihli randevunuz İPTAL EDİLMİŞTİR.`;
                         smsSent = await smsService.sendSms(updatedAppointment.company_id, phone, message);
                     }
 
@@ -436,17 +436,15 @@ class AppointmentService {
                     if (!smsSent && phone && (status === 'approved' || status === 'cancelled')) {
                         console.log(`[Service] SMS not sent, checking for push token for phone: ${phone}`);
 
-                        // Dynamically import pushService to avoid circular dependency just in case, or just require
-                        // I'll import it at the top of the file normally in a moment, but since I'm editing a block, I'll use require inline or just call it if imported at top.
-                        // I need to add import at the top of the file later.
+                        // Dynamically import pushService to avoid circular dependency
                         const pushService = require('./push.service').default;
 
                         const token = await pushService.getPushTokenByPhone(phone);
                         if (token) {
                             const title = status === 'approved' ? 'Randevunuz Onaylandı' : 'Randevunuz İptal Edildi';
                             const body = status === 'approved'
-                                ? `Sayın ${name}, ${date} ${time} randevunuz onaylanmıştır. Bekliyoruz!`
-                                : `Sayın ${name}, ${date} ${time} randevunuz iptal edilmiştir.`;
+                                ? `Sayın ${name}, ${companyName} işletmesinde ${staffName} ile ${date} ${time} randevunuz onaylanmıştır.`
+                                : `Sayın ${name}, ${companyName} işletmesindeki ${date} ${time} randevunuz iptal edilmiştir.`;
 
                             await pushService.sendNotification(token, title, body, {
                                 appointmentId: id,

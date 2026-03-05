@@ -120,16 +120,21 @@ class SmsService {
         // Firmanın kendi SMS ayarını ara, yoksa global ayara (company_id = null) bak
         let settings = await this.getSettings(companyId);
 
-        if (!settings || !settings.is_active) {
-            // Firma ayarı yoksa global ayarı dene
+        if (settings && !settings.is_active) {
+            console.warn(`[SMS] Company ${companyId} explicitly disabled SMS. Skipping.`);
+            return false;
+        }
+
+        if (!settings) {
+            // Firma ayarı hiç yoksa global ayarı dene
             if (companyId !== null) {
-                console.log(`[SMS] Company ${companyId} has no SMS settings, falling back to global settings...`);
+                console.log(`[SMS] Company ${companyId} has no SMS settings record, falling back to global settings...`);
                 settings = await this.getSettings(null);
             }
         }
 
         if (!settings || !settings.is_active) {
-            console.warn(`SMS skipping: Settings not found or inactive for company ${companyId} (and no global fallback)`);
+            console.warn(`SMS skipping: Global Settings not found or inactive`);
             return false;
         }
 
