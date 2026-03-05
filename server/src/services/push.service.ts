@@ -2,25 +2,37 @@ import * as admin from 'firebase-admin';
 import pool from '../config/database';
 
 try {
-    const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
-    if (serviceAccountPath) {
-        // Build the absolute path from the project root or use the provided exact path
-        const path = require('path');
-        const absolutePath = path.resolve(process.cwd(), serviceAccountPath);
-        const serviceAccount = require(absolutePath);
+    if (!admin.apps.length) {
+        // Option 1: JSON string or base64 from environment variable (for Railway/production)
+        const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+        // Option 2: Local JSON file path (for local development)
+        const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
 
-        if (!admin.apps.length) {
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount)
-            });
-            console.log('[PushService] Firebase Admin initialized using Service Account JSON.');
+        if (serviceAccountJson) {
+            let serviceAccount: any;
+            try {
+                // Try plain JSON first
+                serviceAccount = JSON.parse(serviceAccountJson);
+            } catch {
+                // Try base64 decode
+                serviceAccount = JSON.parse(Buffer.from(serviceAccountJson, 'base64').toString('utf8'));
+            }
+            admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+            console.log('[PushService] Firebase Admin initialized via FIREBASE_SERVICE_ACCOUNT_JSON env var.');
+        } else if (serviceAccountPath) {
+            const path = require('path');
+            const absolutePath = path.resolve(process.cwd(), serviceAccountPath);
+            const serviceAccount = require(absolutePath);
+            admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+            console.log('[PushService] Firebase Admin initialized via JSON file:', absolutePath);
+        } else {
+            console.warn('[PushService] Warning: No Firebase credentials found. Push notifications will be simulated.');
         }
-    } else {
-        console.warn('[PushService] Warning: FIREBASE_SERVICE_ACCOUNT_PATH is not set in .env. Notifications will be simulated.');
     }
 } catch (e) {
     console.error('[PushService] Error initializing Firebase Admin:', e);
 }
+
 
 class PushService {
     async sendNotification(pushToken: string, title: string, body: string, data?: any): Promise<boolean> {
