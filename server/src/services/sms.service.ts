@@ -33,7 +33,25 @@ class SmsService {
                 ? 'SELECT * FROM sms_settings WHERE company_id = $1 LIMIT 1'
                 : 'SELECT * FROM sms_settings WHERE company_id IS NULL LIMIT 1';
             const values = cid ? [cid] : [];
-            const result = await pool.query(query, values);
+            let result = await pool.query(query, values);
+
+            if (!result.rows[0] && !cid) {
+                // If checking for NULL (global) and it is not found, fallback to ANY valid settings with an API key
+                const fallbackQuery = `
+                    SELECT * FROM sms_settings
+                    WHERE api_key IS NOT NULL 
+                      AND api_key != '' 
+                      AND api_key LIKE '%:%'
+                      AND is_active = true
+                    ORDER BY id ASC
+                    LIMIT 1
+                `;
+                result = await pool.query(fallbackQuery);
+                if (result.rows[0]) {
+                    console.log(`[SMS] Using Company ID: ${result.rows[0].company_id} as global fallback.`);
+                }
+            }
+
             return result.rows[0] || null;
         } catch (error) {
             console.error('Error fetching SMS settings:', error);
