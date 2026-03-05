@@ -99,12 +99,23 @@ class SmsService {
      * SMS Gönder
      */
     async sendSms(companyId: number | null, phoneNumber: string, message: string): Promise<boolean> {
-        const settings = await this.getSettings(companyId);
+        // Firmanın kendi SMS ayarını ara, yoksa global ayara (company_id = null) bak
+        let settings = await this.getSettings(companyId);
 
         if (!settings || !settings.is_active) {
-            console.warn(`SMS skipping: Settings not found or inactive for company ${companyId}`);
+            // Firma ayarı yoksa global ayarı dene
+            if (companyId !== null) {
+                console.log(`[SMS] Company ${companyId} has no SMS settings, falling back to global settings...`);
+                settings = await this.getSettings(null);
+            }
+        }
+
+        if (!settings || !settings.is_active) {
+            console.warn(`SMS skipping: Settings not found or inactive for company ${companyId} (and no global fallback)`);
             return false;
         }
+
+        console.log(`[SMS] Using settings: company=${settings.company_id ?? 'GLOBAL'}, provider=${settings.provider}`);
 
         // Phone number formatting (Turkish numbers)
         let formattedPhone = phoneNumber.replace(/\D/g, '');
