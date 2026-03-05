@@ -159,19 +159,26 @@ class SmsService {
                 let targetSenderId = settings.sender_id;
 
                 if (!targetApiKey || !targetApiKey.includes(':')) {
-                    // Fallback to central server account
+                    // Fallback to central server account from DB
                     const globalSettings = await this.getSettings(null);
                     if (globalSettings && globalSettings.api_key && globalSettings.api_key.includes(':')) {
                         targetApiKey = globalSettings.api_key;
                         targetApiUrl = globalSettings.api_url || targetApiUrl;
                         if (!targetSenderId) targetSenderId = globalSettings.sender_id;
                     }
+                    // Fallback to environment variables
+                    else if (process.env.NETGSM_API_KEY && process.env.NETGSM_API_KEY.includes(':')) {
+                        console.log('[SMS] Falling back to Netgsm ENV variables');
+                        targetApiKey = process.env.NETGSM_API_KEY;
+                        targetApiUrl = process.env.NETGSM_API_URL || targetApiUrl;
+                        if (!targetSenderId) targetSenderId = process.env.NETGSM_SENDER_ID;
+                    }
                 }
 
                 const [usercode, password] = (targetApiKey || '').split(':');
 
                 if (!usercode || !password) {
-                    throw new Error('Netgsm API key not configured correctly (local or global). Please configure master account.');
+                    throw new Error('Netgsm API key not configured correctly (local, global DB, or ENV). Please configure master account.');
                 }
 
                 const formattedMessage = message.trim();
