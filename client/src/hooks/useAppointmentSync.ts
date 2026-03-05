@@ -125,41 +125,10 @@ export function useAppointmentSync() {
             try {
                 const isNative = (window as any).Capacitor?.isNativePlatform();
                 if (isNative) {
-                    const { PushNotifications } = await import('@capacitor/push-notifications');
-
-                    let permStatus = await PushNotifications.checkPermissions();
-
-                    if (permStatus.receive === 'prompt') {
-                        permStatus = await PushNotifications.requestPermissions();
-                    }
-
-                    if (permStatus.receive === 'granted') {
-                        await PushNotifications.register();
-
-                        PushNotifications.addListener('registration', (token) => {
-                            console.log('[Push] Registration token: ', token.value);
-                            localStorage.setItem('push_token', token.value);
-
-                            // Immediately sync if we have a phone number already
-                            const phone = localStorage.getItem('customer_phone');
-                            const deviceId = localStorage.getItem('device_id');
-                            if (phone && deviceId) {
-                                api.post('/appointments/customers/sync', {
-                                    device_id: deviceId,
-                                    customer_phone: phone,
-                                    push_token: token.value
-                                }).catch(err => console.error('Push sync error:', err));
-                            }
-                        });
-
-                        PushNotifications.addListener('registrationError', (error: any) => {
-                            console.error('[Push] Registration error: ', error);
-                        });
-
-                        PushNotifications.addListener('pushNotificationReceived', (notification) => {
-                            console.log('[Push] Notification received: ', notification);
-                        });
-                    }
+                    // Disable native push notification initialization completely for now.
+                    // Doing an import on `@capacitor/push-notifications` without Firebase (google-services.json) explicitly loaded in Android
+                    // causes a fatal Native Crash (IllegalStateException: Default FirebaseApp is not initialized or App keeps stopping).
+                    console.log('[Push] Native Push Notifications are disabled until Firebase (google-services.json) is fully configured for Android.');
                 } else {
                     // Web push - Service Worker would handle this in a real PWA
                     if ("Notification" in window && Notification.permission !== "denied") {
@@ -180,12 +149,7 @@ export function useAppointmentSync() {
         return () => {
             clearInterval(interval);
             try {
-                const isNative = (window as any).Capacitor?.isNativePlatform();
-                if (isNative) {
-                    import('@capacitor/push-notifications').then(({ PushNotifications }) => {
-                        PushNotifications.removeAllListeners();
-                    });
-                }
+                // (Cleanup for push notifications disabled to prevent fatal error)
             } catch (e) { }
         };
     }, [syncAppointments]);
