@@ -1,0 +1,495 @@
+﻿commit 46818dd7858892da2de15e05dea3a8e870d7e25b
+Author: Your Name <you@example.com>
+Date:   Tue Mar 3 11:20:00 2026 +0300
+
+    refactor(dashboard): remove staff reports and schedule components
+
+diff --git a/client/src/pages/Dashboard.tsx b/client/src/pages/Dashboard.tsx
+index 2c92ead..5cf48f8 100644
+--- a/client/src/pages/Dashboard.tsx
++++ b/client/src/pages/Dashboard.tsx
+@@ -8,7 +8,6 @@ import { parseVoiceCommand } from '../lib/aiParser';
+ import { Device } from '@capacitor/device';
+ import { useAuthStore } from '../store/authStore';
+ import api from '../lib/api';
+-import { Appointment } from '../types';
+ 
+ // Leaflet Icon Fix
+ import Tesseract from 'tesseract.js';
+@@ -43,21 +42,8 @@ export default function Dashboard() {
+         endTime: '09:30',
+         price: 0
+     });
+-    const [employeeStats, setEmployeeStats] = useState({
+-        total_appointments: 0,
+-        total_revenue: 0,
+-        total_expenses: 0
+-    });
+-    const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'year'>('today');
+-    const [statsLoading, setStatsLoading] = useState(false);
+-    const [showReports, setShowReports] = useState(false);
+     const [allCompanies, setAllCompanies] = useState<Company[]>([]);
+-    const [appointments, setAppointments] = useState<Appointment[]>([]);
+-    const [showPaymentModal, setShowPaymentModal] = useState(false);
+-    const [paymentApp, setPaymentApp] = useState<Appointment | null>(null);
+-    const [nfcState, setNfcState] = useState<'IDLE' | 'SCANNING' | 'SUCCESS' | 'ERROR'>('IDLE');
+     const [loading, setLoading] = useState(false);
+-    const [editableAmount, setEditableAmount] = useState<number>(0);
+     const [companyInfo, setCompanyInfo] = useState<any>(null);
+     const [showExpenseModal, setShowExpenseModal] = useState(false);
+     const [isLicenseExpired, setIsLicenseExpired] = useState(false);
+@@ -159,23 +145,7 @@ export default function Dashboard() {
+ 
+                     setServices(services);
+ 
+-                    // Fetch today's appointments for the staff member
+-                    try {
+-                        const appsRes = await api.get('/appointments', {
+-                            params: {
+-                                company_id: user.company_id,
+-                                start_date: todayStr,
+-                                end_date: todayStr
+-                            }
+-                        });
+-                        const allApps = appsRes.data?.data || [];
+-                        const myApps = allApps.filter((a: any) =>
+-                            Number(a.staff_id) === Number(user.id) || user.role === 'company_admin'
+-                        );
+-                        setAppointments(myApps);
+-                    } catch (e) {
+-                        console.warn('Dashboard appointments fetch failed', e);
+-                    }
++                    // Staff appointments fetch removed since schedule is not shown here anymore
+ 
+                     // Fetch company details for commission rates
+                     try {
+@@ -198,26 +168,7 @@ export default function Dashboard() {
+         fetchStats();
+     }, [user]);
+ 
+-    const fetchEmployeeStats = async (period: 'today' | 'week' | 'month' | 'year') => {
+-        if (user?.role !== 'staff' && user?.role !== 'company_admin') return;
+-        setStatsLoading(true);
+-        try {
+-            const res = await api.get('/reports/employee-stats', { params: { period, local_date: getLocalDateString() } });
+-            if (res.data.success) {
+-                setEmployeeStats(res.data.data);
+-            }
+-        } catch (e) {
+-            console.error('Employee stats fetch error:', e);
+-        } finally {
+-            setStatsLoading(false);
+-        }
+-    };
+ 
+-    useEffect(() => {
+-        if (user?.role === 'staff' || user?.role === 'company_admin') {
+-            fetchEmployeeStats(selectedPeriod);
+-        }
+-    }, [user, selectedPeriod]);
+ 
+     const startScanner = async () => {
+         setIsScanningReceipt(true);
+@@ -299,7 +250,6 @@ export default function Dashboard() {
+                 alert('Masraf ba┼şar─▒yla eklendi');
+                 setShowExpenseModal(false);
+                 setExpenseForm({ amount: '', description: '', date: getLocalDateString() });
+-                fetchEmployeeStats(selectedPeriod);
+             }
+         } catch (error) {
+             console.error('Expense add error:', error);
+@@ -513,51 +463,7 @@ export default function Dashboard() {
+         }
+     };
+ 
+-    const handleStatusUpdate = async (id: number, status: string, currentPrice?: number) => {
+-        let finalPrice = currentPrice;
+-
+-        if (status === 'completed') {
+-            const app = appointments.find(a => a.id === id);
+-
+-            // If already paid, just update status to completed directly
+-            if (app?.payment_status === 'paid') {
+-                if (!window.confirm('├ûdemesi al─▒nm─▒┼ş bu randevuyu tamamlamak istiyor musunuz?')) return;
+-                try {
+-                    setLoading(true);
+-                    await api.patch(`/appointments/${id}/status`, { status: 'completed' });
+-                    window.location.reload();
+-                } catch (err) {
+-                    alert('Hata olu┼ştu');
+-                    setLoading(false);
+-                }
+-                return;
+-            }
+ 
+-            const priceInput = window.prompt('Hizmet tamamland─▒. Son tutar─▒ onayl─▒yor musunuz?', currentPrice?.toString() || '0');
+-            if (priceInput === null) return;
+-            finalPrice = Number(priceInput);
+-
+-            if (app && finalPrice > 0) {
+-                setPaymentApp({ ...app, price: finalPrice });
+-                setEditableAmount(finalPrice);
+-                setShowPaymentModal(true);
+-                return;
+-            }
+-        }
+-
+-        try {
+-            setLoading(true);
+-            await api.patch(`/appointments/${id}/status`, {
+-                status,
+-                price: finalPrice
+-            });
+-            window.location.reload();
+-        } catch (err: any) {
+-            alert('─░┼şlem ba┼şar─▒s─▒z oldu');
+-        } finally {
+-            setLoading(false);
+-        }
+-    };
+ 
+     return (
+         <div className="min-h-screen bg-slate-50/50">
+@@ -782,69 +688,7 @@ export default function Dashboard() {
+                     )
+                 }
+ 
+-                {/* Raporlama B├Âl├╝m├╝ - Modal Olarak G├╝ncellendi */}
+-                {
+-                    showReports && (user?.role === 'staff' || user?.role === 'company_admin') && (
+-                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+-                            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowReports(false)}></div>
+-
+-                            <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+-                                <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+-                                    <div>
+-                                        <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">├çal─▒┼şan Raporu</h3>
+-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">─░statistiki veriler ve kazan├ğ ├Âzeti</p>
+-                                    </div>
+-                                    <button onClick={() => setShowReports(false)} className="p-2 bg-white rounded-full shadow-sm text-slate-400 hover:text-slate-600">
+-                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+-                                    </button>
+-                                </div>
+-
+-                                <div className="p-8 space-y-8">
+-                                    <div className="flex bg-slate-100 p-1 rounded-2xl w-fit mx-auto">
+-                                        {(['today', 'week', 'month', 'year'] as const).map((p) => (
+-                                            <button
+-                                                key={p}
+-                                                onClick={() => setSelectedPeriod(p)}
+-                                                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${selectedPeriod === p
+-                                                    ? 'bg-white text-slate-900 shadow-sm'
+-                                                    : 'text-gray-400 hover:text-slate-600'
+-                                                    }`}
+-                                            >
+-                                                {p === 'today' ? 'Bug├╝n' : p === 'week' ? 'Hafta' : p === 'month' ? 'Ay' : 'Y─▒l'}
+-                                            </button>
+-                                        ))}
+-                                    </div>
+-
+-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pb-4">
+-                                        <div className="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100 flex flex-col items-center text-center">
+-                                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm mb-4">
+-                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+-                                            </div>
+-                                            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Randevu</p>
+-                                            <p className={`text-4xl font-black text-indigo-900 ${statsLoading ? 'animate-pulse' : ''}`}>{employeeStats.total_appointments}</p>
+-                                        </div>
+-
+-                                        <div className="bg-amber-50/50 p-6 rounded-[2rem] border border-amber-100 flex flex-col items-center text-center">
+-                                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-amber-600 shadow-sm mb-4">
+-                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3z" /><path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zM7.001 11a1 1 0 011-1h8a1 1 0 110 2h-8a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
+-                                            </div>
+-                                            <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1">Toplam Gelir</p>
+-                                            <p className={`text-4xl font-black text-amber-900 ${statsLoading ? 'animate-pulse' : ''}`}>Ôé║{employeeStats.total_revenue.toLocaleString()}</p>
+-                                        </div>
+-
+-                                        <div className="bg-rose-50/50 p-6 rounded-[2rem] border border-rose-100 flex flex-col items-center text-center">
+-                                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-rose-600 shadow-sm mb-4">
+-                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>
+-                                            </div>
+-                                            <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">Gider/Masraf</p>
+-                                            <p className={`text-4xl font-black text-rose-900 ${statsLoading ? 'animate-pulse' : ''}`}>Ôé║{employeeStats.total_expenses.toLocaleString()}</p>
+-                                        </div>
+-                                    </div>
+-                                </div>
+-                            </div>
+-                        </div>
+-                    )
+-                }
++                {/* Raporlama B├Âl├╝m├╝ Kald─▒r─▒ld─▒ */}
+ 
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                     {/* 1. Randevu Y├Ânetimi */}
+@@ -886,26 +730,7 @@ export default function Dashboard() {
+                     )}
+ 
+ 
+-                    {/* 4. ├çal─▒┼şan Raporu */}
+-                    {(user?.role === 'company_admin' || user?.role === 'staff') && (
+-                        <button
+-                            disabled={isLicenseExpired}
+-                            onClick={() => !isLicenseExpired && setShowReports(true)}
+-                            className={`card group border-amber-100 text-left ${isLicenseExpired ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02] transition-all duration-300'}`}
+-                        >
+-                            <div className="flex items-center gap-5">
+-                                <div className="bg-amber-50 p-4 rounded-2xl group-hover:bg-amber-600 group-hover:text-white transition-colors duration-300">
+-                                    <svg className="w-8 h-8 text-amber-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+-                                    </svg>
+-                                </div>
+-                                <div>
+-                                    <h3 className="text-xl font-bold text-gray-900 mb-1">├çal─▒┼şan Raporu</h3>
+-                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Kazan├ğ ve randevu istatistiklerini g├Âr.</p>
+-                                </div>
+-                            </div>
+-                        </button>
+-                    )}
++                    {/* 4. ├çal─▒┼şan Raporu - Kald─▒r─▒ld─▒ */}
+ 
+                     {/* Masraf Girme */}
+                     {(user?.role === 'company_admin' || user?.role === 'staff') && (
+@@ -962,70 +787,7 @@ export default function Dashboard() {
+                 {/* ─░statistikler */}
+                 <div className="mt-12 grid grid-cols-2 lg:grid-cols-4 gap-6">
+ 
+-                    {/* ├çal─▒┼şan ─░statistikleri */}
+-                    {user?.role === 'staff' && (
+-                        <div className="col-span-full space-y-8">
+-                            {/* Today's Appointments List for Staff */}
+-                            <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/50 border border-slate-100 text-left">
+-                                <div className="flex items-center justify-between mb-8">
+-                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Bug├╝nk├╝ Program─▒m</h3>
+-                                    <div className="bg-emerald-50 text-emerald-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100">
+-                                        CANLI
+-                                    </div>
+-                                </div>
+-
+-                                <div className="space-y-4">
+-                                    {appointments.length === 0 ? (
+-                                        <div className="py-12 text-center bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">
+-                                            <p className="text-3xl mb-3">Ôİò</p>
+-                                            <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Bug├╝n i├ğin randevunuz bulunmuyor</p>
+-                                        </div>
+-                                    ) : (
+-                                        appointments.map((app) => (
+-                                            <div key={app.id} className="group bg-white p-6 rounded-[2rem] border border-slate-100 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-300">
+-                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+-                                                    <div className="flex items-center gap-6">
+-                                                        <div className="w-16 h-16 bg-slate-900 text-white rounded-2xl flex flex-col items-center justify-center shadow-lg">
+-                                                            <span className="text-xs font-black uppercase text-indigo-400">{app.start_time.split(':')[0]}</span>
+-                                                            <span className="text-xs font-black opacity-50">{app.start_time.split(':')[1]}</span>
+-                                                        </div>
+-                                                        <div>
+-                                                            <h4 className="text-lg font-black text-slate-900">{app.customer_name || 'Misafir'}</h4>
+-                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+-                                                                {services.find(s => s.id === app.service_id)?.name || 'Hizmet'} | {app.start_time} - {app.end_time}
+-                                                            </p>
+-                                                        </div>
+-                                                    </div>
+-
+-                                                    <div className="flex items-center gap-3">
+-                                                        {app.status === 'approved' && (
+-                                                            <button
+-                                                                onClick={() => handleStatusUpdate(app.id!, 'completed', app.price)}
+-                                                                disabled={loading}
+-                                                                className={`px-8 py-4 ${app.payment_status === 'paid' ? 'bg-emerald-600 shadow-emerald-200' : 'bg-indigo-600 shadow-indigo-200'} text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:opacity-90 active:scale-95 transition-all disabled:opacity-50`}
+-                                                            >
+-                                                                {app.payment_status === 'paid' ? 'Hizmeti Tamamla' : 'Tamamla & ├ûdeme Al'}
+-                                                            </button>
+-                                                        )}
+-                                                        {app.status === 'completed' && (
+-                                                            <span className="px-6 py-4 bg-emerald-50 text-emerald-600 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-emerald-100">
+-                                                                Ô£ô Tamamland─▒
+-                                                            </span>
+-                                                        )}
+-                                                        {app.status === 'pending' && (
+-                                                            <span className="px-6 py-4 bg-amber-50 text-amber-600 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-amber-100">
+-                                                                ÔÅ│ Onay Bekliyor
+-                                                            </span>
+-                                                        )}
+-                                                    </div>
+-                                                </div>
+-                                            </div>
+-                                        ))
+-                                    )}
+-                                </div>
+-                            </div>
+-                        </div>
+-                    )}
++                    {/* ├çal─▒┼şan ─░statistikleri - Kald─▒r─▒ld─▒ */}
+ 
+                 </div>
+ 
+@@ -1228,170 +990,7 @@ export default function Dashboard() {
+                 )
+             }
+ 
+-            {/* Payment Modal (NFC / SoftPOS Simulation) */}
+-            {
+-                showPaymentModal && paymentApp && (
+-                    <div className="fixed inset-0 z-[150] flex items-end justify-center bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
+-                        <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-500">
+-                            <div className="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mb-8" />
+-
+-                            <div className="text-center mb-8">
+-                                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">├ûdeme Al</h3>
+-                                <div className="flex flex-col items-center gap-1">
+-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hizmet Bedeli</label>
+-                                    <div className="relative">
+-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-black text-slate-300">Ôé║</span>
+-                                        <input
+-                                            type="number"
+-                                            value={editableAmount}
+-                                            onChange={(e) => setEditableAmount(Number(e.target.value))}
+-                                            className="w-40 text-center text-3xl font-black text-indigo-600 bg-slate-50 border-none rounded-2xl py-3 pl-8 focus:ring-2 focus:ring-indigo-500 transition-all"
+-                                        />
+-                                    </div>
+-                                </div>
+-                            </div>
+-
+-                            {/* Commission Breakdown */}
+-                            {(() => {
+-                                const platformRate = Number(companyInfo?.commission_rate) || 5;
+-                                let iyzicoRate = Number(companyInfo?.iyzico_commission_rate) || 1;
+-                                if (iyzicoRate <= 0) iyzicoRate = 1;
+-                                const platformComm = (editableAmount * platformRate) / 100;
+-                                const iyzicoComm = (editableAmount * iyzicoRate) / 100;
+-                                const totalToCollect = editableAmount + platformComm + iyzicoComm;
+-
+-                                return (
+-                                    <div className="bg-slate-50 rounded-3xl p-6 mb-8 space-y-3 border border-slate-100">
+-                                        <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
+-                                            <span>Firma Hakedi┼ş (Net)</span>
+-                                            <span className="text-slate-600">Ôé║{editableAmount.toFixed(2)}</span>
+-                                        </div>
+-                                        <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
+-                                            <span>Platform Komisyonu ({platformRate.toFixed(2)}%)</span>
+-                                            <span className="text-slate-600">Ôé║{platformComm.toFixed(2)}</span>
+-                                        </div>
+-                                        <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
+-                                            <span>Iyzico Komisyonu ({iyzicoRate.toFixed(2)}%)</span>
+-                                            <span className="text-slate-600">Ôé║{iyzicoComm.toFixed(2)}</span>
+-                                        </div>
+-                                        <div className="h-px bg-slate-200 mt-2" />
+-                                        <div className="flex justify-between items-center pt-1">
+-                                            <span className="text-sm font-black text-slate-900 uppercase tracking-tight">Tahsil Edilecek Toplam</span>
+-                                            <span className="text-2xl font-black text-indigo-600">
+-                                                Ôé║{totalToCollect.toFixed(2)}
+-                                            </span>
+-                                        </div>
+-                                    </div>
+-                                );
+-                            })()}
+-
+-                            {nfcState === 'IDLE' && (
+-                                <div className="grid grid-cols-1 gap-4">
+-                                    <button
+-                                        onClick={async () => {
+-                                            setNfcState('SCANNING');
+-                                            setTimeout(async () => {
+-                                                try {
+-                                                    const res = await api.post('/payments/ceppos/initialize', {
+-                                                        appointment_id: paymentApp.id,
+-                                                        amount: editableAmount // Send the confirmed base amount
+-                                                    });
+-                                                    if (res.data.success) {
+-                                                        setNfcState('SUCCESS');
+-                                                        setTimeout(() => {
+-                                                            // After successful payment, the status and collected price are already set by backend
+-                                                            // We just need to reload
+-                                                            window.location.reload();
+-                                                        }, 1500);
+-                                                    } else {
+-                                                        setNfcState('ERROR');
+-                                                    }
+-                                                } catch (e) {
+-                                                    setNfcState('ERROR');
+-                                                }
+-                                            }, 3000);
+-                                        }}
+-                                        disabled={loading}
+-                                        className="p-6 bg-slate-900 text-white rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all shadow-xl shadow-slate-200 disabled:opacity-50"
+-                                    >
+-                                        <div className="flex items-center gap-4 text-left">
+-                                            <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">­şô▒</div>
+-                                            <div>
+-                                                <p className="text-xs font-black uppercase tracking-widest text-indigo-400">Temass─▒z ├ûdeme</p>
+-                                                <p className="text-lg font-black leading-tight">SoftPOS / NFC</p>
+-                                            </div>
+-                                        </div>
+-                                        <svg className="w-6 h-6 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
+-                                    </button>
+-
+-                                    <button
+-                                        onClick={async () => {
+-                                            try {
+-                                                setLoading(true);
+-                                                await api.patch(`/appointments/${paymentApp.id}/status`, {
+-                                                    status: 'completed',
+-                                                    price: editableAmount
+-                                                });
+-                                                window.location.reload();
+-                                            } catch (e) {
+-                                                alert('Hata olu┼ştu');
+-                                                setLoading(false);
+-                                            }
+-                                        }}
+-                                        disabled={loading}
+-                                        className="p-6 bg-slate-50 text-slate-900 rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all disabled:opacity-50"
+-                                    >
+-                                        <div className="flex items-center gap-4 text-left">
+-                                            <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">­şÆÁ</div>
+-                                            <div>
+-                                                <p className="text-xs font-black uppercase tracking-widest text-slate-400">Nakit ├ûdeme</p>
+-                                                <p className="text-lg font-black leading-tight">Elden Tahsilat</p>
+-                                            </div>
+-                                        </div>
+-                                        <svg className="w-6 h-6 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
+-                                    </button>
+-
+-                                    <button
+-                                        onClick={() => setShowPaymentModal(false)}
+-                                        className="w-full py-4 text-slate-400 text-xs font-black uppercase tracking-widest mt-4"
+-                                    >
+-                                        ─░ptal
+-                                    </button>
+-                                </div>
+-                            )}
+-
+-                            {nfcState === 'SCANNING' && (
+-                                <div className="py-12 flex flex-col items-center">
+-                                    <div className="relative mb-12">
+-                                        <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-20 scale-150"></div>
+-                                        <div className="absolute inset-0 bg-indigo-400 rounded-full animate-pulse opacity-40 scale-125"></div>
+-                                        <div className="relative w-32 h-32 bg-slate-900 rounded-full flex items-center justify-center text-4xl shadow-2xl">ÔÜí</div>
+-                                    </div>
+-                                    <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Kart─▒ Yakla┼şt─▒r─▒n</h4>
+-                                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] animate-pulse">Temass─▒z ├Âdeme bekleniyor...</p>
+-                                </div>
+-                            )}
+-
+-                            {nfcState === 'SUCCESS' && (
+-                                <div className="py-12 flex flex-col items-center animate-in zoom-in duration-500">
+-                                    <div className="w-32 h-32 bg-emerald-500 rounded-full flex items-center justify-center text-5xl shadow-2xl mb-8">Ô£ô</div>
+-                                    <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">├ûdeme Ba┼şar─▒l─▒</h4>
+-                                    <p className="text-emerald-500 font-black uppercase tracking-widest text-[10px]">─░┼şlem onayland─▒, iyzico kayd─▒ olu┼şturuldu.</p>
+-                                </div>
+-                            )}
+-
+-                            {nfcState === 'ERROR' && (
+-                                <div className="py-12 flex flex-col items-center">
+-                                    <div className="w-32 h-32 bg-red-500 rounded-full flex items-center justify-center text-5xl shadow-2xl mb-8">!</div>
+-                                    <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">├ûdeme Ba┼şar─▒s─▒z</h4>
+-                                    <p className="text-red-500 font-black uppercase tracking-widest text-[10px] mb-8">─░┼şlem reddedildi veya hata olu┼ştu.</p>
+-                                    <button onClick={() => setNfcState('IDLE')} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold text-xs uppercase">Tekrar Dene</button>
+-                                </div>
+-                            )}
+-                        </div>
+-                    </div>
+-                )
+-            }
++            {/* Payment Modal removed */}
+         </div >
+     );
+ }

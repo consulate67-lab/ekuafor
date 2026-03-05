@@ -30,6 +30,14 @@ export default function Dashboard() {
         todayIncome: 0,
         customerCount: 0
     });
+    const [employeeStats, setEmployeeStats] = useState({
+        total_appointments: 0,
+        total_revenue: 0,
+        total_expenses: 0
+    });
+    const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'year'>('today');
+    const [statsLoading, setStatsLoading] = useState(false);
+    const [showReports, setShowReports] = useState(false);
     const [services, setServices] = useState<Service[]>([]);
     const [isListening, setIsListening] = useState(false);
     const [voiceTranscript, setVoiceTranscript] = useState('');
@@ -168,6 +176,27 @@ export default function Dashboard() {
         fetchStats();
     }, [user]);
 
+    const fetchEmployeeStats = async (period: 'today' | 'week' | 'month' | 'year') => {
+        if (user?.role !== 'staff' && user?.role !== 'company_admin') return;
+        setStatsLoading(true);
+        try {
+            const res = await api.get('/reports/employee-stats', { params: { period, local_date: getLocalDateString() } });
+            if (res.data.success) {
+                setEmployeeStats(res.data.data);
+            }
+        } catch (e) {
+            console.error('Employee stats fetch error:', e);
+        } finally {
+            setStatsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (user?.role === 'staff' || user?.role === 'company_admin') {
+            fetchEmployeeStats(selectedPeriod);
+        }
+    }, [user, selectedPeriod]);
+
 
 
     const startScanner = async () => {
@@ -217,8 +246,9 @@ export default function Dashboard() {
 
             console.log('[OCR Raw Text]', rawText);
 
-            // 1. Öncelikle: toplam/tutar/topla/top gibi anahtar kelimelerle aynı satırdan toplamı bul
-            const totalKeywords = /(top(?:lam?)?|tutar|genel\s*top(?:lam?)?|ara\s*top(?:lam?)?|ödenecek|total|amount|t[o0]p)/i;
+            // 1. Öncelikle: KDV, TOPLAM, GENEL TOPLAM gibi anahtar kelimeleri ve çevresindeki yıldızlı (*) kalın metinleri daha iyi yakala.
+            // Kalın olan yazılar (özellikle termal fişlerde) etrafında yıldızlar veya boşluklarla gelebilir.
+            const totalKeywords = /(?:\*+)?\s*(top(?:lam?)?|genel\s*top(?:lam?)?|ara\s*top(?:lam?)?|ödenecek|total|amount|t[o0]p|kdv)\s*(?:\*+)?/i;
             const pricePattern = /(\d{1,6}[.,]\d{1,2})/g;
             const lines = rawText.split('\n');
 
@@ -227,14 +257,16 @@ export default function Dashboard() {
             // Satır satır tara - anahtar kelime içeren satırda fiyat ara
             for (const line of lines) {
                 if (totalKeywords.test(line)) {
-                    const matches = line.match(pricePattern);
+                    // Kalın yazılardan doğan olası Tesseract okuma hataları (l, I yerine 1 vb.) için küçük düzeltmeler:
+                    const cleanLine = line.replace(/l|I/g, '1').replace(/[^\w\d.,\s*]/gi, '');
+                    const matches = cleanLine.match(pricePattern);
                     if (matches && matches.length > 0) {
-                        // En yüksek fiyatı al (aynı satırda birden fazla değer olabilir)
+                        // En yüksek fiyatı al (aynı satırda KDV matrahı, KDV tutarı ve Toplam olabilir, genelde en büyüğü Toplamdır)
                         const vals = matches.map(m => parseFloat(m.replace(',', '.')));
                         const candidate = Math.max(...vals);
                         if (candidate > 0 && candidate < 1000000) {
                             foundAmount = candidate;
-                            // Son bulunanı al (genelde fişin en altındaki toplam)
+                            // En alttaki TOPLAM genelde sondadır, bu yüzden the "last found candidate" işliyor.
                         }
                     }
                 }
@@ -242,7 +274,9 @@ export default function Dashboard() {
 
             // 2. Fallback: Anahtar kelime bulunamadıysa tüm sayıların en büyüğünü al
             if (foundAmount === null) {
-                const allNums = rawText.match(/\b\d{1,6}[.,]\d{1,2}\b/g);
+                // Yine kalın basılmış olabilecek fontların olası okuma hatalarına karşı toleranslı tarama
+                const cleanedRaw = rawText.replace(/l|I/g, '1');
+                const allNums = cleanedRaw.match(/\b\d{1,6}[.,]\d{1,2}\b/g);
                 if (allNums && allNums.length > 0) {
                     const vals = allNums.map(a => parseFloat(a.replace(',', '.')));
                     foundAmount = Math.max(...vals);
@@ -276,6 +310,9 @@ export default function Dashboard() {
                 alert('Masraf başarıyla eklendi');
                 setShowExpenseModal(false);
                 setExpenseForm({ amount: '', description: '', date: getLocalDateString() });
+                if (user?.role === 'staff' || user?.role === 'company_admin') {
+                    fetchEmployeeStats(selectedPeriod);
+                }
             }
         } catch (error) {
             console.error('Expense add error:', error);
@@ -714,6 +751,70 @@ export default function Dashboard() {
                     )
                 }
 
+                {/* Raporlama Bölümü - Sadece çalışanlar için (Modal) */}
+                {
+                    showReports && (user?.role === 'staff' || user?.role === 'company_admin') && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+                            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowReports(false)}></div>
+
+                            <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+                                <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                                    <div>
+                                        <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Çalışan Raporu</h3>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">İstatistiki veriler ve kazanç özeti</p>
+                                    </div>
+                                    <button onClick={() => setShowReports(false)} className="p-2 bg-white rounded-full shadow-sm text-slate-400 hover:text-slate-600">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                </div>
+
+                                <div className="p-8 space-y-8">
+                                    <div className="flex bg-slate-100 p-1 rounded-2xl w-fit mx-auto">
+                                        {(['today', 'week', 'month', 'year'] as const).map((p) => (
+                                            <button
+                                                key={p}
+                                                onClick={() => setSelectedPeriod(p)}
+                                                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${selectedPeriod === p
+                                                    ? 'bg-white text-slate-900 shadow-sm'
+                                                    : 'text-gray-400 hover:text-slate-600'
+                                                    }`}
+                                            >
+                                                {p === 'today' ? 'Bugün' : p === 'week' ? 'Hafta' : p === 'month' ? 'Ay' : 'Yıl'}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pb-4">
+                                        <div className="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100 flex flex-col items-center text-center">
+                                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm mb-4">
+                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                            </div>
+                                            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Randevu</p>
+                                            <p className={`text-4xl font-black text-indigo-900 ${statsLoading ? 'animate-pulse' : ''}`}>{employeeStats.total_appointments}</p>
+                                        </div>
+
+                                        <div className="bg-amber-50/50 p-6 rounded-[2rem] border border-amber-100 flex flex-col items-center text-center">
+                                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-amber-600 shadow-sm mb-4">
+                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3z" /><path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zM7.001 11a1 1 0 011-1h8a1 1 0 110 2h-8a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
+                                            </div>
+                                            <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1">Toplam Gelir</p>
+                                            <p className={`text-4xl font-black text-amber-900 ${statsLoading ? 'animate-pulse' : ''}`}>₺{employeeStats.total_revenue.toLocaleString()}</p>
+                                        </div>
+
+                                        <div className="bg-rose-50/50 p-6 rounded-[2rem] border border-rose-100 flex flex-col items-center text-center">
+                                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-rose-600 shadow-sm mb-4">
+                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>
+                                            </div>
+                                            <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">Gider/Masraf</p>
+                                            <p className={`text-4xl font-black text-rose-900 ${statsLoading ? 'animate-pulse' : ''}`}>₺{employeeStats.total_expenses.toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
+
                 {/* Raporlama Bölümü Kaldırıldı */}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -734,29 +835,48 @@ export default function Dashboard() {
                         </Link>
                     )}
 
-                    {/* 2. Sesli Randevu */}
+                    {/* 2. Sesli Randevu - Disabled as requested */}
                     {(user?.role === 'company_admin' || user?.role === 'staff') && (
                         <button
-                            disabled={isLicenseExpired}
+                            disabled={true}
                             onClick={() => !isLicenseExpired && startVoiceCommand()}
-                            className={`card group border-indigo-100 text-left relative overflow-hidden ${isLicenseExpired ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02] transition-all duration-300'}`}
+                            className="w-full card group border-indigo-100 text-left relative overflow-hidden opacity-50 cursor-not-allowed"
                         >
                             <div className="flex items-center gap-5 relative z-10">
-                                <div className="p-4 rounded-2xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
+                                <div className="p-4 rounded-2xl bg-indigo-50 text-indigo-600">
                                     <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m8 0h-8m4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                                     </svg>
                                 </div>
                                 <div>
                                     <h3 className="text-xl font-bold text-gray-900 mb-1">Sesli Randevu</h3>
-                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Konuşarak hızlıca randevu oluştur.</p>
+                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Geçici olarak devre dışı.</p>
                                 </div>
                             </div>
                         </button>
                     )}
 
 
-                    {/* 4. Çalışan Raporu - Kaldırıldı */}
+                    {/* 4. Çalışan Raporu - Buton Olarak eklendi */}
+                    {(user?.role === 'staff' || user?.role === 'company_admin') && (
+                        <button
+                            disabled={isLicenseExpired}
+                            onClick={() => !isLicenseExpired && setShowReports(true)}
+                            className={`card group border-amber-100 text-left ${isLicenseExpired ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02] transition-all duration-300'}`}
+                        >
+                            <div className="flex items-center gap-5">
+                                <div className="bg-amber-50 p-4 rounded-2xl group-hover:bg-amber-600 group-hover:text-white transition-colors duration-300">
+                                    <svg className="w-8 h-8 text-amber-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-gray-900 mb-1">Çalışan Raporu</h3>
+                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Kazanç ve randevu istatistiklerini gör.</p>
+                                </div>
+                            </div>
+                        </button>
+                    )}
 
                     {/* Masraf Girme */}
                     {(user?.role === 'company_admin' || user?.role === 'staff') && (
