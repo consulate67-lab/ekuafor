@@ -212,26 +212,52 @@ export default function Dashboard() {
         try {
             const worker = await Tesseract.createWorker('tur');
             const ret = await worker.recognize(canvas.toDataURL('image/jpeg'));
-            const text = ret.data.text;
+            const rawText = ret.data.text;
             await worker.terminate();
 
-            // Sadece sayı ve virgül/notaları al (fiyata benzeyenleri)
-            const amounts = text.match(/\b\d+([.,]\d{1,2})?\b/g);
-            if (amounts && amounts.length > 0) {
-                const values = amounts.map(a => parseFloat(a.replace(',', '.')));
-                const total = Math.max(...values);
-                if (total > 0 && total < 1000000) {
-                    setExpenseForm(prev => ({ ...prev, amount: total.toString() }));
-                    stopScanner();
-                } else {
-                    alert('Geçerli bir tutar okunamadı (Sonuç: ' + total + ')');
+            console.log('[OCR Raw Text]', rawText);
+
+            // 1. Öncelikle: toplam/tutar/topla/top gibi anahtar kelimelerle aynı satırdan toplamı bul
+            const totalKeywords = /(top(?:lam?)?|tutar|genel\s*top(?:lam?)?|ara\s*top(?:lam?)?|ödenecek|total|amount|t[o0]p)/i;
+            const pricePattern = /(\d{1,6}[.,]\d{1,2})/g;
+            const lines = rawText.split('\n');
+
+            let foundAmount: number | null = null;
+
+            // Satır satır tara - anahtar kelime içeren satırda fiyat ara
+            for (const line of lines) {
+                if (totalKeywords.test(line)) {
+                    const matches = line.match(pricePattern);
+                    if (matches && matches.length > 0) {
+                        // En yüksek fiyatı al (aynı satırda birden fazla değer olabilir)
+                        const vals = matches.map(m => parseFloat(m.replace(',', '.')));
+                        const candidate = Math.max(...vals);
+                        if (candidate > 0 && candidate < 1000000) {
+                            foundAmount = candidate;
+                            // Son bulunanı al (genelde fişin en altındaki toplam)
+                        }
+                    }
                 }
+            }
+
+            // 2. Fallback: Anahtar kelime bulunamadıysa tüm sayıların en büyüğünü al
+            if (foundAmount === null) {
+                const allNums = rawText.match(/\b\d{1,6}[.,]\d{1,2}\b/g);
+                if (allNums && allNums.length > 0) {
+                    const vals = allNums.map(a => parseFloat(a.replace(',', '.')));
+                    foundAmount = Math.max(...vals);
+                }
+            }
+
+            if (foundAmount !== null && foundAmount > 0 && foundAmount < 1000000) {
+                setExpenseForm(prev => ({ ...prev, amount: foundAmount!.toFixed(2) }));
+                stopScanner();
             } else {
-                alert('Fişte tutar metni anlaşılamadı. Tekrar deneyin veya elle girin.');
+                alert('Geçerli bir tutar okunamadı. Lütfen fişi daha net tutarak tekrar deneyin veya elle girin.');
             }
         } catch (e) {
             console.error('OCR Error', e);
-            alert('Fiş okunamadı.');
+            alert('Fiş okunamadı. Kamera kalitesini veya ışık koşullarını kontrol edin.');
         } finally {
             setOcrLoading(false);
         }
@@ -858,15 +884,20 @@ export default function Dashboard() {
                                             className="w-full bg-slate-50 border-none rounded-2xl px-4 py-3 text-slate-900 font-bold focus:ring-2 focus:ring-rose-500 outline-none"
                                         />
                                     </div>
-                                    <div className="flex items-center justify-between mb-1 pl-1">
+                                    <div className="flex items-center justify-between mb-2 pl-1">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Tutar (₺)</label>
                                         <button
                                             type="button"
                                             onClick={startScanner}
-                                            className="text-[10px] bg-rose-100 text-rose-600 px-2 py-0.5 rounded-lg font-black uppercase tracking-wider flex items-center gap-1 hover:bg-rose-200 active:scale-95 transition-all"
+                                            className="flex items-center gap-2 bg-gradient-to-r from-rose-500 to-rose-600 text-white px-4 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest shadow-md shadow-rose-500/30 hover:shadow-lg hover:shadow-rose-500/40 hover:scale-105 active:scale-95 transition-all duration-200"
                                         >
-                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                            Fiş Tarat (OCR)
+                                            {/* Scan / receipt icon */}
+                                            <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h8M4 18h5" />
+                                                <rect x="14" y="12" width="7" height="9" rx="1.5" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 15h3M16 17.5h1.5" />
+                                            </svg>
+                                            Fiş Tara
                                         </button>
                                     </div>
                                     <input
