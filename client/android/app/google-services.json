@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "352301372208",
+    "project_id": "saloon-fc5d1",
+    "storage_bucket": "saloon-fc5d1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:352301372208:android:b6e8fa35edc537c8346ef5",
+        "android_client_info": {
+          "package_name": "com.saloon.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCO6I_kIBbnGbeLpEtZ5NFc4YMHMF1Zdf4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

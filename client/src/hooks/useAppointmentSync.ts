@@ -161,13 +161,26 @@ export function useAppointmentSync() {
                         });
                     }
                 } else {
-                    // Web push - Service Worker would handle this in a real PWA
-                    if ("Notification" in window && Notification.permission !== "denied") {
-                        const permission = await Notification.requestPermission();
-                        if (permission === 'granted') {
-                            // Dummy push token for Web until VAPID is implemented
-                            localStorage.setItem('push_token', 'web-push-allowed');
+                    // Web push integration
+                    try {
+                        const { requestWebPushToken } = await import('../lib/firebase');
+                        const token = await requestWebPushToken();
+                        if (token) {
+                            console.log('[Push] Web registration token: ', token);
+                            localStorage.setItem('push_token', token);
+
+                            const phone = localStorage.getItem('customer_phone');
+                            const deviceId = localStorage.getItem('device_id');
+                            if (phone && deviceId) {
+                                api.post('/appointments/customers/sync', {
+                                    device_id: deviceId,
+                                    customer_phone: phone,
+                                    push_token: token
+                                }).catch(err => console.error('Web Push sync error:', err));
+                            }
                         }
+                    } catch (webPushErr) {
+                        console.error('[Push] Web Push Setup failed:', webPushErr);
                     }
                 }
             } catch (e) {
