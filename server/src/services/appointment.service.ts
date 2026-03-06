@@ -413,11 +413,11 @@ class AppointmentService {
                 const time = updatedAppointment.start_time;
 
                 try {
-                    console.log(`[Notification] Status update for app ID ${id}: ${status}, Phone: ${phone}, Name: ${name}`);
+                    console.log(`[Notification] Processing status change: ${status} for App ID: ${id}`);
 
-                    // Fetch company and staff details for the notification text
+                    // Fetch details including sms_enabled flag
                     const detailsRes = await pool.query(`
-                        SELECT c.name as company_name, u.first_name, u.last_name, s.name as service_name
+                        SELECT c.name as company_name, c.sms_enabled, u.first_name, u.last_name, s.name as service_name
                         FROM appointments a
                         LEFT JOIN companies c ON a.company_id = c.id
                         LEFT JOIN users u ON a.staff_id = u.id
@@ -426,41 +426,46 @@ class AppointmentService {
                     `, [id]);
                     const details = detailsRes.rows[0];
                     const companyName = details?.company_name || 'İşletme';
+                    const isSmsEnabled = details?.sms_enabled !== false; // Default true
                     const staffName = (details?.first_name || details?.last_name) ? `${details.first_name || ''} ${details.last_name || ''}`.trim() : 'Uzman personelimiz';
                     const serviceName = details?.service_name || 'Hizmet';
 
                     let smsSent = false;
 
+                    // 1. SMS NOTIFICATION (Priority if enabled)
                     if (phone && (status === 'approved' || status === 'cancelled')) {
-                        const message = status === 'approved'
-                            ? `Sayın ${name}, ${companyName} işletmesinde ${staffName} ile ${serviceName} hizmeti için ${date} ${time} randevunuz ONAYLANMIŞTIR. Bekliyoruz!`
-                            : `Sayın ${name}, ${companyName} işletmesindeki ${date} tarihli randevunuz İPTAL EDİLMİŞTİR.`;
+                        if (isSmsEnabled) {
+                            const message = status === 'approved'
+                                ? `Sayın ${name}, ${companyName} işletmesinde ${staffName} ile ${serviceName} hizmeti için ${date} ${time} randevunuz ONAYLANMIŞTIR. Bekliyoruz!`
+                                : `Sayın ${name}, ${companyName} işletmesindeki ${date} tarihli randevunuz İPTAL EDİLMİŞTİR.`;
 
-                        console.log(`[Notification] Attempting SMS for app ID ${id}...`);
-                        smsSent = await smsService.sendSms(updatedAppointment.company_id, phone, message);
-                        console.log(`[Notification] SMS send result: ${smsSent}`);
+                            console.log(`[Notification] Attempting SMS for app ID ${id}...`);
+                            smsSent = await smsService.sendSms(updatedAppointment.company_id, phone, message);
+                            console.log(`[Notification] SMS send result: ${smsSent}`);
+                        } else {
+                            console.log(`[Notification] SMS is DISABLED for company ${updatedAppointment.company_id}. Skipping SMS.`);
+                        }
                     }
 
-                    // PUSH NOTIFICATION FALLBACK
-                    if (!smsSent && phone && (status === 'approved' || status === 'cancelled')) {
-                        console.log(`[Notification] SMS not sent, checking for push token for phone: ${phone}`);
-
-                        // Dynamically import pushService to avoid circular dependency
+                    // 2. PUSH NOTIFICATION (Fallback or Parallel)
+                    // If status is approved/cancelled, we check for push. 
+                    if (phone && (status === 'approved' || status === 'cancelled')) {
+                        // Dynamically import pushService
                         const pushService = require('./push.service').default;
-
                         const token = await pushService.getPushTokenByPhone(phone);
+
                         if (token) {
-                            console.log(`[Notification] Push token found for ${phone}, sending notification...`);
+                            console.log(`[Notification] Found push token, sending push notification...`);
                             const title = status === 'approved' ? 'Randevunuz Onaylandı' : 'Randevunuz İptal Edildi';
                             const body = status === 'approved'
                                 ? `Sayın ${name}, ${companyName} işletmesinde ${staffName} ile ${date} ${time} randevunuz onaylanmıştır.`
                                 : `Sayın ${name}, ${companyName} işletmesindeki ${date} ${time} randevunuz iptal edilmiştir.`;
 
                             const pushResult = await pushService.sendNotification(token, title, body, {
-                                appointmentId: id,
-                                type: status
+                                appointmentId: id.toString(),
+                                status: status
                             }, phone);
-                            console.log(`[Notification] Push send result: ${pushResult}`);
+                            console.log(`[Notification] Push notification result for ${id}: ${pushResult}`);
                         } else {
                             console.log(`[Notification] No push token found for phone: ${phone} in customer_devices table.`);
                         }
