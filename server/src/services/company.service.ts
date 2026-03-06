@@ -348,11 +348,16 @@ class CompanyService {
             ? `(SELECT COUNT(rating) FROM appointments WHERE company_id = c.id AND rating IS NOT NULL)`
             : `0`;
 
+        const staffCountSubquery = `(SELECT COUNT(*) FROM company_users WHERE company_id = c.id AND role = 'staff')`;
+        const serviceCountSubquery = `(SELECT COUNT(*) FROM services WHERE company_id = c.id)`;
+
         let query = `
             SELECT 
                 c.*,
                 ${ratingSubquery} as rating_avg,
-                ${reviewCountSubquery} as review_count
+                ${reviewCountSubquery} as review_count,
+                ${staffCountSubquery} as staff_count,
+                ${serviceCountSubquery} as service_count
             FROM companies c
             WHERE ${whereClauses.join(' AND ')}
         `;
@@ -449,7 +454,7 @@ class CompanyService {
                 try {
                     const protocol = 'https://';
                     const baseUrl = 'www.saloontr.com';
-                    const message = `Sayın ${company.name}, başvurunuz onaylanmıştır. Firma Yönetim Paneliniz: ${protocol}${baseUrl}/company-panel?key=${company.admin_key} Çalışanlarınızı Tanıtmak İçin: ${protocol}${baseUrl}/setup-staff/${company.id}?key=${company.admin_key}`;
+                    const message = `Sayın ${company.name}, başvurunuz onaylanmıştır. Firma Yönetim Paneliniz: ${protocol}${baseUrl}/#/company-panel?key=${company.admin_key} Çalışanlarınızı Tanıtmak İçin: ${protocol}${baseUrl}/#/setup-staff/${company.id}?key=${company.admin_key}`;
 
                     await smsService.sendSms(null, company.phone, message);
                     console.log(`[CompanyService] Onay SMS gonderildi: ${company.phone}`);

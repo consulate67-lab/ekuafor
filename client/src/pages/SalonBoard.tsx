@@ -48,6 +48,7 @@ export default function SalonBoard() {
 
     // Payment States
     const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [completionModal, setCompletionModal] = useState<{ open: boolean; app: Appointment | null; amount: number }>({ open: false, app: null, amount: 0 });
     const [paymentApp, setPaymentApp] = useState<Appointment | null>(null);
     const [nfcState, setNfcState] = useState<'IDLE' | 'SCANNING' | 'SUCCESS' | 'ERROR'>('IDLE');
 
@@ -370,19 +371,13 @@ export default function SalonBoard() {
         if (newStatus === 'cancelled') msg = 'Bu randevuyu iptal etmek istediğinize emin misiniz?';
         if (newStatus === 'approved') msg = 'Bu randevuyu onaylamak istiyor musunuz?';
         if (newStatus === 'completed') {
-            const priceInput = prompt('Hizmet tamamlandı. Son tutarı onaylıyor musunuz?', currentPrice?.toString() || '0');
-            if (priceInput === null) return;
-            finalPrice = Number(priceInput);
-
-            // Re-fetch app to get full data
             const app = appointments.find(a => a.id === id) || pendingAppointments.find(a => a.id === id);
-            if (app && finalPrice > 0) {
-                setPaymentApp({ ...app, price: finalPrice });
-                setShowPaymentModal(true);
-                return; // Wait for payment modal to proceed
-            }
-
-            msg = `Bu randevuyu ${finalPrice} ₺ tutarıyla tamamlandı olarak işaretlemek istiyor musunuz?`;
+            setCompletionModal({
+                open: true,
+                app: app || null,
+                amount: currentPrice || 0
+            });
+            return;
         }
 
         if (msg && !confirm(msg)) return;
@@ -1646,6 +1641,70 @@ export default function SalonBoard() {
                                 <button onClick={() => setNfcState('IDLE')} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold text-xs uppercase">Tekrar Dene</button>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+            {/* Completion & Amount Confirmation Modal */}
+            {completionModal.open && completionModal.app && (
+                <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-sm rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 duration-300 text-center">
+                        <div className="w-24 h-24 bg-emerald-50 text-emerald-500 rounded-[2rem] flex items-center justify-center text-4xl mx-auto mb-6 shadow-inner rotate-3">
+                            💰
+                        </div>
+                        <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-2">Hizmet Tamamla</h3>
+                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-8">Toplam tutarı onaylayın</p>
+
+                        <div className="mb-10 group">
+                            <div className="relative">
+                                <span className="absolute left-8 top-1/2 -translate-y-1/2 text-3xl font-black text-indigo-200 group-focus-within:text-indigo-400 transition-colors">₺</span>
+                                <input
+                                    type="number"
+                                    value={completionModal.amount}
+                                    onChange={(e) => setCompletionModal(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] py-8 text-center text-5xl font-black text-indigo-600 focus:border-indigo-500 focus:bg-white transition-all outline-none shadow-inner"
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <button
+                                onClick={() => {
+                                    setPaymentApp({ ...completionModal.app!, price: completionModal.amount });
+                                    setCompletionModal({ open: false, app: null, amount: 0 });
+                                    setShowPaymentModal(true);
+                                }}
+                                className="w-full py-6 bg-indigo-600 text-white rounded-3xl font-black text-sm uppercase tracking-widest shadow-[0_20px_40px_-10px_rgba(79,70,229,0.4)] active:scale-95 transition-all flex items-center justify-center gap-3"
+                            >
+                                <span className="text-xl">💳</span> Ödeme Al
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        setLoading(true);
+                                        await api.patch(`/appointments/${completionModal.app!.id}/status`, {
+                                            status: 'completed',
+                                            price: completionModal.amount
+                                        });
+                                        setCompletionModal({ open: false, app: null, amount: 0 });
+                                        if (company?.id) await fetchData(company.id);
+                                    } catch (e) {
+                                        alert('İşlem başarısız');
+                                    } finally {
+                                        setLoading(false);
+                                    }
+                                }}
+                                className="w-full py-6 bg-slate-900 text-white rounded-3xl font-black text-sm uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-3"
+                            >
+                                <span className="text-xl">💵</span> Nakit Tamamla
+                            </button>
+                            <button
+                                onClick={() => setCompletionModal({ open: false, app: null, amount: 0 })}
+                                className="w-full py-4 text-slate-400 font-black text-xs uppercase tracking-widest hover:text-slate-600 transition-colors"
+                            >
+                                Vazgeç
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

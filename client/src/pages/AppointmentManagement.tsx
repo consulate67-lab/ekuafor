@@ -55,6 +55,7 @@ export default function AppointmentManagement() {
     const [isListening, setIsListening] = useState(false);
     const [voiceTranscript, setVoiceTranscript] = useState('');
     const [company, setCompany] = useState<Company | null>(null);
+    const [completionModal, setCompletionModal] = useState<{ open: boolean; app: Appointment | null; amount: number }>({ open: false, app: null, amount: 0 });
     const [userInfo, setUserInfo] = useState<any>(null);
     const [staffMode, setStaffMode] = useState(false);
     const [showAllStaff, setShowAllStaff] = useState(true);
@@ -379,18 +380,12 @@ export default function AppointmentManagement() {
                 return;
             }
 
-            const priceInput = window.prompt('Hizmet tamamlandı. Son tutarı onaylıyor musunuz?', currentPrice?.toString() || '0');
-            if (priceInput === null) return;
-            finalPrice = Number(priceInput);
-
-            if (app && finalPrice > 0) {
-                setPaymentApp({ ...app, price: finalPrice });
-                setEditableAmount(finalPrice);
-                setShowPaymentModal(true);
-                return; // Wait for payment modal to proceed
-            }
-
-            msg = `Bu randevuyu ${finalPrice} ₺ tutarıyla tamamlandı olarak işaretlemek istiyor musunuz?`;
+            setCompletionModal({
+                open: true,
+                app: app || null,
+                amount: currentPrice || 0
+            });
+            return;
         }
 
         if (msg && !window.confirm(msg)) return;
@@ -1407,6 +1402,75 @@ export default function AppointmentManagement() {
                                 "{voiceTranscript}..."
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+            {/* Completion & Amount Confirmation Modal */}
+            {completionModal.open && completionModal.app && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-sm rounded-[3rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
+                        <div className="text-center mb-8">
+                            <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-3xl flex items-center justify-center text-3xl mx-auto mb-4">
+                                💰
+                            </div>
+                            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Hizmet Tamamla</h3>
+                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Lütfen toplam tutarı onaylayın</p>
+                        </div>
+
+                        <div className="mb-8">
+                            <div className="text-center mb-2">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ödenecek Tutar</span>
+                            </div>
+                            <div className="relative">
+                                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-indigo-200">₺</span>
+                                <input
+                                    type="number"
+                                    value={completionModal.amount}
+                                    onChange={(e) => setCompletionModal(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-[2rem] py-6 text-center text-4xl font-black text-indigo-600 focus:border-indigo-500 focus:bg-white transition-all outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <button
+                                onClick={() => {
+                                    setPaymentApp({ ...completionModal.app!, price: completionModal.amount });
+                                    setEditableAmount(completionModal.amount);
+                                    setCompletionModal({ open: false, app: null, amount: 0 });
+                                    setShowPaymentModal(true);
+                                }}
+                                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-200 active:scale-95 transition-all"
+                            >
+                                Ödeme Ekranına Geç
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        setLoading(true);
+                                        await api.patch(`/appointments/${completionModal.app!.id}/status`, {
+                                            status: 'completed',
+                                            price: completionModal.amount
+                                        });
+                                        setCompletionModal({ open: false, app: null, amount: 0 });
+                                        fetchData();
+                                    } catch (e) {
+                                        alert('İşlem başarısız');
+                                    } finally {
+                                        setLoading(false);
+                                    }
+                                }}
+                                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all"
+                            >
+                                Direkt Tamamla (Nakit)
+                            </button>
+                            <button
+                                onClick={() => setCompletionModal({ open: false, app: null, amount: 0 })}
+                                className="w-full py-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest"
+                            >
+                                Vazgeç
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

@@ -686,6 +686,20 @@ class AppointmentService {
         const result = await pool.query(query, values);
         return result.rows;
     }
+
+    async getCustomerNotifications(phone: string) {
+        const query = `
+            SELECT * FROM (
+                (SELECT id, title, body as message, created_at, 'push' as type, status FROM push_logs WHERE phone_number = $1)
+                UNION ALL
+                (SELECT id, 'SMS Bildirimi' as title, message, created_at, 'sms' as type, status FROM sms_logs WHERE phone_number = $1)
+            ) AS combined
+            ORDER BY created_at DESC
+            LIMIT 50
+        `;
+        const result = await pool.query(query, [phone]);
+        return result.rows;
+    }
 }
 
 export default new AppointmentService();

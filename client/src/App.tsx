@@ -19,6 +19,7 @@ import SmsSettings from './pages/SmsSettings';
 import SalonBoard from './pages/SalonBoard';
 import CompanyPanel from './pages/CompanyPanel';
 import MyAppointments from './pages/MyAppointments';
+import MyNotifications from './pages/MyNotifications';
 import MainCompanyPanel from './pages/MainCompanyPanel';
 import MainCompanyReports from './pages/MainCompanyReports';
 import SalonDataGenerator from './pages/SalonDataGenerator';
@@ -202,6 +203,7 @@ function App() {
                     />
                     <Route path="/book/:id" element={<BookingPage />} />
                     <Route path="/my-appointments" element={<MyAppointments />} />
+                    <Route path="/my-notifications" element={<MyNotifications />} />
                     <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
                     <Route path="/customer-login" element={<CustomerLogin />} />
                     <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />} />

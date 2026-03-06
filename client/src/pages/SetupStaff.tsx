@@ -138,20 +138,35 @@ export default function SetupStaff() {
                             Dijital dönüşümün ilk adımı! Salonunuzda kaç uzman personel görev yapıyor? Her birine özel giriş kodu otomatik iletilecek.
                         </p>
 
-                        <div className="mb-12 inline-block relative border-b-2 border-white/5 pb-4 px-8">
-                            <label className="block text-xs font-black uppercase tracking-[0.2em] text-indigo-400 mb-6">Personel Sayısı</label>
-                            <div className="flex items-center justify-center gap-8">
-                                <button type="button" onClick={() => setStaffCount(Math.max(1, staffCount - 1))} className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center text-2xl hover:bg-white/5 transition-colors">−</button>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max="50"
-                                    required
-                                    value={staffCount}
-                                    onChange={e => setStaffCount(parseInt(e.target.value) || 1)}
-                                    className="w-24 text-center bg-transparent text-white text-6xl font-black outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                />
-                                <button type="button" onClick={() => setStaffCount(Math.min(50, staffCount + 1))} className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center text-2xl hover:bg-white/5 transition-colors">+</button>
+                        <div className="mb-12 inline-block relative bg-white/[0.02] border border-white/5 rounded-[2.5rem] p-8 sm:p-12 shadow-2xl">
+                            <label className="block text-xs font-black uppercase tracking-[0.2em] text-indigo-400 mb-8">Personel Sayısı</label>
+                            <div className="flex items-center justify-center gap-10">
+                                <button
+                                    type="button"
+                                    onClick={() => setStaffCount(Math.max(1, staffCount - 1))}
+                                    className="w-16 h-16 rounded-2xl bg-white/10 border-2 border-white/20 flex items-center justify-center text-3xl font-black hover:bg-white/20 hover:border-white/40 active:scale-90 transition-all text-white shadow-lg shadow-black/20"
+                                >
+                                    −
+                                </button>
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="50"
+                                        required
+                                        value={staffCount}
+                                        onChange={e => setStaffCount(parseInt(e.target.value) || 1)}
+                                        className="w-28 text-center bg-white/5 border-2 border-white/10 rounded-3xl py-4 text-white text-6xl font-black outline-none focus:border-indigo-500/50 focus:bg-white/10 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    />
+                                    <div className="absolute -bottom-6 left-0 right-0 text-[9px] font-black text-slate-500 uppercase tracking-widest">Kişi</div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setStaffCount(Math.min(50, staffCount + 1))}
+                                    className="w-16 h-16 rounded-2xl bg-white/10 border-2 border-white/20 flex items-center justify-center text-3xl font-black hover:bg-white/20 hover:border-white/40 active:scale-90 transition-all text-white shadow-lg shadow-black/20"
+                                >
+                                    +
+                                </button>
                             </div>
                         </div>
 

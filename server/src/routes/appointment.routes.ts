@@ -373,4 +373,18 @@ router.patch('/:id/rate', async (req: Request, res: Response) => {
     }
 });
 
+// Müşteri bildirimlerini getir
+router.get('/customers/notifications', async (req: Request, res: Response) => {
+    try {
+        const { phone } = req.query;
+        if (!phone) return res.json({ success: true, data: [] });
+
+        const notifications = await appointmentService.getCustomerNotifications(phone as string);
+        res.json({ success: true, data: notifications });
+    } catch (err) {
+        console.error('Notifications Error:', err);
+        res.status(500).json({ success: false, error: 'Bildirimler alınamadı' });
+    }
+});
+
 export default router;
