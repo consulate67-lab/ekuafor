@@ -195,6 +195,14 @@ export default function Dashboard() {
         if (user?.role === 'staff' || user?.role === 'company_admin') {
             fetchEmployeeStats(selectedPeriod);
         }
+
+        // Cleanup: Stop any accidental active camera stream on unmount
+        return () => {
+            if (videoRef.current && videoRef.current.srcObject) {
+                const stream = videoRef.current.srcObject as MediaStream;
+                stream.getTracks().forEach(track => track.stop());
+            }
+        };
     }, [user, selectedPeriod]);
 
 

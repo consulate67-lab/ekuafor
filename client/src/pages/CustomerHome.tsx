@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import api from '../lib/api';
@@ -38,6 +38,7 @@ export default function CustomerHome() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isScanning, setIsScanning] = useState(false);
     const isScanningRef = useRef(false);
+    const [navigatingTo, setNavigatingTo] = useState<number | null>(null);
 
     const fetchData = async (query?: string, loc?: { lat: number, lng: number } | null, dist?: number) => {
         try {
@@ -159,6 +160,16 @@ export default function CustomerHome() {
             }
         };
         initialFetch();
+
+        // Cleanup: Ensure camera streams are stopped if user navigates away
+        return () => {
+            isScanningRef.current = false;
+            setIsScanning(false);
+            if (videoRef.current && videoRef.current.srcObject) {
+                const stream = videoRef.current.srcObject as MediaStream;
+                stream.getTracks().forEach(track => track.stop());
+            }
+        };
     }, []);
 
     const checkPermissions = async () => {
@@ -245,7 +256,10 @@ export default function CustomerHome() {
     }, [selectedGender, sort]);
 
 
-    const favoriteCompanies = companies.filter(c => favorites.includes(c.id!));
+    const favoriteCompanies = useMemo(() => {
+        const favSet = new Set(favorites);
+        return companies.filter(c => favSet.has(c.id!));
+    }, [companies, favorites]);
 
     const handleCheckCode = async () => {
         if (!codeInput.trim()) return;
@@ -394,16 +408,26 @@ export default function CustomerHome() {
         }
     };
 
-    const scanLoop = async () => {
+    const lastScanTime = useRef(0);
+    const scanLoop = async (time: number) => {
         if (!isScanningRef.current) return;
 
         const video = videoRef.current;
         const canvas = canvasRef.current;
 
-        if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
+        if (!video || !canvas) return; // Break loop if unmounted
+
+        if (video.readyState !== video.HAVE_ENOUGH_DATA) {
             requestAnimationFrame(scanLoop);
             return;
         }
+
+        // Throttle QR detection to 10 FPS (100ms) to save CPU/Battery
+        if (time - lastScanTime.current < 100) {
+            requestAnimationFrame(scanLoop);
+            return;
+        }
+        lastScanTime.current = time;
 
         // 1. Try Native Barcode Detector API if available (Modern Chrome/Android/iOS)
         // @ts-ignore
@@ -432,7 +456,7 @@ export default function CustomerHome() {
 
         canvas.height = video.videoHeight;
         canvas.width = video.videoWidth;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const ctx = canvas.getContext('2d', { WILL_READ_FREQUENTLY: true });
         if (ctx) {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -701,17 +725,24 @@ export default function CustomerHome() {
                     filteredCompanies.map((c: any) => (
                         <div
                             key={c.id}
-                            className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-xl transition-all active:scale-[0.98] relative group overflow-hidden"
+                            className={`bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-xl transition-all active:scale-[0.98] relative group overflow-hidden ${navigatingTo === c.id ? 'opacity-70 grayscale' : ''}`}
                             onClick={() => {
+                                if (navigatingTo) return;
                                 const hasStaff = Number(c.staff_count || 0) > 0;
                                 const hasServices = Number(c.service_count || 0) > 0;
                                 if (!hasStaff || !hasServices) {
                                     setNotRegisteredModal({ open: true, company: c });
                                 } else {
+                                    setNavigatingTo(c.id);
                                     navigate(`/book/${c.id}`);
                                 }
                             }}
                         >
+                            {navigatingTo === c.id && (
+                                <div className="absolute inset-0 z-[100] flex items-center justify-center bg-white/40 backdrop-blur-[2px]">
+                                    <div className="w-8 h-8 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
+                                </div>
+                            )}
                             {/* Premium Shadow & Reflection Layer */}
                             <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-50" />
 

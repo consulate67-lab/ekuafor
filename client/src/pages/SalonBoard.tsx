@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { Company, Appointment } from '../types';
@@ -181,6 +181,58 @@ export default function SalonBoard() {
         : selectedDepartmentId === 'all'
             ? staff
             : staff.filter(s => Number(s.department_id) === Number(selectedDepartmentId));
+
+    // PERFORMANCE OPTIMIZATION: Pre-calculate occupied slots to avoid O(N^2) filtering in the matrix
+    const slotLookup = useMemo(() => {
+        const lookup = new Map<string, Appointment[]>();
+        if (!company) return lookup;
+
+        const slotInterval = company.slot_interval || 30;
+
+        appointments.forEach(a => {
+            const appDate = (a.appointment_date || '').substring(0, 10);
+            if (a.status === 'cancelled' || appDate !== selectedDate) return;
+
+            const [asH, asM] = a.start_time.split(':').map(Number);
+            const [aeH, aeM] = a.end_time.split(':').map(Number);
+            const aStart = asH * 60 + asM;
+            const aEnd = aeH * 60 + aeM;
+
+            // Unique staff involved in this appointment
+            const staffIds = new Set<number>();
+            if (a.staff_id) staffIds.add(Number(a.staff_id));
+            a.services?.forEach((s: any) => { if (s.staff_id) staffIds.add(Number(s.staff_id)); });
+
+            staffIds.forEach(pId => {
+                // For each involved staff, find specific segments
+                // Legacy / General involvement:
+                for (let t = aStart; t < aEnd; t += slotInterval) {
+                    const key = `${pId}-${t}`;
+                    if (!lookup.has(key)) lookup.set(key, []);
+                    const list = lookup.get(key)!;
+                    if (!list.find(found => found.id === a.id)) list.push(a);
+                }
+
+                // Service-specific involvement (overrides general if timing exists)
+                a.services?.forEach((s: any) => {
+                    if (Number(s.staff_id) === pId && s.start_time && s.end_time) {
+                        const [ssH, ssM] = s.start_time.split(':').map(Number);
+                        const [seH, seM] = s.end_time.split(':').map(Number);
+                        const sStart = ssH * 60 + ssM;
+                        const sEnd = seH * 60 + seM;
+
+                        for (let t = sStart; t < sEnd; t += slotInterval) {
+                            const key = `${pId}-${t}`;
+                            if (!lookup.has(key)) lookup.set(key, []);
+                            const list = lookup.get(key)!;
+                            if (!list.find(found => found.id === a.id)) list.push(a);
+                        }
+                    }
+                });
+            });
+        });
+        return lookup;
+    }, [appointments, selectedDate, company, staff]);
 
     const handleStaffLogout = () => {
         localStorage.removeItem('staff_board_code');
@@ -776,44 +828,8 @@ export default function SalonBoard() {
                                             const todayDate = selectedDate;
 
                                             // Find appointments that are active during this slot
-                                            const activeAtSlot = appointments.filter(a => {
-                                                const appDate = (a.appointment_date || '').substring(0, 10);
-                                                if (a.status === 'cancelled' || appDate !== todayDate) return false;
-
-                                                // If we have detailed services with times
-                                                if (a.services && a.services.length > 0 && a.services.some((s: any) => s.start_time && s.end_time)) {
-                                                    // Check if THIS staff member has a service in this slot
-                                                    return a.services.some((s: any) => {
-                                                        if (Number(s.staff_id) !== Number(pId)) return false;
-
-                                                        // Fallback to appointment-level timing if service-level is missing
-                                                        const sStartStr = s.start_time || a.start_time;
-                                                        const sEndStr = s.end_time || a.end_time;
-
-                                                        if (!sStartStr || !sEndStr) return false;
-
-                                                        const [ssH, ssM] = sStartStr.split(':').map(Number);
-                                                        const [seH, seM] = sEndStr.split(':').map(Number);
-                                                        const sStart = ssH * 60 + ssM;
-                                                        const sEnd = seH * 60 + seM;
-
-                                                        return slotTotal >= sStart && slotTotal < sEnd;
-                                                    });
-                                                }
-
-                                                // Check if this staff member is involved in this appointment (legacy fallback)
-                                                const isInvolved = Number(a.staff_id) === Number(pId) ||
-                                                    (a.services && a.services.some((s: any) => Number(s.staff_id) === Number(pId)));
-
-                                                if (!isInvolved) return false;
-
-                                                const [asH, asM] = a.start_time.split(':').map(Number);
-                                                const [aeH, aeM] = a.end_time.split(':').map(Number);
-                                                const aStart = asH * 60 + asM;
-                                                const aEnd = aeH * 60 + aeM;
-
-                                                return slotTotal >= aStart && slotTotal < aEnd;
-                                            });
+                                            // Optimized lookup
+                                            const activeAtSlot = slotLookup.get(`${pId}-${slotTotal}`) || [];
 
                                             const isOccupied = activeAtSlot.length > 0;
                                             const isSlotFree = !isOccupied;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
 import { Appointment, Service, Company, User } from '../types';
@@ -260,8 +260,28 @@ export default function BookingPage() {
         setStep(prevStep);
     };
 
-    const generateTimeSlots = () => {
-        if (!company || !selection.date) return [];
+    // Performance Optimization: Pre-calculate all busy time ranges for all staff on current selection.date
+    const staffBusyMap = useMemo(() => {
+        if (!selection.date || appointments.length === 0) return new Map<number, { start: number, end: number }[]>();
+
+        const map = new Map<number, { start: number, end: number }[]>();
+        const dayApps = appointments.filter(a => (a.appointment_date || '').substring(0, 10) === selection.date && a.status !== 'cancelled');
+
+        dayApps.forEach(app => {
+            const [asH, asM] = app.start_time.split(':').map(Number);
+            const [aeH, aeM] = app.end_time.split(':').map(Number);
+            const start = asH * 60 + asM;
+            const end = aeH * 60 + aeM;
+            const sId = Number(app.staff_id);
+
+            if (!map.has(sId)) map.set(sId, []);
+            map.get(sId)!.push({ start, end });
+        });
+        return map;
+    }, [appointments, selection.date]);
+
+    const timeSlots = useMemo(() => {
+        if (!company || !selection.date || services.length === 0) return [];
 
         const now = new Date();
         const todayStr = now.toLocaleDateString('en-CA');
@@ -287,47 +307,31 @@ export default function BookingPage() {
 
         const slots: { time: string; isAvailable: boolean }[] = [];
 
-        // Pre-parse all appointments for the day to avoid repeated parsing
-        const dayApps = appointments.filter(a => (a.appointment_date || '').substring(0, 10) === selection.date && a.status !== 'cancelled');
-
         for (let time = workBegin; time < workEnd; time += slotInterval) {
             const timeStr = `${String(Math.floor(time / 60)).padStart(2, '0')}:${String(time % 60).padStart(2, '0')}`;
 
-            // 1. Past check
             if (isToday && (time < currentMin + 5)) {
                 slots.push({ time: timeStr, isAvailable: false });
                 continue;
             }
 
-            // 2. Work end check
             if (time + totalDuration > workEnd) {
                 slots.push({ time: timeStr, isAvailable: false });
                 continue;
             }
 
             let canApplySlot = true;
-            let currentOffset = 0;
 
             if (pkg) {
-                // Multi-service sequential staff check
+                let currentOffset = 0;
                 for (const svc of selectedServices) {
                     const svcStart = time + currentOffset;
                     const svcEnd = svcStart + svc.duration_minutes;
 
-                    // Find available staff for this specific service
                     const availableStaff = staff.filter(s => {
-                        // Department filter
                         if (svc.department_id && s.department_id !== svc.department_id) return false;
-
-                        // Check busy
-                        const isBusy = dayApps.some(app => {
-                            if (Number(app.staff_id) !== Number(s.id)) return false;
-                            const [asH, asM] = app.start_time.split(':').map(Number);
-                            const [aeH, aeM] = app.end_time.split(':').map(Number);
-                            const appStart = asH * 60 + asM;
-                            const appEnd = aeH * 60 + aeM;
-                            return (svcStart < appEnd && svcEnd > appStart);
-                        });
+                        const busyRanges = staffBusyMap.get(Number(s.id)) || [];
+                        const isBusy = busyRanges.some(r => svcStart < r.end && svcEnd > r.start);
                         return !isBusy;
                     });
 
@@ -335,54 +339,36 @@ export default function BookingPage() {
                         canApplySlot = false;
                         break;
                     }
-
                     currentOffset += svc.duration_minutes;
                 }
             } else {
-                // Single staff check (Normal flow or single-staff selection)
+                const slotEnd = time + totalDuration;
                 if (!selection.staffId) {
-                    // Staff not yet selected - check if ANY staff is available
-                    // This happens when time step comes before staff step in the flow
                     const staffStep = getStepNumber('staff');
                     const timeStep = getStepNumber('time');
-                    if (staffStep > timeStep || selection.packageId) {
-                        const slotEnd = time + totalDuration;
-                        // Filter staff by selected service department
+                    if (staffStep > timeStep) {
                         const relevantStaff = staff.filter(s => {
                             if (selectedServices.length === 1 && selectedServices[0].department_id) {
                                 return s.department_id === selectedServices[0].department_id;
                             }
                             return true;
                         });
-                        const anyAvailable = relevantStaff.some(s => {
-                            const isBusy = dayApps.some(app => {
-                                if (Number(app.staff_id) !== Number(s.id)) return false;
-                                const [asH, asM] = app.start_time.split(':').map(Number);
-                                const [aeH, aeM] = app.end_time.split(':').map(Number);
-                                return (time < (aeH * 60 + aeM) && slotEnd > (asH * 60 + asM));
-                            });
-                            return !isBusy;
+                        canApplySlot = relevantStaff.some(s => {
+                            const busyRanges = staffBusyMap.get(Number(s.id)) || [];
+                            return !busyRanges.some(r => time < r.end && slotEnd > r.start);
                         });
-                        if (!anyAvailable) canApplySlot = false;
                     } else {
                         canApplySlot = false;
                     }
                 } else {
-                    const slotEnd = time + totalDuration;
-                    const isBusy = dayApps.some(app => {
-                        if (Number(app.staff_id) !== Number(selection.staffId)) return false;
-                        const [asH, asM] = app.start_time.split(':').map(Number);
-                        const [aeH, aeM] = app.end_time.split(':').map(Number);
-                        return (time < (aeH * 60 + aeM) && slotEnd > (asH * 60 + asM));
-                    });
-                    if (isBusy) canApplySlot = false;
+                    const busyRanges = staffBusyMap.get(Number(selection.staffId)) || [];
+                    canApplySlot = !busyRanges.some(r => time < r.end && slotEnd > r.start);
                 }
             }
-
             slots.push({ time: timeStr, isAvailable: canApplySlot });
         }
         return slots;
-    };
+    }, [company, selection.date, selection.staffId, selection.serviceIds, selection.packageId, services, packages, staff, staffBusyMap]);
 
     const handleSubmit = async (e?: React.FormEvent, customSelection?: SelectionState) => {
         if (e) e.preventDefault();
@@ -561,18 +547,23 @@ export default function BookingPage() {
         </div>
     );
 
-    const selectedStaffUser = staff.find(u => (u.id === selection.staffId) || ((u as any).user_id === selection.staffId));
-    let totalPrice = 0;
-    let selectedSvsNames = '';
-    if (selection.packageId) {
-        const pkg = packages.find(p => p.id === selection.packageId);
-        totalPrice = Number(pkg?.price || 0);
-        selectedSvsNames = pkg?.name || '';
-    } else {
-        const selectedSvs = services.filter(s => selection.serviceIds.includes(s.id!));
-        totalPrice = selectedSvs.reduce((sum, s) => sum + Number(s.price), 0);
-        selectedSvsNames = selectedSvs.map(s => s.name).join(', ');
-    }
+    const selectedStaffUser = useMemo(() => staff.find(u => (u.id === selection.staffId) || ((u as any).user_id === selection.staffId)), [staff, selection.staffId]);
+    const totals = useMemo(() => {
+        let totalPrice = 0;
+        let selectedSvsNames = '';
+        if (selection.packageId) {
+            const pkg = packages.find(p => p.id === selection.packageId);
+            totalPrice = Number(pkg?.price || 0);
+            selectedSvsNames = pkg?.name || '';
+        } else {
+            const selectedSvs = services.filter(s => selection.serviceIds.includes(s.id!));
+            totalPrice = selectedSvs.reduce((sum, s) => sum + Number(s.price), 0);
+            selectedSvsNames = selectedSvs.map(s => s.name).join(', ');
+        }
+        return { totalPrice, selectedSvsNames };
+    }, [selection.packageId, selection.serviceIds, packages, services]);
+
+    const { totalPrice, selectedSvsNames } = totals;
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -886,7 +877,7 @@ export default function BookingPage() {
                         <h2 className="text-2xl font-black text-gray-900 mb-6">Saat Seçimi</h2>
                         <div className="grid grid-cols-3 gap-3">
                             {(() => {
-                                const slots = generateTimeSlots();
+                                const slots = timeSlots;
                                 if (slots.length === 0) {
                                     return (
                                         <div className="col-span-3 text-center py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
