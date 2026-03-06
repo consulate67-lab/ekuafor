@@ -42,9 +42,28 @@ class OtpService {
             const sent = await smsService.sendSms(null, formattedPhone, message);
 
             if (!sent) {
-                // Eğer SMS gönderilemezse (ayar yoksa vb.) logla ama hata döndürme (geliştirme aşamasında)
-                console.warn('SMS gönderilemedi, ayarlarınızı kontrol edin.');
-                // return { success: false, message: 'SMS gönderilemedi' };
+                console.warn('[OTP] SMS gönderilemedi, Push denenecek...');
+
+                // PUSH NOTIFICATION FALLBACK
+                try {
+                    const pushService = require('./push.service').default;
+                    const token = await pushService.getPushTokenByPhone(formattedPhone);
+
+                    if (token) {
+                        console.log(`[OTP] Push token bulundu: ${formattedPhone}, bildirim gönderiliyor...`);
+                        await pushService.sendNotification(
+                            token,
+                            'Giriş Kodu',
+                            `Saloon giriş kodunuz: ${code}`,
+                            { type: 'otp', code: code },
+                            formattedPhone
+                        );
+                    } else {
+                        console.log(`[OTP] Cihaz bulunamadı (Push token yok): ${formattedPhone}`);
+                    }
+                } catch (pushError) {
+                    console.error('[OTP] Push hatası:', pushError);
+                }
             }
 
             return { success: true, message: 'OTP gönderildi' };
