@@ -3,34 +3,45 @@ import pool from '../config/database';
 
 try {
     if (!admin.apps.length) {
-        // Option 1: JSON string or base64 from environment variable (for Railway/production)
-        const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-        // Option 2: Local JSON file path (for local development)
-        const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+        const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim();
+        const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH?.trim();
 
         if (serviceAccountJson) {
             let serviceAccount: any;
             try {
-                // Try plain JSON first
-                serviceAccount = JSON.parse(serviceAccountJson);
-            } catch {
-                // Try base64 decode
-                serviceAccount = JSON.parse(Buffer.from(serviceAccountJson, 'base64').toString('utf8'));
+                // Remove potential surrounding quotes from the string
+                const cleanJson = serviceAccountJson.startsWith('"') && serviceAccountJson.endsWith('"')
+                    ? serviceAccountJson.slice(1, -1)
+                    : serviceAccountJson;
+
+                try {
+                    serviceAccount = JSON.parse(cleanJson);
+                } catch {
+                    // Try base64 decode
+                    serviceAccount = JSON.parse(Buffer.from(cleanJson, 'base64').toString('utf8'));
+                }
+
+                admin.initializeApp({
+                    credential: admin.credential.cert(serviceAccount)
+                });
+                console.log('[PushService] Firebase Admin initialized via FIREBASE_SERVICE_ACCOUNT_JSON.');
+            } catch (innerError: any) {
+                console.error('[PushService] CRITICAL: JSON Parse failed for service account.', innerError.message);
             }
-            admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-            console.log('[PushService] Firebase Admin initialized via FIREBASE_SERVICE_ACCOUNT_JSON env var.');
         } else if (serviceAccountPath) {
             const path = require('path');
             const absolutePath = path.resolve(process.cwd(), serviceAccountPath);
             const serviceAccount = require(absolutePath);
-            admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-            console.log('[PushService] Firebase Admin initialized via JSON file:', absolutePath);
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount)
+            });
+            console.log('[PushService] Firebase Admin initialized via file:', absolutePath);
         } else {
-            console.warn('[PushService] Warning: No Firebase credentials found. Push notifications will be simulated.');
+            console.warn('[PushService] Firebase Credentials Missing. Push will be simulated.');
         }
     }
-} catch (e) {
-    console.error('[PushService] Error initializing Firebase Admin:', e);
+} catch (e: any) {
+    console.error('[PushService] Initialization exception:', e.message);
 }
 
 
@@ -41,13 +52,15 @@ class PushService {
         console.log(`[PushService] Preparing push notification for token: ${pushToken}`);
 
         try {
+            console.log(`[PushService] admin.apps.length: ${admin.apps.length}`);
             if (!admin.apps.length) {
-                console.warn('[PushService] Firebase Admin is NOT initialized. Simulating success.');
-                console.log(`[PushService] Simulated Web/Mobile Push -> Title: "${title}", Body: "${body}"`);
+                const envExists = !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+                const pathExists = !!process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+                console.warn(`[PushService] Firebase not initialized. ENV JSON: ${envExists}, PATH: ${pathExists}`);
 
                 await pool.query(
                     'INSERT INTO push_logs (phone_number, title, body, status, error_message) VALUES ($1, $2, $3, $4, $5)',
-                    [phone || null, title, body, 'simulated', 'Firebase not initialized']
+                    [phone || null, title, body, 'simulated', `Firebase not initialized (JSON:${envExists}, PATH:${pathExists})`]
                 );
                 return true;
             }
