@@ -825,7 +825,6 @@ export default function SalonBoard() {
 
                                             const isSlotCurrent = selectedDate === currentDate && currentTotal >= slotTotal && currentTotal < nextSlotTotal;
                                             const isSlotPast = (selectedDate < currentDate) || (selectedDate === currentDate && currentTotal >= nextSlotTotal);
-                                            const todayDate = selectedDate;
 
                                             // Find appointments that are active during this slot
                                             // Optimized lookup
