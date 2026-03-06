@@ -406,7 +406,10 @@ class AppointmentService {
             if (updatedAppointment) {
                 const phone = updatedAppointment.customer_phone;
                 const name = updatedAppointment.customer_name || 'Değerli Müşterimiz';
-                const date = updatedAppointment.appointment_date;
+                const rawDate = updatedAppointment.appointment_date;
+                const date = (rawDate && rawDate instanceof Date)
+                    ? rawDate.toLocaleDateString('tr-TR')
+                    : rawDate;
                 const time = updatedAppointment.start_time;
 
                 try {
@@ -414,21 +417,23 @@ class AppointmentService {
 
                     // Fetch company and staff details for the notification text
                     const detailsRes = await pool.query(`
-                        SELECT c.name as company_name, u.first_name, u.last_name
+                        SELECT c.name as company_name, u.first_name, u.last_name, s.name as service_name
                         FROM appointments a
                         LEFT JOIN companies c ON a.company_id = c.id
                         LEFT JOIN users u ON a.staff_id = u.id
+                        LEFT JOIN services s ON a.service_id = s.id
                         WHERE a.id = $1
                     `, [id]);
                     const details = detailsRes.rows[0];
                     const companyName = details?.company_name || 'İşletme';
                     const staffName = (details?.first_name || details?.last_name) ? `${details.first_name || ''} ${details.last_name || ''}`.trim() : 'Uzman personelimiz';
+                    const serviceName = details?.service_name || 'Hizmet';
 
                     let smsSent = false;
 
                     if (phone && (status === 'approved' || status === 'cancelled')) {
                         const message = status === 'approved'
-                            ? `Sayın ${name}, ${companyName} işletmesinde ${staffName} ile ${date} Tarihli, Saat: ${time} randevunuz ONAYLANMIŞTIR. Bekliyoruz!`
+                            ? `Sayın ${name}, ${companyName} işletmesinde ${staffName} ile ${serviceName} hizmeti için ${date} ${time} randevunuz ONAYLANMIŞTIR. Bekliyoruz!`
                             : `Sayın ${name}, ${companyName} işletmesindeki ${date} tarihli randevunuz İPTAL EDİLMİŞTİR.`;
 
                         console.log(`[Notification] Attempting SMS for app ID ${id}...`);

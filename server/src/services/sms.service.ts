@@ -289,7 +289,8 @@ class SmsService {
                 company_id: companyId,
                 phone_number: formattedPhone,
                 message,
-                status: 'sent'
+                status: 'sent',
+                error_message: settings.provider === 'netgsm' ? `Netgsm ID: ${String(response.data).trim()}` : undefined
             });
 
             return true;
