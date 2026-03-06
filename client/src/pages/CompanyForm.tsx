@@ -72,6 +72,7 @@ export default function CompanyForm() {
         genders: [],
         company_type: 'ASIL',
         main_company_id: null,
+        sms_enabled: true,
     });
 
     const [mainCompanies, setMainCompanies] = useState<any[]>([]);
@@ -299,15 +300,8 @@ export default function CompanyForm() {
                 setMapCenter(newPos);
             }
 
-            // Fetch SMS settings too
-            try {
-                const smsRes = await api.get(`/sms/settings/${id}`);
-                if (smsRes.data.settings) {
-                    setSmsSettings(smsRes.data.settings);
-                }
-            } catch (smsErr) {
-                console.warn('SMS ayarları bulunamadı veya yüklenemedi');
-            }
+            // SMS Settings are now handled directly via 'sms_enabled' flag on the company record.
+            // No separate fetch needed here for simple on/off toggle.
         } catch (err: any) {
             setError(err.response?.data?.error || 'Firma yüklenirken hata oluştu');
         }
@@ -341,27 +335,8 @@ export default function CompanyForm() {
 
             if (isEdit) {
                 await api.put(`/companies/${id}`, data);
-                // Save SMS settings (Don't let it block the main flow)
-                try {
-                    await api.post('/sms/settings', {
-                        ...smsSettings,
-                        company_id: Number(id)
-                    });
-                } catch (smsErr) {
-                    console.error('SMS settings could not be saved:', smsErr);
-                }
             } else {
-                const res = await api.post('/companies', data);
-                // For new company, use the new ID
-                const newId = res.data.data.id;
-                try {
-                    await api.post('/sms/settings', {
-                        ...smsSettings,
-                        company_id: newId
-                    });
-                } catch (smsErr) {
-                    console.error('SMS settings could not be saved for new company:', smsErr);
-                }
+                await api.post('/companies', data);
             }
 
             navigate('/companies');
@@ -902,8 +877,8 @@ export default function CompanyForm() {
                                 <input
                                     type="checkbox"
                                     id="sms_active"
-                                    checked={smsSettings.is_active}
-                                    onChange={(e) => setSmsSettings(prev => ({ ...prev, is_active: e.target.checked }))}
+                                    checked={formData.sms_enabled !== false}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, sms_enabled: e.target.checked }))}
                                     className="w-5 h-5 text-violet-600 border-gray-300 rounded focus:ring-violet-500"
                                 />
                                 <label htmlFor="sms_active" className="text-sm font-bold text-violet-900 select-none cursor-pointer">
@@ -911,7 +886,7 @@ export default function CompanyForm() {
                                 </label>
                             </div>
 
-                            {smsSettings.is_active && (
+                            {formData.sms_enabled !== false && (
                                 <div className="md:col-span-2 p-4 bg-violet-100 rounded-xl border border-violet-200">
                                     <p className="text-sm text-violet-800 font-medium">Sistem merkezi NetGSM altyapısını kullanmaktadır. Bu firmaya ait randevular onaylandığında veya iptal edildiğinde, arka planda otomatik olarak müşteriye SMS gönderilecektir. Ekstra bir ayar yapmanıza gerek yoktur.</p>
                                 </div>

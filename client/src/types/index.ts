@@ -64,6 +64,7 @@ export interface Company {
     booking_flow?: string;
     staff_label?: string;
     service_label?: string;
+    sms_enabled?: boolean;
 }
 
 export interface Province {
