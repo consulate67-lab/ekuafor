@@ -86,14 +86,6 @@ export default function CompanyForm() {
     const [selectedDistrict, setSelectedDistrict] = useState<number | null>(null);
     const [selectedNeighborhood, setSelectedNeighborhood] = useState<number | null>(null);
 
-    // SMS Settings
-    const [smsSettings, setSmsSettings] = useState({
-        provider: 'netgsm',
-        api_url: 'https://api.netgsm.com.tr/sms/send/get',
-        api_key: '',
-        is_active: false,
-    });
-
     // Arama ve Konum Durumları
     const [mapSearchQuery, setMapSearchQuery] = useState('');
     const [mapResults, setMapResults] = useState<any[]>([]);
