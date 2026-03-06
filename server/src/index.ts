@@ -719,6 +719,7 @@ const runMigrations = async () => {
         await pool.query("UPDATE companies SET genders = '{\"Erkek\", \"Kadın\", \"Çocuk\", \"Güzellik Merkezi\"}' WHERE genders IS NULL");
 
         await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS department_id INTEGER');
+        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS sms_enabled BOOLEAN DEFAULT true');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS booking_flow VARCHAR(10) DEFAULT \'SHP\'');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS staff_label VARCHAR(50) DEFAULT \'Personel\'');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS service_label VARCHAR(50) DEFAULT \'Hizmet\'');
