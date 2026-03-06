@@ -61,6 +61,7 @@ export interface Company {
     ubl_incoming_alias?: string | null;
     ubl_outgoing_alias?: string | null;
     license_end_date?: string | Date | null;
+    sms_enabled?: boolean | null;
 }
 
 class CompanyService {
@@ -71,9 +72,11 @@ class CompanyService {
         const client = await pool.connect();
 
         try {
-            // Ensure neighborhood column exists (one-time migration check)
             try {
                 await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS neighborhood TEXT');
+                await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS sms_enabled BOOLEAN DEFAULT true');
+                // Ensure existing companies have this enabled by default if it was null
+                await client.query('UPDATE companies SET sms_enabled = true WHERE sms_enabled IS NULL');
             } catch (e) { /* ignore if fails */ }
 
             if (company.main_company_id) {
@@ -102,8 +105,8 @@ class CompanyService {
           genders, company_type, main_company_id,
           tax_number, tax_office,
           qnb_username, qnb_password, qnb_vkn, efatura_test_mode, invoice_prefix,
-          ubl_incoming_alias, ubl_outgoing_alias
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38)
+          ubl_incoming_alias, ubl_outgoing_alias, sms_enabled
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39)
         RETURNING *
       `;
 
@@ -145,7 +148,8 @@ class CompanyService {
                 company.efatura_test_mode !== false,
                 company.invoice_prefix || 'GIB',
                 company.ubl_incoming_alias || 'default',
-                company.ubl_outgoing_alias || 'default'
+                company.ubl_outgoing_alias || 'default',
+                company.sms_enabled !== false // Default to true if not specified
             ];
 
 

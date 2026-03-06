@@ -117,45 +117,58 @@ class SmsService {
      * SMS Gönder
      */
     async sendSms(companyId: number | null, phoneNumber: string, message: string): Promise<boolean> {
-        // Firmanın kendi SMS ayarını ara, yoksa global ayara (company_id = null) bak
+        // 1. Şirket bazlı kontrol: Şirketin genel SMS izni var mı?
+        if (companyId !== null) {
+            try {
+                const compRes = await pool.query('SELECT sms_enabled FROM companies WHERE id = $1', [companyId]);
+                const isSmsEnabledForCompany = compRes.rows[0]?.sms_enabled;
+
+                if (isSmsEnabledForCompany === false) {
+                    console.log(`[SMS] Company ${companyId} has explicitly disabled SMS (sms_enabled=false). Skipping.`);
+                    return false;
+                }
+                console.log(`[SMS] Company ${companyId} sms_enabled flag: ${isSmsEnabledForCompany}`);
+            } catch (err) {
+                console.error(`[SMS] Error checking company ${companyId} sms_enabled flag:`, err);
+            }
+        }
+
+        // 2. Ayarları Getir (Firma özel veya Global)
         let settings = await this.getSettings(companyId);
 
         if (settings && !settings.is_active) {
-            console.warn(`[SMS] Company ${companyId} explicitly disabled SMS. Skipping.`);
+            console.warn(`[SMS] Company ${companyId} settings record exists but is_active=false. Skipping.`);
             return false;
         }
 
         if (!settings) {
             // Firma ayarı hiç yoksa global ayarı dene
             if (companyId !== null) {
-                console.log(`[SMS] Company ${companyId} has no SMS settings record, falling back to global settings...`);
+                console.log(`[SMS] Company ${companyId} has NO custom settings record. Trying global (NULL company_id) fallback...`);
                 settings = await this.getSettings(null);
             }
         }
 
-        if (!settings || !settings.is_active) {
-            console.warn(`SMS skipping: Global Settings not found or inactive`);
+        if (!settings) {
+            console.error(`[SMS] CRITICAL: No SMS settings found for company ${companyId} OR globally (null).`);
             return false;
         }
 
-        console.log(`[SMS] Using settings: company=${settings.company_id ?? 'GLOBAL'}, provider=${settings.provider}`);
-
-        // Phone number formatting (Turkish numbers)
-        let formattedPhone = phoneNumber.replace(/\D/g, '');
-        // Normalize Turkish numbers
-        if (formattedPhone.startsWith('90') && formattedPhone.length === 12) {
-            // Already 905XXXXXXXXX, keep it
-        } else if (formattedPhone.startsWith('0') && formattedPhone.length === 11) {
-            // 05XXXXXXXXX -> 905XXXXXXXXX
-            formattedPhone = '90' + formattedPhone.substring(1);
-        } else if (formattedPhone.length === 10 && formattedPhone.startsWith('5')) {
-            // 5XXXXXXXXX -> 905XXXXXXXXX
-            formattedPhone = '90' + formattedPhone;
+        if (!settings.is_active) {
+            console.warn(`[SMS] Global SMS settings are found but marked as inactive. Skipping.`);
+            return false;
         }
 
-        // Netgsm standard is often 10 digits for some endpoints, but XML accepts 12 with 90.
-        // Let's create a 10-digit version for GET and 12-digit for XML
-        const phone10 = formattedPhone.startsWith('90') ? formattedPhone.substring(2) : formattedPhone;
+        console.log(`[SMS] Proceeding with provider: ${settings.provider}, URL: ${settings.api_url}`);
+
+        const { normalizePhone } = require('../utils/phone');
+        const phone10 = normalizePhone(phoneNumber);
+        const formattedPhone = '90' + phone10;
+
+        if (!phone10 || phone10.length !== 10) {
+            console.error(`[SMS] Invalid phone number format: ${phoneNumber} (Cleaned: ${phone10})`);
+            return false;
+        }
 
         try {
             let response;

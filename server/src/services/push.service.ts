@@ -35,7 +35,7 @@ try {
 
 
 class PushService {
-    async sendNotification(pushToken: string, title: string, body: string, data?: any): Promise<boolean> {
+    async sendNotification(pushToken: string, title: string, body: string, data?: any, phone?: string): Promise<boolean> {
         if (!pushToken) return false;
 
         console.log(`[PushService] Preparing push notification for token: ${pushToken}`);
@@ -44,6 +44,11 @@ class PushService {
             if (!admin.apps.length) {
                 console.warn('[PushService] Firebase Admin is NOT initialized. Simulating success.');
                 console.log(`[PushService] Simulated Web/Mobile Push -> Title: "${title}", Body: "${body}"`);
+
+                await pool.query(
+                    'INSERT INTO push_logs (phone_number, title, body, status, error_message) VALUES ($1, $2, $3, $4, $5)',
+                    [phone || null, title, body, 'simulated', 'Firebase not initialized']
+                );
                 return true;
             }
 
@@ -57,11 +62,25 @@ class PushService {
                 token: pushToken
             };
 
+            console.log(`[PushService] Payload:`, JSON.stringify(message, null, 2));
+
             const response = await admin.messaging().send(message);
             console.log(`[PushService] Notification sent:`, response);
+
+            await pool.query(
+                'INSERT INTO push_logs (phone_number, title, body, status) VALUES ($1, $2, $3, $4)',
+                [phone || null, title, body, 'sent']
+            );
+
             return true;
         } catch (error: any) {
             console.error('[PushService] Push Sending Error:', error.message);
+
+            await pool.query(
+                'INSERT INTO push_logs (phone_number, title, body, status, error_message) VALUES ($1, $2, $3, $4, $5)',
+                [phone || null, title, body, 'failed', error.message]
+            );
+
             return false;
         }
     }
@@ -78,11 +97,16 @@ class PushService {
 
     async getPushTokenByPhone(phone: string): Promise<string | null> {
         try {
+            const { normalizePhone } = require('../utils/phone');
+            const normalizedPhone = normalizePhone(phone);
+
+            console.log(`[PushService] Searching token for: ${phone} (Normalized: ${normalizedPhone})`);
+
             const result = await pool.query(
                 `SELECT push_token FROM customer_devices 
                  WHERE customer_phone = $1 AND push_token IS NOT NULL 
                  ORDER BY last_sync DESC LIMIT 1`,
-                [phone]
+                [normalizedPhone]
             );
             return result.rows[0]?.push_token || null;
         } catch (error) {

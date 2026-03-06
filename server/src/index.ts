@@ -451,6 +451,18 @@ const runMigrations = async () => {
         `);
 
         await pool.query(`
+            CREATE TABLE IF NOT EXISTS push_logs (
+                id SERIAL PRIMARY KEY,
+                phone_number VARCHAR(20),
+                title TEXT,
+                body TEXT,
+                status VARCHAR(20),
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS company_users (
                 id SERIAL PRIMARY KEY,
                 company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,

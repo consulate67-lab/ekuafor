@@ -410,6 +410,8 @@ class AppointmentService {
                 const time = updatedAppointment.start_time;
 
                 try {
+                    console.log(`[Notification] Status update for app ID ${id}: ${status}, Phone: ${phone}, Name: ${name}`);
+
                     // Fetch company and staff details for the notification text
                     const detailsRes = await pool.query(`
                         SELECT c.name as company_name, u.first_name, u.last_name
@@ -424,38 +426,42 @@ class AppointmentService {
 
                     let smsSent = false;
 
-                    if (phone && status === 'approved') {
-                        const message = `Sayın ${name}, ${companyName} işletmesinde ${staffName} ile ${date} Tarihli, Saat: ${time} randevunuz ONAYLANMIŞTIR. Bekliyoruz!`;
+                    if (phone && (status === 'approved' || status === 'cancelled')) {
+                        const message = status === 'approved'
+                            ? `Sayın ${name}, ${companyName} işletmesinde ${staffName} ile ${date} Tarihli, Saat: ${time} randevunuz ONAYLANMIŞTIR. Bekliyoruz!`
+                            : `Sayın ${name}, ${companyName} işletmesindeki ${date} tarihli randevunuz İPTAL EDİLMİŞTİR.`;
+
+                        console.log(`[Notification] Attempting SMS for app ID ${id}...`);
                         smsSent = await smsService.sendSms(updatedAppointment.company_id, phone, message);
-                    } else if (phone && status === 'cancelled') {
-                        const message = `Sayın ${name}, ${companyName} işletmesindeki ${date} tarihli randevunuz İPTAL EDİLMİŞTİR.`;
-                        smsSent = await smsService.sendSms(updatedAppointment.company_id, phone, message);
+                        console.log(`[Notification] SMS send result: ${smsSent}`);
                     }
 
                     // PUSH NOTIFICATION FALLBACK
                     if (!smsSent && phone && (status === 'approved' || status === 'cancelled')) {
-                        console.log(`[Service] SMS not sent, checking for push token for phone: ${phone}`);
+                        console.log(`[Notification] SMS not sent, checking for push token for phone: ${phone}`);
 
                         // Dynamically import pushService to avoid circular dependency
                         const pushService = require('./push.service').default;
 
                         const token = await pushService.getPushTokenByPhone(phone);
                         if (token) {
+                            console.log(`[Notification] Push token found for ${phone}, sending notification...`);
                             const title = status === 'approved' ? 'Randevunuz Onaylandı' : 'Randevunuz İptal Edildi';
                             const body = status === 'approved'
                                 ? `Sayın ${name}, ${companyName} işletmesinde ${staffName} ile ${date} ${time} randevunuz onaylanmıştır.`
                                 : `Sayın ${name}, ${companyName} işletmesindeki ${date} ${time} randevunuz iptal edilmiştir.`;
 
-                            await pushService.sendNotification(token, title, body, {
+                            const pushResult = await pushService.sendNotification(token, title, body, {
                                 appointmentId: id,
                                 type: status
-                            });
+                            }, phone);
+                            console.log(`[Notification] Push send result: ${pushResult}`);
                         } else {
-                            console.log(`[Service] No push token found for phone: ${phone}`);
+                            console.log(`[Notification] No push token found for phone: ${phone} in customer_devices table.`);
                         }
                     }
                 } catch (smsError) {
-                    console.error(`SMS notification failed for status ${status}:`, smsError);
+                    console.error(`[Notification] Error in notification flow:`, smsError);
                 }
             }
 
@@ -592,6 +598,9 @@ class AppointmentService {
     async syncDeviceWithPhone(deviceId: string, phone: string, pushToken?: string) {
         console.log(`[Service] syncDeviceWithPhone: Device=${deviceId}, Phone=${phone}, pushToken=${pushToken}`);
 
+        const { normalizePhone } = require('../utils/phone');
+        const normalizedPhone = normalizePhone(phone);
+
         if (pushToken) {
             const query = `
                 INSERT INTO customer_devices (device_id, customer_phone, push_token, last_sync)
@@ -599,7 +608,7 @@ class AppointmentService {
                 ON CONFLICT (device_id) 
                 DO UPDATE SET customer_phone = $2, push_token = $3, last_sync = CURRENT_TIMESTAMP
             `;
-            await pool.query(query, [deviceId, phone, pushToken]);
+            await pool.query(query, [deviceId, normalizedPhone, pushToken]);
         } else {
             const query = `
                 INSERT INTO customer_devices (device_id, customer_phone, last_sync)
@@ -607,7 +616,7 @@ class AppointmentService {
                 ON CONFLICT (device_id) 
                 DO UPDATE SET customer_phone = $2, last_sync = CURRENT_TIMESTAMP
             `;
-            await pool.query(query, [deviceId, phone]);
+            await pool.query(query, [deviceId, normalizedPhone]);
         }
 
         // Bilinen tüm randevuları da bu tele bağlayalım (Eski randevuların sahiplenilmesi)
@@ -616,12 +625,16 @@ class AppointmentService {
 
     async claimAppointmentsByDevice(deviceId: string, phone: string, customerId?: number) {
         console.log(`[Service] claimAppointmentsByDevice: Device=${deviceId}, Phone=${phone}`);
-        // Normalize phone for comparison or just use as is for storage
+
+        const { normalizePhone } = require('../utils/phone');
+        const normalizedPhone = normalizePhone(phone);
+
+        // Normalize existing phone for comparison or just use as is for storage
         await pool.query(
             `UPDATE appointments 
              SET customer_phone = $1, customer_id = COALESCE(customer_id, $2)
              WHERE device_id = $3 AND (customer_phone IS NULL OR customer_phone = '')`,
-            [phone, customerId || null, deviceId]
+            [normalizedPhone, customerId || null, deviceId]
         );
     }
 
