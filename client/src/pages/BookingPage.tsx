@@ -35,34 +35,33 @@ export default function BookingPage() {
     const [step, setStep] = useState(1);
 
     // Step content mapping based on booking_flow
-    const getStepContent = (stepNum: number): 'service' | 'staff' | 'date' | 'time' | 'confirm' => {
-        if (stepNum === 5) return 'confirm';
+    const steps = useMemo(() => {
         const flow = company?.booking_flow || 'SPDT';
         const codeToKey: Record<string, 'service' | 'staff' | 'date' | 'time'> = { 'S': 'service', 'P': 'staff', 'D': 'date', 'T': 'time' };
 
-        let steps: ('service' | 'staff' | 'date' | 'time')[];
+        let s: ('service' | 'staff' | 'date' | 'time')[];
         if (flow.length === 4) {
-            steps = flow.split('').map(c => codeToKey[c] || 'service');
+            s = flow.split('').map(c => codeToKey[c] || 'service');
         } else {
-            // Legacy 3-char codes
             const legacy: Record<string, ('service' | 'staff' | 'date' | 'time')[]> = {
                 'SHP': ['service', 'staff', 'date', 'time'],
                 'SDP': ['service', 'date', 'staff', 'time'],
                 'SDT': ['service', 'date', 'time', 'staff'],
             };
-            steps = legacy[flow] || ['service', 'staff', 'date', 'time'];
+            s = legacy[flow] || ['service', 'staff', 'date', 'time'];
         }
+        return s;
+    }, [company?.booking_flow]);
 
+    const getStepContent = (stepNum: number): 'service' | 'staff' | 'date' | 'time' | 'confirm' => {
+        if (stepNum === 5) return 'confirm';
         return steps[stepNum - 1] || 'service';
     };
 
-    // Get step number for a given content type
     const getStepNumber = (content: 'service' | 'staff' | 'date' | 'time' | 'confirm'): number => {
         if (content === 'confirm') return 5;
-        for (let i = 1; i <= 4; i++) {
-            if (getStepContent(i) === content) return i;
-        }
-        return 1;
+        const idx = steps.indexOf(content as any);
+        return idx !== -1 ? idx + 1 : 1;
     };
 
     // Android Hardware Back Button Support

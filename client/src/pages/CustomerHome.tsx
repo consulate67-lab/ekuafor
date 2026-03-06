@@ -40,7 +40,7 @@ export default function CustomerHome() {
     const isScanningRef = useRef(false);
     const [navigatingTo, setNavigatingTo] = useState<number | null>(null);
 
-    const fetchData = async (query?: string, loc?: { lat: number, lng: number } | null, dist?: number) => {
+    const fetchData = React.useCallback(async (query?: string, loc?: { lat: number, lng: number } | null, dist?: number) => {
         try {
             const params: any = { is_active: true, exclude_parent: true };
             if (query) params.search = query;
@@ -58,20 +58,15 @@ export default function CustomerHome() {
 
             const res = await api.get('/companies', { params });
             const allCompanies = res.data?.data || [];
-            setCompanies(allCompanies);
 
             // Haversine formula for precise spherical distance
             const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-                const R = 6371.071; // Earth's radius in km - more precise for local
+                const R = 6371.071;
                 const rLat1 = lat1 * Math.PI / 180;
                 const rLat2 = lat2 * Math.PI / 180;
                 const dLat = (lat2 - lat1) * Math.PI / 180;
                 const dLon = (lon2 - lon1) * Math.PI / 180;
-
-                const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                    Math.cos(rLat1) * Math.cos(rLat2) *
-                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-
+                const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(rLat1) * Math.cos(rLat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
                 const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
                 return R * c;
             };
@@ -79,11 +74,9 @@ export default function CustomerHome() {
             const resultWithDistance = allCompanies.map((c: Company) => {
                 let distance = undefined;
                 if (loc) {
-                    // Critical: Ensure coordinate values are strictly parsed as floats
                     const lat2 = c.latitude ? parseFloat(String(c.latitude)) : null;
                     const lng2 = c.longitude ? parseFloat(String(c.longitude)) : null;
-
-                    if (lat2 !== null && lng2 !== null && !isNaN(lat2) && !isNaN(lng2) && lat2 !== 0 && lng2 !== 0) {
+                    if (lat2 && lng2 && !isNaN(lat2) && !isNaN(lng2) && lat2 !== 0) {
                         distance = calculateDistance(loc.lat, loc.lng, lat2, lng2);
                     }
                 }
@@ -91,26 +84,20 @@ export default function CustomerHome() {
             });
 
             let finalResult = resultWithDistance;
-
-            // Apply strict distance filtering if location is available and slider is active or limit is set
             if (loc) {
                 const threshold = dist || distanceLimit;
-                // Only show results within threshold. If distance is unknown, we hide it to prevent "ghost" results far away.
-                finalResult = resultWithDistance.filter((c: any) =>
-                    c.distance !== undefined && c.distance <= threshold
-                );
-
-                // Sort primarily by distance (closest first)
-                finalResult.sort((a: any, b: any) => (a.distance || 0) - (b.distance || 0));
+                finalResult = resultWithDistance.filter((c: any) => c.distance === undefined || c.distance <= threshold);
+                finalResult.sort((a: any, b: any) => (a.distance || 9999) - (b.distance || 9999));
             }
 
+            setCompanies(allCompanies);
             setFilteredCompanies(finalResult);
         } catch (err) {
             console.error('Failed to fetch companies', err);
         } finally {
             setLoading(false);
         }
-    };
+    }, [selectedGender, sort, distanceLimit, showSlider]);
 
     useEffect(() => {
         if (isAuthenticated && (user?.role === 'staff' || user?.role === 'company_admin' || user?.role === 'super_admin')) {
@@ -253,7 +240,7 @@ export default function CustomerHome() {
 
     useEffect(() => {
         fetchData(searchQuery, location, distanceLimit);
-    }, [selectedGender, sort]);
+    }, [selectedGender, sort, fetchData]);
 
 
     const favoriteCompanies = useMemo(() => {
@@ -682,17 +669,26 @@ export default function CustomerHome() {
                     </div>
                     <div className="flex gap-3 overflow-x-auto px-6 pb-4 hide-scrollbar">
                         {favoriteCompanies.map((c: any) => (
-                            <Link
-                                to={`/book/${c.id}`}
+                            <button
+                                onClick={() => {
+                                    if (navigatingTo) return;
+                                    setNavigatingTo(c.id);
+                                    navigate(`/book/${c.id}`);
+                                }}
                                 key={c.id}
-                                className="flex-shrink-0 w-28 bg-white rounded-3xl p-3 shadow-lg shadow-slate-200/30 border border-slate-50 text-center group active:scale-95 transition-all"
+                                className={`flex-shrink-0 w-28 bg-white rounded-3xl p-3 shadow-lg shadow-slate-200/30 border border-slate-50 text-center group active:scale-95 transition-all relative overflow-hidden ${navigatingTo === c.id ? 'opacity-50' : ''}`}
                             >
+                                {navigatingTo === c.id && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-white/20">
+                                        <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                                    </div>
+                                )}
                                 <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-xl mx-auto mb-2 group-hover:bg-orange-50 transition-colors">
                                     💈
                                 </div>
                                 <h4 className="font-black text-slate-900 text-[10px] truncate">{c.name}</h4>
                                 <p className="text-slate-400 text-[8px] font-bold mt-0.5">{c.district || 'Merkez'}</p>
-                            </Link>
+                            </button>
                         ))}
                     </div>
                 </div>
