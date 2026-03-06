@@ -46,21 +46,69 @@ try {
 
 
 class PushService {
+    // Encapsulates the Firebase initialization logic for lazy/re-initialization
+    private initializeFirebase(): void {
+        if (admin.apps.length) {
+            console.log('[PushService] Firebase Admin already initialized. Skipping lazy initialization attempt.');
+            return;
+        }
+
+        const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim();
+        const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH?.trim();
+
+        try {
+            if (serviceAccountJson) {
+                let serviceAccount: any;
+                const cleanJson = serviceAccountJson.startsWith('"') && serviceAccountJson.endsWith('"')
+                    ? serviceAccountJson.slice(1, -1)
+                    : serviceAccountJson;
+
+                try {
+                    serviceAccount = JSON.parse(cleanJson);
+                } catch {
+                    serviceAccount = JSON.parse(Buffer.from(cleanJson, 'base64').toString('utf8'));
+                }
+                admin.initializeApp({
+                    credential: admin.credential.cert(serviceAccount)
+                });
+                console.log('[PushService] Firebase Admin lazily initialized via FIREBASE_SERVICE_ACCOUNT_JSON.');
+            } else if (serviceAccountPath) {
+                const path = require('path');
+                const absolutePath = path.resolve(process.cwd(), serviceAccountPath);
+                const serviceAccount = require(absolutePath);
+                admin.initializeApp({
+                    credential: admin.credential.cert(serviceAccount)
+                });
+                console.log('[PushService] Firebase Admin lazily initialized via file:', absolutePath);
+            } else {
+                console.warn('[PushService] Firebase Credentials Missing during lazy init. Push will be simulated.');
+            }
+        } catch (e: any) {
+            console.error('[PushService] Lazy Initialization exception:', e.message);
+        }
+    }
+
     async sendNotification(pushToken: string, title: string, body: string, data?: any, phone?: string): Promise<boolean> {
         if (!pushToken) return false;
 
         console.log(`[PushService] Preparing push notification for token: ${pushToken}`);
 
         try {
+            // Lazy initialization if not already initialized
+            if (!admin.apps.length) {
+                console.log('[PushService] Firebase Apps list is empty. Attempting lazy initialization...');
+                this.initializeFirebase();
+            }
+
             console.log(`[PushService] admin.apps.length: ${admin.apps.length}`);
             if (!admin.apps.length) {
                 const envExists = !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
                 const pathExists = !!process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
-                console.warn(`[PushService] Firebase not initialized. ENV JSON: ${envExists}, PATH: ${pathExists}`);
+                console.warn(`[PushService] Firebase STILL NOT initialized after lazy attempt. ENV JSON: ${envExists}, PATH: ${pathExists}`);
 
                 await pool.query(
                     'INSERT INTO push_logs (phone_number, title, body, status, error_message) VALUES ($1, $2, $3, $4, $5)',
-                    [phone || null, title, body, 'simulated', `Firebase not initialized (JSON:${envExists}, PATH:${pathExists})`]
+                    [phone || null, title, body, 'simulated', `Firebase not initialized (v2 JSON:${envExists})`]
                 );
                 return true;
             }
