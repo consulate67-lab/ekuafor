@@ -1,3 +1,4 @@
+// Force redeploy - Triggering sync for Firebase credentials
 import * as admin from 'firebase-admin';
 import pool from '../config/database';
 
