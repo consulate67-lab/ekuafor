@@ -40,6 +40,18 @@ export default function CustomerHome() {
     const isScanningRef = useRef(false);
     const [navigatingTo, setNavigatingTo] = useState<number | null>(null);
 
+    const handleCompanyClick = (c: any) => {
+        if (navigatingTo) return;
+        const hasStaff = Number(c.staff_count || 0) > 0;
+        const hasServices = Number(c.service_count || 0) > 0;
+        if (!hasStaff || !hasServices) {
+            setNotRegisteredModal({ open: true, company: c });
+        } else {
+            setNavigatingTo(c.id);
+            navigate(`/book/${c.id}`);
+        }
+    };
+
     const fetchData = React.useCallback(async (query?: string, loc?: { lat: number, lng: number } | null, dist?: number) => {
         try {
             const params: any = { is_active: true, exclude_parent: true };
@@ -132,18 +144,25 @@ export default function CustomerHome() {
             }
 
             // Then try location using Capacitor for better mobile support
+            let initialLoc = null;
             try {
                 const position = await Geolocation.getCurrentPosition({
                     enableHighAccuracy: true,
                     timeout: 5000
                 });
-                const { latitude, longitude } = position.coords;
-                const newLoc = { lat: latitude, lng: longitude };
-                setLocation(newLoc);
-                fetchData(searchQuery, newLoc, distanceLimit);
+                initialLoc = { lat: position.coords.latitude, lng: position.coords.longitude };
+                setLocation(initialLoc);
             } catch (err) {
                 console.log('Initial geolocation fail', err);
-                fetchData(searchQuery, null, distanceLimit);
+            }
+
+            // Only fetch once here, the other useEffect will handle gender/sort changes if they are NOT defaults
+            // But since they ARE defaults initially, we must call it here or let the other useEffect do it.
+            // Actually, the other useEffect will run on mount because fetchData's identity changes on mount.
+            // So we don't NEED to call it here if location is null.
+            // If location is NOT null, we want to call it with the new location.
+            if (initialLoc) {
+                fetchData(searchQuery, initialLoc, distanceLimit);
             }
         };
         initialFetch();
@@ -238,7 +257,15 @@ export default function CustomerHome() {
         fetchData(searchQuery, location, dist);
     };
 
+    const isFirstRun = useRef(true);
     useEffect(() => {
+        if (isFirstRun.current) {
+            isFirstRun.current = false;
+            if (!location) {
+                fetchData(searchQuery, null, distanceLimit);
+            }
+            return;
+        }
         fetchData(searchQuery, location, distanceLimit);
     }, [selectedGender, sort, fetchData]);
 
@@ -248,18 +275,24 @@ export default function CustomerHome() {
         return companies.filter(c => favSet.has(c.id!));
     }, [companies, favorites]);
 
-    const handleCheckCode = async () => {
-        if (!codeInput.trim()) return;
+    const handleCheckCode = async (overrideCode?: string) => {
+        const code = (overrideCode || codeInput).trim().toUpperCase();
+        if (!code) return;
+
         setCodeChecking(true);
         setCodeError('');
         setCodeResult(null);
         try {
-            const res = await api.post('/companies/check-code', { code: codeInput.trim().toUpperCase() });
+            const res = await api.post('/companies/check-code', { code });
             if (res.data?.success) {
-                setCodeResult(res.data.data);
-                // Yönlendirme için kısa gecikme (kullanıcı sonucu görsün)
+                const data = res.data.data;
+                setCodeResult(data);
+
+                // Success feedback
+                try { window.navigator?.vibrate?.(100); } catch (e) { }
+
+                // Delay for visual feedback
                 setTimeout(() => {
-                    const data = res.data.data;
                     if (data.type === 'admin') {
                         if (data.is_license_expired) {
                             setCodeError('Lisans süreniz dolmuştur. Lütfen ödeme yapın.');
@@ -294,6 +327,7 @@ export default function CustomerHome() {
             }
         } catch (err: any) {
             setCodeError(err.response?.data?.error || 'Geçersiz kod');
+            setCodeResult(null);
         } finally {
             setCodeChecking(false);
         }
@@ -443,7 +477,7 @@ export default function CustomerHome() {
 
         canvas.height = video.videoHeight;
         canvas.width = video.videoWidth;
-        const ctx = canvas.getContext('2d', { WILL_READ_FREQUENTLY: true });
+        const ctx = canvas.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D;
         if (ctx) {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -474,56 +508,7 @@ export default function CustomerHome() {
         try { window.navigator?.vibrate?.(100); } catch (e) { }
 
         // Short delay to show the scanned code in input before checking
-        setTimeout(() => handleCheckCodeWithCode(codeData), 100);
-    };
-
-    const handleCheckCodeWithCode = async (c: string) => {
-        setCodeChecking(true);
-        setCodeError('');
-        setCodeResult(null);
-        try {
-            const res = await api.post('/companies/check-code', { code: c.trim().toUpperCase() });
-            if (res.data?.success) {
-                setCodeResult(res.data.data);
-                setTimeout(() => {
-                    const data = res.data.data;
-                    if (data.type === 'admin') {
-                        if (data.is_license_expired) {
-                            setCodeError('Lisans süreniz dolmuştur.');
-                            setCodeResult(null);
-                        } else {
-                            navigate(data.redirect, { replace: true });
-                        }
-                    } else if (data.type === 'staff') {
-                        if (data.is_license_expired) {
-                            setCodeError('Lisans süresi dolmuştur.');
-                            setCodeResult(null);
-                        } else {
-                            if (data.token) {
-                                setLogin({
-                                    id: data.user_id,
-                                    email: `${data.board_code}@staff.local`,
-                                    first_name: data.staff_name.split(' ')[0],
-                                    last_name: data.staff_name.split(' ').slice(1).join(' '),
-                                    role: 'company_admin',
-                                    company_id: data.company_id,
-                                    photo: data.photo
-                                } as any, data.token);
-                            }
-                            localStorage.setItem('staff_board_code', data.board_code);
-                            navigate('/dashboard', { replace: true });
-                        }
-                    } else if (data.type === 'board') {
-                        localStorage.setItem('salon_board_key', data.board_key);
-                        navigate(data.redirect, { replace: true });
-                    }
-                }, 1200);
-            }
-        } catch (err: any) {
-            setCodeError(err.response?.data?.error || 'Geçersiz kod');
-        } finally {
-            setCodeChecking(false);
-        }
+        setTimeout(() => handleCheckCode(codeData), 100);
     };
 
     return (
@@ -670,11 +655,7 @@ export default function CustomerHome() {
                     <div className="flex gap-3 overflow-x-auto px-6 pb-4 hide-scrollbar">
                         {favoriteCompanies.map((c: any) => (
                             <button
-                                onClick={() => {
-                                    if (navigatingTo) return;
-                                    setNavigatingTo(c.id);
-                                    navigate(`/book/${c.id}`);
-                                }}
+                                onClick={() => handleCompanyClick(c)}
                                 key={c.id}
                                 className={`flex-shrink-0 w-28 bg-white rounded-3xl p-3 shadow-lg shadow-slate-200/30 border border-slate-50 text-center group active:scale-95 transition-all relative overflow-hidden ${navigatingTo === c.id ? 'opacity-50' : ''}`}
                             >
@@ -722,17 +703,7 @@ export default function CustomerHome() {
                         <div
                             key={c.id}
                             className={`bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-xl transition-all active:scale-[0.98] relative group overflow-hidden ${navigatingTo === c.id ? 'opacity-70 grayscale' : ''}`}
-                            onClick={() => {
-                                if (navigatingTo) return;
-                                const hasStaff = Number(c.staff_count || 0) > 0;
-                                const hasServices = Number(c.service_count || 0) > 0;
-                                if (!hasStaff || !hasServices) {
-                                    setNotRegisteredModal({ open: true, company: c });
-                                } else {
-                                    setNavigatingTo(c.id);
-                                    navigate(`/book/${c.id}`);
-                                }
-                            }}
+                            onClick={() => handleCompanyClick(c)}
                         >
                             {navigatingTo === c.id && (
                                 <div className="absolute inset-0 z-[100] flex items-center justify-center bg-white/40 backdrop-blur-[2px]">
@@ -1016,7 +987,7 @@ export default function CustomerHome() {
 
                                 <style>{`
                                         .clip-corners {
-                                            mask: 
+                                            mask:
                                                 linear-gradient(#000 0 0) content-box,
                                                 linear-gradient(#000 0 0);
                                             mask-composite: exclude;
@@ -1059,7 +1030,7 @@ export default function CustomerHome() {
                                     İptal
                                 </button>
                                 <button
-                                    onClick={handleCheckCode}
+                                    onClick={() => handleCheckCode()}
                                     disabled={codeChecking || !codeInput.trim()}
                                     className="flex-1 py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-2xl font-black text-base active:scale-95 transition-all shadow-lg shadow-amber-200 disabled:opacity-50"
                                 >
