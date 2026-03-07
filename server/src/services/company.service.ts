@@ -353,7 +353,7 @@ class CompanyService {
             ) stats ON stats.company_id = c.id
             LEFT JOIN (
                 SELECT company_id, COUNT(*) as cnt 
-                FROM company_users 
+                FROM users 
                 WHERE is_active = true 
                 GROUP BY company_id
             ) staff_stats ON staff_stats.company_id = c.id
