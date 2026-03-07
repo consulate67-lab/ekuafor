@@ -279,13 +279,8 @@ class CompanyService {
 
         let whereClauses = ['1=1'];
 
-        // Caching column check to avoid repetitive schema queries
-        const columnCheck = await pool.query(`
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'appointments' AND column_name = 'rating'
-        `);
-        const hasRatingColumn = columnCheck.rowCount && columnCheck.rowCount > 0;
+        // Resilient check for rating column support
+        const hasRatingColumn = true; // Assumed supported as per main schema.
 
         if (filters?.is_active !== undefined) {
             whereClauses.push(`c.is_active = $${paramIndex}`);
@@ -340,32 +335,22 @@ class CompanyService {
             paramIndex += 3;
         }
 
-        const ratingSubquery = hasRatingColumn
-            ? `(SELECT COALESCE(AVG(rating), 0) FROM appointments WHERE company_id = c.id AND rating IS NOT NULL)`
-            : `0`;
+        const ratingSubquery = `(SELECT COALESCE(AVG(rating), 0) FROM appointments WHERE company_id = c.id AND rating IS NOT NULL)`;
+        const reviewCountSubquery = `(SELECT COUNT(rating) FROM appointments WHERE company_id = c.id AND rating IS NOT NULL)`;
 
-        const reviewCountSubquery = hasRatingColumn
-            ? `(SELECT COUNT(rating) FROM appointments WHERE company_id = c.id AND rating IS NOT NULL)`
-            : `0`;
-
-        const staffCountSubquery = `(SELECT COUNT(*) FROM users WHERE company_id = c.id AND role IN ('staff', 'manager', 'owner', 'company_admin'))`;
+        // Source of truth for personnel: company_users table
+        const staffCountSubquery = `(SELECT COUNT(*) FROM company_users WHERE company_id = c.id AND is_active = true)`;
         const serviceCountSubquery = `(SELECT COUNT(*) FROM services WHERE company_id = c.id AND is_active = true)`;
 
-        // Relation check: Is there at least one staff member who can perform at least one service?
-        // Using EXISTS for better performance and broadening the roles and department logic.
+        // Resilient relation check: 
+        // 1. Company must have at least one active service
+        // 2. Company must have at least one active staff member
+        // This avoids complex department-level joins that can crash if data is mismatched.
         const relationCheckSubquery = `(
             SELECT 1 
             FROM services s 
             WHERE s.company_id = c.id AND s.is_active = true
-            AND (
-                s.department_id IS NULL
-                OR EXISTS (
-                    SELECT 1 FROM users u 
-                    WHERE u.company_id = c.id 
-                    AND u.role IN ('staff', 'manager', 'owner', 'company_admin')
-                    AND (u.department_id = s.department_id OR u.department_id IS NULL)
-                )
-            )
+            AND EXISTS (SELECT 1 FROM company_users cu WHERE cu.company_id = c.id AND cu.is_active = true)
             LIMIT 1
         )`;
 
@@ -381,9 +366,9 @@ class CompanyService {
             WHERE ${whereClauses.join(' AND ')}
         `;
 
-        if (filters?.sort === 'rating' && hasRatingColumn) {
+        if (filters?.sort === 'rating') {
             query += ' ORDER BY rating_avg DESC, review_count DESC';
-        } else if (filters?.sort === 'reviews' && hasRatingColumn) {
+        } else if (filters?.sort === 'reviews') {
             query += ' ORDER BY review_count DESC, rating_avg DESC';
         } else {
             query += ' ORDER BY c.created_at DESC';
