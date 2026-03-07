@@ -27,7 +27,7 @@ export default function SetupStaff() {
             alert('Lütfen en az 1 personel seçin.');
             return;
         }
-        setStaffList(Array(staffCount).fill({ first_name: '', last_name: '', phone: '' }));
+        setStaffList(Array.from({ length: staffCount }, () => ({ first_name: '', last_name: '', phone: '' })));
         setStep(2);
     };
 

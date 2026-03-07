@@ -18,8 +18,16 @@ export const requestWebPushToken = async () => {
     try {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
+            const vapidKey = 'BFVvj_X8E_X8E_X8E_X8E_X8E_X8E_X8E_X8E'; // Firebase'den alınan gerçek key buraya gelmeli
+
+            // Eğer key placeholder ise getToken çağrılmasın
+            if (vapidKey.includes('_X8E_')) {
+                console.warn('Firebase VAPID key ayarlanmamış. Lütfen lib/firebase.ts dosyasını güncelleyin.');
+                return null;
+            }
+
             const token = await getToken(messaging, {
-                vapidKey: 'BFVvj_X8E_X8E_X8E_X8E_X8E_X8E_X8E_X8E' // Not: Gerçek VAPID key Firebase Console'dan alınmalı
+                vapidKey: vapidKey
             });
             return token;
         }

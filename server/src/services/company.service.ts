@@ -348,8 +348,26 @@ class CompanyService {
             ? `(SELECT COUNT(rating) FROM appointments WHERE company_id = c.id AND rating IS NOT NULL)`
             : `0`;
 
-        const staffCountSubquery = `(SELECT COUNT(*) FROM company_users WHERE company_id = c.id AND role = 'staff')`;
-        const serviceCountSubquery = `(SELECT COUNT(*) FROM services WHERE company_id = c.id)`;
+        const staffCountSubquery = `(SELECT COUNT(*) FROM users WHERE company_id = c.id AND role IN ('staff', 'manager', 'owner', 'company_admin'))`;
+        const serviceCountSubquery = `(SELECT COUNT(*) FROM services WHERE company_id = c.id AND is_active = true)`;
+
+        // Relation check: Is there at least one staff member who can perform at least one service?
+        // Using EXISTS for better performance and broadening the roles and department logic.
+        const relationCheckSubquery = `(
+            SELECT 1 
+            FROM services s 
+            WHERE s.company_id = c.id AND s.is_active = true
+            AND (
+                s.department_id IS NULL
+                OR EXISTS (
+                    SELECT 1 FROM users u 
+                    WHERE u.company_id = c.id 
+                    AND u.role IN ('staff', 'manager', 'owner', 'company_admin')
+                    AND (u.department_id = s.department_id OR u.department_id IS NULL)
+                )
+            )
+            LIMIT 1
+        )`;
 
         let query = `
             SELECT 
@@ -357,7 +375,8 @@ class CompanyService {
                 ${ratingSubquery} as rating_avg,
                 ${reviewCountSubquery} as review_count,
                 ${staffCountSubquery} as staff_count,
-                ${serviceCountSubquery} as service_count
+                ${serviceCountSubquery} as service_count,
+                ${relationCheckSubquery} as relation_count
             FROM companies c
             WHERE ${whereClauses.join(' AND ')}
         `;
