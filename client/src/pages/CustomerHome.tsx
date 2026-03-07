@@ -150,22 +150,8 @@ export default function CustomerHome() {
 
     const handleCompanyClick = useCallback((c: any) => {
         if (navigatingTo) return;
-
-        // Final control: Service and Personnel Relation
-        const hasStaff = Number(c.staff_count || 0) > 0;
-        const hasServices = Number(c.service_count || 0) > 0;
-
-        // Handle relation_count correctly: 
-        // If undefined (not returned by backend yet), we assume it's OK to not break existing flow.
-        // If null (returned as null by outer join or count), it means no relation.
-        const hasRelation = c.relation_count === undefined || (c.relation_count !== null && Number(c.relation_count) > 0);
-
-        if (!hasStaff || !hasServices || !hasRelation) {
-            setNotRegisteredModal({ open: true, company: c });
-        } else {
-            setNavigatingTo(c.id);
-            navigate(`/book/${c.id}`);
-        }
+        setNavigatingTo(c.id);
+        navigate(`/book/${c.id}`);
     }, [navigatingTo, navigate]);
 
     const fetchData = React.useCallback(async (query?: string, loc?: { lat: number, lng: number } | null, dist?: number) => {
