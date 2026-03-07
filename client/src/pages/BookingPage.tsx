@@ -198,7 +198,7 @@ export default function BookingPage() {
                             if (Number(app.staff_id) !== Number(candidate.id)) return false;
                             const [asH, asM] = app.start_time.split(':').map(Number);
                             const [aeH, aeM] = app.end_time.split(':').map(Number);
-                            return (svcStart < (aeH * 60 + aeM) && (svcStart + svc.duration_minutes) > (asH * 60 + asM));
+                            return (svcStart < (aeH * 60 + aeM) && svcEnd > (asH * 60 + asM));
                         });
                         if (!isBusy) { bestStaffId = candidate.id; break; }
                     }
