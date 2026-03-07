@@ -335,44 +335,38 @@ class CompanyService {
             paramIndex += 3;
         }
 
-        const ratingSubquery = `(SELECT COALESCE(AVG(rating), 0) FROM appointments WHERE company_id = c.id AND rating IS NOT NULL)`;
-        const reviewCountSubquery = `(SELECT COUNT(rating) FROM appointments WHERE company_id = c.id AND rating IS NOT NULL)`;
-
-        // Source of truth for personnel: company_users table
-        const staffCountSubquery = `(SELECT COUNT(*) FROM company_users WHERE company_id = c.id AND is_active = true)`;
-        const serviceCountSubquery = `(SELECT COUNT(*) FROM services WHERE company_id = c.id AND is_active = true)`;
-
-        // Resilient relation check: 
-        // 1. Company must have at least one active service
-        // 2. Company must have at least one active staff member
-        // This avoids complex department-level joins that can crash if data is mismatched.
-        const relationCheckSubquery = `(
-            SELECT 1 
-            FROM services s 
-            WHERE s.company_id = c.id AND s.is_active = true
-            AND EXISTS (SELECT 1 FROM company_users cu WHERE cu.company_id = c.id AND cu.is_active = true)
-            LIMIT 1
-        )`;
-
-        let query = `
+        // Akıllı filtreleme ve stats birleştirme (JOIN performansı için scalar subquery yerine önerilir)
+        const query = `
             SELECT 
                 c.*,
-                ${ratingSubquery} as rating_avg,
-                ${reviewCountSubquery} as review_count,
-                ${staffCountSubquery} as staff_count,
-                ${serviceCountSubquery} as service_count,
-                ${relationCheckSubquery} as relation_count
+                COALESCE(stats.rating_avg, 0) as rating_avg,
+                COALESCE(stats.review_count, 0) as review_count,
+                COALESCE(staff_stats.cnt, 0) as staff_count,
+                COALESCE(service_stats.cnt, 0) as service_count,
+                (CASE WHEN service_stats.cnt > 0 AND staff_stats.cnt > 0 THEN 1 ELSE 0 END) as relation_count
             FROM companies c
+            LEFT JOIN (
+                SELECT company_id, AVG(rating) as rating_avg, COUNT(rating) as review_count 
+                FROM appointments 
+                WHERE rating IS NOT NULL 
+                GROUP BY company_id
+            ) stats ON stats.company_id = c.id
+            LEFT JOIN (
+                SELECT company_id, COUNT(*) as cnt 
+                FROM company_users 
+                WHERE is_active = true 
+                GROUP BY company_id
+            ) staff_stats ON staff_stats.company_id = c.id
+            LEFT JOIN (
+                SELECT company_id, COUNT(*) as cnt 
+                FROM services 
+                WHERE is_active = true 
+                GROUP BY company_id
+            ) service_stats ON service_stats.company_id = c.id
             WHERE ${whereClauses.join(' AND ')}
+            ${filters?.sort === 'rating' ? 'ORDER BY rating_avg DESC, review_count DESC' :
+                (filters?.sort === 'reviews' ? 'ORDER BY review_count DESC, rating_avg DESC' : 'ORDER BY c.created_at DESC')}
         `;
-
-        if (filters?.sort === 'rating') {
-            query += ' ORDER BY rating_avg DESC, review_count DESC';
-        } else if (filters?.sort === 'reviews') {
-            query += ' ORDER BY review_count DESC, rating_avg DESC';
-        } else {
-            query += ' ORDER BY c.created_at DESC';
-        }
 
         const result = await pool.query(query, values);
         return result.rows;
