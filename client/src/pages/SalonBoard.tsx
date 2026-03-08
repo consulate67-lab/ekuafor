@@ -1161,16 +1161,42 @@ export default function SalonBoard() {
                                             />
                                         </div>
 
-                                        <div className="space-y-2">
+                                        <div className="space-y-4 col-span-1 md:col-span-2">
                                             <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Başlangıç Saati</label>
-                                            <select
-                                                disabled={!!selectedCell}
-                                                value={fastForm.startTime || selectedCell?.hour}
-                                                onChange={e => setFastForm(prev => ({ ...prev, startTime: e.target.value }))}
-                                                className="w-full p-6 bg-white rounded-3xl border-2 border-slate-100 focus:border-indigo-500 transition-all font-black text-xl text-slate-900 outline-none cursor-pointer disabled:bg-slate-50"
-                                            >
-                                                {hours.map(h => <option key={h} value={h}>{h}</option>)}
-                                            </select>
+                                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 max-h-40 overflow-y-auto p-4 bg-slate-50 rounded-[2.5rem]">
+                                                {hours.map(h => {
+                                                    const isSelected = (fastForm.startTime || selectedCell?.hour) === h;
+                                                    const [sh, sm] = h.split(':').map(Number);
+                                                    const selectedTotal = sh * 60 + sm;
+                                                    const now = new Date();
+                                                    const currentTotal = now.getHours() * 60 + now.getMinutes();
+                                                    const isPast = (fastForm.appointmentDate || selectedDate) === currentDate && selectedTotal < currentTotal;
+
+                                                    return (
+                                                        <button
+                                                            key={h}
+                                                            type="button"
+                                                            disabled={isPast}
+                                                            onClick={() => setFastForm(prev => ({ ...prev, startTime: h }))}
+                                                            className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-1 ${isSelected
+                                                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg scale-105'
+                                                                : isPast
+                                                                    ? 'bg-slate-100 border-transparent text-slate-300 cursor-not-allowed opacity-50'
+                                                                    : 'bg-white border-transparent text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/50'
+                                                                }`}
+                                                        >
+                                                            <span className={`text-[10px] font-black tracking-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{h}</span>
+                                                            {isSelected && <div className="w-1 h-1 bg-white rounded-full animate-pulse"></div>}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            {(fastForm.startTime || selectedCell?.hour) && (
+                                                <div className="flex items-center gap-2 px-6 py-3 bg-indigo-50 border border-indigo-100 rounded-2xl animate-in slide-in-from-bottom-2">
+                                                    <span className="text-xl">⏰</span>
+                                                    <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Seçilen Saat: <strong className="text-indigo-900 ml-1">{(fastForm.startTime || selectedCell?.hour)}</strong></span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 

@@ -38,7 +38,12 @@ class ReportService {
         const query = `
             SELECT 
                 COUNT(DISTINCT a.id) as total_appointments,
-                SUM(COALESCE(a.price, s.price, 0)) as total_revenue
+                SUM(COALESCE(
+                    (SELECT SUM(price) FROM appointment_services WHERE appointment_id = a.id AND ($2::INTEGER IS NULL OR staff_id = $2)),
+                    a.price, 
+                    s.price, 
+                    0
+                )) as total_revenue
             FROM appointments a
             LEFT JOIN services s ON a.service_id = s.id
             WHERE a.company_id = $1 
@@ -90,21 +95,31 @@ class ReportService {
 
         // 1. Staff Breakdown (Uses STRICT statsFilter)
         const staffQuery = `
+            WITH staff_all AS (
+                SELECT u.id as staff_id, u.first_name || ' ' || u.last_name as staff_name
+                FROM users u
+                JOIN (
+                    SELECT id as user_id FROM users WHERE company_id = $1
+                    UNION
+                    SELECT user_id FROM company_users WHERE company_id = $1
+                ) cu_all ON u.id = cu_all.user_id
+                WHERE u.role != 'customer'
+            )
             SELECT 
-                u.id as staff_id,
-                u.first_name || ' ' || u.last_name as staff_name,
-                COUNT(a.id) as count,
-                SUM(COALESCE(a.price, s.price, 0)) as revenue
-            FROM users u
-            JOIN (
-                SELECT id as user_id FROM users WHERE company_id = $1
-                UNION
-                SELECT user_id FROM company_users WHERE company_id = $1
-            ) cu_all ON u.id = cu_all.user_id
-            LEFT JOIN appointments a ON u.id = a.staff_id AND a.company_id = $1 AND a.status != 'cancelled' AND ${statsFilter}
+                sa.staff_id,
+                sa.staff_name,
+                COUNT(DISTINCT a.id) as count,
+                SUM(COALESCE(aps.price, a.price / NULLIF((SELECT count(*) FROM appointment_services WHERE appointment_id = a.id), 0), s.price, 0)) as revenue
+            FROM staff_all sa
+            LEFT JOIN (
+                SELECT a.*, aps.staff_id as service_staff_id, aps.price as service_price
+                FROM appointments a
+                LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
+                WHERE a.company_id = $1 AND a.status != 'cancelled' AND ${statsFilter}
+            ) a ON sa.staff_id = a.staff_id OR sa.staff_id = a.service_staff_id
+            LEFT JOIN appointment_services aps ON a.id = aps.appointment_id AND aps.staff_id = sa.staff_id
             LEFT JOIN services s ON a.service_id = s.id
-            WHERE u.role != 'customer'
-            GROUP BY u.id, u.first_name, u.last_name
+            GROUP BY sa.staff_id, sa.staff_name
             ORDER BY count DESC
         `;
 
