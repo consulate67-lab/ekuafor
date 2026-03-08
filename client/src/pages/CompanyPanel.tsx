@@ -1302,6 +1302,46 @@ export default function CompanyPanel() {
                                 <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-6">Firma Tanıtım Bilgileri</h2>
 
                                 <div className="space-y-4">
+                                    {/* Firma Logosu / Fotoğrafı */}
+                                    <div className="flex flex-col items-center mb-8">
+                                        <div className="relative group/logo">
+                                            <div className="w-32 h-32 rounded-3xl bg-slate-50 border-2 border-dashed border-slate-200 overflow-hidden flex items-center justify-center shadow-inner">
+                                                {company.photo ? (
+                                                    <img src={company.photo} alt="Logo" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="text-center">
+                                                        <span className="text-4xl block mb-1">🏢</span>
+                                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Logo Yok</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    const input = document.createElement('input');
+                                                    input.type = 'file';
+                                                    input.accept = 'image/*';
+                                                    input.onchange = (e: any) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (!file) return;
+                                                        const reader = new FileReader();
+                                                        reader.onload = (event) => {
+                                                            setCompany({ ...company, photo: event.target?.result as string });
+                                                        };
+                                                        reader.readAsDataURL(file);
+                                                    };
+                                                    input.click();
+                                                }}
+                                                className="absolute -bottom-2 -right-2 w-10 h-10 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-xl hover:bg-indigo-700 active:scale-95 transition-all border-4 border-white"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-4">Firma Logosu / Fotoğrafı</p>
+                                    </div>
+
                                     <div>
                                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">İşletme Adı</label>
                                         <input
@@ -1696,7 +1736,13 @@ export default function CompanyPanel() {
                                 <p className="text-indigo-200 text-xs font-bold leading-relaxed mb-6">Müşterileriniz haritada veya listede sizi bu bilgilerle görecekler.</p>
                                 <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-xl">🏢</div>
+                                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-xl overflow-hidden shrink-0">
+                                            {company.photo ? (
+                                                <img src={company.photo} alt="Logo" className="w-full h-full object-cover" />
+                                            ) : (
+                                                '🏢'
+                                            )}
+                                        </div>
                                         <div>
                                             <p className="font-black text-sm">{company.name}</p>
                                             <p className="text-[10px] text-indigo-300 font-bold uppercase">{company.district || company.city || 'Şehir Belirtilmemiş'}</p>

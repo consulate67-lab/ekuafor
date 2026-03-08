@@ -61,11 +61,13 @@ const CompanyCard = React.memo(({ company: c, navigatingToId, favorites, toggleF
             <div className="w-20 h-20 rounded-[1.5rem] flex-shrink-0 flex items-center justify-center shadow-inner border border-slate-200/50 group-hover:scale-105 transition-transform overflow-hidden relative bg-slate-100">
                 <img
                     src={
-                        (c.genders && c.genders.includes('Kadın'))
-                            ? 'https://images.pexels.com/photos/3993472/pexels-photo-3993472.jpeg?auto=compress&cs=tinysrgb&w=400'
-                            : ((c.genders && c.genders.includes('Erkek'))
-                                ? 'https://images.pexels.com/photos/1813272/pexels-photo-1813272.jpeg?auto=compress&cs=tinysrgb&w=400'
-                                : 'https://images.pexels.com/photos/705255/pexels-photo-705255.jpeg?auto=compress&cs=tinysrgb&w=400')
+                        c.photo ? c.photo : (
+                            (c.genders && c.genders.includes('Kadın'))
+                                ? 'https://images.pexels.com/photos/3993472/pexels-photo-3993472.jpeg?auto=compress&cs=tinysrgb&w=400'
+                                : ((c.genders && c.genders.includes('Erkek'))
+                                    ? 'https://images.pexels.com/photos/1813272/pexels-photo-1813272.jpeg?auto=compress&cs=tinysrgb&w=400'
+                                    : 'https://images.pexels.com/photos/705255/pexels-photo-705255.jpeg?auto=compress&cs=tinysrgb&w=400')
+                        )
                     }
                     alt={c.name}
                     className="w-full h-full object-cover absolute inset-0 z-10"
@@ -1103,6 +1105,7 @@ export default function CustomerHome() {
                             >
                                 Kapat
                             </button>
+                            <p className="text-[9px] text-slate-300 text-center mt-4 font-black uppercase tracking-widest">Saloontr v1.9.9</p>
                         </div>
                     </div>
                 )

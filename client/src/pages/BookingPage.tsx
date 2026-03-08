@@ -391,14 +391,22 @@ export default function BookingPage() {
                                             const isSelected = selection.serviceIds.includes(s.id!);
                                             return (
                                                 <button key={s.id} onClick={() => {
+                                                    const isSelected = selection.serviceIds.includes(s.id!);
                                                     const newIds = isSelected ? selection.serviceIds.filter(idx => idx !== s.id) : [...selection.serviceIds, s.id!];
                                                     setSelection({ ...selection, serviceIds: newIds });
-                                                }} className={`w-full p-5 rounded-[2rem] border-2 flex items-center gap-4 text-left ${isSelected ? 'bg-indigo-50 border-indigo-500 shadow-lg' : 'bg-white border-transparent shadow-sm'}`}>
-                                                    <div className="flex-1">
-                                                        <h3 className="font-black text-sm uppercase">{s.name}</h3>
+                                                }} className={`w-full p-4 rounded-[1.5rem] border-2 flex items-center gap-4 text-left transition-all ${isSelected ? 'bg-amber-50 border-amber-500 shadow-md' : 'bg-white border-transparent shadow-sm'}`}>
+                                                    <div className="w-16 h-16 bg-slate-100 rounded-2xl flex-shrink-0 overflow-hidden flex items-center justify-center">
+                                                        {s.photo ? (
+                                                            <img src={s.photo} alt={s.name} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <span className="text-2xl">✂️</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="font-black text-sm uppercase truncate">{s.name}</h3>
                                                         <p className="text-[10px] font-bold text-slate-400">{s.duration_minutes} dk</p>
                                                     </div>
-                                                    <div className="font-black text-base">₺{s.price}</div>
+                                                    <div className="font-black text-base text-amber-600">₺{s.price}</div>
                                                 </button>
                                             );
                                         })}
@@ -428,9 +436,21 @@ export default function BookingPage() {
                                 <h2 className="text-2xl font-black text-gray-900 mb-6">{company?.staff_label || 'Personel'} Seçimi</h2>
                                 <div className="space-y-3">
                                     {staff.map(u => (
-                                        <button key={u.id} onClick={() => { setSelection({ ...selection, staffId: u.id }); handleNext(); }} className="w-full bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-5 text-left active:scale-[0.98]">
-                                            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center font-black text-xl">{u.first_name?.[0]}</div>
-                                            <div className="flex-1"><h3 className="font-black text-slate-900 text-lg uppercase">{u.first_name} {u.last_name}</h3></div>
+                                        <button key={u.id} onClick={() => { setSelection({ ...selection, staffId: u.id }); handleNext(); }} className="w-full bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-5 text-left active:scale-[0.98] transition-all hover:border-amber-500">
+                                            <div className="w-20 h-20 bg-amber-50 rounded-[1.5rem] flex items-center justify-center font-black text-2xl text-amber-600 overflow-hidden shrink-0 shadow-inner">
+                                                {u.photo ? (
+                                                    <img src={u.photo} alt={u.first_name} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    u.first_name?.[0]
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="font-black text-slate-900 text-lg uppercase truncate">{u.first_name} {u.last_name}</h3>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">{u.department_name || 'Uzman'}</p>
+                                            </div>
+                                            <div className="text-amber-500">
+                                                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
+                                            </div>
                                         </button>
                                     ))}
                                 </div>
