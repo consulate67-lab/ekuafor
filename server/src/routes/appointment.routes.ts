@@ -302,8 +302,8 @@ router.post('/', async (req: Request, res: Response) => {
 router.patch('/:id/status', async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
-        const { status, price } = req.body;
-        const appointment = await appointmentService.updateAppointmentStatus(id, status, price);
+        const { status, price, payment_method } = req.body;
+        const appointment = await appointmentService.updateAppointmentStatus(id, status, price, payment_method);
         if (!appointment) {
             return res.status(404).json({ success: false, error: 'Randevu bulunamadı' });
         }

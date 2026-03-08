@@ -384,16 +384,16 @@ class AppointmentService {
         }
     }
 
-    async updateAppointmentStatus(id: number, status: string, price?: number): Promise<Appointment | null> {
+    async updateAppointmentStatus(id: number, status: string, price?: number, payment_method?: string): Promise<Appointment | null> {
         try {
             let result;
             if (price !== undefined && price !== null) {
                 const paymentStatus = (status === 'completed') ? 'paid' : 'pending';
-                const paymentMethod = (status === 'completed') ? 'cash' : null;
+                const finalPaymentMethod = payment_method || ((status === 'completed') ? 'cash' : null);
 
                 result = await pool.query(
                     'UPDATE appointments SET status = $1, price = $2, payment_status = $3, payment_method = COALESCE(payment_method, $4), collected_price = COALESCE(collected_price, $2) WHERE id = $5 RETURNING *',
-                    [status, price, paymentStatus, paymentMethod, id]
+                    [status, price, paymentStatus, finalPaymentMethod, id]
                 );
             } else {
                 result = await pool.query(

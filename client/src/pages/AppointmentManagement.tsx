@@ -1281,7 +1281,8 @@ export default function AppointmentManagement() {
                                         setLoading(true);
                                         await api.patch(`/appointments/${completionModal.app!.id}/status`, {
                                             status: 'completed',
-                                            price: completionModal.amount
+                                            price: completionModal.amount,
+                                            payment_method: 'unspecified'
                                         });
                                         setCompletionModal({ open: false, app: null, amount: 0 });
                                         setSelectedAppointment(null);
