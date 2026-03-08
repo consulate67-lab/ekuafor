@@ -46,7 +46,6 @@ export default function BookingPage() {
         customerPhone: user?.phone || ''
     });
 
-    const dateInputRef = useRef<HTMLInputElement>(null);
     const firstAvailableTimeRef = useRef<HTMLButtonElement>(null);
 
     const steps = useMemo(() => {
@@ -71,79 +70,90 @@ export default function BookingPage() {
         return steps[stepNum - 1] || 'service';
     }, [steps]);
 
-    const getStepNumber = useCallback((content: 'service' | 'staff' | 'date' | 'time' | 'confirm'): number => {
-        if (content === 'confirm') return 5;
-        const idx = steps.indexOf(content as any);
-        return idx !== -1 ? idx + 1 : 1;
-    }, [steps]);
 
     const staffBusyMap = useMemo(() => {
-        if (!selection.date || appointments.length === 0) return new Map<number, { start: number, end: number }[]>();
+        if (!selection.date || !appointments) return new Map<number, { start: number, end: number }[]>();
         const map = new Map<number, { start: number, end: number }[]>();
-        const dayApps = appointments.filter(a => (a.appointment_date || '').substring(0, 10) === selection.date && a.status !== 'cancelled');
+        const targetDate = selection.date;
+        const dayApps = appointments.filter(a => (a.appointment_date || '').substring(0, 10) === targetDate && a.status !== 'cancelled');
         dayApps.forEach(app => {
+            if (!app.start_time || !app.end_time) return;
             const [asH, asM] = app.start_time.split(':').map(Number);
             const [aeH, aeM] = app.end_time.split(':').map(Number);
-            const start = asH * 60 + asM;
-            const end = aeH * 60 + aeM;
+            const start = (asH || 0) * 60 + (asM || 0);
+            const end = (aeH || 0) * 60 + (aeM || 0);
             const sId = Number(app.staff_id);
-            if (!map.has(sId)) map.set(sId, []);
-            map.get(sId)!.push({ start, end });
+            if (!isNaN(sId)) {
+                if (!map.has(sId)) map.set(sId, []);
+                map.get(sId)!.push({ start, end });
+            }
         });
         return map;
     }, [appointments, selection.date]);
 
     const timeSlots = useMemo(() => {
         if (!company || !selection.date || (services.length === 0 && packages.length === 0)) return [];
+
         const now = new Date();
         const todayStr = now.toLocaleDateString('en-CA');
         const isToday = selection.date === todayStr;
         const currentMin = now.getHours() * 60 + now.getMinutes();
+
         const [startH, startM] = (company.work_start_time || '09:00').split(':').map(Number);
         const [endH, endM] = (company.work_end_time || '20:00').split(':').map(Number);
-        const workBegin = startH * 60 + startM;
-        const workEnd = endH * 60 + endM;
+        const workBegin = (startH || 0) * 60 + (startM || 0);
+        const workEnd = (endH || 0) * 60 + (endM || 0);
         const slotInterval = company.slot_interval || 30;
+
         const pkg = selection.packageId ? packages.find(p => p.id === selection.packageId) : null;
-        const selectedServices = pkg ? pkg.services || [] : services.filter(s => selection.serviceIds.includes(s.id!));
-        const totalDuration = pkg ? pkg.duration_minutes : selectedServices.reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
+        const selectedServices: any[] = pkg ? pkg.services || [] : services.filter(s => selection.serviceIds.includes(s.id!));
+
+        let totalDuration = 0;
+        if (pkg) {
+            totalDuration = pkg.duration_minutes || 0;
+        } else {
+            totalDuration = selectedServices.reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
+        }
+
         if (totalDuration === 0) return [];
+
         const slots: { time: string; isAvailable: boolean }[] = [];
         for (let time = workBegin; time < workEnd; time += slotInterval) {
             const timeStr = `${String(Math.floor(time / 60)).padStart(2, '0')}:${String(time % 60).padStart(2, '0')}`;
+
+            // 1. Basic checks (Past time & Working hours)
             if (isToday && (time < currentMin + 5)) { slots.push({ time: timeStr, isAvailable: false }); continue; }
             if (time + totalDuration > workEnd) { slots.push({ time: timeStr, isAvailable: false }); continue; }
-            let canApplySlot = true;
+
+            let canApplySlot = false;
             if (pkg) {
+                // Package: Check if ANY staff is available for each service sequentially
                 let currentOffset = 0;
+                let pkgAvailable = true;
                 for (const svc of selectedServices) {
                     const svcStart = time + currentOffset;
-                    const svcEnd = svcStart + svc.duration_minutes;
+                    const svcEnd = svcStart + (svc.duration_minutes || 0);
                     const availableStaff = staff.filter(s => {
                         if (svc.department_id && s.department_id !== svc.department_id) return false;
                         const busyRanges = staffBusyMap.get(Number(s.id)) || [];
-                        const isBusy = busyRanges.some(r => svcStart < r.end && svcEnd > r.start);
-                        return !isBusy;
+                        return !busyRanges.some(r => svcStart < r.end && svcEnd > r.start);
                     });
-                    if (availableStaff.length === 0) { canApplySlot = false; break; }
-                    currentOffset += svc.duration_minutes;
+                    if (availableStaff.length === 0) { pkgAvailable = false; break; }
+                    currentOffset += (svc.duration_minutes || 0);
                 }
+                canApplySlot = pkgAvailable;
             } else {
+                // Individual Services
                 const slotEnd = time + totalDuration;
                 if (!selection.staffId) {
-                    const staffStep = getStepNumber('staff');
-                    const timeStep = getStepNumber('time');
-                    if (staffStep > timeStep) {
-                        const relevantStaff = staff.filter(s => {
-                            if (selectedServices.length === 1 && selectedServices[0].department_id) { return s.department_id === selectedServices[0].department_id; }
-                            return true;
-                        });
-                        canApplySlot = relevantStaff.some(s => {
-                            const busyRanges = staffBusyMap.get(Number(s.id)) || [];
-                            return !busyRanges.some(r => time < r.end && slotEnd > r.start);
-                        });
-                    } else { canApplySlot = false; }
+                    // No staff selected yet (e.g. Service -> Date -> Time flow)
+                    // Check if ANY staff exists who can do these services
+                    canApplySlot = staff.some(s => {
+                        const busyRanges = staffBusyMap.get(Number(s.id)) || [];
+                        return !busyRanges.some(r => time < r.end && slotEnd > r.start);
+                    });
                 } else {
+                    // Specific staff selected
                     const busyRanges = staffBusyMap.get(Number(selection.staffId)) || [];
                     canApplySlot = !busyRanges.some(r => time < r.end && slotEnd > r.start);
                 }
@@ -151,7 +161,7 @@ export default function BookingPage() {
             slots.push({ time: timeStr, isAvailable: canApplySlot });
         }
         return slots;
-    }, [company, selection.date, selection.staffId, selection.serviceIds, selection.packageId, services, packages, staff, staffBusyMap, getStepNumber]);
+    }, [company, selection.date, selection.staffId, selection.serviceIds, selection.packageId, services, packages, staff, staffBusyMap]);
 
     const selectedStaffUser = useMemo(() => staff.find(u => (u.id === selection.staffId) || ((u as any).user_id === selection.staffId)), [staff, selection.staffId]);
 
@@ -207,7 +217,7 @@ export default function BookingPage() {
                 }
             } else {
                 const selectedServices = services.filter(s => currentSel.serviceIds.includes(s.id!));
-                duration = selectedServices.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+                duration = selectedServices.reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
                 finalPrice = selectedServices.reduce((sum, s) => sum + Number(s.price), 0);
                 finalServices = currentSel.serviceIds.map(sid => ({ service_id: sid, staff_id: currentSel.staffId }));
             }
@@ -291,11 +301,6 @@ export default function BookingPage() {
         }
     }, [step]);
 
-    useEffect(() => {
-        if (step === 3 && dateInputRef.current) {
-            setTimeout(() => { try { dateInputRef.current?.showPicker(); } catch (e) { console.log('showPicker not supported', e); } }, 300);
-        }
-    }, [step]);
 
     useEffect(() => {
         const fetchCompanyData = async () => {
@@ -461,10 +466,56 @@ export default function BookingPage() {
                             <div className="animate-in slide-in-from-right duration-300 fade-in">
                                 <button onClick={handleBack} className="text-xs font-bold text-gray-400 mb-4">← Geri</button>
                                 <h2 className="text-2xl font-black text-gray-900 mb-6">Tarih Seçimi</h2>
-                                <div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-slate-100">
-                                    <input type="date" ref={dateInputRef} value={selection.date || ''} onChange={(e) => setSelection({ ...selection, date: e.target.value })} className="w-full p-4 border-2 border-slate-100 rounded-2xl mb-4 font-bold" />
-                                    <button disabled={!selection.date} onClick={handleNext} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase">Randevu Saati Seç</button>
+
+                                <div className="flex gap-3 overflow-x-auto pb-6 hide-scrollbar">
+                                    {Array.from({ length: 14 }).map((_, i) => {
+                                        const d = new Date();
+                                        d.setDate(d.getDate() + i);
+                                        const dateStr = d.toLocaleDateString('en-CA');
+                                        const isSelected = selection.date === dateStr;
+                                        const dayName = d.toLocaleDateString('tr-TR', { weekday: 'short' });
+                                        const dayNum = d.getDate();
+                                        const monthName = d.toLocaleDateString('tr-TR', { month: 'short' });
+
+                                        return (
+                                            <button
+                                                key={dateStr}
+                                                onClick={() => {
+                                                    setSelection({ ...selection, date: dateStr });
+                                                    // Auto-advance to time step
+                                                    setTimeout(handleNext, 100);
+                                                }}
+                                                className={`flex-shrink-0 w-20 py-4 rounded-[2rem] border-2 flex flex-col items-center transition-all ${isSelected
+                                                    ? 'bg-[#b45309] border-[#b45309] text-white shadow-lg scale-105'
+                                                    : 'bg-white border-slate-100 text-slate-400 active:bg-slate-50'
+                                                    }`}
+                                            >
+                                                <span className={`text-[10px] font-bold uppercase tracking-widest ${isSelected ? 'text-white/70' : 'text-slate-400'}`}>{dayName}</span>
+                                                <span className="text-xl font-black my-1">{dayNum}</span>
+                                                <span className={`text-[10px] font-bold uppercase ${isSelected ? 'text-white/70' : 'text-slate-300'}`}>{monthName}</span>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
+
+                                <div className="bg-white rounded-[2rem] p-4 shadow-sm border border-slate-100 mt-4">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 text-center">Veya Başka Bir Tarih Seçin</p>
+                                    <input
+                                        type="date"
+                                        value={selection.date || ''}
+                                        min={new Date().toLocaleDateString('en-CA')}
+                                        onChange={(e) => setSelection({ ...selection, date: e.target.value })}
+                                        className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold text-center"
+                                    />
+                                </div>
+
+                                <button
+                                    disabled={!selection.date}
+                                    onClick={handleNext}
+                                    className="w-full mt-8 py-5 bg-slate-900 text-white rounded-[2rem] font-black uppercase shadow-xl disabled:opacity-30"
+                                >
+                                    Randevu Saati Seç
+                                </button>
                             </div>
                         )}
 
@@ -472,13 +523,31 @@ export default function BookingPage() {
                             <div className="animate-in slide-in-from-right duration-300 fade-in">
                                 <button onClick={handleBack} className="text-xs font-bold text-gray-400 mb-4">← Geri</button>
                                 <h2 className="text-2xl font-black text-gray-900 mb-6">Saat Seçimi</h2>
-                                <div className="grid grid-cols-3 gap-3">
-                                    {timeSlots.map(slot => (
-                                        <button key={slot.time} disabled={!slot.isAvailable} onClick={() => { setSelection({ ...selection, time: slot.time }); handleNext(); }} className={`py-4 rounded-2xl font-black text-sm transition-all shadow-sm ${slot.isAvailable ? 'bg-white border-2 border-slate-100 text-[#1e1b4b]' : 'bg-slate-50 text-slate-200'}`}>
-                                            {slot.time}
-                                        </button>
-                                    ))}
-                                </div>
+
+                                {timeSlots.length === 0 ? (
+                                    <div className="bg-white p-12 rounded-[3rem] text-center border border-slate-100 shadow-sm">
+                                        <span className="text-4xl mb-4 block">😴</span>
+                                        <p className="font-black text-slate-900 uppercase">Bu Tarih İçin Müsaitlik Yok</p>
+                                        <p className="text-xs text-slate-400 font-bold mt-2">Lütfen başka bir tarih seçmeyi deneyin.</p>
+                                        <button onClick={handleBack} className="mt-6 text-indigo-600 font-black uppercase text-[10px] tracking-widest">Tarih Değiştir</button>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-3 gap-3 pb-20">
+                                        {timeSlots.map(slot => (
+                                            <button
+                                                key={slot.time}
+                                                disabled={!slot.isAvailable}
+                                                onClick={() => { setSelection({ ...selection, time: slot.time }); handleNext(); }}
+                                                className={`py-5 rounded-[1.5rem] font-black text-sm transition-all shadow-sm ${slot.isAvailable
+                                                    ? 'bg-white border-2 border-transparent text-[#1e1b4b] active:scale-95 active:border-amber-500'
+                                                    : 'bg-slate-50 text-slate-200 border-2 border-transparent'
+                                                    }`}
+                                            >
+                                                {slot.time}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
 
