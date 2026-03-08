@@ -1723,6 +1723,28 @@ export default function SalonBoard() {
                                 <span className="text-xl">💵</span> Nakit Tamamla
                             </button>
                             <button
+                                onClick={async () => {
+                                    try {
+                                        setLoading(true);
+                                        await api.patch(`/appointments/${completionModal.app!.id}/status`, {
+                                            status: 'completed',
+                                            price: completionModal.amount
+                                        });
+                                        setCompletionModal({ open: false, app: null, amount: 0 });
+                                        setIsDetailModalOpen(false);
+                                        setIsPendingListModalOpen(false);
+                                        if (company?.id) await fetchData(company.id);
+                                    } catch (e) {
+                                        alert('İşlem başarısız');
+                                    } finally {
+                                        setLoading(false);
+                                    }
+                                }}
+                                className="w-full py-6 bg-emerald-500 text-white rounded-3xl font-black text-sm uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-3 shadow-xl shadow-emerald-100"
+                            >
+                                <span className="text-xl">✅</span> Sadece Tamamla
+                            </button>
+                            <button
                                 onClick={() => setCompletionModal({ open: false, app: null, amount: 0 })}
                                 className="w-full py-4 text-slate-400 font-black text-xs uppercase tracking-widest hover:text-slate-600 transition-colors"
                             >

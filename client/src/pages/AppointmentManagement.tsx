@@ -47,136 +47,72 @@ export default function AppointmentManagement() {
         servicePriceOverrides: {} as Record<number, number>,
         serviceDurationOverrides: {} as Record<number, number>
     });
-    const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-    const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [paymentApp, setPaymentApp] = useState<Appointment | null>(null);
-    const [nfcState, setNfcState] = useState<'IDLE' | 'SCANNING' | 'SUCCESS' | 'ERROR'>('IDLE');
-    const [editableAmount, setEditableAmount] = useState<number>(0);
-    const [isListening, setIsListening] = useState(false);
-    const [voiceTranscript, setVoiceTranscript] = useState('');
+
     const [company, setCompany] = useState<Company | null>(null);
-    const [completionModal, setCompletionModal] = useState<{ open: boolean; app: Appointment | null; amount: number }>({ open: false, app: null, amount: 0 });
+    const [voiceStep, setVoiceStep] = useState<'IDLE' | 'NAME' | 'DATE' | 'TIME' | 'SERVICE' | 'CONFIRM'>('IDLE');
+    const [isListening, setIsListening] = useState(false);
     const [userInfo, setUserInfo] = useState<any>(null);
     const [staffMode, setStaffMode] = useState(false);
-    const [showAllStaff, setShowAllStaff] = useState(true);
-    const [voiceStep, setVoiceStep] = useState<'IDLE' | 'NAME' | 'DATE' | 'TIME' | 'SERVICE' | 'CONFIRM'>('IDLE');
-    const [guidedData, setGuidedData] = useState<any>({
-        customerName: '',
-        date: '',
-        startTime: '09:00',
-        endTime: '09:30',
-        serviceId: null,
-        price: 0
-    });
-
+    const showAllStaff = true;
     const [selectedDate, setSelectedDate] = useState(getLocalDateString());
     const [showTimePicker, setShowTimePicker] = useState(false);
+    const [voiceTranscript, setVoiceTranscript] = useState('');
+    const [guidedData, setGuidedData] = useState<any>({});
+    const [completionModal, setCompletionModal] = useState<{
+        open: boolean;
+        app: Appointment | null;
+        amount: number;
+    }>({
+        open: false,
+        app: null,
+        amount: 0
+    });
+    const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+
+    const speak = (text: string) => {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'tr-TR';
+        window.speechSynthesis.speak(utterance);
+    };
 
     const fetchData = async () => {
+        setLoading(true);
+        setError('');
         try {
-            let companyId = null;
-            try {
-                const meRes = await api.get('/auth/me');
-                if (meRes.data?.data?.company_id) {
-                    companyId = meRes.data.data.company_id;
-                    setUserInfo(meRes.data.data);
-                    if (meRes.data.data.role === 'staff') {
-                        setStaffMode(true);
-                        setShowAllStaff(false);
-                    } else if (meRes.data.data.role === 'company_admin') {
-                        // Default to self-view as per user request
-                        setShowAllStaff(false);
-                    }
-                    const companyRes = await api.get(`/companies/${companyId}`);
-                    setCompany(companyRes.data?.data || null);
-                }
-            } catch (err) {
-                console.warn('Company/Auth fetch failed', err);
-            }
+            const userRes = await api.get('/auth/me');
+            setUserInfo(userRes.data);
+            setStaffMode(userRes.data.role === 'staff' || userRes.data.role === 'admin');
 
-            try {
-                const now = new Date();
-                const firstDayOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-
-                const appResponse = await api.get('/appointments', {
-                    params: {
-                        company_id: companyId,
-                        start_date: firstDayOfMonth
-                    }
-                });
-                const fetchedApps = appResponse.data?.data || [];
-                setAppointments(fetchedApps);
-            } catch (err) {
-                console.warn('Appointments fetch failed', err);
-                setAppointments([]);
-            }
-
-            try {
-                const [svcResponse, pkgResponse, staffResponse] = await Promise.all([
-                    api.get('/services', { params: { company_id: companyId } }),
-                    api.get('/packages', { params: { company_id: companyId } }),
-                    api.get(`/companies/${companyId}/employees`)
-                ]);
-                setServices(svcResponse.data?.data || []);
-                setPackages(pkgResponse.data?.data || []);
-                setStaff(staffResponse.data?.data || []);
-            } catch (err) {
-                console.warn('Services/Packages/Staff fetch failed', err);
-                setServices([]);
-                setPackages([]);
-                setStaff([]);
-            }
-
-        } catch (err) {
-            console.error('General fetch error', err);
-            setError('Veriler yüklenirken hata oluştu. Lütfen sayfayı yenileyin.');
+            const [compRes, appRes, servRes, packRes, staffRes] = await Promise.all([
+                api.get('/company'),
+                api.get('/appointments'),
+                api.get('/services'),
+                api.get('/packages'),
+                api.get('/staff')
+            ]);
+            setCompany(compRes.data);
+            setAppointments(appRes.data.data);
+            setServices(servRes.data.data);
+            setPackages(packRes.data.data);
+            setStaff(staffRes.data.data);
+        } catch (err: any) {
+            setError('Veriler yüklenirken hata oluştu: ' + (err.response?.data?.message || err.message));
+            console.error(err);
         } finally {
             setLoading(false);
         }
     };
 
+
+
     useEffect(() => {
         fetchData();
     }, []);
 
-    const speak = (text: string) => {
-        if (!window.speechSynthesis) return;
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'tr-TR';
-        utterance.rate = 1.0;
-
-        const voices = window.speechSynthesis.getVoices();
-        const trVoice = voices.find(v => v.lang.includes('tr'));
-        if (trVoice) utterance.voice = trVoice;
-
-        window.speechSynthesis.speak(utterance);
-    };
-
-    useEffect(() => {
-        if (window.speechSynthesis) {
-            window.speechSynthesis.getVoices();
-        }
-    }, []);
-
     const startVoiceCommand = () => {
-        // Warm up speech synthesis for mobile
-        if (window.speechSynthesis) {
-            const warmUp = new SpeechSynthesisUtterance('');
-            warmUp.lang = 'tr-TR';
-            window.speechSynthesis.speak(warmUp);
-        }
-
         setVoiceStep('NAME');
-        setGuidedData({
-            customerName: '',
-            date: getLocalDateString(),
-            startTime: '09:00',
-            endTime: '09:30',
-            serviceId: null,
-            price: 0
-        });
-        speak('Müşterinin ismi nedir?');
+        setGuidedData({});
+        speak('Randevu almak istediğiniz kişinin adı nedir?');
         listenNextStep('NAME');
     };
 
@@ -405,6 +341,28 @@ export default function AppointmentManagement() {
         }
     };
 
+    const updateNewAppointmentTime = (startTime: string) => {
+        let duration = 30;
+        if (newAppointment.package_id) {
+            const pkg = packages.find(p => p.id === newAppointment.package_id);
+            if (pkg) {
+                duration = pkg.services?.reduce((sum: number, ps: any) =>
+                    sum + (newAppointment.serviceDurationOverrides[ps.id] || ps.duration_minutes || 0), 0) || pkg.duration_minutes;
+            }
+        } else if (newAppointment.service_ids.length > 0) {
+            const selectedServices = services.filter(sv => newAppointment.service_ids.includes(sv.id!));
+            duration = selectedServices.reduce((sum, sv) => sum + (sv.duration_minutes || 0), 0);
+        }
+
+        const [sh, sm] = startTime.split(':').map(Number);
+        const totalMin = sh * 60 + sm + duration;
+        const endH = Math.floor(totalMin / 60);
+        const endM = totalMin % 60;
+        const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+        setNewAppointment({ ...newAppointment, start_time: startTime, end_time: endTime });
+    };
+
     const handleAddAppointment = async (e: React.FormEvent) => {
         e.preventDefault();
         setFormError('');
@@ -451,12 +409,40 @@ export default function AppointmentManagement() {
                 }
             }
 
-            // Re-calculate end time for safety
-            const [sh, sm] = newAppointment.start_time.split(':').map(Number);
-            const totalMin = sh * 60 + sm + totalDur;
-            const endH = Math.floor(totalMin / 60);
-            const endM = totalMin % 60;
-            const finalEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+            // ÇAKIŞMA KONTROLÜ - BOARDDA OLDUĞU GİBİ
+            const [newSh, newSm] = newAppointment.start_time.split(':').map(Number);
+            const newStartTotal = newSh * 60 + newSm;
+            const newEndTotal = newStartTotal + totalDur;
+
+            // Mevcut randevuları aynı tarih ve aynı personel için filtrele
+            const existingDayApps = appointments.filter(a => {
+                const appDate = formatDateKey(a.appointment_date);
+                const targetDate = formatDateKey(newAppointment.appointment_date);
+
+                // Eğer personel seçili ise o personele bak, yoksa genel bak (opsiyonel ama boardda personel bazlıdır)
+                const isSameStaff = newAppointment.staff_id ? (Number(a.staff_id) === Number(newAppointment.staff_id)) : true;
+
+                return isSameStaff && a.status !== 'cancelled' && appDate === targetDate;
+            });
+
+            const conflict = existingDayApps.find(app => {
+                const [asH, asM] = app.start_time.split(':').map(Number);
+                const [aeH, aeM] = app.end_time.split(':').map(Number);
+                const appStart = asH * 60 + asM;
+                const appEnd = aeH * 60 + aeM;
+                // Kesişme kontrolü: (Baslangic1 < Bitis2) && (Bitis1 > Baslangic2)
+                return (newStartTotal < appEnd && newEndTotal > appStart);
+            });
+
+            if (conflict) {
+                const conflictName = conflict.customer_name || 'Başka bir müşteri';
+                setFormError(`⚠️ ÇAKIŞMA: Bu saatte (${conflict.start_time} - ${conflict.end_time}) ${conflictName} için randevu var.`);
+                return;
+            }
+
+            const eh = Math.floor(newEndTotal / 60);
+            const em = newEndTotal % 60;
+            const finalEndTime = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
 
             await api.post('/appointments', {
                 ...newAppointment,
@@ -521,6 +507,10 @@ export default function AppointmentManagement() {
 
     return (
         <div className="min-h-screen bg-slate-50/30">
+            <style>{`
+                .no-scrollbar::-webkit-scrollbar { display: none; }
+                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
             {/* Header Area */}
             <div className="bg-white px-6 pt-12 pb-6 border-b border-slate-100 sticky top-0 z-40 backdrop-blur-xl bg-white/80">
                 <div className="flex justify-between items-center mb-4">
@@ -1136,172 +1126,6 @@ export default function AppointmentManagement() {
                     </div>
                 </div>
             )}
-            {/* Payment Modal (NFC / SoftPOS Simulation) */}
-            {showPaymentModal && paymentApp && (
-                <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-500">
-                        <div className="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mb-8" />
-
-                        <div className="text-center mb-8">
-                            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">Ödeme Al</h3>
-                            <div className="flex flex-col items-center gap-1">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hizmet Bedeli</label>
-                                <div className="relative">
-                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-black text-slate-300">₺</span>
-                                    <input
-                                        type="number"
-                                        value={editableAmount}
-                                        onChange={(e) => setEditableAmount(Number(e.target.value))}
-                                        className="w-40 text-center text-3xl font-black text-indigo-600 bg-slate-50 border-none rounded-2xl py-3 pl-8 focus:ring-2 focus:ring-indigo-500 transition-all font-sans"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Commission Breakdown */}
-                        {(() => {
-                            const platformRate = Number(company?.commission_rate) || 5;
-                            let iyzicoRate = Number(company?.iyzico_commission_rate) || 1;
-                            if (iyzicoRate <= 0) iyzicoRate = 1;
-                            const platformComm = (editableAmount * platformRate) / 100;
-                            const iyzicoComm = (editableAmount * iyzicoRate) / 100;
-                            const totalToCollect = editableAmount + platformComm + iyzicoComm;
-
-                            return (
-                                <div className="bg-slate-50 rounded-3xl p-6 mb-8 space-y-3 border border-slate-100">
-                                    <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
-                                        <span>Firma Hakediş (Net)</span>
-                                        <span className="text-slate-600">₺{editableAmount.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
-                                        <span>Platform Komisyonu ({platformRate.toFixed(2)}%)</span>
-                                        <span className="text-slate-600">₺{platformComm.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-widest">
-                                        <span>Iyzico Komisyonu ({iyzicoRate.toFixed(2)}%)</span>
-                                        <span className="text-slate-600">₺{iyzicoComm.toFixed(2)}</span>
-                                    </div>
-                                    <div className="h-px bg-slate-200 mt-2" />
-                                    <div className="flex justify-between items-center pt-1">
-                                        <span className="text-sm font-black text-slate-900 uppercase tracking-tight">Tahsil Edilecek Toplam</span>
-                                        <span className="text-2xl font-black text-indigo-600">
-                                            ₺{totalToCollect.toFixed(2)}
-                                        </span>
-                                    </div>
-                                </div>
-                            );
-                        })()}
-
-                        {nfcState === 'IDLE' && (
-                            <div className="grid grid-cols-1 gap-4">
-                                <button
-                                    onClick={async () => {
-                                        setNfcState('SCANNING');
-                                        setTimeout(async () => {
-                                            try {
-                                                const res = await api.post('/payments/ceppos/initialize', {
-                                                    appointment_id: paymentApp.id,
-                                                    amount: editableAmount
-                                                });
-                                                if (res.data.success) {
-                                                    setNfcState('SUCCESS');
-                                                    setTimeout(() => {
-                                                        // Proceed with status update after success
-                                                        fetchData();
-                                                        setShowPaymentModal(false);
-                                                        setNfcState('IDLE');
-                                                        setSelectedAppointment(null);
-                                                    }, 1500);
-                                                } else {
-                                                    setNfcState('ERROR');
-                                                }
-                                            } catch (e) {
-                                                setNfcState('ERROR');
-                                            }
-                                        }, 3000);
-                                    }}
-                                    disabled={loading}
-                                    className="p-6 bg-slate-900 text-white rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all shadow-xl shadow-slate-200 disabled:opacity-50"
-                                >
-                                    <div className="flex items-center gap-4 text-left">
-                                        <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">📱</div>
-                                        <div>
-                                            <p className="text-xs font-black uppercase tracking-widest text-indigo-400">Temassız Ödeme</p>
-                                            <p className="text-lg font-black leading-tight">SoftPOS / NFC</p>
-                                        </div>
-                                    </div>
-                                    <svg className="w-6 h-6 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
-                                </button>
-
-                                <button
-                                    onClick={async () => {
-                                        try {
-                                            setLoading(true);
-                                            await api.patch(`/appointments/${paymentApp.id}/status`, {
-                                                status: 'completed',
-                                                price: editableAmount
-                                            });
-                                            fetchData();
-                                            setShowPaymentModal(false);
-                                            setSelectedAppointment(null);
-                                        } catch (e) {
-                                            alert('Hata oluştu');
-                                            setLoading(false);
-                                        }
-                                    }}
-                                    disabled={loading}
-                                    className="p-6 bg-slate-50 text-slate-900 rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all disabled:opacity-50"
-                                >
-                                    <div className="flex items-center gap-4 text-left">
-                                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">💵</div>
-                                        <div>
-                                            <p className="text-xs font-black uppercase tracking-widest text-slate-400">Nakit Ödeme</p>
-                                            <p className="text-lg font-black leading-tight">Elden Tahsilat</p>
-                                        </div>
-                                    </div>
-                                    <svg className="w-6 h-6 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
-                                </button>
-
-                                <button
-                                    onClick={() => setShowPaymentModal(false)}
-                                    className="w-full py-4 text-slate-400 text-xs font-black uppercase tracking-widest mt-4"
-                                >
-                                    İptal
-                                </button>
-                            </div>
-                        )}
-
-                        {nfcState === 'SCANNING' && (
-                            <div className="py-12 flex flex-col items-center">
-                                <div className="relative mb-12">
-                                    <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-20 scale-150"></div>
-                                    <div className="absolute inset-0 bg-indigo-400 rounded-full animate-pulse opacity-40 scale-125"></div>
-                                    <div className="relative w-32 h-32 bg-slate-900 rounded-full flex items-center justify-center text-4xl shadow-2xl">⚡</div>
-                                </div>
-                                <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Kartı Yaklaştırın</h4>
-                                <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] animate-pulse">Temassız ödeme bekleniyor...</p>
-                            </div>
-                        )}
-
-                        {nfcState === 'SUCCESS' && (
-                            <div className="py-12 flex flex-col items-center animate-in zoom-in duration-500">
-                                <div className="w-32 h-32 bg-emerald-500 rounded-full flex items-center justify-center text-5xl shadow-2xl mb-8">✓</div>
-                                <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Ödeme Başarılı</h4>
-                                <p className="text-emerald-500 font-black uppercase tracking-widest text-[10px]">İşlem onaylandı, iyzico kaydı oluşturuldu.</p>
-                            </div>
-                        )}
-
-                        {nfcState === 'ERROR' && (
-                            <div className="py-12 flex flex-col items-center">
-                                <div className="w-32 h-32 bg-red-500 rounded-full flex items-center justify-center text-5xl shadow-2xl mb-8">!</div>
-                                <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Ödeme Başarısız</h4>
-                                <p className="text-red-500 font-black uppercase tracking-widest text-[10px] mb-8">İşlem reddedildi veya hata oluştu.</p>
-                                <button onClick={() => setNfcState('IDLE')} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold text-xs uppercase">Tekrar Dene</button>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
 
             {/* Ses Dinleme Overlay (Yönlendirmeli) */}
             {voiceStep !== 'IDLE' && (
@@ -1386,6 +1210,7 @@ export default function AppointmentManagement() {
                     </div>
                 </div>
             )}
+
             {/* Completion & Amount Confirmation Modal */}
             {completionModal.open && completionModal.app && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
@@ -1415,15 +1240,32 @@ export default function AppointmentManagement() {
 
                         <div className="space-y-3">
                             <button
-                                onClick={() => {
-                                    setPaymentApp({ ...completionModal.app!, price: completionModal.amount });
-                                    setEditableAmount(completionModal.amount);
-                                    setCompletionModal({ open: false, app: null, amount: 0 });
-                                    setShowPaymentModal(true);
-                                }}
-                                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-200 active:scale-95 transition-all"
+                                disabled={true}
+                                className="w-full py-4 bg-slate-100 text-slate-400 rounded-2xl font-black text-xs uppercase tracking-widest cursor-not-allowed opacity-70 flex items-center justify-center gap-2"
                             >
-                                Ödeme Ekranına Geç
+                                💳 Kredi Kartı (Pasif)
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        setLoading(true);
+                                        await api.patch(`/appointments/${completionModal.app!.id}/status`, {
+                                            status: 'completed',
+                                            price: completionModal.amount,
+                                            payment_method: 'cash'
+                                        });
+                                        setCompletionModal({ open: false, app: null, amount: 0 });
+                                        setSelectedAppointment(null);
+                                        fetchData();
+                                    } catch (e) {
+                                        alert('İşlem başarısız');
+                                    } finally {
+                                        setLoading(false);
+                                    }
+                                }}
+                                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2"
+                            >
+                                💵 Nakit Ödeme (Tamamla)
                             </button>
                             <button
                                 onClick={async () => {
@@ -1434,6 +1276,7 @@ export default function AppointmentManagement() {
                                             price: completionModal.amount
                                         });
                                         setCompletionModal({ open: false, app: null, amount: 0 });
+                                        setSelectedAppointment(null);
                                         fetchData();
                                     } catch (e) {
                                         alert('İşlem başarısız');
@@ -1441,83 +1284,98 @@ export default function AppointmentManagement() {
                                         setLoading(false);
                                     }
                                 }}
-                                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all"
+                                className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-100"
                             >
-                                Direkt Tamamla (Nakit)
+                                ✅ SADECE TAMAMLA
                             </button>
                             <button
-                                onClick={() => setCompletionModal({ open: false, app: null, amount: 0 })}
+                                onClick={() => {
+                                    setCompletionModal({ open: false, app: null, amount: 0 });
+                                    setSelectedAppointment(null);
+                                }}
                                 className="w-full py-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest"
                             >
-                                Vazgeç
+                                Geri Dön
                             </button>
                         </div>
                     </div>
                 </div>
             )}
+
             {/* Modern Time Picker Modal */}
             {showTimePicker && (
                 <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300 p-0 sm:p-4">
-                    <div className="bg-white w-full max-w-lg rounded-t-[3rem] sm:rounded-[4rem] p-8 pb-12 sm:pb-8 shadow-2xl animate-in slide-in-from-bottom duration-500 max-h-[85vh] overflow-y-auto">
+                    <div className="bg-white w-full max-w-sm rounded-t-[3rem] sm:rounded-[3rem] p-8 pb-12 sm:pb-8 shadow-2xl animate-in slide-in-from-bottom duration-500 overflow-hidden">
                         <div className="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mb-8 sm:hidden" />
-                        <div className="flex justify-between items-center mb-10">
+                        <div className="flex justify-between items-center mb-6">
                             <div>
-                                <h3 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Saat Seçin</h3>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">15 dakikalık aralıklarla</p>
+                                <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase">Saat Seçin</h3>
                             </div>
-                            <button onClick={() => setShowTimePicker(false)} className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                            <button onClick={() => setShowTimePicker(false)} className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-4 gap-3">
-                            {(() => {
-                                const slots = [];
-                                for (let h = 8; h <= 21; h++) {
-                                    for (let m = 0; m < 60; m += 15) {
-                                        const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-                                        const isSelected = newAppointment.start_time === time;
-                                        slots.push(
-                                            <button
-                                                key={time}
-                                                type="button"
-                                                onClick={() => {
-                                                    const start = time;
-                                                    let duration = 30;
-                                                    if (newAppointment.package_id) {
-                                                        const pkg = packages.find(p => p.id === newAppointment.package_id);
-                                                        if (pkg) {
-                                                            duration = pkg.services?.reduce((sum: number, ps: any) =>
-                                                                sum + (newAppointment.serviceDurationOverrides[ps.id] || ps.duration_minutes || 0), 0) || pkg.duration_minutes;
-                                                        }
-                                                    } else if (newAppointment.service_ids.length > 0) {
-                                                        const selectedServices = services.filter(sv => newAppointment.service_ids.includes(sv.id!));
-                                                        duration = selectedServices.reduce((sum, sv) => sum + (sv.duration_minutes || 0), 0);
-                                                    }
+                        <div className="relative h-64 flex gap-4 items-center justify-center mb-8 px-4">
+                            {/* Selection Overlay */}
+                            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-16 bg-slate-50 rounded-2xl pointer-events-none border border-slate-100"></div>
 
-                                                    const [sh, sm] = start.split(':').map(Number);
-                                                    const totalMin = sh * 60 + sm + duration;
-                                                    const endH = Math.floor(totalMin / 60);
-                                                    const endM = totalMin % 60;
-                                                    const end = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+                            {/* Hours Column */}
+                            <div className="flex-1 h-full overflow-y-auto no-scrollbar snap-y snap-mandatory py-24 text-center">
+                                {Array.from({ length: 15 }, (_, i) => i + 8).map(h => {
+                                    const val = String(h).padStart(2, '0');
+                                    const isSel = newAppointment.start_time.split(':')[0] === val;
+                                    return (
+                                        <div
+                                            key={val}
+                                            onClick={() => {
+                                                const parts = newAppointment.start_time.split(':');
+                                                const newT = `${val}:${parts[1] || '00'}`;
+                                                updateNewAppointmentTime(newT);
+                                            }}
+                                            className={`h-16 flex items-center justify-center text-2xl font-black cursor-pointer snap-center transition-all ${isSel ? 'text-pink-600 scale-125' : 'text-slate-300'}`}
+                                        >
+                                            {val}
+                                        </div>
+                                    );
+                                })}
+                            </div>
 
-                                                    setNewAppointment({ ...newAppointment, start_time: start, end_time: end });
-                                                    setShowTimePicker(false);
-                                                }}
-                                                className={`py-4 rounded-2xl font-black text-sm transition-all ${isSelected ? 'bg-pink-600 text-white shadow-xl shadow-pink-200 scale-105' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
-                                            >
-                                                {time}
-                                            </button>
-                                        );
-                                    }
-                                }
-                                return slots;
-                            })()}
+                            <div className="text-3xl font-black text-slate-200">:</div>
+
+                            {/* Minutes Column */}
+                            <div className="flex-1 h-full overflow-y-auto no-scrollbar snap-y snap-mandatory py-24 text-center">
+                                {Array.from({ length: 12 }, (_, i) => i * 5).map(m => {
+                                    const val = String(m).padStart(2, '0');
+                                    const isSel = newAppointment.start_time.split(':')[1] === val;
+                                    return (
+                                        <div
+                                            key={val}
+                                            onClick={() => {
+                                                const parts = newAppointment.start_time.split(':');
+                                                const newT = `${parts[0] || '08'}:${val}`;
+                                                updateNewAppointmentTime(newT);
+                                            }}
+                                            className={`h-16 flex items-center justify-center text-2xl font-black cursor-pointer snap-center transition-all ${isSel ? 'text-pink-600 scale-125' : 'text-slate-300'}`}
+                                        >
+                                            {val}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
+
+                        <button
+                            onClick={() => setShowTimePicker(false)}
+                            className="w-full bg-slate-900 text-white py-5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl active:scale-[0.98] transition-all"
+                        >
+                            Tamam
+                        </button>
                     </div>
                 </div>
             )}
         </div>
     );
 }
+
 

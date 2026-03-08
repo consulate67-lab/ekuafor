@@ -371,10 +371,11 @@ export default function BookingPage() {
                 </div>
             ) : (
                 <>
-                    <header className="bg-white/90 backdrop-blur-md p-4 shadow-sm text-center sticky top-0 z-10 border-b border-slate-100" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1.5rem)' }}>
-                        <h1 className="text-xl font-black text-slate-900 tracking-tight leading-tight">{company.name}</h1>
+                    <header className="bg-white/90 backdrop-blur-md p-6 shadow-sm text-center sticky top-0 z-50 border-b border-slate-100" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 3rem)' }}>
+                        <h1 className="text-xl font-black text-slate-900 tracking-tight leading-tight uppercase">{company.name}</h1>
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">Randevu Oluştur</p>
                     </header>
+
 
                     <div className="flex-1 max-w-md mx-auto w-full p-6 pt-8">
                         <div className="flex gap-2 mb-10">
@@ -442,7 +443,7 @@ export default function BookingPage() {
                                 <div className="space-y-3">
                                     {staff.map(u => (
                                         <button key={u.id} onClick={() => { setSelection({ ...selection, staffId: u.id }); handleNext(); }} className="w-full bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-5 text-left active:scale-[0.98] transition-all hover:border-amber-500">
-                                            <div className="w-20 h-20 bg-amber-50 rounded-[1.5rem] flex items-center justify-center font-black text-2xl text-amber-600 overflow-hidden shrink-0 shadow-inner">
+                                            <div className="w-24 h-24 bg-amber-50 rounded-[1.5rem] flex items-center justify-center font-black text-3xl text-amber-600 overflow-hidden shrink-0 shadow-inner">
                                                 {u.photo ? (
                                                     <img src={u.photo} alt={u.first_name} className="w-full h-full object-cover" />
                                                 ) : (

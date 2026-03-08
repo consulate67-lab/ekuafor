@@ -276,28 +276,24 @@ export default function Dashboard() {
 
             console.log('[OCR Sonuç]', rawText);
 
-            // Gelişmiş Tutar Yakalama Mantığı
             const lines = rawText.split('\n');
             let foundAmount: number | null = null;
+            const keywords = ['TOPLAM', 'TOP', 'GENEL', 'TOPLAMA', 'TOTAL', 'AMOUNT', 'KDV', 'ÖDENECEK', 'TUTAR', 'FIYAT', 'TOP*', 'NAKİT', 'TUTARI', 'G.TOPLAM'];
+            const priceRegex = /([\d\s]{1,10}[.,]\d{2})/g;
 
-            // Fişlerdeki toplam tutar genellikle en altta ve KDV, TOPLAM, TOP, GENEL, ÖDENECEK gibi kelimelerden sonra gelir.
-            const keywords = ['TOPLAM', 'TOP', 'GENEL', 'TOPLAMA', 'TOTAL', 'AMOUNT', 'KDV', 'ÖDENECEK', 'TUTAR', 'FIYAT', 'TOP*'];
-            const priceRegex = /(\d{1,6}[.,]\d{2})/g;
-
-            // Satırları sondan başa tara (Genelde toplam en sondadır)
             for (let i = lines.length - 1; i >= 0; i--) {
                 const line = lines[i].toUpperCase();
                 const hasKeyword = keywords.some(k => line.includes(k));
-
                 if (hasKeyword) {
                     const matches = line.match(priceRegex);
                     if (matches) {
-                        const vals = matches.map(m => parseFloat(m.replace(',', '.')));
+                        const vals = matches.map(m => parseFloat(m.replace(/\s/g, '').replace(',', '.')));
                         foundAmount = Math.max(...vals);
                         break;
                     }
                 }
             }
+
 
             // Fallback: Keyword bulunamazsa tüm sayıların en büyüğünü al (Makul limitler dahilinde)
             if (foundAmount === null) {
