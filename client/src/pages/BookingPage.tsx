@@ -387,7 +387,7 @@ export default function BookingPage() {
                             </a>
                         )}
                         <a
-                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${company.address_line || ''} ${company.city || ''} ${company.name || ''}`)}`}
+                            href={company.latitude && company.longitude && parseFloat(String(company.latitude)) !== 0 ? `https://www.google.com/maps/dir/?api=1&destination=${company.latitude},${company.longitude}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${company.name} ${company.address_line || ''} ${company.city || ''}`)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-indigo-100 flex items-center justify-center gap-2"
@@ -418,7 +418,7 @@ export default function BookingPage() {
                             </a>
                         )}
                         <a
-                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${company.address_line || ''} ${company.city || ''} ${company.name || ''}`)}`}
+                            href={company.latitude && company.longitude && parseFloat(String(company.latitude)) !== 0 ? `https://www.google.com/maps/dir/?api=1&destination=${company.latitude},${company.longitude}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${company.name} ${company.address_line || ''} ${company.city || ''}`)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-indigo-100 flex items-center justify-center gap-2"
