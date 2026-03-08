@@ -238,68 +238,87 @@ export default function Dashboard() {
         const video = videoRef.current;
         const canvas = canvasRef.current;
 
+        // Tesseract'ın daha iyi okuması için yüksek çözünürlük ve ön işleme
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
+        // 1. Resmi Çiz
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // 2. Ön İşleme (Görüntü kalitesini artır)
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+            // Grayscale (Gri Tonlama)
+            const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+            // Contrast (Kontrast Artırımı)
+            const threshold = 128; // Eşik değeri
+            const v = avg > threshold ? 255 : 0; // Siyah-Beyaz yap (Binarization)
+            data[i] = v;
+            data[i + 1] = v;
+            data[i + 2] = v;
+        }
+        ctx.putImageData(imageData, 0, 0);
 
         setOcrLoading(true);
         try {
             const worker = await Tesseract.createWorker('tur');
-            const ret = await worker.recognize(canvas.toDataURL('image/jpeg'));
+            // 'tur' dili ve özel karakter tanımları
+            await worker.setParameters({
+                tessedit_char_whitelist: '0123456789.,ABCDEFGHIJKLMNOPQRSTUVWXYZabcçdefgğhıijklmnoöprsştuüvyz *:=-'
+            });
+
+            const ret = await worker.recognize(canvas.toDataURL('image/jpeg', 0.9));
             const rawText = ret.data.text;
             await worker.terminate();
 
-            console.log('[OCR Raw Text]', rawText);
+            console.log('[OCR Sonuç]', rawText);
 
-            // 1. Öncelikle: KDV, TOPLAM, GENEL TOPLAM gibi anahtar kelimeleri ve çevresindeki yıldızlı (*) kalın metinleri daha iyi yakala.
-            // Kalın olan yazılar (özellikle termal fişlerde) etrafında yıldızlar veya boşluklarla gelebilir.
-            const totalKeywords = /(?:\*+)?\s*(top(?:lam?)?|genel\s*top(?:lam?)?|ara\s*top(?:lam?)?|ödenecek|total|amount|t[o0]p|kdv)\s*(?:\*+)?/i;
-            const pricePattern = /(\d{1,6}[.,]\d{1,2})/g;
+            // Gelişmiş Tutar Yakalama Mantığı
             const lines = rawText.split('\n');
-
             let foundAmount: number | null = null;
 
-            // Satır satır tara - anahtar kelime içeren satırda fiyat ara
-            for (const line of lines) {
-                if (totalKeywords.test(line)) {
-                    // Kalın yazılardan doğan olası Tesseract okuma hataları (l, I yerine 1 vb.) için küçük düzeltmeler:
-                    const cleanLine = line.replace(/l|I/g, '1').replace(/[^\w\d.,\s*]/gi, '');
-                    const matches = cleanLine.match(pricePattern);
-                    if (matches && matches.length > 0) {
-                        // En yüksek fiyatı al (aynı satırda KDV matrahı, KDV tutarı ve Toplam olabilir, genelde en büyüğü Toplamdır)
+            // Fişlerdeki toplam tutar genellikle en altta ve KDV, TOPLAM, TOP, GENEL, ÖDENECEK gibi kelimelerden sonra gelir.
+            const keywords = ['TOPLAM', 'TOP', 'GENEL', 'TOPLAMA', 'TOTAL', 'AMOUNT', 'KDV', 'ÖDENECEK', 'TUTAR', 'FIYAT', 'TOP*'];
+            const priceRegex = /(\d{1,6}[.,]\d{2})/g;
+
+            // Satırları sondan başa tara (Genelde toplam en sondadır)
+            for (let i = lines.length - 1; i >= 0; i--) {
+                const line = lines[i].toUpperCase();
+                const hasKeyword = keywords.some(k => line.includes(k));
+
+                if (hasKeyword) {
+                    const matches = line.match(priceRegex);
+                    if (matches) {
                         const vals = matches.map(m => parseFloat(m.replace(',', '.')));
-                        const candidate = Math.max(...vals);
-                        if (candidate > 0 && candidate < 1000000) {
-                            foundAmount = candidate;
-                            // En alttaki TOPLAM genelde sondadır, bu yüzden the "last found candidate" işliyor.
-                        }
+                        foundAmount = Math.max(...vals);
+                        break;
                     }
                 }
             }
 
-            // 2. Fallback: Anahtar kelime bulunamadıysa tüm sayıların en büyüğünü al
+            // Fallback: Keyword bulunamazsa tüm sayıların en büyüğünü al (Makul limitler dahilinde)
             if (foundAmount === null) {
-                // Yine kalın basılmış olabilecek fontların olası okuma hatalarına karşı toleranslı tarama
-                const cleanedRaw = rawText.replace(/l|I/g, '1');
-                const allNums = cleanedRaw.match(/\b\d{1,6}[.,]\d{1,2}\b/g);
-                if (allNums && allNums.length > 0) {
-                    const vals = allNums.map(a => parseFloat(a.replace(',', '.')));
-                    foundAmount = Math.max(...vals);
+                const allMatches = rawText.match(priceRegex);
+                if (allMatches) {
+                    const vals = allMatches.map(m => parseFloat(m.replace(',', '.'))).filter(v => v > 0 && v < 50000);
+                    if (vals.length > 0) {
+                        foundAmount = Math.max(...vals);
+                    }
                 }
             }
 
-            if (foundAmount !== null && foundAmount > 0 && foundAmount < 1000000) {
+            if (foundAmount !== null && foundAmount > 0) {
                 setExpenseForm(prev => ({ ...prev, amount: foundAmount!.toFixed(2) }));
                 stopScanner();
             } else {
-                alert('Geçerli bir tutar okunamadı. Lütfen fişi daha net tutarak tekrar deneyin veya elle girin.');
+                alert('Tutar okunamadı. Lütfen fişi daha net ve ışıklı bir ortamda tutarak tekrar deneyin.');
             }
         } catch (e) {
-            console.error('OCR Error', e);
-            alert('Fiş okunamadı. Kamera kalitesini veya ışık koşullarını kontrol edin.');
+            console.error('OCR Hatası', e);
+            alert('Fiş tarama başarısız oldu.');
         } finally {
             setOcrLoading(false);
         }

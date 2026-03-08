@@ -70,6 +70,7 @@ export default function AppointmentManagement() {
     });
 
     const [selectedDate, setSelectedDate] = useState(getLocalDateString());
+    const [showTimePicker, setShowTimePicker] = useState(false);
 
     const fetchData = async () => {
         try {
@@ -958,34 +959,14 @@ export default function AppointmentManagement() {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-700 mb-2 uppercase ml-1 tracking-wider">Saat</label>
-                                    <input
-                                        type="time"
-                                        required
-                                        className="w-full bg-slate-50 border-none rounded-2xl py-4 px-4 font-bold text-slate-900"
-                                        value={newAppointment.start_time}
-                                        onChange={(e) => {
-                                            const start = e.target.value;
-                                            let duration = 30;
-                                            if (newAppointment.package_id) {
-                                                const pkg = packages.find(p => p.id === newAppointment.package_id);
-                                                if (pkg) {
-                                                    duration = pkg.services?.reduce((sum: number, ps: any) =>
-                                                        sum + (newAppointment.serviceDurationOverrides[ps.id] || ps.duration_minutes || 0), 0) || pkg.duration_minutes;
-                                                }
-                                            } else if (newAppointment.service_ids.length > 0) {
-                                                const selectedServices = services.filter(sv => newAppointment.service_ids.includes(sv.id!));
-                                                duration = selectedServices.reduce((sum, sv) => sum + (sv.duration_minutes || 0), 0);
-                                            }
-
-                                            const [h, m] = start.split(':').map(Number);
-                                            const totalMin = h * 60 + m + duration;
-                                            const endH = Math.floor(totalMin / 60);
-                                            const endM = totalMin % 60;
-                                            const end = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-
-                                            setNewAppointment({ ...newAppointment, start_time: start, end_time: end });
-                                        }}
-                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowTimePicker(true)}
+                                        className="w-full bg-slate-50 border-none rounded-2xl py-4 px-4 font-black text-slate-900 text-left flex items-center justify-between"
+                                    >
+                                        <span>{newAppointment.start_time}</span>
+                                        <svg className="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    </button>
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
@@ -1474,6 +1455,69 @@ export default function AppointmentManagement() {
                     </div>
                 </div>
             )}
+            {/* Modern Time Picker Modal */}
+            {showTimePicker && (
+                <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300 p-0 sm:p-4">
+                    <div className="bg-white w-full max-w-lg rounded-t-[3rem] sm:rounded-[4rem] p-8 pb-12 sm:pb-8 shadow-2xl animate-in slide-in-from-bottom duration-500 max-h-[85vh] overflow-y-auto">
+                        <div className="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mb-8 sm:hidden" />
+                        <div className="flex justify-between items-center mb-10">
+                            <div>
+                                <h3 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Saat Seçin</h3>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">15 dakikalık aralıklarla</p>
+                            </div>
+                            <button onClick={() => setShowTimePicker(false)} className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-3">
+                            {(() => {
+                                const slots = [];
+                                for (let h = 8; h <= 21; h++) {
+                                    for (let m = 0; m < 60; m += 15) {
+                                        const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                                        const isSelected = newAppointment.start_time === time;
+                                        slots.push(
+                                            <button
+                                                key={time}
+                                                type="button"
+                                                onClick={() => {
+                                                    const start = time;
+                                                    let duration = 30;
+                                                    if (newAppointment.package_id) {
+                                                        const pkg = packages.find(p => p.id === newAppointment.package_id);
+                                                        if (pkg) {
+                                                            duration = pkg.services?.reduce((sum: number, ps: any) =>
+                                                                sum + (newAppointment.serviceDurationOverrides[ps.id] || ps.duration_minutes || 0), 0) || pkg.duration_minutes;
+                                                        }
+                                                    } else if (newAppointment.service_ids.length > 0) {
+                                                        const selectedServices = services.filter(sv => newAppointment.service_ids.includes(sv.id!));
+                                                        duration = selectedServices.reduce((sum, sv) => sum + (sv.duration_minutes || 0), 0);
+                                                    }
+
+                                                    const [sh, sm] = start.split(':').map(Number);
+                                                    const totalMin = sh * 60 + sm + duration;
+                                                    const endH = Math.floor(totalMin / 60);
+                                                    const endM = totalMin % 60;
+                                                    const end = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+                                                    setNewAppointment({ ...newAppointment, start_time: start, end_time: end });
+                                                    setShowTimePicker(false);
+                                                }}
+                                                className={`py-4 rounded-2xl font-black text-sm transition-all ${isSelected ? 'bg-pink-600 text-white shadow-xl shadow-pink-200 scale-105' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                                            >
+                                                {time}
+                                            </button>
+                                        );
+                                    }
+                                }
+                                return slots;
+                            })()}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
+
