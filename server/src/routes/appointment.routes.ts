@@ -85,8 +85,20 @@ const privateAppointmentHandler = async (req: Request, res: Response, next: any)
             'SELECT role FROM company_users WHERE company_id=$1 AND user_id=$2',
             [companyId, userId]
         );
-        const companyRole = roleResult.rows[0]?.role;
+        let companyRole = roleResult.rows[0]?.role;
         console.log(`[GET /appointments] Company Role Found: ${companyRole}`);
+
+        // Fallback check in users table if company_users is missing
+        if (!companyRole) {
+            const userCheck = await pool.query(
+                'SELECT role, company_id FROM users WHERE id = $1 AND company_id = $2',
+                [userId, companyId]
+            );
+            if (userCheck.rows.length > 0) {
+                companyRole = 'staff';
+                console.log(`[GET /appointments] Fallback Role used: ${companyRole}`);
+            }
+        }
 
         // Super Admin Bypass
         if (req.user?.role === 'super_admin') {

@@ -169,6 +169,16 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
                 ]
             );
 
+            // FIX: company_users tablosuna da ekle ki yetki hatası almasınlar
+            try {
+                await pool.query(
+                    'INSERT INTO company_users (company_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+                    [parseInt(id as string), insertRes.rows[0].id, 'staff']
+                );
+            } catch (e) {
+                console.error('Error adding to company_users:', e);
+            }
+
             // Send SMS to staff
             const smsMsg = `Sayin ${staff.first_name}, ${companyName} personeli olarak sisteme eklendiniz. Yonetim paneli: https://www.saloontr.com/#/dashboard?code=${boardCode}`;
             import('../services/sms.service').then(m => {
@@ -482,7 +492,7 @@ router.post('/:id/create-staff-board', async (req: Request, res: Response) => {
         const email = `${board_code.toLowerCase()}@staff.local`;
         const userResult = await pool.query(
             `INSERT INTO users (email, password, role, first_name, last_name, phone, company_id, board_code, gender, department_id, photo, quantity, unit)
-             VALUES ($1, $2, 'company_admin', $3, $4, '', $5, $6, $7, $8, $9, $10, $11)
+             VALUES ($1, $2, 'staff', $3, $4, '', $5, $6, $7, $8, $9, $10, $11)
              RETURNING *`,
             [email, 'board-auth-only', first_name, last_name, companyId, board_code, gender || null, department_id || null, photo || null, quantity || null, unit || null]
         );

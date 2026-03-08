@@ -80,23 +80,31 @@ export default function AppointmentManagement() {
         setError('');
         try {
             const userRes = await api.get('/auth/me');
-            setUserInfo(userRes.data);
-            setStaffMode(userRes.data.role === 'staff' || userRes.data.role === 'admin');
+            const user = userRes.data.data;
+            if (!user) throw new Error('Oturum kapalı');
+
+            setUserInfo(user);
+            setStaffMode(user.role === 'staff' || user.role === 'admin' || user.role === 'company_admin');
+
+            const compId = user.company_id;
+            if (!compId) throw new Error('Firma bilgisi bulunamadı');
 
             const [compRes, appRes, servRes, packRes, staffRes] = await Promise.all([
-                api.get('/company'),
-                api.get('/appointments'),
-                api.get('/services'),
-                api.get('/packages'),
-                api.get('/staff')
+                api.get(`/companies/${compId}`),
+                api.get('/appointments'), // This uses companyId from token in backend
+                api.get('/services', { params: { company_id: compId } }),
+                api.get('/packages', { params: { company_id: compId } }),
+                api.get(`/companies/${compId}/staff-boards`)
             ]);
-            setCompany(compRes.data);
-            setAppointments(appRes.data.data);
-            setServices(servRes.data.data);
-            setPackages(packRes.data.data);
-            setStaff(staffRes.data.data);
+
+            setCompany(compRes.data.data);
+            setAppointments(appRes.data.data || []);
+            setServices(servRes.data.data || []);
+            setPackages(packRes.data.data || []);
+            setStaff(staffRes.data.data || []);
         } catch (err: any) {
-            setError('Veriler yüklenirken hata oluştu: ' + (err.response?.data?.message || err.message));
+            const msg = err.response?.data?.error || err.response?.data?.message || err.message;
+            setError('Veriler yüklenirken hata oluştu: ' + msg);
             console.error(err);
         } finally {
             setLoading(false);
