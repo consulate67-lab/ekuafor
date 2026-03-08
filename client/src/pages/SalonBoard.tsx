@@ -796,7 +796,7 @@ export default function SalonBoard() {
                                         <td className="sticky left-0 z-[50] bg-white p-2 lg:p-3 border-r border-slate-100 font-bold text-slate-900 shadow-[10px_0_30px_-15px_rgba(0,0,0,0.1)] group-hover:bg-slate-50 transition-colors">
                                             <div className="flex items-center gap-2">
                                                 <div
-                                                    className="w-16 h-16 lg:w-20 lg:h-20 rounded-3xl text-white flex items-center justify-center font-black text-xl lg:text-3xl uppercase shadow-xl shrink-0 overflow-hidden border-4 border-white"
+                                                    className="w-32 h-32 lg:w-40 lg:h-40 rounded-[2.5rem] text-white flex items-center justify-center font-black text-3xl lg:text-5xl uppercase shadow-2xl shrink-0 overflow-hidden border-4 border-white"
                                                     style={{ backgroundColor: person.photo ? 'transparent' : staffColor }}
                                                 >
                                                     {person.photo ? (
@@ -1562,12 +1562,15 @@ export default function SalonBoard() {
                                                         // Proceed with status update after success
                                                         api.patch(`/appointments/${paymentApp.id}/status`, {
                                                             status: 'completed',
-                                                            price: paymentApp.price
+                                                            price: paymentApp.price,
+                                                            payment_method: 'card_ceppos'
                                                         }).then(() => {
                                                             if (company?.id) fetchData(company.id);
                                                             setShowPaymentModal(false);
                                                             setNfcState('IDLE');
                                                             setSelectedAppointment(null);
+                                                            setIsDetailModalOpen(false);
+                                                            setIsPendingListModalOpen(false);
                                                         });
                                                     }, 1500);
                                                 } else {
@@ -1576,18 +1579,18 @@ export default function SalonBoard() {
                                             } catch (e) {
                                                 setNfcState('ERROR');
                                             }
-                                        }, 3000);
+                                        }, 2000);
                                     }}
-                                    className="p-6 bg-slate-900 text-white rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all shadow-xl shadow-slate-200"
+                                    className="p-6 bg-indigo-600 text-white rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all shadow-xl shadow-indigo-100"
                                 >
                                     <div className="flex items-center gap-4 text-left">
-                                        <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">📱</div>
+                                        <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">💳</div>
                                         <div>
-                                            <p className="text-xs font-black uppercase tracking-widest text-indigo-400">Temassız Ödeme</p>
-                                            <p className="text-lg font-black leading-tight">SoftPOS / NFC</p>
+                                            <p className="text-xs font-black uppercase tracking-widest text-indigo-200">Kredi Kartı</p>
+                                            <p className="text-lg font-black leading-tight">Terminal / SoftPOS</p>
                                         </div>
                                     </div>
-                                    <svg className="w-6 h-6 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
+                                    <svg className="w-6 h-6 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
                                 </button>
 
                                 <button
@@ -1596,11 +1599,14 @@ export default function SalonBoard() {
                                             setLoading(true);
                                             await api.patch(`/appointments/${paymentApp.id}/status`, {
                                                 status: 'completed',
-                                                price: paymentApp.price
+                                                price: paymentApp.price,
+                                                payment_method: 'cash'
                                             });
                                             if (company?.id) fetchData(company.id);
                                             setShowPaymentModal(false);
                                             setSelectedAppointment(null);
+                                            setIsDetailModalOpen(false);
+                                            setIsPendingListModalOpen(false);
                                         } catch (e) {
                                             alert('Hata oluştu');
                                         } finally {
@@ -1699,9 +1705,12 @@ export default function SalonBoard() {
                                         setLoading(true);
                                         await api.patch(`/appointments/${completionModal.app!.id}/status`, {
                                             status: 'completed',
-                                            price: completionModal.amount
+                                            price: completionModal.amount,
+                                            payment_method: 'cash'
                                         });
                                         setCompletionModal({ open: false, app: null, amount: 0 });
+                                        setIsDetailModalOpen(false);
+                                        setIsPendingListModalOpen(false);
                                         if (company?.id) await fetchData(company.id);
                                     } catch (e) {
                                         alert('İşlem başarısız');
