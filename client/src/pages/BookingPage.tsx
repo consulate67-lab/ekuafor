@@ -371,15 +371,15 @@ export default function BookingPage() {
                 </div>
             ) : (
                 <>
-                    <header className="bg-white p-4 shadow-sm text-center sticky top-0 z-10">
-                        <h1 className="text-xl font-bold text-gray-900">{company.name}</h1>
-                        <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Randevu Oluştur</p>
+                    <header className="bg-white/90 backdrop-blur-md p-4 shadow-sm text-center sticky top-0 z-10 border-b border-slate-100" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1.5rem)' }}>
+                        <h1 className="text-xl font-black text-slate-900 tracking-tight leading-tight">{company.name}</h1>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-1">Randevu Oluştur</p>
                     </header>
 
-                    <div className="flex-1 max-w-md mx-auto w-full p-6">
-                        <div className="flex gap-2 mb-8">
+                    <div className="flex-1 max-w-md mx-auto w-full p-6 pt-8">
+                        <div className="flex gap-2 mb-10">
                             {[1, 2, 3, 4, 5].map(s => (
-                                <div key={s} className={`h-1 flex-1 rounded-full transition-colors duration-300 ${s <= step ? 'bg-[#b45309]' : 'bg-gray-200'}`}></div>
+                                <div key={s} className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${s <= step ? 'bg-[#b45309] shadow-sm' : 'bg-slate-100'}`}></div>
                             ))}
                         </div>
 
