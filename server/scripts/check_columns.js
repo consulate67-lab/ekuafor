@@ -1,34 +1,39 @@
 const { Pool } = require('pg');
-require('dotenv').config();
+const pool = new Pool({
+    connectionString: 'postgresql://postgres:RE_YV_RE_YY_87@junction.proxy.rlwy.net:18744/railway'
+});
 
-const config = process.env.DATABASE_URL
-    ? { connectionString: process.env.DATABASE_URL }
-    : {
-        host: process.env.DB_HOST,
-        user: process.env.DB_USER,
-        password: process.env.DB_PASSWORD,
-        database: process.env.DB_NAME,
-        port: process.env.DB_PORT
-    };
-
-const pool = new Pool(config);
-
-async function check() {
+async function checkColumns() {
     try {
-        console.log('Checking database...');
-        const res = await pool.query("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'companies'");
-        console.log('Columns in companies table:');
-        console.table(res.rows);
+        const res = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'companies' 
+      AND column_name = 'photo';
+    `);
+        console.log('Companies photo column:', res.rows.length > 0 ? 'exists' : 'missing');
 
-        const res2 = await pool.query("SELECT id, name, genders FROM companies LIMIT 5");
-        console.log('Recent companies and their genders:');
-        console.table(res2.rows);
+        const res2 = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'users' 
+      AND (column_name = 'photo' OR column_name = 'profile_photo');
+    `);
+        console.log('Users (Staff) photo column info:', res2.rows.map(r => r.column_name));
 
-        process.exit(0);
+        const res3 = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'services' 
+      AND column_name = 'photo';
+    `);
+        console.log('Services photo column:', res3.rows.length > 0 ? 'exists' : 'missing');
+
     } catch (err) {
-        console.error('Error during check:', err);
-        process.exit(1);
+        console.error(err);
+    } finally {
+        await pool.end();
     }
 }
 
-check();
+checkColumns();

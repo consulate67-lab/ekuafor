@@ -69,6 +69,7 @@ const companySchema = z.object({
     ubl_outgoing_alias: nullableString,
     license_end_date: z.any().nullable().optional(),
     sms_enabled: z.preprocess(v => (v === "" || v === null) ? null : v, z.boolean().nullable().optional()),
+    photo: nullableString,
 });
 
 /**
