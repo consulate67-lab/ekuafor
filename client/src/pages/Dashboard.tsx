@@ -247,59 +247,81 @@ export default function Dashboard() {
         // 1. Resmi Çiz
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // 2. Ön İşleme (Görüntü kalitesini artır)
+        // 2. Gelişmiş Ön İşleme (Görüntü kalitesini artır)
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
         for (let i = 0; i < data.length; i += 4) {
-            // Grayscale (Gri Tonlama)
-            const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-            // Contrast (Kontrast Artırımı)
-            const threshold = 128; // Eşik değeri
-            const v = avg > threshold ? 255 : 0; // Siyah-Beyaz yap (Binarization)
-            data[i] = v;
-            data[i + 1] = v;
-            data[i + 2] = v;
+            // Grayscale (Luminance method for better weight)
+            const v = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+
+            // Contrast & Thresholding
+            const result = v > 150 ? 255 : 0; // Biraz daha parlak eşik
+            data[i] = data[i + 1] = data[i + 2] = result;
         }
         ctx.putImageData(imageData, 0, 0);
 
         setOcrLoading(true);
         try {
             const worker = await Tesseract.createWorker('tur');
-            // 'tur' dili ve özel karakter tanımları
             await worker.setParameters({
-                tessedit_char_whitelist: '0123456789.,ABCDEFGHIJKLMNOPQRSTUVWXYZabcçdefgğhıijklmnoöprsştuüvyz *:=-'
+                tessedit_char_whitelist: '0123456789.,ABCDEFGHIJKLMNOPQRSTUVWXYZabcçdefgğhıijklmnoöprsştuüvyz *:=-+TL'
             });
 
-            const ret = await worker.recognize(canvas.toDataURL('image/jpeg', 0.9));
+            const ret = await worker.recognize(canvas.toDataURL('image/jpeg', 0.95));
             const rawText = ret.data.text;
             await worker.terminate();
 
-            console.log('[OCR Sonuç]', rawText);
+            console.log('[OCR Ham Metin]', rawText);
 
-            const lines = rawText.split('\n');
+            const lines = rawText.split('\n').map(l => l.trim().toUpperCase()).filter(l => l.length > 0);
             let foundAmount: number | null = null;
-            const keywords = ['TOPLAM', 'TOP', 'GENEL', 'TOPLAMA', 'TOTAL', 'AMOUNT', 'KDV', 'ÖDENECEK', 'TUTAR', 'FIYAT', 'TOP*', 'NAKİT', 'TUTARI', 'G.TOPLAM'];
-            const priceRegex = /([\d\s]{1,10}[.,]\d{2})/g;
 
+            // Genişletilmiş anahtar kelimeler
+            const keywords = ['TOPLAM', 'TOTAL', 'GENEL', 'KDV', 'ODENECEK', 'TUTAR', 'FIYAT', 'NAKIT', 'G.TOP', 'TOP*', 'TUTARI', 'TOPLAMA', 'AMOUNT'];
+
+            // Fiyat ayıklama fonksiyonu - Daha esnek
+            const findPriceInStr = (str: string) => {
+                // Yıldızları, TL simgelerini ve boşlukları temizle, virgülü noktaya çevir
+                const clean = str.replace(/[*TL ]/g, '').replace(',', '.');
+                // Sayı+Nokta+2 hane (Örn: 125.50 veya 1.250.50 gibi durumlar için son kısmı yakala)
+                const matches = clean.match(/(\d+[.,]\d{2})|(\d+\d{2})/);
+                if (matches) {
+                    let valStr = matches[0].replace(',', '.');
+                    // Eğer nokta yoksa son 2 haneyi kuruş kabul et (OCR bazen noktayı kaçırır)
+                    if (!valStr.includes('.')) {
+                        valStr = valStr.slice(0, -2) + '.' + valStr.slice(-2);
+                    }
+                    const val = parseFloat(valStr);
+                    return isNaN(val) ? null : val;
+                }
+                return null;
+            };
+
+            // 1. Strateji: Anahtar kelime içeren satırları sondan başa tara (Genelde toplam alttadır)
             for (let i = lines.length - 1; i >= 0; i--) {
-                const line = lines[i].toUpperCase();
-                const hasKeyword = keywords.some(k => line.includes(k));
-                if (hasKeyword) {
-                    const matches = line.match(priceRegex);
-                    if (matches) {
-                        const vals = matches.map(m => parseFloat(m.replace(/\s/g, '').replace(',', '.')));
-                        foundAmount = Math.max(...vals);
+                const isTotalLine = keywords.some(k => lines[i].includes(k));
+                if (isTotalLine) {
+                    const price = findPriceInStr(lines[i]);
+                    if (price && price > 0) {
+                        foundAmount = price;
                         break;
+                    }
+                    // Bazen tutar bir alt satırda olur
+                    if (i + 1 < lines.length) {
+                        const subPrice = findPriceInStr(lines[i + 1]);
+                        if (subPrice && subPrice > 0) {
+                            foundAmount = subPrice;
+                            break;
+                        }
                     }
                 }
             }
 
-
-            // Fallback: Keyword bulunamazsa tüm sayıların en büyüğünü al (Makul limitler dahilinde)
+            // 2. Strateji (Fallback): Hiçbir şey bulunamazsa tüm metindeki en büyük sayıyı al (Makul sınırlar: 1 - 50.000 TL)
             if (foundAmount === null) {
-                const allMatches = rawText.match(priceRegex);
-                if (allMatches) {
-                    const vals = allMatches.map(m => parseFloat(m.replace(',', '.'))).filter(v => v > 0 && v < 50000);
+                const allWords = rawText.replace(',', '.').match(/(\d+\.\d{2})/g);
+                if (allWords) {
+                    const vals = allWords.map(v => parseFloat(v)).filter(v => v > 0 && v < 50000);
                     if (vals.length > 0) {
                         foundAmount = Math.max(...vals);
                     }
@@ -309,12 +331,13 @@ export default function Dashboard() {
             if (foundAmount !== null && foundAmount > 0) {
                 setExpenseForm(prev => ({ ...prev, amount: foundAmount!.toFixed(2) }));
                 stopScanner();
+                // Tutarın girildiğine dair küçük bir sesli geri bildirim veya görsel efekt eklenebilir
             } else {
-                alert('Tutar okunamadı. Lütfen fişi daha net ve ışıklı bir ortamda tutarak tekrar deneyin.');
+                alert('Tutar tam olarak okunamadı. Lütfen fişi düz, net ve gölgesiz bir şekilde tutarak tekrar deneyin.');
             }
         } catch (e) {
-            console.error('OCR Hatası', e);
-            alert('Fiş tarama başarısız oldu.');
+            console.error('OCR İşleme Hatası', e);
+            alert('Fiş okuma sırasında bir hata oluştu.');
         } finally {
             setOcrLoading(false);
         }
