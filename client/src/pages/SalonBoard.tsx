@@ -43,7 +43,8 @@ export default function SalonBoard() {
         startTime: '',
         serviceStaffOverrides: {} as Record<number, number>, // {serviceId: staffId}
         servicePriceOverrides: {} as Record<number, number>, // {serviceId: price}
-        serviceDurationOverrides: {} as Record<number, number> // {serviceId: duration}
+        serviceDurationOverrides: {} as Record<number, number>, // {serviceId: duration}
+        activeTab: 'services' as 'services' | 'packages'
     });
 
     // Payment States
@@ -403,7 +404,8 @@ export default function SalonBoard() {
                 startTime: '',
                 serviceStaffOverrides: {},
                 servicePriceOverrides: {},
-                serviceDurationOverrides: {}
+                serviceDurationOverrides: {},
+                activeTab: 'services'
             });
             setSelectedCell(null);
             if (company.id) await fetchData(company.id);
@@ -724,7 +726,8 @@ export default function SalonBoard() {
                                         }) || '09:00',
                                         serviceStaffOverrides: {},
                                         servicePriceOverrides: {},
-                                        serviceDurationOverrides: {}
+                                        serviceDurationOverrides: {},
+                                        activeTab: 'services'
                                     });
                                     setIsModalOpen(true);
                                 }}
@@ -796,7 +799,7 @@ export default function SalonBoard() {
                                         <td className="sticky left-0 z-[50] bg-white p-2 lg:p-3 border-r border-slate-100 font-bold text-slate-900 shadow-[10px_0_30px_-15px_rgba(0,0,0,0.1)] group-hover:bg-slate-50 transition-colors">
                                             <div className="flex items-center gap-2">
                                                 <div
-                                                    className="w-32 h-32 lg:w-40 lg:h-40 rounded-[2.5rem] text-white flex items-center justify-center font-black text-3xl lg:text-5xl uppercase shadow-2xl shrink-0 overflow-hidden border-4 border-white"
+                                                    className="w-14 h-14 lg:w-16 lg:h-16 rounded-2xl text-white flex items-center justify-center font-black text-xl lg:text-2xl uppercase shadow-lg shrink-0 overflow-hidden border-2 border-white"
                                                     style={{ backgroundColor: person.photo ? 'transparent' : staffColor }}
                                                 >
                                                     {person.photo ? (
@@ -853,7 +856,8 @@ export default function SalonBoard() {
                                                             startTime: hour,
                                                             serviceStaffOverrides: {},
                                                             servicePriceOverrides: {},
-                                                            serviceDurationOverrides: {}
+                                                            serviceDurationOverrides: {},
+                                                            activeTab: 'services'
                                                         });
                                                         setIsModalOpen(true);
                                                     }}
@@ -988,21 +992,21 @@ export default function SalonBoard() {
                                             <div className="flex gap-4 mb-2">
                                                 <button
                                                     type="button"
-                                                    onClick={() => setFastForm({ ...fastForm, packageId: '' })}
-                                                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${!fastForm.packageId ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}
+                                                    onClick={() => setFastForm({ ...fastForm, activeTab: 'services', packageId: '' })}
+                                                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${fastForm.activeTab === 'services' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}
                                                 >
                                                     {company?.service_label ? (company.service_label + 'ler') : 'Hizmetler'}
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() => setFastForm({ ...fastForm, serviceIds: [], packageId: packages[0]?.id?.toString() || '' })}
-                                                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${fastForm.packageId ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}
+                                                    onClick={() => setFastForm({ ...fastForm, activeTab: 'packages', serviceIds: [], packageId: fastForm.packageId || (packages[0]?.id?.toString() || '') })}
+                                                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${fastForm.activeTab === 'packages' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}
                                                 >
                                                     Paketler
                                                 </button>
                                             </div>
 
-                                            {!fastForm.packageId ? (
+                                            {fastForm.activeTab === 'services' ? (
                                                 <>
                                                     <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">{(company?.service_label || 'Hizmet')} Seçimi (Birden Fazla Seçebilirsiniz)</label>
                                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-48 overflow-y-auto p-4 bg-slate-50 rounded-[2.5rem]">
@@ -1030,98 +1034,104 @@ export default function SalonBoard() {
                                             ) : (
                                                 <>
                                                     <div className="space-y-3 max-h-64 overflow-y-auto p-4 bg-slate-50 rounded-[2.5rem]">
-                                                        {packages.map(p => {
-                                                            const isSelected = parseInt(fastForm.packageId) === p.id;
-                                                            return (
-                                                                <div key={p.id} className="space-y-4">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => setFastForm({ ...fastForm, packageId: p.id.toString(), serviceIds: [], serviceStaffOverrides: {} })}
-                                                                        className={`w-full p-4 rounded-2xl border-2 transition-all flex flex-col gap-1 text-left ${isSelected ? 'bg-amber-600 border-amber-600 text-white shadow-lg' : 'bg-white border-transparent text-slate-600'}`}
-                                                                    >
-                                                                        <p className={`text-xs font-black uppercase leading-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{p.name}</p>
-                                                                        <div className="flex items-center gap-2">
-                                                                            {p.services && p.services.length > 0 && (() => {
-                                                                                const originalSum = p.services.reduce((sum: number, ps: any) => sum + (ps.price || 0), 0);
-                                                                                if (originalSum > (p.price || 0)) {
-                                                                                    return <span className={`text-[8px] font-bold line-through opacity-60 ${isSelected ? 'text-white' : 'text-slate-400'}`}>₺{originalSum}</span>;
-                                                                                }
-                                                                                return null;
-                                                                            })()}
-                                                                            <p className={`text-[8px] font-bold ${isSelected ? 'text-amber-100' : 'text-slate-400'}`}>₺{p.price} | {p.duration_minutes} dk</p>
-                                                                        </div>
-                                                                    </button>
+                                                        {packages.length === 0 ? (
+                                                            <div className="text-center py-10">
+                                                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Henüz paket tanımlanmamış</p>
+                                                            </div>
+                                                        ) : (
+                                                            packages.map(p => {
+                                                                const isSelected = parseInt(fastForm.packageId) === p.id;
+                                                                return (
+                                                                    <div key={p.id} className="space-y-4">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setFastForm({ ...fastForm, packageId: p.id.toString(), serviceIds: [], serviceStaffOverrides: {} })}
+                                                                            className={`w-full p-4 rounded-2xl border-2 transition-all flex flex-col gap-1 text-left ${isSelected ? 'bg-amber-600 border-amber-600 text-white shadow-lg' : 'bg-white border-transparent text-slate-600'}`}
+                                                                        >
+                                                                            <p className={`text-xs font-black uppercase leading-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{p.name}</p>
+                                                                            <div className="flex items-center gap-2">
+                                                                                {p.services && p.services.length > 0 && (() => {
+                                                                                    const originalSum = p.services.reduce((sum: number, ps: any) => sum + (ps.price || 0), 0);
+                                                                                    if (originalSum > (p.price || 0)) {
+                                                                                        return <span className={`text-[8px] font-bold line-through opacity-60 ${isSelected ? 'text-white' : 'text-slate-400'}`}>₺{originalSum}</span>;
+                                                                                    }
+                                                                                    return null;
+                                                                                })()}
+                                                                                <p className={`text-[8px] font-bold ${isSelected ? 'text-amber-100' : 'text-slate-400'}`}>₺{p.price} | {p.duration_minutes} dk</p>
+                                                                            </div>
+                                                                        </button>
 
-                                                                    {isSelected && (
-                                                                        <div className="pl-6 space-y-3 animate-in slide-in-from-left duration-300 border-l-4 border-amber-200 ml-2">
-                                                                            <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest pl-2">🛠️ İşlem Dağılımı (Sıralı Yapılacak)</p>
-                                                                            <div className="space-y-2">
-                                                                                {p.services?.map((ps: any) => (
-                                                                                    <div key={ps.id} className="flex items-center justify-between gap-4 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-amber-400">
-                                                                                        <div className="flex flex-col flex-1 min-w-0 pl-2">
-                                                                                            <span className="text-[10px] font-black text-slate-700 uppercase truncate">{ps.name}</span>
-                                                                                            <div className="flex gap-2 mt-1">
-                                                                                                <div className="flex-1">
-                                                                                                    <label className="block text-[7px] font-bold text-slate-400 uppercase mb-0.5 ml-1">Süre (Dk)</label>
-                                                                                                    <div className="w-full p-2 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-400">
-                                                                                                        {ps.duration_minutes}
+                                                                        {isSelected && (
+                                                                            <div className="pl-6 space-y-3 animate-in slide-in-from-left duration-300 border-l-4 border-amber-200 ml-2">
+                                                                                <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest pl-2">🛠️ İşlem Dağılımı (Sıralı Yapılacak)</p>
+                                                                                <div className="space-y-2">
+                                                                                    {p.services?.map((ps: any) => (
+                                                                                        <div key={ps.id} className="flex items-center justify-between gap-4 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-amber-400">
+                                                                                            <div className="flex flex-col flex-1 min-w-0 pl-2">
+                                                                                                <span className="text-[10px] font-black text-slate-700 uppercase truncate">{ps.name}</span>
+                                                                                                <div className="flex gap-2 mt-1">
+                                                                                                    <div className="flex-1">
+                                                                                                        <label className="block text-[7px] font-bold text-slate-400 uppercase mb-0.5 ml-1">Süre (Dk)</label>
+                                                                                                        <div className="w-full p-2 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-400">
+                                                                                                            {ps.duration_minutes}
+                                                                                                        </div>
                                                                                                     </div>
-                                                                                                </div>
-                                                                                                <div className="flex-1">
-                                                                                                    <label className="block text-[7px] font-bold text-slate-400 uppercase mb-0.5 ml-1">Fiyat (₺)</label>
-                                                                                                    <div className="w-full p-2 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-400">
-                                                                                                        {ps.price}
+                                                                                                    <div className="flex-1">
+                                                                                                        <label className="block text-[7px] font-bold text-slate-400 uppercase mb-0.5 ml-1">Fiyat (₺)</label>
+                                                                                                        <div className="w-full p-2 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-400">
+                                                                                                            {ps.price}
+                                                                                                        </div>
                                                                                                     </div>
                                                                                                 </div>
                                                                                             </div>
+                                                                                            <div className="flex flex-col items-end gap-1">
+                                                                                                <span className="text-[8px] font-black text-slate-400 uppercase">{company?.staff_label || 'Uzman'}</span>
+                                                                                                <select
+                                                                                                    value={fastForm.serviceStaffOverrides[ps.id] || fastForm.staffId || selectedCell?.person.user_id || selectedCell?.person.id}
+                                                                                                    onChange={(e) => {
+                                                                                                        setFastForm(prev => ({
+                                                                                                            ...prev,
+                                                                                                            serviceStaffOverrides: {
+                                                                                                                ...prev.serviceStaffOverrides,
+                                                                                                                [ps.id]: Number(e.target.value)
+                                                                                                            }
+                                                                                                        }));
+                                                                                                    }}
+                                                                                                    className="text-[10px] font-bold bg-amber-50 text-amber-900 border-none rounded-xl p-2 outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                                                                                                >
+                                                                                                    {staff.map(s => (
+                                                                                                        <option key={s.user_id || s.id} value={s.user_id || s.id}>
+                                                                                                            {s.first_name}
+                                                                                                        </option>
+                                                                                                    ))}
+                                                                                                </select>
+                                                                                            </div>
                                                                                         </div>
-                                                                                        <div className="flex flex-col items-end gap-1">
-                                                                                            <span className="text-[8px] font-black text-slate-400 uppercase">{company?.staff_label || 'Uzman'}</span>
-                                                                                            <select
-                                                                                                value={fastForm.serviceStaffOverrides[ps.id] || fastForm.staffId || selectedCell?.person.user_id || selectedCell?.person.id}
-                                                                                                onChange={(e) => {
-                                                                                                    setFastForm(prev => ({
-                                                                                                        ...prev,
-                                                                                                        serviceStaffOverrides: {
-                                                                                                            ...prev.serviceStaffOverrides,
-                                                                                                            [ps.id]: Number(e.target.value)
-                                                                                                        }
-                                                                                                    }));
-                                                                                                }}
-                                                                                                className="text-[10px] font-bold bg-amber-50 text-amber-900 border-none rounded-xl p-2 outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
-                                                                                            >
-                                                                                                {staff.map(s => (
-                                                                                                    <option key={s.user_id || s.id} value={s.user_id || s.id}>
-                                                                                                        {s.first_name}
-                                                                                                    </option>
-                                                                                                ))}
-                                                                                            </select>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                ))}
-                                                                            </div>
-                                                                            <div className="flex justify-between items-center bg-amber-50 p-4 rounded-2xl border-2 border-amber-200 shadow-inner mt-2">
-                                                                                <div className="flex flex-col">
-                                                                                    <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">TOPLAM SÜRE</span>
-                                                                                    <span className="text-sm font-black text-amber-900">
-                                                                                        {p.duration_minutes || 0} DK
-                                                                                    </span>
+                                                                                    ))}
                                                                                 </div>
-                                                                                <div className="flex flex-col items-end">
-                                                                                    <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">TOPLAM FİYAT</span>
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <span className="text-lg font-black text-amber-900">
-                                                                                            ₺{p.price || 0}
+                                                                                <div className="flex justify-between items-center bg-amber-50 p-4 rounded-2xl border-2 border-amber-200 shadow-inner mt-2">
+                                                                                    <div className="flex flex-col">
+                                                                                        <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">TOPLAM SÜRE</span>
+                                                                                        <span className="text-sm font-black text-amber-900">
+                                                                                            {p.duration_minutes || 0} DK
                                                                                         </span>
                                                                                     </div>
+                                                                                    <div className="flex flex-col items-end">
+                                                                                        <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">TOPLAM FİYAT</span>
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <span className="text-lg font-black text-amber-900">
+                                                                                                ₺{p.price || 0}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    </div>
                                                                                 </div>
+                                                                                <p className="text-[8px] font-bold text-slate-400 italic pl-2">* Hizmetler yukarıdan aşağıya sırayla atanacaktır.</p>
                                                                             </div>
-                                                                            <p className="text-[8px] font-bold text-slate-400 italic pl-2">* Hizmetler yukarıdan aşağıya sırayla atanacaktır.</p>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        })}
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })
+                                                        )}
                                                     </div>
                                                 </>
                                             )}

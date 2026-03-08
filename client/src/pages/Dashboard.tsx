@@ -587,11 +587,11 @@ export default function Dashboard() {
                         <img
                             src={user.photo}
                             alt={user.first_name}
-                            className="w-14 h-14 rounded-2xl object-cover shadow-md border-2 border-white"
+                            className="w-32 h-32 rounded-[2.5rem] object-cover shadow-2xl border-4 border-white"
                         />
                     ) : (
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-500 to-indigo-600 flex items-center justify-center text-white font-black text-xl shadow-md border-2 border-white">
-                            {user?.first_name?.[0]}-{user?.last_name?.[0]}
+                        <div className="w-32 h-32 rounded-[2.5rem] bg-gradient-to-tr from-indigo-500 to-indigo-600 flex items-center justify-center text-white font-black text-4xl shadow-2xl border-4 border-white">
+                            {user?.first_name?.[0]}{user?.last_name?.[0]}
                         </div>
                     )}
                 </div>

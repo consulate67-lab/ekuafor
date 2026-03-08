@@ -11,6 +11,7 @@ interface StaffInfo {
     department_id: number;
     department_name: string;
     company_id: number;
+    photo?: string;
 }
 
 export default function StaffPanel() {
@@ -120,22 +121,35 @@ export default function StaffPanel() {
                 <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-400/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
                 <div className="absolute bottom-0 left-0 w-28 h-28 bg-purple-400/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-2xl"></div>
 
-                <div className="relative z-10 flex items-start justify-between">
-                    <div>
-                        <p className="text-[10px] font-black text-indigo-300 uppercase tracking-[0.3em] mb-1">{company.name}</p>
-                        <h1 className="text-2xl font-black tracking-tight leading-tight">
-                            {staffInfo.first_name} {staffInfo.last_name}
-                        </h1>
-                        <div className="flex items-center gap-2 mt-2">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${staffInfo.gender === 'erkek' ? 'bg-blue-500/20 text-blue-200' : 'bg-pink-500/20 text-pink-200'
-                                }`}>
-                                {staffInfo.gender === 'erkek' ? '♂ Erkek' : '♀ Kadın'}
-                            </span>
-                            {staffInfo.department_name && (
-                                <span className="px-2.5 py-0.5 bg-white/10 text-white/70 rounded-full text-[9px] font-black uppercase tracking-widest">
-                                    {staffInfo.department_name}
+                <div className="relative z-10 flex items-center justify-between gap-6">
+                    <div className="flex items-center gap-6">
+                        {staffInfo.photo ? (
+                            <img
+                                src={staffInfo.photo}
+                                alt={staffInfo.first_name}
+                                className="w-32 h-32 rounded-[2.5rem] object-cover border-4 border-white/20 shadow-2xl"
+                            />
+                        ) : (
+                            <div className="w-32 h-32 rounded-[2.5rem] bg-indigo-500/30 flex items-center justify-center text-white font-black text-4xl border-4 border-white/20 shadow-2xl shrink-0">
+                                {staffInfo.first_name?.[0]}{staffInfo.last_name?.[0]}
+                            </div>
+                        )}
+                        <div>
+                            <p className="text-[10px] font-black text-indigo-300 uppercase tracking-[0.3em] mb-1">{company.name}</p>
+                            <h1 className="text-2xl font-black tracking-tight leading-tight">
+                                {staffInfo.first_name} {staffInfo.last_name}
+                            </h1>
+                            <div className="flex items-center gap-2 mt-2">
+                                <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${staffInfo.gender === 'erkek' ? 'bg-blue-500/20 text-blue-200' : 'bg-pink-500/20 text-pink-200'
+                                    }`}>
+                                    {staffInfo.gender === 'erkek' ? '♂ Erkek' : '♀ Kadın'}
                                 </span>
-                            )}
+                                {staffInfo.department_name && (
+                                    <span className="px-2.5 py-0.5 bg-white/10 text-white/70 rounded-full text-[9px] font-black uppercase tracking-widest">
+                                        {staffInfo.department_name}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
                     <button

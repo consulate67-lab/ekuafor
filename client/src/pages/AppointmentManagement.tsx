@@ -45,7 +45,8 @@ export default function AppointmentManagement() {
         price: 0,
         serviceStaffOverrides: {} as Record<number, number>,
         servicePriceOverrides: {} as Record<number, number>,
-        serviceDurationOverrides: {} as Record<number, number>
+        serviceDurationOverrides: {} as Record<number, number>,
+        activeTab: 'services' as 'services' | 'packages'
     });
 
     const [company, setCompany] = useState<Company | null>(null);
@@ -480,7 +481,8 @@ export default function AppointmentManagement() {
                 price: 0,
                 serviceStaffOverrides: {},
                 servicePriceOverrides: {},
-                serviceDurationOverrides: {}
+                serviceDurationOverrides: {},
+                activeTab: 'services'
             });
             setShowAddForm(false);
             alert('Randevu başarıyla ONAYLI olarak oluşturuldu.');
@@ -768,86 +770,48 @@ export default function AppointmentManagement() {
                         )}
 
                         <form onSubmit={handleAddAppointment} className="space-y-6">
-                            <div>
-                                <div className="flex gap-4 mb-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => setNewAppointment({ ...newAppointment, package_id: 0 })}
-                                        className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${newAppointment.package_id === 0 ? 'bg-pink-600 text-white' : 'bg-slate-100 text-slate-400'}`}
-                                    >
-                                        Hizmetler
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setNewAppointment({ ...newAppointment, service_ids: [], package_id: packages[0]?.id || 0 })}
-                                        className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${newAppointment.package_id !== 0 ? 'bg-pink-600 text-white' : 'bg-slate-100 text-slate-400'}`}
-                                    >
-                                        Paketler
-                                    </button>
-                                </div>
+                            <div className="flex gap-4 mb-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setNewAppointment({ ...newAppointment, activeTab: 'services', package_id: 0 })}
+                                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${newAppointment.activeTab === 'services' ? 'bg-pink-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400'}`}
+                                >
+                                    Hizmetler
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setNewAppointment({ ...newAppointment, activeTab: 'packages', service_ids: [], package_id: newAppointment.package_id || (packages[0]?.id || 0) })}
+                                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${newAppointment.activeTab === 'packages' ? 'bg-pink-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400'}`}
+                                >
+                                    Paketler
+                                </button>
+                            </div>
 
-                                {newAppointment.package_id === 0 ? (
-                                    <>
-                                        <label className="block text-xs font-bold text-slate-700 mb-2 uppercase ml-1 tracking-wider">Hizmet Seçimi</label>
-                                        <div className="space-y-2 max-h-48 overflow-y-auto bg-slate-50 p-4 rounded-2xl">
-                                            {services.map(s => {
-                                                const isSelected = newAppointment.service_ids.includes(s.id!);
-                                                return (
-                                                    <label key={s.id} className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all cursor-pointer ${isSelected ? 'bg-white border-pink-500 shadow-sm' : 'bg-transparent border-transparent'}`}>
-                                                        <div className="flex items-center gap-3">
-                                                            <input
-                                                                type="checkbox"
-                                                                className="w-5 h-5 rounded border-slate-300 text-pink-600 focus:ring-pink-500"
-                                                                checked={isSelected}
-                                                                onChange={(e) => {
-                                                                    let newIds = [...newAppointment.service_ids];
-                                                                    if (e.target.checked) {
-                                                                        newIds.push(s.id!);
-                                                                    } else {
-                                                                        newIds = newIds.filter(id => id !== s.id);
-                                                                    }
+                            {newAppointment.activeTab === 'services' ? (
+                                <>
+                                    <label className="block text-xs font-bold text-slate-700 mb-2 uppercase ml-1 tracking-wider">Hizmet Seçimi</label>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto bg-slate-50 p-4 rounded-2xl">
+                                        {services.map(s => {
+                                            const isSelected = newAppointment.service_ids.includes(s.id!);
+                                            return (
+                                                <label key={s.id} className={`flex items-center justify-between p-3 rounded-xl border-2 transition-all cursor-pointer ${isSelected ? 'bg-white border-pink-500 shadow-sm' : 'bg-transparent border-transparent'}`}>
+                                                    <div className="flex items-center gap-3">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="w-5 h-5 rounded border-slate-300 text-pink-600 focus:ring-pink-500"
+                                                            checked={isSelected}
+                                                            onChange={(e) => {
+                                                                let newIds = [...newAppointment.service_ids];
+                                                                if (e.target.checked) {
+                                                                    newIds.push(s.id!);
+                                                                } else {
+                                                                    newIds = newIds.filter(id => id !== s.id);
+                                                                }
 
-                                                                    // Calculate total duration and price
-                                                                    const selectedServices = services.filter(sv => newIds.includes(sv.id!));
-                                                                    const totalDur = selectedServices.reduce((sum, sv) => sum + (sv.duration_minutes || 0), 0);
-                                                                    const totalPr = selectedServices.reduce((sum, sv) => sum + (sv.price || 0), 0);
-
-                                                                    let newEndTime = newAppointment.end_time;
-                                                                    if (newAppointment.start_time) {
-                                                                        const [h, m] = newAppointment.start_time.split(':').map(Number);
-                                                                        const totalMin = h * 60 + m + totalDur;
-                                                                        const endH = Math.floor(totalMin / 60);
-                                                                        const endM = totalMin % 60;
-                                                                        newEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-                                                                    }
-
-                                                                    setNewAppointment({ ...newAppointment, service_ids: newIds, end_time: newEndTime, price: totalPr });
-                                                                }}
-                                                            />
-                                                            <div>
-                                                                <p className={`text-xs font-black ${isSelected ? 'text-slate-900' : 'text-slate-500'}`}>{s.name}</p>
-                                                                <p className="text-[10px] font-bold text-slate-400">{s.duration_minutes} Dakika</p>
-                                                            </div>
-                                                        </div>
-                                                        <span className="text-xs font-black text-pink-600">₺{s.price}</span>
-                                                    </label>
-                                                );
-                                            })}
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="space-y-3 max-h-64 overflow-y-auto bg-slate-50 p-4 rounded-2xl">
-                                            {packages.map(p => {
-                                                const isSelected = newAppointment.package_id === p.id;
-                                                return (
-                                                    <div key={p.id} className="space-y-3">
-                                                        <button
-                                                            key={p.id}
-                                                            type="button"
-                                                            onClick={() => {
-                                                                const totalDur = p.duration_minutes || 30;
-                                                                const totalPr = Number(p.price);
+                                                                // Calculate total duration and price
+                                                                const selectedServices = services.filter(sv => newIds.includes(sv.id!));
+                                                                const totalDur = selectedServices.reduce((sum, sv) => sum + (sv.duration_minutes || 0), 0);
+                                                                const totalPr = selectedServices.reduce((sum, sv) => sum + (sv.price || 0), 0);
 
                                                                 let newEndTime = newAppointment.end_time;
                                                                 if (newAppointment.start_time) {
@@ -858,90 +822,113 @@ export default function AppointmentManagement() {
                                                                     newEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
                                                                 }
 
-                                                                setNewAppointment({ ...newAppointment, package_id: p.id, service_ids: [], end_time: newEndTime, price: totalPr, serviceStaffOverrides: {} });
+                                                                setNewAppointment({ ...newAppointment, service_ids: newIds, end_time: newEndTime, price: totalPr });
                                                             }}
-                                                            className={`flex flex-col p-4 rounded-xl border-2 transition-all text-left w-full ${isSelected ? 'bg-white border-pink-500 shadow-sm' : 'bg-transparent border-transparent'}`}
+                                                        />
+                                                        <div>
+                                                            <p className={`text-xs font-black ${isSelected ? 'text-slate-900' : 'text-slate-500'}`}>{s.name}</p>
+                                                            <p className="text-[10px] font-bold text-slate-400">{s.duration_minutes} Dakika</p>
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-xs font-black text-pink-600">₺{s.price}</span>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="space-y-3 max-h-64 overflow-y-auto bg-slate-50 p-4 rounded-2xl">
+                                        {packages.length === 0 ? (
+                                            <div className="text-center py-6">
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Henüz paket tanımlanmamış</p>
+                                            </div>
+                                        ) : (
+                                            packages.map(p => {
+                                                const isSelected = newAppointment.package_id === p.id;
+                                                return (
+                                                    <div key={p.id} className="space-y-4">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setNewAppointment({ ...newAppointment, package_id: p.id, service_ids: [], serviceStaffOverrides: {} })}
+                                                            className={`w-full p-4 rounded-2xl border-2 transition-all flex flex-col gap-1 text-left ${isSelected ? 'bg-pink-50 border-pink-500 shadow-sm' : 'bg-white border-transparent text-slate-600'}`}
                                                         >
-                                                            <div className="flex justify-between items-center w-full mb-1">
-                                                                <p className={`text-xs font-black ${isSelected ? 'text-slate-900' : 'text-slate-500'}`}>{p.name}</p>
-                                                                <div className="flex items-center gap-1.5">
-                                                                    {p.services && p.services.length > 0 && (() => {
-                                                                        const originalSum = p.services.reduce((sum: number, ps: any) => sum + (ps.price || 0), 0);
-                                                                        if (originalSum > (p.price || 0)) {
-                                                                            return <span className={`text-[8px] font-bold line-through opacity-60 ${isSelected ? 'text-slate-900' : 'text-slate-400'}`}>₺{originalSum}</span>;
-                                                                        }
-                                                                        return null;
-                                                                    })()}
-                                                                    <span className="text-xs font-black text-pink-600">₺{p.price}</span>
-                                                                </div>
-                                                            </div>
-                                                            <p className="text-[9px] font-bold text-slate-400">{p.duration_minutes} Dakika | {p.services?.length || 0} Hizmet</p>
+                                                            <p className={`text-xs font-black uppercase leading-tight ${isSelected ? 'text-pink-600' : 'text-slate-900'}`}>{p.name}</p>
+                                                            <p className="text-[10px] font-bold text-slate-400">₺{p.price} | {p.duration_minutes} dk</p>
                                                         </button>
 
                                                         {isSelected && (
-                                                            <div className="pl-4 space-y-4">
-                                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hizmet Özelleştirme & Uzman Atama</p>
-                                                                {p.services?.map((ps: any) => (
-                                                                    <div key={ps.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3">
-                                                                        <div className="flex justify-between items-center">
-                                                                            <span className="text-[10px] font-black text-slate-700 uppercase truncate">{ps.name}</span>
-                                                                            <select
-                                                                                value={newAppointment.serviceStaffOverrides[ps.id] || newAppointment.staff_id || ''}
-                                                                                onChange={(e) => {
-                                                                                    setNewAppointment(prev => ({
-                                                                                        ...prev,
-                                                                                        serviceStaffOverrides: { ...prev.serviceStaffOverrides, [ps.id]: Number(e.target.value) }
-                                                                                    }));
-                                                                                }}
-                                                                                className="text-[10px] font-bold bg-white border border-slate-200 rounded-lg p-1.5 outline-none"
-                                                                            >
-                                                                                <option value="">Uzman Seçin</option>
-                                                                                {staff.map(s => (
-                                                                                    <option key={s.user_id || s.id} value={s.user_id || s.id}>
-                                                                                        {s.first_name}
-                                                                                    </option>
-                                                                                ))}
-                                                                            </select>
-                                                                        </div>
-                                                                        <div className="grid grid-cols-2 gap-3">
-                                                                            <div>
-                                                                                <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 ml-1">Süre (Dk)</label>
-                                                                                <div className="w-full p-2 bg-white rounded-lg border border-slate-200 text-[10px] font-bold text-slate-400">
-                                                                                    {ps.duration_minutes}
+                                                            <div className="pl-6 space-y-4 animate-in slide-in-from-left duration-300 border-l-4 border-pink-200 ml-2">
+                                                                <p className="text-[10px] font-black text-pink-600 uppercase tracking-widest pl-2">🛠️ İşlem Dağılımı</p>
+                                                                <div className="space-y-2">
+                                                                    {p.services?.map((ps: any) => (
+                                                                        <div key={ps.id} className="flex items-center justify-between gap-4 bg-white p-3 rounded-2xl border-2 border-slate-100 shadow-sm transition-all hover:border-pink-300">
+                                                                            <div className="flex flex-col flex-1 min-w-0">
+                                                                                <span className="text-[10px] font-black text-slate-900 uppercase truncate">{ps.name}</span>
+                                                                                <div className="flex gap-2 mt-1">
+                                                                                    <div className="flex-1">
+                                                                                        <label className="block text-[7px] font-bold text-slate-400 uppercase mb-0.5 ml-1">Süre (Dk)</label>
+                                                                                        <div className="w-full px-2 py-1.5 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-400">
+                                                                                            {ps.duration_minutes}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <div className="flex-1">
+                                                                                        <label className="block text-[7px] font-bold text-slate-400 uppercase mb-0.5 ml-1">Fiyat (₺)</label>
+                                                                                        <div className="w-full px-2 py-1.5 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-400">
+                                                                                            {ps.price}
+                                                                                        </div>
+                                                                                    </div>
                                                                                 </div>
                                                                             </div>
-                                                                            <div>
-                                                                                <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 ml-1">Fiyat (₺)</label>
-                                                                                <div className="w-full p-2 bg-white rounded-lg border border-slate-200 text-[10px] font-bold text-slate-400">
-                                                                                    {ps.price}
-                                                                                </div>
+                                                                            <div className="flex flex-col items-end gap-1 px-1">
+                                                                                <span className="text-[8px] font-black text-slate-400 uppercase">{company?.staff_label || 'Uzman'}</span>
+                                                                                <select
+                                                                                    value={newAppointment.serviceStaffOverrides[ps.id] || newAppointment.staff_id || (staff[0]?.user_id || staff[0]?.id)}
+                                                                                    onChange={(e) => {
+                                                                                        setNewAppointment(prev => ({
+                                                                                            ...prev,
+                                                                                            serviceStaffOverrides: {
+                                                                                                ...prev.serviceStaffOverrides,
+                                                                                                [ps.id]: Number(e.target.value)
+                                                                                            }
+                                                                                        }));
+                                                                                    }}
+                                                                                    className="text-[10px] font-bold bg-pink-50 text-pink-900 border-none rounded-xl p-2 outline-none focus:ring-2 focus:ring-pink-500 cursor-pointer"
+                                                                                >
+                                                                                    {staff.map(s => (
+                                                                                        <option key={s.user_id || s.id} value={s.user_id || s.id}>
+                                                                                            {s.first_name}
+                                                                                        </option>
+                                                                                    ))}
+                                                                                </select>
                                                                             </div>
                                                                         </div>
-                                                                    </div>
-                                                                ))}
-                                                                <div className="flex justify-between items-center bg-pink-50 p-4 rounded-2xl border border-pink-100">
+                                                                    ))}
+                                                                </div>
+                                                                <div className="flex justify-between items-center bg-pink-50/50 p-4 rounded-2xl border-2 border-pink-100 shadow-inner mt-2">
                                                                     <div className="flex flex-col">
-                                                                        <span className="text-[8px] font-black text-pink-400 uppercase tracking-widest">TOPLAM SÜRE</span>
-                                                                        <span className="text-xs font-black text-pink-600">
-                                                                            {p.duration_minutes || 0} Dakika
+                                                                        <span className="text-[8px] font-black text-pink-600 uppercase tracking-widest">TOPLAM SÜRE</span>
+                                                                        <span className="text-sm font-black text-pink-900">
+                                                                            {p.duration_minutes || 0} DK
                                                                         </span>
                                                                     </div>
                                                                     <div className="flex flex-col items-end">
-                                                                        <span className="text-[8px] font-black text-pink-400 uppercase tracking-widest">TOPLAM FİYAT</span>
-                                                                        <span className="text-base font-black text-pink-600">
+                                                                        <span className="text-[8px] font-black text-pink-600 uppercase tracking-widest">TOPLAM FİYAT</span>
+                                                                        <span className="text-lg font-black text-pink-900">
                                                                             ₺{p.price || 0}
                                                                         </span>
                                                                     </div>
                                                                 </div>
+                                                                <p className="text-[8px] font-bold text-slate-400 italic pl-2">* Hizmetler yukarıdan aşağıya sırayla atanacaktır.</p>
                                                             </div>
                                                         )}
                                                     </div>
                                                 );
-                                            })}
-                                        </div>
-                                    </>
-                                )}
-                            </div>
+                                            })
+                                        )}
+                                    </div>
+                                </>
+                            )}
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -994,396 +981,405 @@ export default function AppointmentManagement() {
                             </button>
                         </form>
                     </div>
-                </div>
-            )}
+                </div >
+            )
+            }
 
             {/* Appointment Details Modal */}
-            {selectedAppointment && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-white p-8 rounded-[3rem] w-full max-w-md max-h-[95vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 duration-300 relative">
-                        <div className="flex justify-between items-start mb-6">
-                            <div>
-                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Randevu Detayı</h3>
-                                <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider mt-1 bg-emerald-100 text-emerald-600">Onaylandı</span>
-                            </div>
-                            <button onClick={() => setSelectedAppointment(null)} className="text-slate-400 hover:text-slate-600 bg-slate-50 rounded-full p-2">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
-                        </div>
-
-                        <div className="space-y-6">
-                            <div className="bg-slate-50 p-4 rounded-2xl flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-black text-xl">
-                                    {(() => {
-                                        const nameMatch = selectedAppointment.notes?.match(/Müşteri:\s*([^|]+)/);
-                                        const extracted = nameMatch ? nameMatch[1].trim() : '';
-                                        const name = extracted || selectedAppointment.customer_name || 'Misafir';
-                                        return name.charAt(0).toUpperCase();
-                                    })()}
+            {
+                selectedAppointment && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+                        <div className="bg-white p-8 rounded-[3rem] w-full max-w-md max-h-[95vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 duration-300 relative">
+                            <div className="flex justify-between items-start mb-6">
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Randevu Detayı</h3>
+                                    <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider mt-1 bg-emerald-100 text-emerald-600">Onaylandı</span>
                                 </div>
-                                <div className="min-w-0">
-                                    <h4 className="font-black text-slate-900 text-lg leading-none truncate">
+                                <button onClick={() => setSelectedAppointment(null)} className="text-slate-400 hover:text-slate-600 bg-slate-50 rounded-full p-2">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+
+                            <div className="space-y-6">
+                                <div className="bg-slate-50 p-4 rounded-2xl flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center font-black text-xl">
                                         {(() => {
                                             const nameMatch = selectedAppointment.notes?.match(/Müşteri:\s*([^|]+)/);
                                             const extracted = nameMatch ? nameMatch[1].trim() : '';
-                                            return extracted || selectedAppointment.customer_name || 'Misafir';
+                                            const name = extracted || selectedAppointment.customer_name || 'Misafir';
+                                            return name.charAt(0).toUpperCase();
                                         })()}
-                                    </h4>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Müşteri</p>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="font-black text-slate-900 text-lg leading-none truncate">
+                                            {(() => {
+                                                const nameMatch = selectedAppointment.notes?.match(/Müşteri:\s*([^|]+)/);
+                                                const extracted = nameMatch ? nameMatch[1].trim() : '';
+                                                return extracted || selectedAppointment.customer_name || 'Misafir';
+                                            })()}
+                                        </h4>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Müşteri</p>
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-slate-50 p-4 rounded-2xl">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Zaman</p>
-                                    <p className="font-black text-slate-900 text-sm">{(selectedAppointment as any).display_start_time || selectedAppointment.start_time}</p>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-slate-50 p-4 rounded-2xl">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Zaman</p>
+                                        <p className="font-black text-slate-900 text-sm">{(selectedAppointment as any).display_start_time || selectedAppointment.start_time}</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-2xl">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tarih</p>
+                                        <p className="font-black text-slate-900 text-sm">{new Date(selectedAppointment.appointment_date).toLocaleDateString('tr-TR')}</p>
+                                    </div>
                                 </div>
-                                <div className="bg-slate-50 p-4 rounded-2xl">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tarih</p>
-                                    <p className="font-black text-slate-900 text-sm">{new Date(selectedAppointment.appointment_date).toLocaleDateString('tr-TR')}</p>
-                                </div>
-                            </div>
 
-                            <div className="bg-slate-50 p-4 rounded-2xl">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Hizmetler</p>
-                                <div className="space-y-2">
-                                    {selectedAppointment.services && selectedAppointment.services.length > 0 ? (
-                                        selectedAppointment.services.map((s: any, idx: number) => {
-                                            const isThisSub = (selectedAppointment as any).is_subservice && (selectedAppointment as any).aps_id === s.aps_id;
-                                            return (
-                                                <div key={idx} className={`flex justify-between items-center p-2 rounded-xl border transition-all ${isThisSub ? 'bg-indigo-50 border-indigo-200 shadow-sm ring-1 ring-indigo-100' : 'bg-white/50 border-slate-100'}`}>
-                                                    <div className="flex flex-col min-w-0 pr-2">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className={`font-black text-xs uppercase tracking-tight truncate ${isThisSub ? 'text-indigo-900' : 'text-slate-800'}`}>{s.name}</span>
-                                                            {isThisSub && <span className="w-1 h-1 bg-indigo-500 rounded-full animate-pulse"></span>}
+                                <div className="bg-slate-50 p-4 rounded-2xl">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Hizmetler</p>
+                                    <div className="space-y-2">
+                                        {selectedAppointment.services && selectedAppointment.services.length > 0 ? (
+                                            selectedAppointment.services.map((s: any, idx: number) => {
+                                                const isThisSub = (selectedAppointment as any).is_subservice && (selectedAppointment as any).aps_id === s.aps_id;
+                                                return (
+                                                    <div key={idx} className={`flex justify-between items-center p-2 rounded-xl border transition-all ${isThisSub ? 'bg-indigo-50 border-indigo-200 shadow-sm ring-1 ring-indigo-100' : 'bg-white/50 border-slate-100'}`}>
+                                                        <div className="flex flex-col min-w-0 pr-2">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className={`font-black text-xs uppercase tracking-tight truncate ${isThisSub ? 'text-indigo-900' : 'text-slate-800'}`}>{s.name}</span>
+                                                                {isThisSub && <span className="w-1 h-1 bg-indigo-500 rounded-full animate-pulse"></span>}
+                                                            </div>
+                                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{s.start_time} - {s.end_time} | {s.service_staff_name}</span>
                                                         </div>
-                                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{s.start_time} - {s.end_time} | {s.service_staff_name}</span>
+                                                        <div className="flex items-center gap-1.5">
+                                                            {s.original_price && Number(s.original_price) !== Number(s.price) && (
+                                                                <span className="text-[8px] font-bold line-through text-slate-400">₺{s.original_price}</span>
+                                                            )}
+                                                            <span className={`font-black text-[10px] ${isThisSub ? 'text-indigo-600' : 'text-slate-800'}`}>₺{s.price}</span>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex items-center gap-1.5">
-                                                        {s.original_price && Number(s.original_price) !== Number(s.price) && (
-                                                            <span className="text-[8px] font-bold line-through text-slate-400">₺{s.original_price}</span>
-                                                        )}
-                                                        <span className={`font-black text-[10px] ${isThisSub ? 'text-indigo-600' : 'text-slate-800'}`}>₺{s.price}</span>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })
-                                    ) : (
-                                        <div className="flex justify-between items-center">
-                                            <span className="font-black text-slate-900">{selectedAppointment.package_name || selectedAppointment.service_name || 'Hizmet Bilgisi Yok'}</span>
-                                            <span className="font-black text-pink-600">₺{selectedAppointment.price || 0}</span>
+                                                );
+                                            })
+                                        ) : (
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-black text-slate-900">{selectedAppointment.package_name || selectedAppointment.service_name || 'Hizmet Bilgisi Yok'}</span>
+                                                <span className="font-black text-pink-600">₺{selectedAppointment.price || 0}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {selectedAppointment.services && selectedAppointment.services.length > 0 && (
+                                        <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center px-1">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase">Toplam</span>
+                                            <div className="flex items-center gap-2">
+                                                {(() => {
+                                                    const originalTotal = selectedAppointment.services?.reduce((sum: number, s: any) => sum + (Number(s.original_price) || 0), 0);
+                                                    if (originalTotal > Number(selectedAppointment.price)) {
+                                                        return <span className="text-[10px] font-bold line-through text-slate-400">₺{originalTotal}</span>;
+                                                    }
+                                                    return null;
+                                                })()}
+                                                <span className="text-sm font-black text-indigo-600">₺{selectedAppointment.price}</span>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
-                                {selectedAppointment.services && selectedAppointment.services.length > 0 && (
-                                    <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center px-1">
-                                        <span className="text-[9px] font-black text-slate-400 uppercase">Toplam</span>
-                                        <div className="flex items-center gap-2">
-                                            {(() => {
-                                                const originalTotal = selectedAppointment.services?.reduce((sum: number, s: any) => sum + (Number(s.original_price) || 0), 0);
-                                                if (originalTotal > Number(selectedAppointment.price)) {
-                                                    return <span className="text-[10px] font-bold line-through text-slate-400">₺{originalTotal}</span>;
-                                                }
-                                                return null;
-                                            })()}
-                                            <span className="text-sm font-black text-indigo-600">₺{selectedAppointment.price}</span>
-                                        </div>
+
+                                {selectedAppointment.status !== 'completed' && (
+                                    <div className="flex flex-col gap-3">
+                                        {selectedAppointment.status === 'approved' && (
+                                            <button
+                                                onClick={() => {
+                                                    handleStatusUpdate(selectedAppointment.id!, 'completed', selectedAppointment.price);
+                                                }}
+                                                disabled={loading}
+                                                className={`w-full ${selectedAppointment.payment_status === 'paid' ? 'bg-emerald-600 shadow-emerald-100' : 'bg-indigo-600 shadow-indigo-100'} text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl hover:opacity-90 transition-all disabled:opacity-50`}
+                                            >
+                                                {selectedAppointment.payment_status === 'paid' ? '✓ Hizmeti Tamamla' : 'Tamamla & Ödeme Al'}
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => handleWhatsAppNotify(selectedAppointment)}
+                                            className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-emerald-100 hover:bg-emerald-600 transition-all"
+                                        >
+                                            WhatsApp ile Bildir
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                handleStatusUpdate(selectedAppointment.id!, 'cancelled', selectedAppointment.price);
+                                                setSelectedAppointment(null);
+                                            }}
+                                            className="w-full bg-slate-50 text-red-500 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-50 transition-all"
+                                        >
+                                            Randevuyu İptal Et
+                                        </button>
+                                    </div>
+                                )}
+
+                                {selectedAppointment.status === 'completed' && (
+                                    <div className="p-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-center">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                            Bu randevu tamamlanmıştır ve üzerinde işlem yapılamaz.
+                                        </p>
                                     </div>
                                 )}
                             </div>
-
-                            {selectedAppointment.status !== 'completed' && (
-                                <div className="flex flex-col gap-3">
-                                    {selectedAppointment.status === 'approved' && (
-                                        <button
-                                            onClick={() => {
-                                                handleStatusUpdate(selectedAppointment.id!, 'completed', selectedAppointment.price);
-                                            }}
-                                            disabled={loading}
-                                            className={`w-full ${selectedAppointment.payment_status === 'paid' ? 'bg-emerald-600 shadow-emerald-100' : 'bg-indigo-600 shadow-indigo-100'} text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl hover:opacity-90 transition-all disabled:opacity-50`}
-                                        >
-                                            {selectedAppointment.payment_status === 'paid' ? '✓ Hizmeti Tamamla' : 'Tamamla & Ödeme Al'}
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => handleWhatsAppNotify(selectedAppointment)}
-                                        className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-emerald-100 hover:bg-emerald-600 transition-all"
-                                    >
-                                        WhatsApp ile Bildir
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            handleStatusUpdate(selectedAppointment.id!, 'cancelled', selectedAppointment.price);
-                                            setSelectedAppointment(null);
-                                        }}
-                                        className="w-full bg-slate-50 text-red-500 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-50 transition-all"
-                                    >
-                                        Randevuyu İptal Et
-                                    </button>
-                                </div>
-                            )}
-
-                            {selectedAppointment.status === 'completed' && (
-                                <div className="p-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-center">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                        Bu randevu tamamlanmıştır ve üzerinde işlem yapılamaz.
-                                    </p>
-                                </div>
-                            )}
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Ses Dinleme Overlay (Yönlendirmeli) */}
-            {voiceStep !== 'IDLE' && (
-                <div className="fixed inset-0 z-[100] bg-indigo-950/95 backdrop-blur-2xl flex flex-col items-center justify-center animate-fade-in p-6">
-                    <button
-                        onClick={() => setVoiceStep('IDLE')}
-                        className="absolute top-10 right-10 text-white/40 hover:text-white"
-                    >
-                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
+            {
+                voiceStep !== 'IDLE' && (
+                    <div className="fixed inset-0 z-[100] bg-indigo-950/95 backdrop-blur-2xl flex flex-col items-center justify-center animate-fade-in p-6">
+                        <button
+                            onClick={() => setVoiceStep('IDLE')}
+                            className="absolute top-10 right-10 text-white/40 hover:text-white"
+                        >
+                            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
 
-                    <div className="relative mb-12">
-                        {isListening && (
-                            <>
-                                <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-20 scale-150"></div>
-                                <div className="absolute inset-0 bg-indigo-400 rounded-full animate-pulse opacity-40 scale-125"></div>
-                            </>
-                        )}
-                        <div className={`relative w-24 h-24 rounded-full flex items-center justify-center shadow-2xl transition-all ${isListening ? 'bg-indigo-600' : 'bg-slate-800'}`}>
-                            <svg className={`w-12 h-12 text-white ${isListening ? 'animate-bounce' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m8 0h-8m4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                            </svg>
-                        </div>
-                    </div>
-
-                    <div className="text-center max-w-lg w-full">
-                        <h2 className="text-4xl font-black text-white tracking-tighter mb-4">
-                            {voiceStep === 'NAME' && '1. Müşteri İsmi?'}
-                            {voiceStep === 'DATE' && '2. Randevu Tarihi?'}
-                            {voiceStep === 'TIME' && '3. Randevu Saati?'}
-                            {voiceStep === 'SERVICE' && '4. Yapılacak İşlem?'}
-                            {voiceStep === 'CONFIRM' && 'Son Kontrol'}
-                        </h2>
-
-                        <p className="text-indigo-300 font-bold uppercase tracking-[0.2em] text-[11px] mb-12">
-                            {voiceStep === 'NAME' && 'Müşterinin adını söyleyin'}
-                            {voiceStep === 'DATE' && 'Bugün, Yarın veya bir gün söyleyin'}
-                            {voiceStep === 'TIME' && 'Saat bilgisini söyleyin (örn: 14:30)'}
-                            {voiceStep === 'SERVICE' && 'Hangi hizmet yapılacak?'}
-                            {voiceStep === 'CONFIRM' && 'Randevu detayları aşağıdadır'}
-                        </p>
-
-                        <div className="space-y-4 bg-white/5 p-8 rounded-[2.5rem] border border-white/10 text-left">
-                            <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                                <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Müşteri</span>
-                                <span className="text-white font-black text-lg">{guidedData.customerName || '...'}</span>
-                            </div>
-                            <div className="flex justify-between items-center border-b border-white/5 py-4">
-                                <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Tarih / Saat</span>
-                                <span className="text-white font-black text-lg">{guidedData.date ? new Date(guidedData.date).toLocaleDateString('tr-TR') : '...'} - {guidedData.startTime}</span>
-                            </div>
-                            <div className="flex justify-between items-center py-4">
-                                <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Hizmet</span>
-                                <span className="text-white font-black text-lg">
-                                    {services.find(s => s.id === guidedData.serviceId)?.name || (voiceStep === 'CONFIRM' ? 'Belirlenemedi' : '...')}
-                                </span>
+                        <div className="relative mb-12">
+                            {isListening && (
+                                <>
+                                    <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-20 scale-150"></div>
+                                    <div className="absolute inset-0 bg-indigo-400 rounded-full animate-pulse opacity-40 scale-125"></div>
+                                </>
+                            )}
+                            <div className={`relative w-24 h-24 rounded-full flex items-center justify-center shadow-2xl transition-all ${isListening ? 'bg-indigo-600' : 'bg-slate-800'}`}>
+                                <svg className={`w-12 h-12 text-white ${isListening ? 'animate-bounce' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m8 0h-8m4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                                </svg>
                             </div>
                         </div>
 
-                        {voiceStep === 'CONFIRM' && (
-                            <div className="mt-12 flex gap-4 w-full">
-                                <button
-                                    onClick={() => setVoiceStep('IDLE')}
-                                    className="flex-1 py-6 bg-white/10 text-white rounded-3xl font-black uppercase tracking-widest hover:bg-white/20 transition-all"
-                                >
-                                    İptal
-                                </button>
-                                <button
-                                    onClick={confirmGuidedAppointment}
-                                    className="flex-1 py-6 bg-indigo-600 text-white rounded-3xl font-black uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:scale-105 transition-all"
-                                >
-                                    Onayla
-                                </button>
-                            </div>
-                        )}
+                        <div className="text-center max-w-lg w-full">
+                            <h2 className="text-4xl font-black text-white tracking-tighter mb-4">
+                                {voiceStep === 'NAME' && '1. Müşteri İsmi?'}
+                                {voiceStep === 'DATE' && '2. Randevu Tarihi?'}
+                                {voiceStep === 'TIME' && '3. Randevu Saati?'}
+                                {voiceStep === 'SERVICE' && '4. Yapılacak İşlem?'}
+                                {voiceStep === 'CONFIRM' && 'Son Kontrol'}
+                            </h2>
 
-                        {voiceStep !== 'CONFIRM' && isListening && voiceTranscript && (
-                            <div className="mt-8 text-white/60 italic font-medium">
-                                "{voiceTranscript}..."
+                            <p className="text-indigo-300 font-bold uppercase tracking-[0.2em] text-[11px] mb-12">
+                                {voiceStep === 'NAME' && 'Müşterinin adını söyleyin'}
+                                {voiceStep === 'DATE' && 'Bugün, Yarın veya bir gün söyleyin'}
+                                {voiceStep === 'TIME' && 'Saat bilgisini söyleyin (örn: 14:30)'}
+                                {voiceStep === 'SERVICE' && 'Hangi hizmet yapılacak?'}
+                                {voiceStep === 'CONFIRM' && 'Randevu detayları aşağıdadır'}
+                            </p>
+
+                            <div className="space-y-4 bg-white/5 p-8 rounded-[2.5rem] border border-white/10 text-left">
+                                <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                                    <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Müşteri</span>
+                                    <span className="text-white font-black text-lg">{guidedData.customerName || '...'}</span>
+                                </div>
+                                <div className="flex justify-between items-center border-b border-white/5 py-4">
+                                    <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Tarih / Saat</span>
+                                    <span className="text-white font-black text-lg">{guidedData.date ? new Date(guidedData.date).toLocaleDateString('tr-TR') : '...'} - {guidedData.startTime}</span>
+                                </div>
+                                <div className="flex justify-between items-center py-4">
+                                    <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Hizmet</span>
+                                    <span className="text-white font-black text-lg">
+                                        {services.find(s => s.id === guidedData.serviceId)?.name || (voiceStep === 'CONFIRM' ? 'Belirlenemedi' : '...')}
+                                    </span>
+                                </div>
                             </div>
-                        )}
+
+                            {voiceStep === 'CONFIRM' && (
+                                <div className="mt-12 flex gap-4 w-full">
+                                    <button
+                                        onClick={() => setVoiceStep('IDLE')}
+                                        className="flex-1 py-6 bg-white/10 text-white rounded-3xl font-black uppercase tracking-widest hover:bg-white/20 transition-all"
+                                    >
+                                        İptal
+                                    </button>
+                                    <button
+                                        onClick={confirmGuidedAppointment}
+                                        className="flex-1 py-6 bg-indigo-600 text-white rounded-3xl font-black uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:scale-105 transition-all"
+                                    >
+                                        Onayla
+                                    </button>
+                                </div>
+                            )}
+
+                            {voiceStep !== 'CONFIRM' && isListening && voiceTranscript && (
+                                <div className="mt-8 text-white/60 italic font-medium">
+                                    "{voiceTranscript}..."
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Completion & Amount Confirmation Modal */}
-            {completionModal.open && completionModal.app && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="bg-white w-full max-w-sm rounded-[3rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
-                        <div className="text-center mb-8">
-                            <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-3xl flex items-center justify-center text-3xl mx-auto mb-4">
-                                💰
+            {
+                completionModal.open && completionModal.app && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                        <div className="bg-white w-full max-w-sm rounded-[3rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
+                            <div className="text-center mb-8">
+                                <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-3xl flex items-center justify-center text-3xl mx-auto mb-4">
+                                    💰
+                                </div>
+                                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Hizmet Tamamla</h3>
+                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Lütfen toplam tutarı onaylayın</p>
                             </div>
-                            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Hizmet Tamamla</h3>
-                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Lütfen toplam tutarı onaylayın</p>
-                        </div>
 
-                        <div className="mb-8">
-                            <div className="text-center mb-2">
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ödenecek Tutar</span>
+                            <div className="mb-8">
+                                <div className="text-center mb-2">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ödenecek Tutar</span>
+                                </div>
+                                <div className="relative">
+                                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-indigo-200">₺</span>
+                                    <input
+                                        type="number"
+                                        value={completionModal.amount}
+                                        onChange={(e) => setCompletionModal(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-[2rem] py-6 text-center text-4xl font-black text-indigo-600 focus:border-indigo-500 focus:bg-white transition-all outline-none"
+                                    />
+                                </div>
                             </div>
-                            <div className="relative">
-                                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-indigo-200">₺</span>
-                                <input
-                                    type="number"
-                                    value={completionModal.amount}
-                                    onChange={(e) => setCompletionModal(prev => ({ ...prev, amount: Number(e.target.value) }))}
-                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-[2rem] py-6 text-center text-4xl font-black text-indigo-600 focus:border-indigo-500 focus:bg-white transition-all outline-none"
-                                />
-                            </div>
-                        </div>
 
-                        <div className="space-y-3">
-                            <button
-                                disabled={true}
-                                className="w-full py-4 bg-slate-100 text-slate-400 rounded-2xl font-black text-xs uppercase tracking-widest cursor-not-allowed opacity-70 flex items-center justify-center gap-2"
-                            >
-                                💳 Kredi Kartı (Pasif)
-                            </button>
-                            <button
-                                onClick={async () => {
-                                    try {
-                                        setLoading(true);
-                                        await api.patch(`/appointments/${completionModal.app!.id}/status`, {
-                                            status: 'completed',
-                                            price: completionModal.amount,
-                                            payment_method: 'cash'
-                                        });
+                            <div className="space-y-3">
+                                <button
+                                    disabled={true}
+                                    className="w-full py-4 bg-slate-100 text-slate-400 rounded-2xl font-black text-xs uppercase tracking-widest cursor-not-allowed opacity-70 flex items-center justify-center gap-2"
+                                >
+                                    💳 Kredi Kartı (Pasif)
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            setLoading(true);
+                                            await api.patch(`/appointments/${completionModal.app!.id}/status`, {
+                                                status: 'completed',
+                                                price: completionModal.amount,
+                                                payment_method: 'cash'
+                                            });
+                                            setCompletionModal({ open: false, app: null, amount: 0 });
+                                            setSelectedAppointment(null);
+                                            fetchData();
+                                        } catch (e) {
+                                            alert('İşlem başarısız');
+                                        } finally {
+                                            setLoading(false);
+                                        }
+                                    }}
+                                    className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2"
+                                >
+                                    💵 Nakit Ödeme (Tamamla)
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            setLoading(true);
+                                            await api.patch(`/appointments/${completionModal.app!.id}/status`, {
+                                                status: 'completed',
+                                                price: completionModal.amount,
+                                                payment_method: 'unspecified'
+                                            });
+                                            setCompletionModal({ open: false, app: null, amount: 0 });
+                                            setSelectedAppointment(null);
+                                            fetchData();
+                                        } catch (e) {
+                                            alert('İşlem başarısız');
+                                        } finally {
+                                            setLoading(false);
+                                        }
+                                    }}
+                                    className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-100"
+                                >
+                                    ✅ SADECE TAMAMLA
+                                </button>
+                                <button
+                                    onClick={() => {
                                         setCompletionModal({ open: false, app: null, amount: 0 });
                                         setSelectedAppointment(null);
-                                        fetchData();
-                                    } catch (e) {
-                                        alert('İşlem başarısız');
-                                    } finally {
-                                        setLoading(false);
-                                    }
-                                }}
-                                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2"
-                            >
-                                💵 Nakit Ödeme (Tamamla)
-                            </button>
-                            <button
-                                onClick={async () => {
-                                    try {
-                                        setLoading(true);
-                                        await api.patch(`/appointments/${completionModal.app!.id}/status`, {
-                                            status: 'completed',
-                                            price: completionModal.amount,
-                                            payment_method: 'unspecified'
-                                        });
-                                        setCompletionModal({ open: false, app: null, amount: 0 });
-                                        setSelectedAppointment(null);
-                                        fetchData();
-                                    } catch (e) {
-                                        alert('İşlem başarısız');
-                                    } finally {
-                                        setLoading(false);
-                                    }
-                                }}
-                                className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-100"
-                            >
-                                ✅ SADECE TAMAMLA
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setCompletionModal({ open: false, app: null, amount: 0 });
-                                    setSelectedAppointment(null);
-                                }}
-                                className="w-full py-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest"
-                            >
-                                Geri Dön
-                            </button>
+                                    }}
+                                    className="w-full py-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest"
+                                >
+                                    Geri Dön
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Modern Time Picker Modal */}
-            {showTimePicker && (
-                <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300 p-0 sm:p-4">
-                    <div className="bg-white w-full max-w-sm rounded-t-[3rem] sm:rounded-[3rem] p-8 pb-12 sm:pb-8 shadow-2xl animate-in slide-in-from-bottom duration-500 overflow-hidden">
-                        <div className="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mb-8 sm:hidden" />
-                        <div className="flex justify-between items-center mb-6">
-                            <div>
-                                <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase">Saat Seçin</h3>
+            {
+                showTimePicker && (
+                    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300 p-0 sm:p-4">
+                        <div className="bg-white w-full max-w-sm rounded-t-[3rem] sm:rounded-[3rem] p-8 pb-12 sm:pb-8 shadow-2xl animate-in slide-in-from-bottom duration-500 overflow-hidden">
+                            <div className="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mb-8 sm:hidden" />
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase">Saat Seçin</h3>
+                                </div>
+                                <button onClick={() => setShowTimePicker(false)} className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
                             </div>
-                            <button onClick={() => setShowTimePicker(false)} className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+
+                            <div className="relative h-64 flex gap-4 items-center justify-center mb-8 px-4">
+                                {/* Selection Overlay */}
+                                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-16 bg-slate-50 rounded-2xl pointer-events-none border border-slate-100"></div>
+
+                                {/* Hours Column */}
+                                <div className="flex-1 h-full overflow-y-auto no-scrollbar snap-y snap-mandatory py-24 text-center">
+                                    {Array.from({ length: 15 }, (_, i) => i + 8).map(h => {
+                                        const val = String(h).padStart(2, '0');
+                                        const isSel = newAppointment.start_time.split(':')[0] === val;
+                                        return (
+                                            <div
+                                                key={val}
+                                                onClick={() => {
+                                                    const parts = newAppointment.start_time.split(':');
+                                                    const newT = `${val}:${parts[1] || '00'}`;
+                                                    updateNewAppointmentTime(newT);
+                                                }}
+                                                className={`h-16 flex items-center justify-center text-2xl font-black cursor-pointer snap-center transition-all ${isSel ? 'text-pink-600 scale-125' : 'text-slate-300'}`}
+                                            >
+                                                {val}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="text-3xl font-black text-slate-200">:</div>
+
+                                {/* Minutes Column */}
+                                <div className="flex-1 h-full overflow-y-auto no-scrollbar snap-y snap-mandatory py-24 text-center">
+                                    {Array.from({ length: 12 }, (_, i) => i * 5).map(m => {
+                                        const val = String(m).padStart(2, '0');
+                                        const isSel = newAppointment.start_time.split(':')[1] === val;
+                                        return (
+                                            <div
+                                                key={val}
+                                                onClick={() => {
+                                                    const parts = newAppointment.start_time.split(':');
+                                                    const newT = `${parts[0] || '08'}:${val}`;
+                                                    updateNewAppointmentTime(newT);
+                                                }}
+                                                className={`h-16 flex items-center justify-center text-2xl font-black cursor-pointer snap-center transition-all ${isSel ? 'text-pink-600 scale-125' : 'text-slate-300'}`}
+                                            >
+                                                {val}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => setShowTimePicker(false)}
+                                className="w-full bg-slate-900 text-white py-5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl active:scale-[0.98] transition-all"
+                            >
+                                Tamam
                             </button>
                         </div>
-
-                        <div className="relative h-64 flex gap-4 items-center justify-center mb-8 px-4">
-                            {/* Selection Overlay */}
-                            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-16 bg-slate-50 rounded-2xl pointer-events-none border border-slate-100"></div>
-
-                            {/* Hours Column */}
-                            <div className="flex-1 h-full overflow-y-auto no-scrollbar snap-y snap-mandatory py-24 text-center">
-                                {Array.from({ length: 15 }, (_, i) => i + 8).map(h => {
-                                    const val = String(h).padStart(2, '0');
-                                    const isSel = newAppointment.start_time.split(':')[0] === val;
-                                    return (
-                                        <div
-                                            key={val}
-                                            onClick={() => {
-                                                const parts = newAppointment.start_time.split(':');
-                                                const newT = `${val}:${parts[1] || '00'}`;
-                                                updateNewAppointmentTime(newT);
-                                            }}
-                                            className={`h-16 flex items-center justify-center text-2xl font-black cursor-pointer snap-center transition-all ${isSel ? 'text-pink-600 scale-125' : 'text-slate-300'}`}
-                                        >
-                                            {val}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            <div className="text-3xl font-black text-slate-200">:</div>
-
-                            {/* Minutes Column */}
-                            <div className="flex-1 h-full overflow-y-auto no-scrollbar snap-y snap-mandatory py-24 text-center">
-                                {Array.from({ length: 12 }, (_, i) => i * 5).map(m => {
-                                    const val = String(m).padStart(2, '0');
-                                    const isSel = newAppointment.start_time.split(':')[1] === val;
-                                    return (
-                                        <div
-                                            key={val}
-                                            onClick={() => {
-                                                const parts = newAppointment.start_time.split(':');
-                                                const newT = `${parts[0] || '08'}:${val}`;
-                                                updateNewAppointmentTime(newT);
-                                            }}
-                                            className={`h-16 flex items-center justify-center text-2xl font-black cursor-pointer snap-center transition-all ${isSel ? 'text-pink-600 scale-125' : 'text-slate-300'}`}
-                                        >
-                                            {val}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={() => setShowTimePicker(false)}
-                            className="w-full bg-slate-900 text-white py-5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl active:scale-[0.98] transition-all"
-                        >
-                            Tamam
-                        </button>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }
 
