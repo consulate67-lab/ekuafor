@@ -112,6 +112,28 @@ export default function AppointmentManagement() {
         }
     };
 
+    const generateHours = () => {
+        if (!company) return Array.from({ length: 14 }, (_, i) => `${String(i + 8).padStart(2, '0')}:00`);
+
+        const [startH, startM] = (company.work_start_time || '08:00').split(':').map(Number);
+        const [endH, endM] = (company.work_end_time || '21:00').split(':').map(Number);
+        const interval = company.slot_interval || 30;
+
+        const res = [];
+        let currentMin = startH * 60 + startM;
+        const endMin = endH * 60 + endM;
+
+        while (currentMin < endMin) {
+            const h = Math.floor(currentMin / 60);
+            const m = currentMin % 60;
+            res.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+            currentMin += interval;
+        }
+        return res;
+    };
+
+    const hours = generateHours();
+
 
 
     useEffect(() => {
@@ -1320,54 +1342,44 @@ export default function AppointmentManagement() {
                                 </button>
                             </div>
 
-                            <div className="relative h-64 flex gap-4 items-center justify-center mb-8 px-4">
-                                {/* Selection Overlay */}
-                                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-16 bg-slate-50 rounded-2xl pointer-events-none border border-slate-100"></div>
+                            <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-[400px] overflow-y-auto p-4 bg-slate-50 rounded-[2.5rem] mb-6 shadow-inner">
+                                {hours.map(h => {
+                                    const isSel = newAppointment.start_time === h;
+                                    const [sh, sm] = h.split(':').map(Number);
+                                    const totalMin = sh * 60 + sm;
+                                    const now = new Date();
+                                    const currentTotal = now.getHours() * 60 + now.getMinutes();
+                                    const isPast = newAppointment.appointment_date === getLocalDateString() && totalMin < currentTotal;
 
-                                {/* Hours Column */}
-                                <div className="flex-1 h-full overflow-y-auto no-scrollbar snap-y snap-mandatory py-24 text-center">
-                                    {Array.from({ length: 15 }, (_, i) => i + 8).map(h => {
-                                        const val = String(h).padStart(2, '0');
-                                        const isSel = newAppointment.start_time.split(':')[0] === val;
-                                        return (
-                                            <div
-                                                key={val}
-                                                onClick={() => {
-                                                    const parts = newAppointment.start_time.split(':');
-                                                    const newT = `${val}:${parts[1] || '00'}`;
-                                                    updateNewAppointmentTime(newT);
-                                                }}
-                                                className={`h-16 flex items-center justify-center text-2xl font-black cursor-pointer snap-center transition-all ${isSel ? 'text-pink-600 scale-125' : 'text-slate-300'}`}
-                                            >
-                                                {val}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-
-                                <div className="text-3xl font-black text-slate-200">:</div>
-
-                                {/* Minutes Column */}
-                                <div className="flex-1 h-full overflow-y-auto no-scrollbar snap-y snap-mandatory py-24 text-center">
-                                    {Array.from({ length: 12 }, (_, i) => i * 5).map(m => {
-                                        const val = String(m).padStart(2, '0');
-                                        const isSel = newAppointment.start_time.split(':')[1] === val;
-                                        return (
-                                            <div
-                                                key={val}
-                                                onClick={() => {
-                                                    const parts = newAppointment.start_time.split(':');
-                                                    const newT = `${parts[0] || '08'}:${val}`;
-                                                    updateNewAppointmentTime(newT);
-                                                }}
-                                                className={`h-16 flex items-center justify-center text-2xl font-black cursor-pointer snap-center transition-all ${isSel ? 'text-pink-600 scale-125' : 'text-slate-300'}`}
-                                            >
-                                                {val}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                    return (
+                                        <button
+                                            key={h}
+                                            type="button"
+                                            disabled={isPast}
+                                            onClick={() => updateNewAppointmentTime(h)}
+                                            className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-1 ${isSel
+                                                ? 'bg-pink-600 border-pink-600 text-white shadow-lg scale-105'
+                                                : isPast
+                                                    ? 'bg-slate-100 border-transparent text-slate-300 cursor-not-allowed opacity-50'
+                                                    : 'bg-white border-transparent text-slate-600 hover:border-pink-200 hover:bg-pink-50/50'
+                                                }`}
+                                        >
+                                            <span className={`text-[11px] font-black tracking-tight ${isSel ? 'text-white' : 'text-slate-900'}`}>{h}</span>
+                                            {isSel && <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse shadow-sm"></div>}
+                                        </button>
+                                    );
+                                })}
                             </div>
+
+                            {newAppointment.start_time && (
+                                <div className="flex items-center gap-2 px-6 py-4 bg-pink-50 border border-pink-100 rounded-2xl mb-6 animate-in slide-in-from-bottom-2">
+                                    <span className="text-2xl">⏰</span>
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] font-black text-pink-600 uppercase tracking-widest">Seçilen Saat</span>
+                                        <span className="text-xl font-black text-pink-900 leading-none">{newAppointment.start_time}</span>
+                                    </div>
+                                </div>
+                            )}
 
                             <button
                                 onClick={() => setShowTimePicker(false)}
