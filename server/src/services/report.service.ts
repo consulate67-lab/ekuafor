@@ -43,12 +43,18 @@ class ReportService {
                     a.price, 
                     s.price, 
                     0
-                )) as total_revenue
+                )) as total_revenue,
+                SUM(CASE WHEN a.status = 'completed' THEN COALESCE(
+                    (SELECT SUM(price) FROM appointment_services WHERE appointment_id = a.id AND ($2::INTEGER IS NULL OR staff_id = $2)),
+                    a.price, 
+                    s.price, 
+                    0
+                ) ELSE 0 END) as completed_revenue
             FROM appointments a
             LEFT JOIN services s ON a.service_id = s.id
             WHERE a.company_id = $1 
             ${staffFilter}
-            AND a.status != 'cancelled'
+            AND a.status NOT IN ('cancelled', 'pending')
             AND ${dateFilter}
         `;
 
@@ -66,6 +72,7 @@ class ReportService {
         return {
             total_appointments: parseInt(result.rows[0].total_appointments) || 0,
             total_revenue: parseFloat(result.rows[0].total_revenue) || 0,
+            completed_revenue: parseFloat(result.rows[0].completed_revenue) || 0,
             total_expenses: parseFloat(expResult.rows[0].total_expenses) || 0
         };
     }

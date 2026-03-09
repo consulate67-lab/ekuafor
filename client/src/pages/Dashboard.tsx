@@ -33,6 +33,7 @@ export default function Dashboard() {
     const [employeeStats, setEmployeeStats] = useState({
         total_appointments: 0,
         total_revenue: 0,
+        completed_revenue: 0,
         total_expenses: 0
     });
     const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'year'>('today');
@@ -830,29 +831,37 @@ export default function Dashboard() {
                                         ))}
                                     </div>
 
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pb-4">
-                                        <div className="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100 flex flex-col items-center text-center">
-                                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm mb-4">
-                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pb-4">
+                                        <div className="bg-indigo-50/20 p-4 rounded-[2rem] border border-indigo-100/50 flex flex-col items-center text-center">
+                                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-indigo-600 shadow-sm mb-3">
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                                             </div>
-                                            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Randevu</p>
-                                            <p className={`text-4xl font-black text-indigo-900 ${statsLoading ? 'animate-pulse' : ''}`}>{employeeStats.total_appointments}</p>
+                                            <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-1">Randevu</p>
+                                            <p className={`text-2xl font-black text-indigo-900 ${statsLoading ? 'animate-pulse' : ''}`}>{employeeStats.total_appointments}</p>
                                         </div>
 
-                                        <div className="bg-amber-50/50 p-6 rounded-[2rem] border border-amber-100 flex flex-col items-center text-center">
-                                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-amber-600 shadow-sm mb-4">
-                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3z" /><path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zM7.001 11a1 1 0 011-1h8a1 1 0 110 2h-8a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
+                                        <div className="bg-amber-50/20 p-4 rounded-[2rem] border border-amber-100/50 flex flex-col items-center text-center">
+                                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-amber-600 shadow-sm mb-3">
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                                             </div>
-                                            <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1">Toplam Gelir</p>
-                                            <p className={`text-4xl font-black text-amber-900 ${statsLoading ? 'animate-pulse' : ''}`}>₺{employeeStats.total_revenue.toLocaleString()}</p>
+                                            <p className="text-[8px] font-black text-amber-400 uppercase tracking-widest mb-1">Randevu Toplamı</p>
+                                            <p className={`text-2xl font-black text-amber-900 ${statsLoading ? 'animate-pulse' : ''}`}>₺{employeeStats.total_revenue.toLocaleString()}</p>
                                         </div>
 
-                                        <div className="bg-rose-50/50 p-6 rounded-[2rem] border border-rose-100 flex flex-col items-center text-center">
-                                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-rose-600 shadow-sm mb-4">
-                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>
+                                        <div className="bg-emerald-50/20 p-4 rounded-[2rem] border border-emerald-100/50 flex flex-col items-center text-center">
+                                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm mb-3">
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
                                             </div>
-                                            <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">Gider/Masraf</p>
-                                            <p className={`text-4xl font-black text-rose-900 ${statsLoading ? 'animate-pulse' : ''}`}>₺{employeeStats.total_expenses.toLocaleString()}</p>
+                                            <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">Tamamlanan Kazanç</p>
+                                            <p className={`text-2xl font-black text-emerald-900 ${statsLoading ? 'animate-pulse' : ''}`}>₺{employeeStats.completed_revenue.toLocaleString()}</p>
+                                        </div>
+
+                                        <div className="bg-rose-50/20 p-4 rounded-[2rem] border border-rose-100/50 flex flex-col items-center text-center">
+                                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-rose-600 shadow-sm mb-3">
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>
+                                            </div>
+                                            <p className="text-[8px] font-black text-rose-400 uppercase tracking-widest mb-1">Gider/Masraf</p>
+                                            <p className={`text-2xl font-black text-rose-900 ${statsLoading ? 'animate-pulse' : ''}`}>₺{employeeStats.total_expenses.toLocaleString()}</p>
                                         </div>
                                     </div>
                                 </div>
