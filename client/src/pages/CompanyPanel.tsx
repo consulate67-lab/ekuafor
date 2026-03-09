@@ -36,6 +36,7 @@ interface CurrentAccount {
     district?: string;
     country?: string;
     is_active?: boolean;
+    balance?: number;
 }
 
 type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'finance' | 'ai' | 'reports' | 'profile' | 'integration';
@@ -176,7 +177,8 @@ export default function CompanyPanel() {
         type: 'e-arsiv',
         customer_name: '',
         customer_phone: '',
-        customer_id: null as number | null
+        customer_id: null as number | null,
+        current_account_id: null as number | null
     });
     const [showPurchaseDetailModal, setShowPurchaseDetailModal] = useState(false);
     const [selectedPurchaseInvoice, setSelectedPurchaseInvoice] = useState<any>(null);
@@ -223,9 +225,8 @@ export default function CompanyPanel() {
                 fetchData(comp.id);
             }
 
-            // Load AI rules from localStorage for specific company
-            const savedRules = localStorage.getItem(`ai_rules_${comp.id}`);
-            setAiRules(savedRules || 'Varsayılan randevu kuralları aktiftir.');
+            // Load AI rules - Backend'den geleni önceliklendir
+            setAiRules(comp.ai_rules || localStorage.getItem(`ai_rules_${comp.id}`) || 'Varsayılan randevu kuralları aktiftir.');
         } catch (err: any) {
             setError(err.response?.data?.error || 'Geçersiz anahtar');
         } finally {
@@ -428,7 +429,8 @@ export default function CompanyPanel() {
                     type: 'e-arsiv',
                     customer_name: '',
                     customer_phone: '',
-                    customer_id: null
+                    customer_id: null,
+                    current_account_id: null
                 });
                 fetchFinanceData();
             }
@@ -978,21 +980,26 @@ export default function CompanyPanel() {
         ]
     };
 
-    const handleSaveAIRules = () => {
+    const handleSaveAIRules = async () => {
         if (!company) return;
         setIsSavingAI(true);
         try {
+            // LocalStorage'ı da güncelle
             localStorage.setItem(`ai_rules_${company.id}`, aiRules);
-            setTimeout(() => {
+
+            // API üzerinden güncelle
+            const response = await api.put(`/companies/${company.id}`, { ai_rules: aiRules });
+
+            if (response.data.success) {
+                setCompany(response.data.data);
                 alert('Yapay zeka kuralları başarıyla kaydedildi.');
-                setIsSavingAI(false);
-            }, 500);
-        } catch (e) {
-            alert('Kurallar kaydedilemedi');
+            }
+        } catch (e: any) {
+            alert(e.response?.data?.error || 'Kurallar kaydedilemedi');
+        } finally {
             setIsSavingAI(false);
         }
     };
-
     const handleLogout = () => {
         localStorage.removeItem('company_admin_key');
         localStorage.removeItem('token');
@@ -1063,19 +1070,38 @@ export default function CompanyPanel() {
         if (!company) return;
         setLoading(true);
         try {
-            const data = { ...company };
-            // Remove legacy fields
-            delete (data as any).province_id;
-            delete (data as any).province_name;
-            delete (data as any).district_id;
-            delete (data as any).district_name;
-            delete (data as any).neighborhood_id;
-            delete (data as any).neighborhood_name;
+            // Detach AI rules from state to ensure latest are sent
+            const data: any = {
+                ...company,
+                ai_rules: aiRules
+            };
 
-            await api.put(`/companies/${company.id}`, data);
-            alert('Firma bilgileri başarıyla güncellendi.');
+            // Remove internal/read-only or UI-only fields that might block or fail validation
+            const fieldsToOmit = [
+                'province_id', 'province_name', 'district_id', 'district_name',
+                'neighborhood_id', 'neighborhood_name', 'created_at', 'updated_at',
+                'is_license_expired', 'token', 'id'
+            ];
+
+            fieldsToOmit.forEach(f => {
+                if (f in data) delete data[f];
+            });
+
+            console.log('Updating company with data:', data);
+
+            const response = await api.put(`/companies/${company.id}`, data);
+            if (response.data.success && response.data.data) {
+                setCompany(response.data.data);
+                // Also update localStorage for AI rules as a fallback/cache
+                localStorage.setItem(`ai_rules_${company.id}`, aiRules);
+                alert('Firma bilgileri başarıyla güncellendi.');
+            } else {
+                alert(response.data.error || 'Güncelleme başarısız oldu.');
+            }
         } catch (err: any) {
-            alert(err.response?.data?.error || 'Güncelleme sırasında hata oluştu');
+            console.error('Company update error:', err);
+            const errorMsg = err.response?.data?.error || err.response?.data?.details?.[0]?.message || 'Güncelleme sırasında hata oluştu';
+            alert(errorMsg);
         } finally {
             setLoading(false);
         }
@@ -1402,14 +1428,25 @@ export default function CompanyPanel() {
                                             />
                                         </div>
                                     </div>
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Açık Adres</label>
-                                        <textarea
-                                            rows={2}
-                                            className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
-                                            value={company.address_line || ''}
-                                            onChange={e => setCompany({ ...company, address_line: e.target.value })}
-                                        />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Açık Adres</label>
+                                            <textarea
+                                                rows={2}
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.address_line || ''}
+                                                onChange={e => setCompany({ ...company, address_line: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Adres Devamı (Üst Kat, No vb.)</label>
+                                            <textarea
+                                                rows={2}
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.address_line2 || ''}
+                                                onChange={e => setCompany({ ...company, address_line2: e.target.value })}
+                                            />
+                                        </div>
                                     </div>
                                     <div className="grid grid-cols-3 gap-4">
                                         <div>
@@ -2903,6 +2940,20 @@ export default function CompanyPanel() {
                                                             </div>
                                                         </div>
 
+                                                        {/* Balance Section */}
+                                                        <div className="bg-slate-50 px-8 py-4 rounded-3xl border border-slate-100 flex-shrink-0 min-w-[200px]">
+                                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">GÜNCEL BAKİYE</p>
+                                                            <div className="flex items-baseline gap-1">
+                                                                <span className={`text-2xl font-black ${Number(c.balance || 0) > 0 ? 'text-emerald-600' : Number(c.balance || 0) < 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                                                                    {Math.abs(Number(c.balance || 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                                                </span>
+                                                                <span className="text-xs font-black text-slate-400">₺</span>
+                                                            </div>
+                                                            <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${Number(c.balance || 0) > 0 ? 'text-emerald-500' : Number(c.balance || 0) < 0 ? 'text-rose-500' : 'text-slate-300'}`}>
+                                                                {Number(c.balance || 0) > 0 ? 'Borçlu (Alacağımız)' : Number(c.balance || 0) < 0 ? 'Alacaklı (Borcumuz)' : 'Bakiye Yok'}
+                                                            </p>
+                                                        </div>
+
                                                         {/* Content Grid */}
                                                         <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
                                                             {/* Contact */}
@@ -3004,8 +3055,12 @@ export default function CompanyPanel() {
                                             <p className="text-3xl font-black text-slate-900">{reportData.staffStats.reduce((sum: number, s: any) => sum + s.count, 0)}</p>
                                         </div>
                                         <div className="bg-white p-6 rounded-[2rem] shadow-xl shadow-slate-200/40 border border-slate-50">
-                                            <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">Toplam Ciro</p>
-                                            <p className="text-3xl font-black text-slate-900">{reportData.staffStats.reduce((sum: number, s: any) => sum + s.revenue, 0).toLocaleString('tr-TR')} ₺</p>
+                                            <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-1">Potansiyel Kazanç</p>
+                                            <p className="text-3xl font-black text-slate-900">{reportData.staffStats.reduce((sum: number, s: any) => sum + s.total_booked_value, 0).toLocaleString('tr-TR')} ₺</p>
+                                        </div>
+                                        <div className="bg-white p-6 rounded-[2rem] shadow-xl shadow-slate-200/40 border border-slate-50">
+                                            <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">Tahsil Edilen (Ciro)</p>
+                                            <p className="text-3xl font-black text-slate-900">{reportData.staffStats.reduce((sum: number, s: any) => sum + s.actual_collected, 0).toLocaleString('tr-TR')} ₺</p>
                                         </div>
                                     </div>
 
@@ -3028,7 +3083,10 @@ export default function CompanyPanel() {
                                                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.count} Randevu</p>
                                                             </div>
                                                         </div>
-                                                        <p className="font-black text-indigo-600">{s.revenue.toLocaleString('tr-TR')} ₺</p>
+                                                        <div className="text-right">
+                                                            <p className="font-black text-indigo-600">{s.actual_collected.toLocaleString('tr-TR')} ₺</p>
+                                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Pot: {s.total_booked_value.toLocaleString('tr-TR')} ₺</p>
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>
@@ -3051,12 +3109,13 @@ export default function CompanyPanel() {
                                                                 <div className="flex items-center gap-2">
                                                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{d.count} Randevu</span>
                                                                     <div className="w-1 h-1 bg-slate-200 rounded-full"></div>
-                                                                    <span className="text-[10px] font-black text-emerald-500">{((d.revenue / (reportData.staffStats.reduce((sum: number, s: any) => sum + s.revenue, 0) || 1)) * 100).toFixed(0)}% Pay</span>
+                                                                    <span className="text-[10px] font-black text-emerald-500">{((d.actual_collected / (reportData.staffStats.reduce((sum: number, s: any) => sum + s.actual_collected, 0) || 1)) * 100).toFixed(0)}% Pay</span>
                                                                 </div>
                                                             </div>
                                                         </div>
                                                         <div className="text-right">
-                                                            <p className="font-black text-slate-900">{d.revenue.toLocaleString('tr-TR')} ₺</p>
+                                                            <p className="font-black text-slate-900">{d.actual_collected.toLocaleString('tr-TR')} ₺</p>
+                                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Pot: {d.total_booked_value.toLocaleString('tr-TR')} ₺</p>
                                                         </div>
                                                     </div>
                                                 )) : (
@@ -3076,14 +3135,14 @@ export default function CompanyPanel() {
                                                 {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
                                                     const dayNames: any = { 'Monday': 'Pazartesi', 'Tuesday': 'Salı', 'Wednesday': 'Çarşamba', 'Thursday': 'Perşembe', 'Friday': 'Cuma', 'Saturday': 'Cumartesi', 'Sunday': 'Pazar' };
                                                     const stat = reportData.weeklyStats.find((s: any) => s.day === day);
-                                                    const maxRevenue = Math.max(...reportData.weeklyStats.map((s: any) => s.revenue), 1);
-                                                    const widthScale = stat ? (stat.revenue / maxRevenue) * 100 : 2;
+                                                    const maxRevenue = Math.max(...reportData.weeklyStats.map((s: any) => s.actual_collected || 0), 1);
+                                                    const widthScale = stat ? (stat.actual_collected / maxRevenue) * 100 : 2;
                                                     return (
                                                         <div key={day} className="space-y-1.5">
                                                             <div className="flex justify-between items-center px-1">
                                                                 <span className="text-[10px] font-black text-slate-500 uppercase">{dayNames[day]}</span>
                                                                 <span className="text-[10px] font-black text-slate-900">
-                                                                    {stat ? stat.revenue.toLocaleString('tr-TR') : 0} ₺
+                                                                    {stat ? stat.actual_collected.toLocaleString('tr-TR') : 0} ₺
                                                                 </span>
                                                             </div>
                                                             <div className="w-full h-2.5 bg-slate-50 rounded-full overflow-hidden border border-slate-100/50">
@@ -3142,13 +3201,13 @@ export default function CompanyPanel() {
                                                 <h3 className="text-lg font-black mb-6">🗓️ Ay Bazında Ciro Dağılımı</h3>
                                                 <div className="space-y-4">
                                                     {reportData.monthlyStats.map((m: any) => {
-                                                        const maxMonthlyRevenue = Math.max(...reportData.monthlyStats.map((ms: any) => ms.revenue), 1);
-                                                        const monthWidth = (m.revenue / maxMonthlyRevenue) * 100;
+                                                        const maxMonthlyRevenue = Math.max(...reportData.monthlyStats.map((ms: any) => ms.actual_collected || 0), 1);
+                                                        const monthWidth = (m.actual_collected / maxMonthlyRevenue) * 100;
                                                         return (
                                                             <div key={m.month} className="bg-white/10 p-5 rounded-[2rem] backdrop-blur-sm border border-white/10">
                                                                 <div className="flex justify-between items-center mb-2">
                                                                     <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">{m.month}</p>
-                                                                    <p className="text-lg font-black">{m.revenue.toLocaleString('tr-TR')} ₺</p>
+                                                                    <p className="text-lg font-black">{m.actual_collected.toLocaleString('tr-TR')} ₺</p>
                                                                 </div>
                                                                 <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
                                                                     <div className="h-full bg-white rounded-full transition-all duration-1000" style={{ width: `${monthWidth}%` }}></div>
@@ -3779,6 +3838,30 @@ export default function CompanyPanel() {
                         <p className="text-sm text-slate-400 mb-8 font-bold uppercase tracking-widest">{selectedAppointment.customer_name} • {selectedAppointment.price} ₺</p>
 
                         <div className="space-y-6">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Cari Kart Seçin (İsteğe Bağlı)</label>
+                                <select
+                                    value={invoiceForm.current_account_id || ''}
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        const selectedCari = currentAccounts.find(c => c.id === parseInt(val));
+                                        setInvoiceForm(prev => ({
+                                            ...prev,
+                                            current_account_id: val ? parseInt(val) : null,
+                                            customer_name: selectedCari ? selectedCari.name : prev.customer_name,
+                                            vkn: selectedCari ? (selectedCari.tax_number || '') : prev.vkn,
+                                            tax_office: selectedCari ? (selectedCari.tax_office || '') : prev.tax_office
+                                        }));
+                                    }}
+                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all appearance-none"
+                                >
+                                    <option value="">Cari Seçilmedi (Manuel Giriş)</option>
+                                    {currentAccounts.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+                                    ))}
+                                </select>
+                            </div>
+
                             {/* VKN / TCKN Check */}
                             <div className="bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Müşteri VKN / TCKN</label>
@@ -3946,7 +4029,8 @@ export default function CompanyPanel() {
                                         type: 'e-arsiv',
                                         customer_name: '',
                                         customer_phone: '',
-                                        customer_id: null
+                                        customer_id: null,
+                                        current_account_id: null
                                     });
                                 }}
                                 className="w-full py-5 bg-slate-100 text-slate-400 rounded-2xl font-black text-base uppercase tracking-widest"
@@ -4351,6 +4435,15 @@ export default function CompanyPanel() {
                                 </div>
                             </div>
                             <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Cari Kart Seçin (İsteğe Bağlı)</label>
+                                <select id="c_cari" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                                    <option value="">Cari Seçilmedi</option>
+                                    {currentAccounts.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Açıklama</label>
                                 <textarea id="c_desc" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" rows={2} placeholder="İşlem detayı..." />
                             </div>
@@ -4361,6 +4454,7 @@ export default function CompanyPanel() {
                                     const credit = Number((document.getElementById('c_credit') as HTMLInputElement).value || 0);
                                     const date = (document.getElementById('c_date') as HTMLInputElement).value;
                                     const desc = (document.getElementById('c_desc') as HTMLTextAreaElement).value;
+                                    const cariId = (document.getElementById('c_cari') as HTMLSelectElement).value;
 
                                     if (debit === 0 && credit === 0) {
                                         alert('Lütfen bir tutar girin');
@@ -4378,7 +4472,8 @@ export default function CompanyPanel() {
                                         credit,
                                         description: desc,
                                         transaction_date: date,
-                                        payment_method: 'nakit'
+                                        payment_method: 'nakit',
+                                        current_account_id: cariId ? parseInt(cariId) : null
                                     });
                                 }}
                                 className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-base uppercase tracking-widest shadow-xl shadow-slate-200 mt-4"

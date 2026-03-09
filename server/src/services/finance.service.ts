@@ -24,6 +24,7 @@ export interface Invoice {
     gib_uuid?: string;
     gib_status?: string;
     created_at?: string;
+    current_account_id?: number | null;
 }
 
 export interface CashTransaction {
@@ -38,6 +39,7 @@ export interface CashTransaction {
     description?: string;
     transaction_date?: string;
     due_date?: string;
+    current_account_id?: number | null;
 }
 
 export interface CurrentAccount {
@@ -57,6 +59,7 @@ export interface CurrentAccount {
     district?: string;
     country?: string;
     is_active?: boolean;
+    balance?: number;
 }
 
 class FinanceService {
@@ -105,7 +108,8 @@ class FinanceService {
                 ['gib_sent_at', 'TIMESTAMP'],
                 ['appointment_id', 'INTEGER'],
                 ['invoice_no', 'VARCHAR(20)'],
-                ['xml_content', 'TEXT']
+                ['xml_content', 'TEXT'],
+                ['current_account_id', 'INTEGER REFERENCES current_accounts(id) ON DELETE SET NULL']
             ];
             for (const [col, type] of invoiceCols) {
                 await client.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS ${col} ${type}`);
@@ -139,7 +143,10 @@ class FinanceService {
             const cashCols = [
                 ['debit', 'NUMERIC(15,2) DEFAULT 0'],
                 ['credit', 'NUMERIC(15,2) DEFAULT 0'],
-                ['transaction_date', 'DATE DEFAULT CURRENT_DATE']
+                ['transaction_date', 'DATE DEFAULT CURRENT_DATE'],
+                ['source_id', 'INTEGER'],
+                ['source_type', 'VARCHAR(50)'],
+                ['current_account_id', 'INTEGER REFERENCES current_accounts(id) ON DELETE SET NULL']
             ];
             for (const [col, type] of cashCols) {
                 await client.query(`ALTER TABLE cash_transactions ADD COLUMN IF NOT EXISTS ${col} ${type}`);
@@ -205,8 +212,8 @@ class FinanceService {
                     company_id, appointment_id, customer_id, customer_name, customer_tax_number,
                     customer_tax_office, type, payment_method, amount, 
                     vat_rate, vat_amount, discount_rate, discount_amount, grand_total,
-                    status, gib_status
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                    status, gib_status, current_account_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
                 RETURNING *
             `;
             const values = [
@@ -214,7 +221,7 @@ class FinanceService {
                 invoice.customer_tax_number, invoice.customer_tax_office,
                 invoice.type, invoice.payment_method, amount,
                 vatRate, vat_amount, discRate, discount_amount, grand_total,
-                'completed', 'not_sent'
+                'completed', 'not_sent', invoice.current_account_id || null
             ];
             const result = await client.query(query, values);
             const newInvoice = result.rows[0];
@@ -229,13 +236,16 @@ class FinanceService {
                 credit: 0,
                 description: `${invoice.customer_name} - Satış Faturası (${invoice.type})`,
                 transaction_date: invoice.created_at ? new Date(invoice.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-                due_date: invoice.payment_method === 'kart' ? this.calculateDueDate() : undefined
+                due_date: invoice.payment_method === 'kart' ? this.calculateDueDate() : undefined,
+                source_id: newInvoice.id,
+                source_type: 'sales_invoice',
+                current_account_id: invoice.current_account_id || null
             });
 
             if (invoice.appointment_id) {
                 await client.query(
-                    "UPDATE appointments SET status = 'invoiced' WHERE id = $1",
-                    [invoice.appointment_id]
+                    "UPDATE appointments SET status = 'invoiced', collected_price = COALESCE(collected_price, $2) WHERE id = $1",
+                    [invoice.appointment_id, grand_total]
                 );
             }
 
@@ -249,11 +259,11 @@ class FinanceService {
         }
     }
 
-    async createCashTransactionInternal(client: any, transaction: CashTransaction) {
+    async createCashTransactionInternal(client: any, transaction: any) {
         const query = `
             INSERT INTO cash_transactions (
-                company_id, type, category, payment_method, amount, debit, credit, description, transaction_date, due_date
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                company_id, type, category, payment_method, amount, debit, credit, description, transaction_date, due_date, source_id, source_type, current_account_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING *
         `;
         const values = [
@@ -262,7 +272,10 @@ class FinanceService {
             transaction.debit || 0, transaction.credit || 0,
             transaction.description,
             transaction.transaction_date || new Date().toISOString().split('T')[0],
-            transaction.due_date
+            transaction.due_date,
+            transaction.source_id,
+            transaction.source_type,
+            transaction.current_account_id || null
         ];
         return await client.query(query, values);
     }
@@ -342,13 +355,26 @@ class FinanceService {
             const amount = subtotal - discount_total + vat_total;
 
             const query = `
-                INSERT INTO purchase_invoices (company_id, supplier_name, invoice_no, amount, subtotal, vat_total, discount_total, invoice_date, description, is_closed)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                INSERT INTO purchase_invoices (company_id, supplier_name, current_account_id, invoice_no, amount, subtotal, vat_total, discount_total, invoice_date, description, is_closed)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                 RETURNING *
             `;
-            const values = [data.company_id, data.supplier_name, data.invoice_no, amount, subtotal, vat_total, discount_total, data.invoice_date || new Date().toISOString().split('T')[0], data.description, data.is_closed !== false];
+            const values = [
+                data.company_id,
+                data.supplier_name,
+                data.current_account_id || null,
+                data.invoice_no,
+                amount,
+                subtotal,
+                vat_total,
+                discount_total,
+                data.invoice_date || new Date().toISOString().split('T')[0],
+                data.description,
+                data.is_closed !== false
+            ];
             const result = await client.query(query, values);
-            const invoiceId = result.rows[0].id;
+            const newInvoice = result.rows[0];
+            const invoiceId = newInvoice.id;
 
             if (data.items && Array.isArray(data.items)) {
                 for (const item of data.items) {
@@ -374,7 +400,10 @@ class FinanceService {
                     debit: 0,
                     credit: amount,
                     description: `${data.supplier_name} - Alış Faturası (${data.invoice_no})`,
-                    transaction_date: data.invoice_date || new Date().toISOString().split('T')[0]
+                    transaction_date: data.invoice_date || new Date().toISOString().split('T')[0],
+                    source_id: invoiceId,
+                    source_type: 'purchase_invoice',
+                    current_account_id: data.current_account_id || null
                 });
             }
 
@@ -771,11 +800,10 @@ class FinanceService {
                 await client.query("UPDATE appointments SET status = 'completed' WHERE id = $1", [inv.appointment_id]);
             }
 
-            // Remove associated cash transactions (best effort by description matching or we should have linked them better)
-            // For now, look for transactions with this invoice details
+            // Remove associated cash transactions
             await client.query(
-                "DELETE FROM cash_transactions WHERE company_id = $1 AND description LIKE $2",
-                [companyId, `%Satış Faturası%`] // This is risky but based on current implementation
+                "DELETE FROM cash_transactions WHERE company_id = $1 AND source_id = $2 AND source_type = 'sales_invoice'",
+                [companyId, invoiceId]
             );
 
             await client.query('DELETE FROM invoices WHERE id = $1', [invoiceId]);
@@ -802,8 +830,8 @@ class FinanceService {
             // Remove matching cash transaction if it was closed
             if (p.is_closed) {
                 await client.query(
-                    "DELETE FROM cash_transactions WHERE company_id = $1 AND category = 'purchase' AND description LIKE $2",
-                    [companyId, `%${p.supplier_name}%Alış Faturası%`]
+                    "DELETE FROM cash_transactions WHERE company_id = $1 AND source_id = $2 AND source_type = 'purchase_invoice'",
+                    [companyId, id]
                 );
             }
 
@@ -868,7 +896,17 @@ class FinanceService {
     }
 
     async getCurrentAccounts(companyId: number, search?: string) {
-        let query = 'SELECT * FROM current_accounts WHERE company_id = $1 AND is_active = true';
+        let query = `
+            SELECT ca.*,
+                (
+                    COALESCE((SELECT SUM(grand_total) FROM invoices WHERE current_account_id = ca.id), 0) -
+                    COALESCE((SELECT SUM(amount) FROM purchase_invoices WHERE current_account_id = ca.id), 0) +
+                    COALESCE((SELECT SUM(credit) FROM cash_transactions WHERE current_account_id = ca.id), 0) -
+                    COALESCE((SELECT SUM(debit) FROM cash_transactions WHERE current_account_id = ca.id), 0)
+                ) as balance
+            FROM current_accounts ca
+            WHERE ca.company_id = $1 AND ca.is_active = true
+        `;
         const values: any[] = [companyId];
 
         if (search) {

@@ -38,13 +38,11 @@ const companySchema = z.object({
     iban: z.preprocess(v => (v === "" || v === null) ? null : v, z.string().nullable().optional().transform(v => {
         if (!v) return v;
         return v.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-    }).refine(
-        v => {
-            if (!v) return true;
-            return /^TR[A-Z0-9]{13,32}$/.test(v);
-        },
-        'Geçerli bir IBAN giriniz'
-    )),
+    })),
+    bank_iban: z.preprocess(v => (v === "" || v === null) ? null : v, z.string().nullable().optional().transform(v => {
+        if (!v) return v;
+        return v.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+    })),
     account_holder_name: nullableString,
 
     commission_rate: nullableNumber.refine(v => v === null || v === undefined || (v >= 0 && v <= 100), 'Komisyon oranı 0-100 arasında olmalıdır'),
@@ -58,6 +56,8 @@ const companySchema = z.object({
     main_company_id: nullableNumber,
     staff_label: z.string().max(50).nullable().optional(),
     service_label: z.string().max(50).nullable().optional(),
+    booking_flow: z.string().nullable().optional(),
+    ai_rules: z.string().nullable().optional(),
     tax_number: nullableString,
     tax_office: nullableString,
     qnb_username: nullableString,
@@ -70,6 +70,10 @@ const companySchema = z.object({
     license_end_date: z.any().nullable().optional(),
     sms_enabled: z.preprocess(v => (v === "" || v === null) ? null : v, z.boolean().nullable().optional()),
     photo: nullableString,
+    building_number: nullableString,
+    door_number: nullableString,
+    nace_code: nullableString,
+    fax_number: nullableString,
 });
 
 /**

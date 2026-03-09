@@ -62,6 +62,12 @@ export interface Company {
     ubl_outgoing_alias?: string | null;
     license_end_date?: string | Date | null;
     sms_enabled?: boolean | null;
+    ai_rules?: string | null;
+    photo?: string | null;
+    building_number?: string | null;
+    door_number?: string | null;
+    nace_code?: string | null;
+    fax_number?: string | null;
 }
 
 class CompanyService {
@@ -75,6 +81,12 @@ class CompanyService {
             try {
                 await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS neighborhood TEXT');
                 await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS sms_enabled BOOLEAN DEFAULT true');
+                await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS ai_rules TEXT');
+                await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS photo TEXT');
+                await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS building_number TEXT');
+                await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS door_number TEXT');
+                await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS nace_code TEXT');
+                await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS fax_number TEXT');
                 // Ensure existing companies have this enabled by default if it was null
                 await client.query('UPDATE companies SET sms_enabled = true WHERE sms_enabled IS NULL');
             } catch (e) { /* ignore if fails */ }
@@ -105,8 +117,9 @@ class CompanyService {
           genders, company_type, main_company_id,
           tax_number, tax_office,
           qnb_username, qnb_password, qnb_vkn, efatura_test_mode, invoice_prefix,
-          ubl_incoming_alias, ubl_outgoing_alias, sms_enabled
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39)
+          ubl_incoming_alias, ubl_outgoing_alias, sms_enabled, ai_rules, photo,
+          building_number, door_number, nace_code, fax_number, booking_flow, bank_iban
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47)
         RETURNING *
       `;
 
@@ -149,7 +162,15 @@ class CompanyService {
                 company.invoice_prefix || 'GIB',
                 company.ubl_incoming_alias || 'default',
                 company.ubl_outgoing_alias || 'default',
-                company.sms_enabled !== false // Default to true if not specified
+                company.sms_enabled !== false,
+                company.ai_rules || null,
+                company.photo || null,
+                company.building_number || null,
+                company.door_number || null,
+                company.nace_code || null,
+                company.fax_number || null,
+                company.booking_flow || null,
+                company.bank_iban || null
             ];
 
 

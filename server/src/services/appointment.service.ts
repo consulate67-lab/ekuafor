@@ -140,9 +140,9 @@ class AppointmentService {
       INSERT INTO appointments (
         company_id, customer_id, service_id, staff_id, 
         appointment_date, start_time, end_time, status, notes, price,
-        customer_phone, customer_name, device_id, package_id
+        customer_phone, customer_name, device_id, package_id, original_price
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING *
     `;
 
@@ -160,7 +160,8 @@ class AppointmentService {
             appointment.customer_phone || null,
             appointment.customer_name || null,
             appointment.device_id || null,
-            appointment.package_id || null
+            appointment.package_id || null,
+            appointment.price || null // original_price is set to starting price
         ];
 
         const client = await pool.connect();
@@ -396,10 +397,17 @@ class AppointmentService {
                     [status, price, paymentStatus, finalPaymentMethod, id]
                 );
             } else {
-                result = await pool.query(
-                    'UPDATE appointments SET status = $1 WHERE id = $2 RETURNING *',
-                    [status, id]
-                );
+                if (status === 'completed') {
+                    result = await pool.query(
+                        'UPDATE appointments SET status = $1, collected_price = COALESCE(collected_price, price) WHERE id = $2 RETURNING *',
+                        [status, id]
+                    );
+                } else {
+                    result = await pool.query(
+                        'UPDATE appointments SET status = $1 WHERE id = $2 RETURNING *',
+                        [status, id]
+                    );
+                }
             }
             const updatedAppointment = result.rows[0];
 

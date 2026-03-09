@@ -40,16 +40,18 @@ class ReportService {
                 COUNT(DISTINCT a.id) as total_appointments,
                 SUM(COALESCE(
                     (SELECT SUM(price) FROM appointment_services WHERE appointment_id = a.id AND ($2::INTEGER IS NULL OR staff_id = $2)),
+                    a.original_price,
                     a.price, 
                     s.price, 
                     0
-                )) as total_revenue,
-                SUM(CASE WHEN a.status = 'completed' THEN COALESCE(
+                )) as total_booked_value,
+                SUM(CASE WHEN a.status IN ('completed', 'invoiced') THEN COALESCE(
                     (SELECT SUM(price) FROM appointment_services WHERE appointment_id = a.id AND ($2::INTEGER IS NULL OR staff_id = $2)),
+                    a.collected_price,
                     a.price, 
                     s.price, 
                     0
-                ) ELSE 0 END) as completed_revenue
+                ) ELSE 0 END) as actual_collected
             FROM appointments a
             LEFT JOIN services s ON a.service_id = s.id
             WHERE a.company_id = $1 
@@ -71,8 +73,8 @@ class ReportService {
 
         return {
             total_appointments: parseInt(result.rows[0].total_appointments) || 0,
-            total_revenue: parseFloat(result.rows[0].total_revenue) || 0,
-            completed_revenue: parseFloat(result.rows[0].completed_revenue) || 0,
+            total_booked_value: parseFloat(result.rows[0].total_booked_value) || 0,
+            actual_collected: parseFloat(result.rows[0].actual_collected) || 0,
             total_expenses: parseFloat(expResult.rows[0].total_expenses) || 0
         };
     }
@@ -116,7 +118,8 @@ class ReportService {
                 sa.staff_id,
                 sa.staff_name,
                 COUNT(DISTINCT a.id) as count,
-                SUM(COALESCE(aps.price, a.price / NULLIF((SELECT count(*) FROM appointment_services WHERE appointment_id = a.id), 0), s.price, 0)) as revenue
+                SUM(COALESCE(aps.price, a.original_price / NULLIF((SELECT count(*) FROM appointment_services WHERE appointment_id = a.id), 0), a.price / NULLIF((SELECT count(*) FROM appointment_services WHERE appointment_id = a.id), 0), a.original_price, a.price, s.price, 0)) as total_booked_value,
+                SUM(CASE WHEN a.status IN ('completed', 'invoiced') THEN COALESCE(aps.price, a.collected_price / NULLIF((SELECT count(*) FROM appointment_services WHERE appointment_id = a.id), 0), a.price / NULLIF((SELECT count(*) FROM appointment_services WHERE appointment_id = a.id), 0), a.collected_price, a.price, s.price, 0) ELSE 0 END) as actual_collected
             FROM staff_all sa
             LEFT JOIN (
                 SELECT a.*, aps.staff_id as service_staff_id, aps.price as service_price
@@ -147,7 +150,8 @@ class ReportService {
                 TO_CHAR(appointment_date, 'Day') as day_name,
                 EXTRACT(DOW FROM appointment_date) as day_index,
                 COUNT(*) as count,
-                SUM(COALESCE(a.price, s.price, 0)) as revenue
+                SUM(COALESCE(a.original_price, a.price, s.price, 0)) as total_booked_value,
+                SUM(CASE WHEN a.status IN ('completed', 'invoiced') THEN COALESCE(a.collected_price, a.price, s.price, 0) ELSE 0 END) as actual_collected
             FROM appointments a
             LEFT JOIN services s ON a.service_id = s.id
             WHERE a.company_id = $1 AND a.status != 'cancelled' AND ${chartFilter}
@@ -161,7 +165,8 @@ class ReportService {
                 TO_CHAR(appointment_date, 'Month') as month_name,
                 EXTRACT(MONTH FROM appointment_date) as month_index,
                 COUNT(*) as count,
-                SUM(COALESCE(a.price, s.price, 0)) as revenue
+                SUM(COALESCE(a.original_price, a.price, s.price, 0)) as total_booked_value,
+                SUM(CASE WHEN a.status IN ('completed', 'invoiced') THEN COALESCE(a.collected_price, a.price, s.price, 0) ELSE 0 END) as actual_collected
             FROM appointments a
             LEFT JOIN services s ON a.service_id = s.id
             WHERE a.company_id = $1 AND a.status != 'cancelled' AND ${chartFilter}
@@ -175,14 +180,15 @@ class ReportService {
                 d.id as department_id,
                 d.name as department_name,
                 COUNT(a.id) as count,
-                SUM(COALESCE(a.price, s.price, 0)) as revenue
+                SUM(COALESCE(a.original_price, a.price, s.price, 0)) as total_booked_value,
+                SUM(CASE WHEN a.status IN ('completed', 'invoiced') THEN COALESCE(a.collected_price, a.price, s.price, 0) ELSE 0 END) as actual_collected
             FROM departments d
             LEFT JOIN users u ON u.department_id = d.id
             LEFT JOIN appointments a ON a.staff_id = u.id AND a.company_id = $1 AND a.status != 'cancelled' AND ${statsFilter}
             LEFT JOIN services s ON a.service_id = s.id
             WHERE d.company_id = $1
             GROUP BY d.id, d.name
-            ORDER BY revenue DESC
+            ORDER BY actual_collected DESC
         `;
 
         const [staffRes, hourlyRes, weeklyRes, monthlyRes, deptRes] = await Promise.all([
@@ -194,11 +200,11 @@ class ReportService {
         ]);
 
         return {
-            staffStats: staffRes.rows.map(r => ({ ...r, count: parseInt(r.count), revenue: parseFloat(r.revenue || 0) })),
+            staffStats: staffRes.rows.map(r => ({ ...r, count: parseInt(r.count), total_booked_value: parseFloat(r.total_booked_value || 0), actual_collected: parseFloat(r.actual_collected || 0) })),
             hourlyStats: hourlyRes.rows.map(r => ({ hour: parseInt(r.hour), count: parseInt(r.count) })),
-            weeklyStats: weeklyRes.rows.map(r => ({ day: r.day_name.trim(), count: parseInt(r.count), revenue: parseFloat(r.revenue || 0) })),
-            monthlyStats: monthlyRes.rows.map(r => ({ month: r.month_name.trim(), count: parseInt(r.count), revenue: parseFloat(r.revenue || 0) })),
-            departmentStats: deptRes.rows.map(r => ({ ...r, count: parseInt(r.count), revenue: parseFloat(r.revenue || 0) }))
+            weeklyStats: weeklyRes.rows.map(r => ({ day: r.day_name.trim(), count: parseInt(r.count), total_booked_value: parseFloat(r.total_booked_value || 0), actual_collected: parseFloat(r.actual_collected || 0) })),
+            monthlyStats: monthlyRes.rows.map(r => ({ month: r.month_name.trim(), count: parseInt(r.count), total_booked_value: parseFloat(r.total_booked_value || 0), actual_collected: parseFloat(r.actual_collected || 0) })),
+            departmentStats: deptRes.rows.map(r => ({ ...r, count: parseInt(r.count), total_booked_value: parseFloat(r.total_booked_value || 0), actual_collected: parseFloat(r.actual_collected || 0) }))
         };
     }
 }

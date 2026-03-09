@@ -32,8 +32,8 @@ export default function Dashboard() {
     });
     const [employeeStats, setEmployeeStats] = useState({
         total_appointments: 0,
-        total_revenue: 0,
-        completed_revenue: 0,
+        total_booked_value: 0,
+        actual_collected: 0,
         total_expenses: 0
     });
     const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'year'>('today');
@@ -844,16 +844,16 @@ export default function Dashboard() {
                                             <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-amber-600 shadow-sm mb-3">
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                                             </div>
-                                            <p className="text-[8px] font-black text-amber-400 uppercase tracking-widest mb-1">Randevu Toplamı</p>
-                                            <p className={`text-2xl font-black text-amber-900 ${statsLoading ? 'animate-pulse' : ''}`}>₺{employeeStats.total_revenue.toLocaleString()}</p>
+                                            <p className="text-[8px] font-black text-amber-400 uppercase tracking-widest mb-1">Potansiyel Kazanç</p>
+                                            <p className={`text-2xl font-black text-amber-900 ${statsLoading ? 'animate-pulse' : ''}`}>₺{employeeStats.total_booked_value.toLocaleString()}</p>
                                         </div>
 
                                         <div className="bg-emerald-50/20 p-4 rounded-[2rem] border border-emerald-100/50 flex flex-col items-center text-center">
                                             <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm mb-3">
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
                                             </div>
-                                            <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">Tamamlanan Kazanç</p>
-                                            <p className={`text-2xl font-black text-emerald-900 ${statsLoading ? 'animate-pulse' : ''}`}>₺{employeeStats.completed_revenue.toLocaleString()}</p>
+                                            <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">Tahsil Edilen</p>
+                                            <p className={`text-2xl font-black text-emerald-900 ${statsLoading ? 'animate-pulse' : ''}`}>₺{employeeStats.actual_collected.toLocaleString()}</p>
                                         </div>
 
                                         <div className="bg-rose-50/20 p-4 rounded-[2rem] border border-rose-100/50 flex flex-col items-center text-center">
