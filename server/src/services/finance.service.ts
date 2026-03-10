@@ -64,7 +64,8 @@ export interface CurrentAccount {
 
 class FinanceService {
     constructor() {
-        this.runMigrations().catch(err => console.error('Migration Error:', err));
+        console.log('[FinanceService] Initialized');
+        // Do not auto-run migrations in constructor to avoid pool exhaustion at startup
     }
 
     private async runMigrations() {

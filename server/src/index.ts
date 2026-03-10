@@ -107,9 +107,14 @@ app.get('/verify-test', async (req: Request, res: Response) => {
     }
 });
 
+// Basic Ping (No DB)
+app.get('/api/ping', (req, res) => {
+    res.json({ status: 'pong', timestamp: new Date().toISOString() });
+});
+
 // API Info
 app.get('/api', (req, res) => {
-    res.json({ message: 'Saloon API v1.69.2', status: 'running' });
+    res.json({ message: 'Saloon API v1.69.5', status: 'running' });
 });
 
 // API Routes (Explicit Definition)
@@ -791,10 +796,18 @@ const runMigrations = async () => {
 };
 
 // Start server
-const server = app.listen(PORT, async () => {
-    await runMigrations();
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+const server = app.listen(PORT, () => {
+    console.log(`🚀 Server listening on port ${PORT}`);
+
+    // Run migrations in background with a slight delay
+    setTimeout(async () => {
+        console.log('🏁 Starting background migrations...');
+        try {
+            await runMigrations();
+        } catch (e) {
+            console.error('🔥 Background migration failed:', e);
+        }
+    }, 5000);
 });
 
 // Graceful shutdown
