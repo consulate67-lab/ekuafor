@@ -589,6 +589,20 @@ const runMigrations = async () => {
             )
         `);
 
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS callback_logs (
+                id SERIAL PRIMARY KEY,
+                method VARCHAR(10),
+                url TEXT,
+                headers TEXT,
+                all_data TEXT,
+                detected_gsm VARCHAR(50),
+                detected_msg TEXT,
+                result TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
         // 2. Add Columns & References (Incremental updates for existing tables)
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(20)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255)');

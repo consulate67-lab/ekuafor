@@ -500,10 +500,19 @@ class CompanyService {
 
         console.log(`[SMS-CB] [START] Mesaj: "${message}", Tel: "${phone}"`);
 
-        // Kod ayıklama (5-6 karakterli alphanumeric, mesajın içinde herhangi bir yerde olabilir)
-        // \b word boundary kullanarak telefon numaralarının içindeki parçaların eşleşmesini önlüyoruz
-        const codeMatch = message.match(/\b[A-Z0-9]{5,6}\b/gi);
-        const cleanCode = (codeMatch ? codeMatch[0] : message.trim()).toUpperCase();
+        // Kod ayıklama (5-6 karakterli alphanumeric)
+        // Eğer mesaj sadece kod ise direkt al, yoksa içinden ara
+        let cleanCode = message.trim().toUpperCase();
+        const codeMatches = message.match(/([A-Z0-9]{5,6})/gi);
+        
+        if (codeMatches && codeMatches.length > 0) {
+            // Eğer birden fazla 5-6 haneli grup varsa (örn tel no parçası ve kod)
+            // İçinde harf olanı tercih et (çünkü kodlarımız harf içerebiliyor: ABC12)
+            // Harf içeren yoksa ilk sayısal grubu al
+            const bestMatch = codeMatches.find(c => /[A-Z]/i.test(c)) || codeMatches[0];
+            cleanCode = bestMatch.toUpperCase();
+            console.log(`[SMS-CB] [REGEX] Kodlar bulundu: ${codeMatches.join(', ')}. Secilen: ${cleanCode}`);
+        }
 
         // Telefon normalizasyonu (Son 10 hane her zaman en güvenilir olanıdır)
         const cleanPhone = normalizePhone(phone); // 5336660125

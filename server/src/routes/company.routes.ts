@@ -732,31 +732,58 @@ router.all('/sms-callback', async (req: Request, res: Response) => {
         const allData = { ...req.query, ...req.body, ...req.params };
 
         console.log('[SMS Callback] Collected Data:', JSON.stringify(allData));
-        if (req.method === 'POST') {
-            console.log('[SMS Callback] Raw Body:', typeof req.body === 'object' ? JSON.stringify(req.body) : req.body);
-        }
-
-        const gsm = allData.sourceNumber || allData.source_number || allData.gsm || allData.phone || allData.from || allData.source || allData.number;
-        const msg = allData.content || allData.msg || allData.message || allData.text || allData.body;
+        
+        const gsm = allData.sourceNumber || allData.source_number || allData.gsm || allData.phone || allData.from || allData.source || allData.number || allData.sender;
+        const msg = allData.content || allData.msg || allData.message || allData.text || allData.body || allData.sms_text;
 
         console.log(`[SMS Callback] Detected: GSM=${gsm}, MSG=${msg}`);
 
+        let resultMessage = 'NOT_PROCESSED';
         if (msg && gsm) {
             const company = await companyService.verifyBySmsCode(String(msg), String(gsm));
             if (company) {
                 console.log(`[SMS Callback] SUCCESS: Approved ${company.name}`);
+                resultMessage = `SUCCESS: Approved ${company.name}`;
+                
+                // Track hit in DB for debugging
+                await pool.query(
+                    'INSERT INTO callback_logs (method, url, headers, all_data, detected_gsm, detected_msg, result) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                    [req.method, req.originalUrl, JSON.stringify(req.headers), JSON.stringify(allData), String(gsm), String(msg), resultMessage]
+                ).catch(e => console.error('Error logging callback:', e));
+
                 return res.json({ status: "OK", message: "Approved", company: company.name });
             } else {
                 console.log(`[SMS Callback] FAILED: Dogrulama basarisiz (Kriterlere uyan kayit yok)`);
+                resultMessage = 'FAILED: No matching company found';
             }
         } else {
             console.log(`[SMS Callback] ERROR: Parametreler eksik (GSM veya MSG bulunamadi)`);
+            resultMessage = 'ERROR: Missing parameters';
         }
 
-        res.json({ status: "NOT_PROCESSED" });
+        // Always log failures too
+        await pool.query(
+            'INSERT INTO callback_logs (method, url, headers, all_data, detected_gsm, detected_msg, result) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+            [req.method, req.originalUrl, JSON.stringify(req.headers), JSON.stringify(allData), String(gsm || ''), String(msg || ''), resultMessage]
+        ).catch(e => console.error('Error logging callback:', e));
+
+        res.json({ status: resultMessage });
     } catch (err) {
         console.error('[SMS Callback] CRITICAL ERROR:', err);
         res.status(500).json({ status: "ERROR" });
+    }
+});
+
+/**
+ * GET /api/companies/debug/callback-logs
+ * Debugging purposes only
+ */
+router.get('/debug/callback-logs', async (req: Request, res: Response) => {
+    try {
+        const result = await pool.query('SELECT * FROM callback_logs ORDER BY created_at DESC LIMIT 50');
+        res.json({ success: true, count: result.rowCount, data: result.rows });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 
