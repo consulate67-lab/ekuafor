@@ -64,10 +64,14 @@ async function runMigration() {
 
         console.log('✅ Incremental migration completed!');
     } catch (err) {
-        console.error('❌ Migration failed:', err);
+        console.error('❌ Migration_v2 failed but continuing:', err.message);
     } finally {
-        client.release();
-        await pool.end();
+        try {
+            if (client) client.release();
+            await pool.end();
+        } catch (e) { }
+        console.log('🏁 Migration_v2 finished.');
+        process.exit(0);
     }
 }
 
