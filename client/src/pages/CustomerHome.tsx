@@ -7,6 +7,15 @@ import { Geolocation } from '@capacitor/geolocation';
 import { Camera } from '@capacitor/camera';
 
 // Optimize individual item render - Moved outside to prevent recreation on every render
+const formatDialNumber = (phone?: string) => {
+    if (!phone) return "";
+    let cleaned = phone.replace(/[^0-9]/g, "");
+    if (cleaned.length === 10 && cleaned.startsWith('5')) {
+        return '0' + cleaned;
+    }
+    return cleaned;
+};
+
 const CompanyCard = React.memo(({ company: c, navigatingToId, favorites, toggleFavorite, onCompanyClick, onCallClick }: any) => {
     const isNavigating = navigatingToId === c.id;
 
@@ -164,13 +173,13 @@ export default function CustomerHome() {
             const staffWithPhone = allStaff.filter((s: any) => (s.phone && s.phone.trim().length > 5) || (s.user_phone && s.user_phone.trim().length > 5));
 
             if (staffWithPhone.length === 0) {
-                window.location.href = `tel:${company.phone.replace(/[^0-9]/g, '')}`;
+                window.location.href = `tel:${formatDialNumber(company.phone)}`;
             } else {
                 setCallPicker({ open: true, company, staff: staffWithPhone });
             }
         } catch (err) {
             console.error('Staff fetch error:', err);
-            window.location.href = `tel:${company.phone.replace(/[^0-9]/g, '')}`;
+            window.location.href = `tel:${formatDialNumber(company.phone)}`;
         } finally {
             setFetchingStaff(false);
         }
@@ -871,7 +880,7 @@ export default function CustomerHome() {
                             <div className="flex flex-col gap-3">
                                 {notRegisteredModal.company?.phone && (
                                     <a
-                                        href={`tel:${notRegisteredModal.company.phone.replace(/[^0-9]/g, '')}`}
+                                        href={`tel:${formatDialNumber(notRegisteredModal.company.phone)}`}
                                         className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 active:scale-95 transition-all"
                                     >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
@@ -972,7 +981,7 @@ export default function CustomerHome() {
                         <div className="space-y-3">
                             {/* Company Phone */}
                             <a
-                                href={`tel:${callPicker.company.phone.replace(/[^0-9]/g, '')}`}
+                                href={`tel:${formatDialNumber(callPicker.company.phone)}`}
                                 className="flex items-center gap-4 p-5 bg-gradient-to-tr from-indigo-50 to-indigo-100/30 rounded-3xl border border-indigo-100 active:scale-95 transition-all group"
                             >
                                 <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-xl shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-colors">
@@ -995,7 +1004,7 @@ export default function CustomerHome() {
                             {callPicker.staff.map((s: any) => (
                                 <a
                                     key={s.id}
-                                    href={`tel:${(s.phone || s.user_phone).replace(/[^0-9]/g, '')}`}
+                                    href={`tel:${formatDialNumber(s.phone || s.user_phone)}`}
                                     className="flex items-center gap-4 p-4 bg-slate-50 hover:bg-white hover:shadow-lg hover:shadow-slate-200/50 rounded-3xl border border-slate-100 active:scale-95 transition-all group"
                                 >
                                     <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center text-lg shadow-sm group-hover:bg-emerald-500 group-hover:text-white transition-colors overflow-hidden">
