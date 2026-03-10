@@ -52,9 +52,14 @@ app.use((req, res, next) => {
     next();
 });
 
+// Basic Ping endpoints for debugging
+app.get('/ping', (req, res) => res.json({ status: 'pong', source: 'root', time: new Date().toISOString() }));
+app.get('/api/ping', (req, res) => res.json({ status: 'pong', source: 'api', time: new Date().toISOString() }));
+app.get('/ekuafor/api/ping', (req, res) => res.json({ status: 'pong', source: 'ekuafor', time: new Date().toISOString() }));
+
 // Root Route
 app.get('/', (req, res) => {
-    res.send('<h1>Saloon Backend is Live!</h1>');
+    res.send('<h1>Saloon Backend is Live!</h1><p>Try <a href="/api/ping">/api/ping</a></p>');
 });
 
 // Health Checks (Explicit)
@@ -797,9 +802,13 @@ const runMigrations = async () => {
 
 // Start server
 const server = app.listen(PORT, () => {
-    console.log(`🚀 Server listening on port ${PORT}`);
+    console.log('================================================');
+    console.log(`🚀 SERVIS CALISIYOR! PORT: ${PORT}`);
+    console.log(`🌍 NODE_ENV: ${process.env.NODE_ENV}`);
+    console.log(`🔗 DB_URL_TEST: ${process.env.DATABASE_URL ? 'VAR' : 'YOK'}`);
+    console.log('================================================');
 
-    // Run migrations in background with a slight delay
+    // Run migrations in background
     setTimeout(async () => {
         console.log('🏁 Starting background migrations...');
         try {
