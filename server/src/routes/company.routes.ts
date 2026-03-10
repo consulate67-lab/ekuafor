@@ -726,24 +726,27 @@ router.post('/check-code', async (req: Request, res: Response) => {
  */
 router.all('/sms-callback', async (req: Request, res: Response) => {
     try {
-        const { gsm, msg } = req.query; // NetGSM genellikle GET kullanır
-        const bodyMsg = req.body.msg || msg;
-        const bodyGsm = req.body.gsm || gsm;
+        // Support both GET (query) and POST (body)
+        // Netgsm Interactive SMS sends: { sourceNumber: "...", content: "...", ... }
+        const { gsm, msg, sourceNumber, content } = { ...req.query, ...req.body };
+
+        const bodyMsg = content || msg;
+        const bodyGsm = sourceNumber || gsm;
 
         console.log(`[SMS Callback] Incoming: GSM=${bodyGsm}, MSG=${bodyMsg}`);
 
-        if (bodyMsg) {
+        if (bodyMsg && bodyGsm) {
             const company = await companyService.verifyBySmsCode(String(bodyMsg), String(bodyGsm));
             if (company) {
                 console.log(`[SMS Callback] Firma Otomatik Onaylandi: ${company.name} (ID: ${company.id})`);
-                return res.send('OK'); // SMS sağlayıcısına yanıt
+                return res.json({ status: "OK" }); // Netgsm usually expects a successful response
             }
         }
 
-        res.send('NOT_PROCESSED');
+        res.json({ status: "NOT_PROCESSED" });
     } catch (err) {
         console.error('[SMS Callback] Error:', err);
-        res.status(500).send('ERROR');
+        res.status(500).json({ status: "ERROR" });
     }
 });
 
