@@ -52,11 +52,14 @@ export default function LandingPage() {
             const res = await api.post('/companies/register', formData);
             if (res.data.success) {
                 const { verification_code } = res.data.data;
-                const systemPhone = "8503058349"; // NetGSM numarası
+                const systemPhone = "+908503058349"; // Tam uluslararası format
 
-                // SMS Intent URL
-                // Mesaj formatı: Sadece KOD (Güvenlik için telefon eşleşmesini sunucuda yapacağız)
-                const smsUrl = `sms:${systemPhone}?body=${verification_code}`;
+                // Cihaz tipine göre SMS ayırıcı (iOS '?' yerine '&' veya bazen ';' bekleyebilir)
+                // Ancak standart olarak '?' iOS 8+ ve Android için genellikle çalışır.
+                // En garantisi platform tespiti yapmaktır:
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                const separator = isIOS ? '&' : '?';
+                const smsUrl = `sms:${systemPhone}${separator}body=${verification_code}`;
 
                 setSuccess(true);
 
