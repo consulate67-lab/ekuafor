@@ -747,6 +747,7 @@ const runMigrations = async () => {
         await pool.query('UPDATE services SET is_active = true WHERE is_active IS NULL');
         await pool.query('UPDATE packages SET is_active = true WHERE is_active IS NULL');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS bank_iban VARCHAR(34)');
+        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS verification_code VARCHAR(10)');
 
         // 3. Triggers & Functions
         await pool.query(`

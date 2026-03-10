@@ -51,12 +51,25 @@ export default function LandingPage() {
         try {
             const res = await api.post('/companies/register', formData);
             if (res.data.success) {
+                const { verification_code } = res.data.data;
+                const systemPhone = "8503058349"; // NetGSM numarası
+
+                // SMS Intent URL
+                // Mesaj formatı: Sadece KOD (Güvenlik için telefon eşleşmesini sunucuda yapacağız)
+                const smsUrl = `sms:${systemPhone}?body=${verification_code}`;
+
                 setSuccess(true);
+
+                // Kısa bir süre sonra yönlendir
+                setTimeout(() => {
+                    window.location.href = smsUrl;
+                }, 2000);
+
                 setTimeout(() => {
                     setIsModalOpen(false);
                     setSuccess(false);
                     setFormData({ name: '', phone: '', address_line: '', city: '', district: '', latitude: null, longitude: null, target_genders: [] });
-                }, 4000);
+                }, 6000);
             }
         } catch (err: any) {
             alert(err.response?.data?.error || 'Kayıt sırasında bir hata oluştu.');
@@ -165,7 +178,7 @@ export default function LandingPage() {
                                 </div>
                                 <h3 className="text-2xl font-black text-white mb-2">Başvurunuz Alındı!</h3>
                                 <p className="text-slate-400 font-medium leading-relaxed">
-                                    Kayıt işleminiz başarıyla oluşturuldu. Ekibimiz onayladıktan sonra belirttiginiz telefona <strong className="text-white">şifreniz SMS ile</strong> iletilecektir.
+                                    Lütfen açılan SMS ekranından <strong className="text-white">mesajı gönderin</strong>. Mesajınız ulaştığında firmanız otomatik olarak onaylanacaktır.
                                 </p>
                             </div>
                         ) : (

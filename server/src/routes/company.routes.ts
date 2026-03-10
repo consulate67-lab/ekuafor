@@ -110,8 +110,13 @@ router.post('/register', async (req: Request, res: Response) => {
 
         res.status(201).json({
             success: true,
-            data: company,
-            message: 'Kayıt başvurunuz alındı. Onaylandıktan sonra SMS ile bilgilendirileceksiniz.'
+            data: {
+                id: company.id,
+                name: company.name,
+                phone: company.phone,
+                verification_code: company.verification_code // Geri döndür ki client SMS linkine eklesin
+            },
+            message: 'Kayıt başvurunuz alındı. Telefonunuzdaki SMS ekranına yönlendiriliyorsunuz.'
         });
     } catch (error) {
         if (error instanceof z.ZodError) {
@@ -711,6 +716,34 @@ router.post('/check-code', async (req: Request, res: Response) => {
             success: false,
             error: error instanceof Error ? error.message : 'Kod kontrol edilirken hata oluştu'
         });
+    }
+});
+
+/**
+ * GET /api/companies/sms-callback
+ * NetGSM veya diğer sağlayıcılardan gelen SMS bildirimlerini yakalar
+ * Format: ?gsm=905XXXX&msg=CODE&tarih=...
+ */
+router.all('/sms-callback', async (req: Request, res: Response) => {
+    try {
+        const { gsm, msg } = req.query; // NetGSM genellikle GET kullanır
+        const bodyMsg = req.body.msg || msg;
+        const bodyGsm = req.body.gsm || gsm;
+
+        console.log(`[SMS Callback] Incoming: GSM=${bodyGsm}, MSG=${bodyMsg}`);
+
+        if (bodyMsg) {
+            const company = await companyService.verifyBySmsCode(String(bodyMsg), String(bodyGsm));
+            if (company) {
+                console.log(`[SMS Callback] Firma Otomatik Onaylandi: ${company.name} (ID: ${company.id})`);
+                return res.send('OK'); // SMS sağlayıcısına yanıt
+            }
+        }
+
+        res.send('NOT_PROCESSED');
+    } catch (err) {
+        console.error('[SMS Callback] Error:', err);
+        res.status(500).send('ERROR');
     }
 });
 

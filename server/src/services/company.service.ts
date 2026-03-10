@@ -68,6 +68,7 @@ export interface Company {
     door_number?: string | null;
     nace_code?: string | null;
     fax_number?: string | null;
+    verification_code?: string | null;
 }
 
 class CompanyService {
@@ -105,24 +106,6 @@ class CompanyService {
                 }
             }
 
-            const query = `
-        INSERT INTO companies (
-          name, description, phone, email, website,
-          address_line, city, district, neighborhood, postal_code,
-          latitude, longitude,
-          bank_name, bank_branch, iban, account_holder_name,
-          commission_rate, payment_enabled,
-          is_active, is_verified, created_by, board_key, 
-          work_start_time, work_end_time, slot_interval, admin_key,
-          genders, company_type, main_company_id,
-          tax_number, tax_office,
-          qnb_username, qnb_password, qnb_vkn, efatura_test_mode, invoice_prefix,
-          ubl_incoming_alias, ubl_outgoing_alias, sms_enabled, ai_rules, photo,
-          building_number, door_number, nace_code, fax_number, booking_flow, bank_iban
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47)
-        RETURNING *
-      `;
-
             const values = [
                 company.name,
                 company.description,
@@ -142,14 +125,14 @@ class CompanyService {
                 company.account_holder_name,
                 company.commission_rate || 0,
                 company.payment_enabled || false,
-                company.is_active !== false,
+                company.is_active !== undefined ? company.is_active : false,
                 company.is_verified || false,
                 createdBy,
-                company.board_key || null,
+                company.board_key || Math.random().toString(36).substring(2, 10).toUpperCase(),
                 company.work_start_time || '09:00',
-                company.work_end_time || '20:00',
+                company.work_end_time || '19:00',
                 company.slot_interval || 30,
-                company.admin_key || `ADM-${company.name.substring(0, 3).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+                company.admin_key || Math.floor(100000 + Math.random() * 900000).toString(),
                 company.genders || [],
                 company.company_type || 'ASIL',
                 company.main_company_id || null,
@@ -158,23 +141,40 @@ class CompanyService {
                 company.qnb_username || null,
                 company.qnb_password || null,
                 company.qnb_vkn || null,
-                company.efatura_test_mode !== false,
+                company.efatura_test_mode !== undefined ? company.efatura_test_mode : true,
                 company.invoice_prefix || 'GIB',
-                company.ubl_incoming_alias || 'default',
-                company.ubl_outgoing_alias || 'default',
-                company.sms_enabled !== false,
+                company.ubl_incoming_alias || null,
+                company.ubl_outgoing_alias || null,
+                company.sms_enabled !== undefined ? company.sms_enabled : true,
                 company.ai_rules || null,
                 company.photo || null,
                 company.building_number || null,
                 company.door_number || null,
                 company.nace_code || null,
                 company.fax_number || null,
-                company.booking_flow || null,
-                company.bank_iban || null
+                company.booking_flow || 'SPDT',
+                company.bank_iban || null,
+                company.verification_code || Math.random().toString(36).substring(2, 7).toUpperCase()
             ];
 
-
-            const result = await client.query(query, values);
+            const result = await client.query(`
+                INSERT INTO companies (
+                  name, description, phone, email, website,
+                  address_line, city, district, neighborhood, postal_code,
+                  latitude, longitude,
+                  bank_name, bank_branch, iban, account_holder_name,
+                  commission_rate, payment_enabled,
+                  is_active, is_verified, created_by, board_key, 
+                  work_start_time, work_end_time, slot_interval, admin_key,
+                  genders, company_type, main_company_id,
+                  tax_number, tax_office,
+                  qnb_username, qnb_password, qnb_vkn, efatura_test_mode, invoice_prefix,
+                  ubl_incoming_alias, ubl_outgoing_alias, sms_enabled, ai_rules, photo,
+                  building_number, door_number, nace_code, fax_number, booking_flow, bank_iban,
+                  verification_code
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48)
+                RETURNING *
+            `, values);
             return result.rows[0];
         } finally {
             client.release();
@@ -484,6 +484,43 @@ class CompanyService {
         }
 
         return company;
+    }
+
+    /**
+     * SMS ile gelen kod üzerinden firma onayla
+     */
+    async verifyBySmsCode(message: string, phone: string): Promise<Company | null> {
+        if (!message || !phone) return null;
+
+        // Mesaj içinden 5 karakterli kodu ayıkla
+        const codeMatch = message.match(/[A-Z0-9]{5}/i);
+        const cleanCode = codeMatch ? codeMatch[0].toUpperCase() : message.trim().toUpperCase();
+
+        // Gelen telefonu normalize et (90... -> 10 hane veya direkt 10 hane)
+        const { normalizePhone } = require('../utils/phone');
+        const cleanPhone = normalizePhone(phone);
+
+        console.log(`[CompanyService] SMS Onay Denemesi: Kod=${cleanCode}, Telefon=${cleanPhone}`);
+
+        // Firmayı bul: Hem kod hem de telefon eşleşmeli
+        // Not: LIKE kullanıyoruz çünkü telefon rehberde "0532..." veya "532..." veya "90532..." olarak tutulmuş olabilir
+        // normalizePhone genelde 10 hane döndürür (532...), DB'deki phone sütunu ile karşılaştırıyoruz.
+        const findRes = await pool.query(
+            `SELECT id FROM companies 
+             WHERE verification_code = $1 
+             AND (phone LIKE $2 OR phone LIKE $3)
+             AND is_verified = false 
+             LIMIT 1`,
+            [cleanCode, `%${cleanPhone}`, `%${phone.replace(/\D/g, '')}`]
+        );
+
+        if (findRes.rows.length === 0) {
+            console.log(`[CompanyService] SMS Onay Basarisiz: Kod veya Telefon eslesmedi (Kod: ${cleanCode}, Tel: ${cleanPhone})`);
+            return null;
+        }
+
+        const companyId = findRes.rows[0].id;
+        return await this.verifyCompany(companyId);
     }
 }
 
