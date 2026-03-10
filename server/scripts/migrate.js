@@ -3,14 +3,21 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
+console.log('--- DB Config Debug ---');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+if (process.env.DATABASE_URL) {
+    console.log('Using DATABASE_URL connection string');
+} else {
+    console.log('DATABASE_URL NOT FOUND, falling back to individual env vars');
+    console.log('Host:', process.env.DB_HOST || 'localhost');
+}
+
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    host: process.env.DATABASE_URL ? undefined : (process.env.DB_HOST || 'localhost'),
-    port: process.env.DATABASE_URL ? undefined : parseInt(process.env.DB_PORT || '5432'),
-    database: process.env.DATABASE_URL ? undefined : (process.env.DB_NAME || 'saloon_db'),
-    user: process.env.DATABASE_URL ? undefined : (process.env.DB_USER || 'postgres'),
-    password: process.env.DATABASE_URL ? undefined : process.env.DB_PASSWORD,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    ssl: (process.env.NODE_ENV === 'production' || process.env.DATABASE_URL?.includes('railway.app'))
+        ? { rejectUnauthorized: false }
+        : false,
 });
 
 async function migrate() {
