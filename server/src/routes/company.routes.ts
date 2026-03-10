@@ -765,4 +765,18 @@ router.all('/sms-callback', async (req: Request, res: Response) => {
     }
 });
 
+/**
+ * GET /api/verify-test?gsm=...&msg=...
+ */
+router.get('/verify-test', async (req: Request, res: Response) => {
+    try {
+        const { gsm, msg } = req.query;
+        if (!gsm || !msg) return res.send('GSM ve MSG gerekli');
+        const company = await companyService.verifyBySmsCode(String(msg), String(gsm));
+        res.json({ success: !!company, name: company?.name || 'BULUNAMADI' });
+    } catch (e: any) {
+        res.status(500).send(e.message);
+    }
+});
+
 export default router;

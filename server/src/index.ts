@@ -94,7 +94,7 @@ const healthHandler = async (req: Request, res: Response) => {
 
         res.json({
             success: true,
-            version: '1.69.2-unified',
+            version: '1.69.5-SMS-Callback',
             db: 'Connected',
             time: result.rows[0].now,
             connected_host: dbHost,
