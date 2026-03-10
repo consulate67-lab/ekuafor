@@ -52,77 +52,64 @@ app.use((req, res, next) => {
     next();
 });
 
-// Basic Ping endpoints for debugging
-app.get('/ping', (req, res) => res.json({ status: 'pong', source: 'root', time: new Date().toISOString() }));
-app.get('/api/ping', (req, res) => res.json({ status: 'pong', source: 'api', time: new Date().toISOString() }));
-app.get('/ekuafor/api/ping', (req, res) => res.json({ status: 'pong', source: 'ekuafor', time: new Date().toISOString() }));
+// --- GLOBAL TEST & HEALTH ROUTES ---
+const commonPing = (req: Request, res: Response) => res.json({
+    status: 'pong',
+    time: new Date().toISOString(),
+    version: '1.69.5-SMS-FIX',
+    port: PORT
+});
+
+const commonVerify = async (req: Request, res: Response) => {
+    try {
+        const { gsm, msg } = req.query;
+        console.log(`[VerifyTest] Global Call. GSM: ${gsm}, MSG: ${msg}`);
+        if (!gsm || !msg) return res.json({ success: false, error: 'GSM ve MSG eksik' });
+        const company = await companyService.verifyBySmsCode(String(msg), String(gsm));
+        res.json({
+            success: !!company,
+            name: company?.name || 'BULUNAMADI',
+            status: !!company ? 'APPROVED' : 'PENDING'
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+};
+
+// Map these routes everywhere they might be called
+app.get('/ping', commonPing);
+app.get('/api/ping', commonPing);
+app.get('/ekuafor/api/ping', commonPing);
+
+app.get('/verify-test', commonVerify);
+app.get('/api/verify-test', commonVerify);
+app.get('/api/companies/verify-test', commonVerify);
+app.get('/ekuafor/api/verify-test', commonVerify);
+app.get('/ekuafor/api/companies/verify-test', commonVerify);
 
 // Root Route
 app.get('/', (req, res) => {
-    res.send('<h1>Saloon Backend is Live!</h1><p>Try <a href="/api/ping">/api/ping</a></p>');
+    res.send('<h1>Saloon Backend is Live!</h1> <p>Try <a href="/api/ping">/api/ping</a></p>');
 });
 
 // Health Checks (Explicit)
 const healthHandler = async (req: Request, res: Response) => {
     console.log('[Health] Request received');
     let dbStatus = 'Pending';
-    let dbTime = null;
-
     try {
-        const result = await pool.query('SELECT NOW()').catch(e => {
-            console.error('[Health] DB Query failed:', e.message);
-            return null;
-        });
-
-        if (result) {
-            dbStatus = 'Connected';
-            dbTime = result.rows[0].now;
-        } else {
-            dbStatus = 'Error/Timeout';
-        }
+        const result = await pool.query('SELECT NOW()');
+        dbStatus = result ? 'Connected' : 'Error';
     } catch (err: any) {
-        dbStatus = 'Critical Error';
-        console.error('[Health] Top-level error:', err.message);
+        dbStatus = 'Critical Error: ' + err.message;
     }
-
-    res.json({
-        success: true,
-        version: '1.69.5-SMS-Callback',
-        db: dbStatus,
-        time: dbTime,
-        env: process.env.NODE_ENV,
-        timestamp: new Date().toISOString()
-    });
+    res.json({ success: true, db: dbStatus, timestamp: new Date().toISOString() });
 };
 
 app.get('/health', healthHandler);
 app.get('/api/health', healthHandler);
+app.get('/ekuafor/api/health', healthHandler);
 
-// Verify Test Route
-app.get('/verify-test', async (req: Request, res: Response) => {
-    try {
-        const { gsm, msg } = req.query;
-        console.log(`[VerifyTest] Request received. GSM: ${gsm}, MSG: ${msg}`);
-        if (!gsm || !msg) return res.send('GSM ve MSG parametreleri eksik');
-        const company = await companyService.verifyBySmsCode(String(msg), String(gsm));
-        res.json({ success: !!company, name: company?.name || 'BULUNAMADI' });
-    } catch (e: any) {
-        console.error('[VerifyTest] Error:', e);
-        res.status(500).send(e.message);
-    }
-});
-
-// Basic Ping (No DB)
-app.get('/api/ping', (req, res) => {
-    res.json({ status: 'pong', timestamp: new Date().toISOString() });
-});
-
-// API Info
-app.get('/api', (req, res) => {
-    res.json({ message: 'Saloon API v1.69.5', status: 'running' });
-});
-
-// API Routes (Explicit Definition)
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/ekuafor/api/auth', authRoutes);
 
