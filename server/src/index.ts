@@ -19,6 +19,7 @@ import financeRoutes from './routes/finance.routes';
 import generatorRoutes from './routes/generator.routes';
 import paymentRoutes from './routes/payment.routes';
 import expenseRoutes from './routes/expense.routes';
+import companyService from './services/company.service';
 import cronService from './services/cron.service';
 
 
@@ -57,40 +58,16 @@ const healthHandler = async (req: Request, res: Response) => {
     try {
         const result = await pool.query('SELECT NOW()');
 
-        // Extract DB Host for debugging (Masking credentials)
-        let dbHost = 'Unknown';
+        // Extract DB Host for debugging
+        let dbHost = 'Localhost';
         try {
             if (process.env.DATABASE_URL) {
                 const url = new URL(process.env.DATABASE_URL);
                 dbHost = url.hostname;
+            } else if (process.env.DB_HOST) {
+                dbHost = process.env.DB_HOST;
             }
         } catch (e) { dbHost = 'Parse Error'; }
-
-        // Check for critical tables
-        const tableCheck = await pool.query(`
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema = 'public'
-        `);
-        const tableList = tableCheck.rows.map(r => r.table_name);
-
-        // List ALL foreign keys on companies table
-        const fkCheck = await pool.query(`
-            SELECT
-                tc.constraint_name, 
-                kcu.column_name, 
-                ccu.table_name AS foreign_table_name,
-                ccu.column_name AS foreign_column_name 
-            FROM 
-                information_schema.table_constraints AS tc 
-                JOIN information_schema.key_column_usage AS kcu
-                  ON tc.constraint_name = kcu.constraint_name
-                JOIN information_schema.constraint_column_usage AS ccu
-                  ON ccu.constraint_name = tc.constraint_name
-            WHERE tc.table_name='companies' AND tc.constraint_type = 'FOREIGN KEY';
-        `);
-
-        const companyTypes = await pool.query('SELECT company_type, COUNT(*) FROM companies GROUP BY company_type');
 
         res.json({
             success: true,
@@ -98,9 +75,6 @@ const healthHandler = async (req: Request, res: Response) => {
             db: 'Connected',
             time: result.rows[0].now,
             connected_host: dbHost,
-            tables_found: tableList,
-            company_stats: companyTypes.rows,
-            constraints: fkCheck.rows,
             env: process.env.NODE_ENV
         });
     } catch (error: any) {
@@ -118,6 +92,20 @@ const healthHandler = async (req: Request, res: Response) => {
 
 app.get('/health', healthHandler);
 app.get('/api/health', healthHandler);
+
+// Verify Test Route
+app.get('/verify-test', async (req: Request, res: Response) => {
+    try {
+        const { gsm, msg } = req.query;
+        console.log(`[VerifyTest] Request received. GSM: ${gsm}, MSG: ${msg}`);
+        if (!gsm || !msg) return res.send('GSM ve MSG parametreleri eksik');
+        const company = await companyService.verifyBySmsCode(String(msg), String(gsm));
+        res.json({ success: !!company, name: company?.name || 'BULUNAMADI' });
+    } catch (e: any) {
+        console.error('[VerifyTest] Error:', e);
+        res.status(500).send(e.message);
+    }
+});
 
 // API Info
 app.get('/api', (req, res) => {
@@ -634,22 +622,14 @@ const runMigrations = async () => {
             await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS original_price DECIMAL(10, 2)');
             await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS collected_price DECIMAL(10, 2)');
 
-            // Migrate existing address data if new columns are empty
-            await pool.query(`
-                UPDATE companies 
-                SET city = province_name 
-                WHERE (city IS NULL OR city = '') AND province_name IS NOT NULL AND province_name != ''
-            `);
-            await pool.query(`
-                UPDATE companies 
-                SET district = district_name 
-                WHERE (district IS NULL OR district = '') AND district_name IS NOT NULL AND district_name != ''
-            `);
-            await pool.query(`
-                UPDATE companies 
-                SET neighborhood = neighborhood_name 
-                WHERE (neighborhood IS NULL OR neighborhood = '') AND neighborhood_name IS NOT NULL AND neighborhood_name != ''
-            `);
+            /* 
+            // Migrate existing address data if new columns are empty (Legacy - column province_name removed)
+            try {
+                await pool.query(`UPDATE companies SET city = province_name WHERE (city IS NULL OR city = '') AND province_name IS NOT NULL AND province_name != ''`);
+                await pool.query(`UPDATE companies SET district = district_name WHERE (district IS NULL OR district = '') AND district_name IS NOT NULL AND district_name != ''`);
+                await pool.query(`UPDATE companies SET neighborhood = neighborhood_name WHERE (neighborhood IS NULL OR neighborhood = '') AND neighborhood_name IS NOT NULL AND neighborhood_name != ''`);
+            } catch (e) { }
+            */
 
             // Drop ANY and ALL existing constraints on main_company_id column
             await pool.query(`
