@@ -62,6 +62,7 @@ export default function Dashboard() {
         date: ''
     });
     const [renewingLicense, setRenewingLicense] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // OCR States
     const [isScanningReceipt, setIsScanningReceipt] = useState(false);
@@ -369,6 +370,38 @@ export default function Dashboard() {
         }
     };
 
+    const handlePhotoClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const base64String = reader.result as string;
+                await handlePhotoUpload(base64String);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handlePhotoUpload = async (photo: string) => {
+        if (!user?.company_id) return;
+        setLoading(true);
+        try {
+            const res = await api.put(`/companies/${user.company_id}`, { photo });
+            if (res.data.success) {
+                alert('Firma fotoğrafı başarıyla güncellendi');
+                window.location.reload();
+            }
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Fotoğraf yüklenemedi');
+        } finally {
+            setLoading(false);
+        }
+    };
+
 
     const speak = (text: string) => {
         if (!window.speechSynthesis) return;
@@ -607,17 +640,35 @@ export default function Dashboard() {
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                 <div className="mb-10 flex flex-col sm:flex-row items-center gap-4 pt-4 sm:text-left text-center">
-                    {user?.photo ? (
-                        <img
-                            src={user.photo}
-                            alt={user.first_name}
-                            className="w-32 h-32 rounded-[2.5rem] object-cover shadow-2xl border-4 border-white"
-                        />
-                    ) : (
-                        <div className="w-32 h-32 rounded-[2.5rem] bg-gradient-to-tr from-indigo-500 to-indigo-600 flex items-center justify-center text-white font-black text-4xl shadow-2xl border-4 border-white">
-                            {user?.first_name?.[0]}{user?.last_name?.[0]}
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        accept="image/*"
+                        className="hidden"
+                    />
+                    <div
+                        onClick={handlePhotoClick}
+                        className="cursor-pointer group relative"
+                    >
+                        {companyInfo?.photo ? (
+                            <img
+                                src={companyInfo.photo}
+                                alt={companyInfo.name}
+                                className="w-32 h-32 rounded-[2.5rem] object-cover shadow-2xl border-4 border-white transition-all group-hover:scale-105 active:scale-95"
+                            />
+                        ) : (
+                            <div className="w-32 h-32 rounded-[2.5rem] bg-gradient-to-tr from-indigo-500 to-indigo-600 flex items-center justify-center text-white font-black text-4xl shadow-2xl border-4 border-white transition-all group-hover:scale-105 active:scale-95">
+                                {companyInfo?.name?.[0] || user?.first_name?.[0]}{companyInfo?.name?.[1] || user?.last_name?.[0]}
+                            </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/20 rounded-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
                         </div>
-                    )}
+                    </div>
                 </div>
 
                 {

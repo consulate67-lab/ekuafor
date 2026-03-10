@@ -7,7 +7,7 @@ import { Geolocation } from '@capacitor/geolocation';
 import { Camera } from '@capacitor/camera';
 
 // Optimize individual item render - Moved outside to prevent recreation on every render
-const CompanyCard = React.memo(({ company: c, navigatingToId, favorites, toggleFavorite, onCompanyClick }: any) => {
+const CompanyCard = React.memo(({ company: c, navigatingToId, favorites, toggleFavorite, onCompanyClick, onCallClick }: any) => {
     const isNavigating = navigatingToId === c.id;
 
     return (
@@ -45,16 +45,15 @@ const CompanyCard = React.memo(({ company: c, navigatingToId, favorites, toggleF
                 </a>
 
                 {c.phone && (
-                    <a
-                        href={`tel:${c.phone.replace(/[^0-9]/g, '')}`}
-                        onClick={(e) => { e.stopPropagation(); }}
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onCallClick(e, c); }}
                         className="w-10 h-10 flex items-center justify-center bg-emerald-50 text-emerald-600 rounded-2xl transition-all hover:bg-emerald-600 hover:text-white shadow-md shadow-emerald-100 border border-emerald-100 active:scale-90"
                         title="Telefon"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                         </svg>
-                    </a>
+                    </button>
                 )}
             </div>
 
@@ -149,6 +148,33 @@ export default function CustomerHome() {
     const [isScanning, setIsScanning] = useState(false);
     const isScanningRef = useRef(false);
     const [navigatingTo, setNavigatingTo] = useState<number | null>(null);
+    const [callPicker, setCallPicker] = useState<{ open: boolean, company: any, staff: any[] }>({ open: false, company: null, staff: [] });
+    const [fetchingStaff, setFetchingStaff] = useState(false);
+
+    const handleCallClick = async (e: React.MouseEvent, company: any) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (fetchingStaff) return;
+
+        setFetchingStaff(true);
+        try {
+            const res = await api.get(`/companies/${company.id}/employees`);
+            const allStaff = res.data?.data || [];
+            const staffWithPhone = allStaff.filter((s: any) => (s.phone && s.phone.trim().length > 5) || (s.user_phone && s.user_phone.trim().length > 5));
+
+            if (staffWithPhone.length === 0) {
+                window.location.href = `tel:${company.phone.replace(/[^0-9]/g, '')}`;
+            } else {
+                setCallPicker({ open: true, company, staff: staffWithPhone });
+            }
+        } catch (err) {
+            console.error('Staff fetch error:', err);
+            window.location.href = `tel:${company.phone.replace(/[^0-9]/g, '')}`;
+        } finally {
+            setFetchingStaff(false);
+        }
+    };
 
     const handleCompanyClick = useCallback((c: any) => {
         if (navigatingTo) return;
@@ -775,6 +801,14 @@ export default function CustomerHome() {
                                 </div>
                                 <h4 className="font-black text-slate-900 text-[10px] truncate">{c.name}</h4>
                                 <p className="text-slate-400 text-[8px] font-bold mt-0.5">{c.district || 'Merkez'}</p>
+                                <div className="absolute top-2 right-2">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleCallClick(e, c); }}
+                                        className="w-6 h-6 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center active:scale-90"
+                                    >
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                    </button>
+                                </div>
                             </button>
                         ))}
                     </div>
@@ -813,6 +847,7 @@ export default function CustomerHome() {
                             favorites={favorites}
                             toggleFavorite={toggleFavorite}
                             onCompanyClick={handleCompanyClick}
+                            onCallClick={handleCallClick}
                         />
                     ))
                 )}
@@ -914,6 +949,75 @@ export default function CustomerHome() {
 
             {/* Content Bottom Spacer to avoid overlap */}
             <div className="h-32"></div>
+
+            {/* Call Picker Modal */}
+            {callPicker.open && (
+                <div className="fixed inset-0 z-[100] flex items-end justify-center px-4 pb-6 sm:items-center sm:pb-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setCallPicker({ ...callPicker, open: false })}>
+                    <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl p-6 relative overflow-hidden animate-in slide-in-from-bottom-10 duration-500" onClick={e => e.stopPropagation()}>
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
+
+                        <div className="flex justify-between items-center mb-8">
+                            <div>
+                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">İletişim</h3>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Kimle görüşmek istersiniz?</p>
+                            </div>
+                            <button
+                                onClick={() => setCallPicker({ ...callPicker, open: false })}
+                                className="w-10 h-10 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center hover:bg-slate-200 transition-colors"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+
+                        <div className="space-y-3">
+                            {/* Company Phone */}
+                            <a
+                                href={`tel:${callPicker.company.phone.replace(/[^0-9]/g, '')}`}
+                                className="flex items-center gap-4 p-5 bg-gradient-to-tr from-indigo-50 to-indigo-100/30 rounded-3xl border border-indigo-100 active:scale-95 transition-all group"
+                            >
+                                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-xl shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                    🏢
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest leading-none mb-1.5">ŞUBE / ANA HAT</p>
+                                    <h4 className="font-black text-indigo-950 uppercase tracking-tighter text-lg">{callPicker.company.name}</h4>
+                                </div>
+                                <svg className="w-5 h-5 text-indigo-300 group-hover:text-indigo-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                            </a>
+
+                            <div className="flex items-center gap-3 py-2 px-2">
+                                <div className="h-px bg-slate-100 flex-1"></div>
+                                <span className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">Uzman Kadromuz</span>
+                                <div className="h-px bg-slate-100 flex-1"></div>
+                            </div>
+
+                            {/* Staff Phones */}
+                            {callPicker.staff.map((s: any) => (
+                                <a
+                                    key={s.id}
+                                    href={`tel:${(s.phone || s.user_phone).replace(/[^0-9]/g, '')}`}
+                                    className="flex items-center gap-4 p-4 bg-slate-50 hover:bg-white hover:shadow-lg hover:shadow-slate-200/50 rounded-3xl border border-slate-100 active:scale-95 transition-all group"
+                                >
+                                    <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center text-lg shadow-sm group-hover:bg-emerald-500 group-hover:text-white transition-colors overflow-hidden">
+                                        {s.photo || s.user_photo ? (
+                                            <img src={s.photo || s.user_photo} className="w-full h-full object-cover" />
+                                        ) : '👤'}
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{s.title || 'Personel'}</p>
+                                        <h4 className="font-bold text-slate-800 uppercase tracking-tight">{s.first_name || s.user_first_name} {s.last_name || s.user_last_name}</h4>
+                                    </div>
+                                    <svg className="w-5 h-5 text-slate-200 group-hover:text-emerald-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                </a>
+                            ))}
+                        </div>
+
+                        <div className="mt-6 flex justify-center">
+                            <p className="text-[8px] font-bold text-slate-300 uppercase tracking-[0.3em]">Hızlı & Doğru İletişim</p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Code Entry Modal */}
             {
