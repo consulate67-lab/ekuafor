@@ -1,6 +1,7 @@
 import pool from '../config/database';
 import iyzicoService from './iyzico.service';
 import smsService from './sms.service';
+import { normalizePhone } from '../utils/phone';
 
 
 export interface Company {
@@ -491,24 +492,20 @@ class CompanyService {
      */
     async verifyBySmsCode(message: string, phone: string): Promise<Company | null> {
         if (!message || !phone) {
-            console.log('[CompanyService] SMS Onay Hatasi: Mesaj veya Telefon bos');
+            console.log('[CompanyService] [ERROR] Mesaj veya Tel bos gonderildi');
             return null;
         }
 
-        console.log(`[CompanyService] Gelen Ham Veri: Kod=${message}, Telefon=${phone}`);
+        console.log(`[CompanyService] [START] Mesaj: "${message}", Tel: "${phone}"`);
 
-        // Mesaj içinden 5 karakterli kodu ayıklayan regex (Case insensitive)
+        // Kod ayıklama
         const codeMatch = message.match(/[A-Z0-9]{5}/i);
-        const cleanCode = codeMatch ? codeMatch[0].toUpperCase() : message.trim().toUpperCase();
+        const cleanCode = (codeMatch ? codeMatch[0] : message.trim()).toUpperCase();
+        const cleanPhone = normalizePhone(phone); // 10 hane
 
-        const { normalizePhone } = require('../utils/phone');
-        const cleanPhone = normalizePhone(phone); // Örn: 5336660125 (10 hane)
+        console.log(`[CompanyService] [CLEAN] Kod: ${cleanCode}, Tel: ${cleanPhone}`);
 
-        console.log(`[CompanyService] Islenmis Veri: Kod=${cleanCode}, TemizTel=${cleanPhone}`);
-
-        // Firmayı bul:
-        // 1. verification_code tam eşleşmeli (X7A2B)
-        // 2. Telefon numarasının son 10 hanesi eşleşmeli
+        // Sorgu: Son 10 hane eslesmesi + Kod eslesmesi
         const findRes = await pool.query(
             `SELECT id, name, phone, verification_code FROM companies 
              WHERE (UPPER(verification_code) = $1 OR UPPER(verification_code) = $2)
@@ -519,15 +516,15 @@ class CompanyService {
         );
 
         if (findRes.rows.length === 0) {
-            console.log(`[CompanyService] SMS Onay Basarisiz: Kod(${cleanCode}) veya Tel(${cleanPhone}) eslesmedi.`);
-            // Debug için bekleyen birkac kaydı loglayalım
-            const debugPending = await pool.query('SELECT name, phone, verification_code FROM companies WHERE is_verified = false ORDER BY created_at DESC LIMIT 10');
-            console.log('[CompanyService] Veritabaninda Bekleyen Kodlar:', JSON.stringify(debugPending.rows.map(r => ({ name: r.name, code: r.verification_code, tel: r.phone }))));
+            console.log(`[CompanyService] [FAIL] Eslesme yok: Kod=${cleanCode}, Tel=${cleanPhone}`);
+            // Log pending verifications for easier debugging
+            const pending = await pool.query('SELECT name, phone, verification_code FROM companies WHERE is_verified = false ORDER BY created_at DESC LIMIT 5');
+            console.log('[CompanyService] [DEBUG] Veritabaninda baska ne var?:', JSON.stringify(pending.rows));
             return null;
         }
 
         const company = findRes.rows[0];
-        console.log(`[CompanyService] SMS Onay Basarili: ${company.name} (ID: ${company.id}) onaylaniyor...`);
+        console.log(`[CompanyService] [SUCCESS] Bulundu: ${company.name} (ID: ${company.id}). Onaylaniyor...`);
         return await this.verifyCompany(company.id);
     }
 }
