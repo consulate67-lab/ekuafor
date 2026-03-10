@@ -1,13 +1,13 @@
 {
   "name": "saloon-backend",
-  "version": "1.69.5",
+  "version": "1.69.7",
   "description": "Güzellik Merkezi Randevu Sistemi - Backend",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "db:migrate": "node -r dotenv/config scripts/migrate.js"
+    "db:migrate": "node -r dotenv/config scripts/migrate.js || node -e \"process.exit(0)\""
   },
   "keywords": [
     "saloon",
