@@ -193,10 +193,11 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     });
 });
 
-// Auto-migration on startup
 const runMigrations = async () => {
+    let client;
     try {
         console.log('🔄 Running auto-migrations...');
+        client = await pool.connect();
 
         // 0. Enum Types
         await pool.query(`
@@ -785,6 +786,8 @@ const runMigrations = async () => {
         console.log('✅ Auto-migrations and seeding completed.');
     } catch (err) {
         console.error('❌ Migration failed:', err);
+    } finally {
+        if (client) client.release();
     }
 };
 
