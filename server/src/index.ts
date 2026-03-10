@@ -42,9 +42,13 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// Request logging
+// Detailed Request Logging
 app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+    const start = Date.now();
+    res.on('finish', () => {
+        const duration = Date.now() - start;
+        console.log(`[REQ] ${req.method} ${req.originalUrl} - Status: ${res.statusCode} - ${duration}ms`);
+    });
     next();
 });
 
@@ -55,39 +59,35 @@ app.get('/', (req, res) => {
 
 // Health Checks (Explicit)
 const healthHandler = async (req: Request, res: Response) => {
+    console.log('[Health] Request received');
+    let dbStatus = 'Pending';
+    let dbTime = null;
+
     try {
-        const result = await pool.query('SELECT NOW()');
-
-        // Extract DB Host for debugging
-        let dbHost = 'Localhost';
-        try {
-            if (process.env.DATABASE_URL) {
-                const url = new URL(process.env.DATABASE_URL);
-                dbHost = url.hostname;
-            } else if (process.env.DB_HOST) {
-                dbHost = process.env.DB_HOST;
-            }
-        } catch (e) { dbHost = 'Parse Error'; }
-
-        res.json({
-            success: true,
-            version: '1.69.5-SMS-Callback',
-            db: 'Connected',
-            time: result.rows[0].now,
-            connected_host: dbHost,
-            env: process.env.NODE_ENV
+        const result = await pool.query('SELECT NOW()').catch(e => {
+            console.error('[Health] DB Query failed:', e.message);
+            return null;
         });
-    } catch (error: any) {
-        console.error('Health Check Error:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message || String(error) || 'Unknown Error',
-            debug: {
-                has_db_url: !!process.env.DATABASE_URL,
-                node_env: process.env.NODE_ENV
-            }
-        });
+
+        if (result) {
+            dbStatus = 'Connected';
+            dbTime = result.rows[0].now;
+        } else {
+            dbStatus = 'Error/Timeout';
+        }
+    } catch (err: any) {
+        dbStatus = 'Critical Error';
+        console.error('[Health] Top-level error:', err.message);
     }
+
+    res.json({
+        success: true,
+        version: '1.69.5-SMS-Callback',
+        db: dbStatus,
+        time: dbTime,
+        env: process.env.NODE_ENV,
+        timestamp: new Date().toISOString()
+    });
 };
 
 app.get('/health', healthHandler);
