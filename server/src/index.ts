@@ -56,7 +56,7 @@ app.use((req, res, next) => {
 const commonPing = (req: Request, res: Response) => res.json({
     status: 'pong',
     time: new Date().toISOString(),
-    version: '1.69.5-SMS-FIX',
+    version: '1.69.11-NETGSM-FIX',
     port: PORT
 });
 
