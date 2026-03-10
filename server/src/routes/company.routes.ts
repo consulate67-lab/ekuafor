@@ -730,10 +730,19 @@ router.all('/sms-callback', async (req: Request, res: Response) => {
 
         // Netgsm values can be anywhere
         const allData = { ...req.query, ...req.body, ...req.params };
+
+        // Handle cases where POST body is sent as a string (missing headers)
+        if (req.method === 'POST' && typeof req.body === 'string') {
+            try {
+                const parsed = JSON.parse(req.body);
+                Object.assign(allData, parsed);
+            } catch (e) { }
+        }
+
         console.log('[SMS Callback] Collected Data:', JSON.stringify(allData));
 
-        const gsm = allData.gsm || allData.sourceNumber || allData.phone || allData.from;
-        const msg = allData.msg || allData.content || allData.message || allData.text;
+        const gsm = allData.sourceNumber || allData.gsm || allData.phone || allData.from;
+        const msg = allData.content || allData.msg || allData.message || allData.text;
 
         console.log(`[SMS Callback] Detected: GSM=${gsm}, MSG=${msg}`);
 
