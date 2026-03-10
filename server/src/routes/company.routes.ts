@@ -726,25 +726,27 @@ router.post('/check-code', async (req: Request, res: Response) => {
  */
 router.all('/sms-callback', async (req: Request, res: Response) => {
     try {
-        const queryParams = req.query;
-        const bodyContent = req.body;
+        console.log(`[SMS Callback] [${new Date().toISOString()}] New Request: ${req.method} ${req.originalUrl}`);
 
-        console.log('[SMS Callback] Raw Data:', JSON.stringify({ query: queryParams, body: bodyContent }));
+        // Netgsm values can be anywhere
+        const allData = { ...req.query, ...req.body, ...req.params };
+        console.log('[SMS Callback] Collected Data:', JSON.stringify(allData));
 
-        // Netgsm values can be in query or body
-        const gsm = queryParams.gsm || bodyContent.sourceNumber || queryParams.sourceNumber || bodyContent.gsm;
-        const msg = queryParams.msg || bodyContent.content || queryParams.content || bodyContent.msg;
+        const gsm = allData.gsm || allData.sourceNumber || allData.phone || allData.from;
+        const msg = allData.msg || allData.content || allData.message || allData.text;
+
+        console.log(`[SMS Callback] Detected: GSM=${gsm}, MSG=${msg}`);
 
         if (msg && gsm) {
             const company = await companyService.verifyBySmsCode(String(msg), String(gsm));
             if (company) {
-                console.log(`[SMS Callback] SUCCESS: Firma Onaylandi: ${company.name} (ID: ${company.id})`);
-                return res.json({ status: "OK", message: "Approved" });
+                console.log(`[SMS Callback] SUCCESS: Approved ${company.name}`);
+                return res.json({ status: "OK", message: "Approved", company: company.name });
             } else {
-                console.log(`[SMS Callback] FAILED: Dogrulama basarisiz (Kod=${msg}, Tel=${gsm})`);
+                console.log(`[SMS Callback] FAILED: Dogrulama basarisiz (Kriterlere uyan kayit yok)`);
             }
         } else {
-            console.log(`[SMS Callback] ERRROR: Eksik parametre (GSM=${gsm}, MSG=${msg})`);
+            console.log(`[SMS Callback] ERROR: Parametreler eksik (GSM veya MSG bulunamadi)`);
         }
 
         res.json({ status: "NOT_PROCESSED" });

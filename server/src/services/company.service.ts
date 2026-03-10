@@ -495,28 +495,34 @@ class CompanyService {
             return null;
         }
 
+        console.log(`[CompanyService] Gelen Ham Veri: Kod=${message}, Telefon=${phone}`);
+
         // Mesaj içinden 5 karakterli kodu ayıklayan regex
         const codeMatch = message.match(/[A-Z0-9]{5}/i);
         const cleanCode = codeMatch ? codeMatch[0].toUpperCase() : message.trim().toUpperCase();
 
         const { normalizePhone } = require('../utils/phone');
-        const cleanPhone = normalizePhone(phone);
+        const cleanPhone = normalizePhone(phone); // Örn: 5336660125 (10 hane)
 
-        console.log(`[CompanyService] SMS Onay Denemesi: Kod=${cleanCode}, GelenTel=${phone}, TemizTel=${cleanPhone}`);
+        console.log(`[CompanyService] Temizlenmis Veri: Kod=${cleanCode}, TemizTel=${cleanPhone}`);
 
-        // Firmayı bul: Hem kod hem de telefon eşleşmeli
-        // Telefon numarasını son 10 hanesine göre arıyoruz ki 0532, 90532 gibi farklı kayıt formatları sorun çıkarmasın
+        // Firmayı bul:
+        // 1. verification_code tam eşleşmeli (X7A2B)
+        // 2. Telefon numarasının son 10 hanesi eşleşmeli (5336660125)
         const findRes = await pool.query(
-            `SELECT id, name, phone FROM companies 
+            `SELECT id, name, phone, verification_code FROM companies 
              WHERE (verification_code = $1 OR verification_code = $2)
-             AND (phone LIKE $3 OR phone LIKE $4 OR RIGHT(phone, 10) = $5)
+             AND (RIGHT(phone, 10) = $3 OR phone LIKE $4 OR phone = $5)
              AND is_verified = false 
              LIMIT 1`,
-            [cleanCode, message.trim().toUpperCase(), `%${cleanPhone}`, `%${phone.replace(/\D/g, '')}`, cleanPhone]
+            [cleanCode, message.trim().toUpperCase(), cleanPhone, `%${cleanPhone}`, phone.replace(/\D/g, '')]
         );
 
         if (findRes.rows.length === 0) {
-            console.log(`[CompanyService] SMS Onay Basarisiz: Kayit bulunamadi veya zaten onayli. (Kod: ${cleanCode}, Tel: ${cleanPhone})`);
+            console.log(`[CompanyService] SMS Onay Basarisiz: Kod veya Telefon eslesmedi. (Kod: ${cleanCode}, Tel: ${cleanPhone})`);
+            // Debug: Log existing codes to see what's wrong (limited to 5 for security)
+            const debugRes = await pool.query('SELECT name, phone, verification_code FROM companies WHERE is_verified = false ORDER BY created_at DESC LIMIT 5');
+            console.log('[CompanyService] Bekleyen Firmalar (Debug):', JSON.stringify(debugRes.rows));
             return null;
         }
 
