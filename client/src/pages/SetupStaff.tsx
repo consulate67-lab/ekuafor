@@ -179,59 +179,59 @@ export default function SetupStaff() {
                     </form>
                 ) : (
                     <div className="animate-in fade-in slide-in-from-right-10 duration-500">
-                        <div className="flex items-center justify-between mb-10">
+                        <div className="flex items-center justify-between mb-6 sm:mb-10">
                             <div>
-                                <h2 className="text-3xl font-black text-white tracking-tight">Uzman Kadronuz</h2>
-                                <p className="text-xs text-indigo-400 font-black uppercase tracking-widest mt-2 bg-indigo-500/10 px-3 py-1.5 rounded-full inline-block">
+                                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Uzman Kadronuz</h2>
+                                <p className="text-[10px] text-indigo-400 font-black uppercase tracking-widest mt-1.5 bg-indigo-500/10 px-2.5 py-1 rounded-full inline-block">
                                     PERSONEL #{currentStaffIndex + 1} / {staffCount}
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setStep(step - 1)}
-                                className="h-10 px-4 flex items-center gap-2 rounded-xl text-xs font-black uppercase tracking-widest text-slate-500 hover:text-white hover:bg-white/5 transition-all"
+                                className="h-8 sm:h-10 px-3 sm:px-4 flex items-center gap-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest text-slate-500 hover:text-white hover:bg-white/5 transition-all border border-white/5"
                             >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path d="M15 19l-7-7 7-7" /></svg>
+                                <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path d="M15 19l-7-7 7-7" /></svg>
                                 Geri
                             </button>
                         </div>
 
-                        <div className="space-y-6 mb-10">
-                            <div className="group bg-white/[0.03] border border-white/5 rounded-3xl p-8 relative overflow-hidden transition-all duration-500">
-                                <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-pink-500 to-indigo-500" />
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Adı</label>
+                        <div className="space-y-4 sm:space-y-6 mb-8 sm:mb-10">
+                            <div className="group bg-white/[0.03] border border-white/5 rounded-2xl sm:rounded-3xl p-5 sm:p-8 relative overflow-hidden transition-all duration-500">
+                                <div className="absolute top-0 left-0 w-1 sm:w-1.5 h-full bg-gradient-to-b from-pink-500 to-indigo-500" />
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                                    <div className="space-y-1.5 sm:space-y-2">
+                                        <label className="block text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Adı</label>
                                         <input
                                             type="text"
                                             required
                                             value={staffList[currentStaffIndex]?.first_name || ''}
                                             onChange={e => handleStaffChange(currentStaffIndex, 'first_name', e.target.value)}
-                                            className="w-full bg-slate-950/50 border border-white/10 rounded-xl px-5 py-4 text-white text-sm focus:border-indigo-500/50 outline-none transition-all"
+                                            className="w-full bg-slate-950/50 border border-white/10 rounded-xl px-4 py-3 sm:px-5 sm:py-4 text-white text-sm focus:border-indigo-500/50 outline-none transition-all"
                                             placeholder="Örn: Sibel"
                                         />
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Soyadı</label>
+                                    <div className="space-y-1.5 sm:space-y-2">
+                                        <label className="block text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Soyadı</label>
                                         <input
                                             type="text"
                                             required
                                             value={staffList[currentStaffIndex]?.last_name || ''}
                                             onChange={e => handleStaffChange(currentStaffIndex, 'last_name', e.target.value)}
-                                            className="w-full bg-slate-950/50 border border-white/10 rounded-xl px-5 py-4 text-white text-sm focus:border-indigo-500/50 outline-none transition-all"
+                                            className="w-full bg-slate-950/50 border border-white/10 rounded-xl px-4 py-3 sm:px-5 sm:py-4 text-white text-sm focus:border-indigo-500/50 outline-none transition-all"
                                             placeholder="Örn: Kaya"
                                         />
                                     </div>
-                                    <div className="sm:col-span-2 space-y-2">
-                                        <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Telefon Numarası</label>
+                                    <div className="sm:col-span-2 space-y-1.5 sm:space-y-2">
+                                        <label className="block text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Telefon Numarası</label>
                                         <div className="relative">
-                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 text-xs font-bold border-r border-white/10 pr-3">+90</div>
+                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 text-[10px] font-bold border-r border-white/10 pr-3">+90</div>
                                             <input
                                                 type="tel"
                                                 required
                                                 value={staffList[currentStaffIndex]?.phone || ''}
                                                 onChange={e => handleStaffChange(currentStaffIndex, 'phone', e.target.value)}
-                                                className="w-full bg-slate-950/50 border border-white/10 rounded-xl px-4 py-4 pl-16 text-white text-sm focus:border-indigo-500/50 outline-none transition-all"
+                                                className="w-full bg-slate-950/50 border border-white/10 rounded-xl px-4 py-3 sm:px-4 sm:py-4 pl-14 sm:pl-16 text-white text-sm focus:border-indigo-500/50 outline-none transition-all"
                                                 placeholder="5XX XXX XX XX"
                                             />
                                         </div>
@@ -240,12 +240,12 @@ export default function SetupStaff() {
                             </div>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row gap-4">
+                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                             {currentStaffIndex < staffCount - 1 ? (
                                 <button
                                     type="button"
                                     onClick={handleNextStep}
-                                    className="flex-1 px-10 py-5 bg-white text-slate-900 rounded-2xl font-black text-lg transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3"
+                                    className="flex-1 px-8 py-4 sm:px-10 sm:py-5 bg-white text-slate-900 rounded-2xl font-black text-base sm:text-lg transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3"
                                 >
                                     İleri
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -256,7 +256,7 @@ export default function SetupStaff() {
                                 <button
                                     onClick={handleStaffSubmit}
                                     disabled={loading}
-                                    className="flex-1 px-10 py-5 bg-gradient-to-r from-pink-600 to-indigo-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-indigo-600/20 hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+                                    className="flex-1 px-8 py-4 sm:px-10 sm:py-5 bg-gradient-to-r from-pink-600 to-indigo-600 text-white rounded-2xl font-black text-base sm:text-lg shadow-xl shadow-indigo-600/20 hover:scale-[1.02] active:scale-95 disabled:opacity-50"
                                 >
                                     {loading ? 'Kaydediliyor...' : 'Tüm Personelleri Kaydet ve Tamamla'}
                                 </button>
