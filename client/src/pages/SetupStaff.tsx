@@ -114,7 +114,7 @@ export default function SetupStaff() {
             <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-pink-600/10 blur-[120px] pointer-events-none animate-pulse" />
             <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-600/10 blur-[120px] pointer-events-none animate-pulse" />
 
-            <div className="relative bg-[#0b1120]/80 backdrop-blur-2xl border border-white/10 w-full max-w-2xl rounded-[3rem] shadow-2xl p-8 sm:p-12 z-10">
+            <div className="relative bg-[#0b1120]/80 backdrop-blur-2xl border border-white/10 w-full max-w-2xl rounded-[2.5rem] sm:rounded-[3rem] shadow-2xl p-6 sm:p-12 z-10">
                 {/* Step Progress */}
                 <div className="flex items-center gap-1.5 mb-10 overflow-hidden">
                     <div className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${step >= 1 ? 'bg-gradient-to-r from-pink-500 to-purple-500' : 'bg-white/10'}`} />
@@ -138,13 +138,13 @@ export default function SetupStaff() {
                             Dijital dönüşümün ilk adımı! Salonunuzda kaç uzman personel görev yapıyor? Her birine özel giriş kodu otomatik iletilecek.
                         </p>
 
-                        <div className="mb-12 inline-block relative bg-white/[0.02] border border-white/5 rounded-[2.5rem] p-8 sm:p-12 shadow-2xl">
-                            <label className="block text-xs font-black uppercase tracking-[0.2em] text-indigo-400 mb-8">Personel Sayısı</label>
-                            <div className="flex items-center justify-center gap-10">
+                        <div className="mb-8 sm:mb-12 inline-block relative bg-white/[0.02] border border-white/5 rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-12 shadow-2xl">
+                            <label className="block text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-indigo-400 mb-6 sm:mb-8">Personel Sayısı</label>
+                            <div className="flex items-center justify-center gap-4 sm:gap-10">
                                 <button
                                     type="button"
                                     onClick={() => setStaffCount(Math.max(1, staffCount - 1))}
-                                    className="w-16 h-16 rounded-2xl bg-white/10 border-2 border-white/20 flex items-center justify-center text-3xl font-black hover:bg-white/20 hover:border-white/40 active:scale-90 transition-all text-white shadow-lg shadow-black/20"
+                                    className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-white/10 border-2 border-white/20 flex items-center justify-center text-2xl sm:text-3xl font-black hover:bg-white/20 hover:border-white/40 active:scale-90 transition-all text-white shadow-lg shadow-black/20"
                                 >
                                     −
                                 </button>
@@ -156,14 +156,14 @@ export default function SetupStaff() {
                                         required
                                         value={staffCount}
                                         onChange={e => setStaffCount(parseInt(e.target.value) || 1)}
-                                        className="w-28 text-center bg-white/5 border-2 border-white/10 rounded-3xl py-4 text-white text-6xl font-black outline-none focus:border-indigo-500/50 focus:bg-white/10 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        className="w-20 sm:w-28 text-center bg-white/5 border-2 border-white/10 rounded-2xl sm:rounded-3xl py-2 sm:py-4 text-white text-4xl sm:text-6xl font-black outline-none focus:border-indigo-500/50 focus:bg-white/10 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     />
-                                    <div className="absolute -bottom-6 left-0 right-0 text-[9px] font-black text-slate-500 uppercase tracking-widest">Kişi</div>
+                                    <div className="absolute -bottom-5 sm:-bottom-6 left-0 right-0 text-[8px] sm:text-[9px] font-black text-slate-500 uppercase tracking-widest">Kişi</div>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={() => setStaffCount(Math.min(50, staffCount + 1))}
-                                    className="w-16 h-16 rounded-2xl bg-white/10 border-2 border-white/20 flex items-center justify-center text-3xl font-black hover:bg-white/20 hover:border-white/40 active:scale-90 transition-all text-white shadow-lg shadow-black/20"
+                                    className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-white/10 border-2 border-white/20 flex items-center justify-center text-2xl sm:text-3xl font-black hover:bg-white/20 hover:border-white/40 active:scale-90 transition-all text-white shadow-lg shadow-black/20"
                                 >
                                     +
                                 </button>
@@ -172,7 +172,7 @@ export default function SetupStaff() {
 
                         <button
                             type="submit"
-                            className="group relative px-12 py-5 bg-white text-slate-900 rounded-2xl font-black text-xl shadow-[0_20px_40px_-15px_rgba(30,20,50,0.5)] hover:scale-[1.02] active:scale-95 transition-all w-full sm:w-auto"
+                            className="group relative px-8 py-4 sm:px-12 sm:py-5 bg-white text-slate-900 rounded-2xl font-black text-lg sm:text-xl shadow-[0_20px_40px_-15px_rgba(30,20,50,0.5)] hover:scale-[1.02] active:scale-95 transition-all w-full sm:w-auto"
                         >
                             Bilgileri Doldurmaya Başla
                         </button>
