@@ -172,14 +172,15 @@ import setupRoutes from './routes/setup.routes';
 app.use('/api/setup', setupRoutes);
 app.use('/ekuafor/api/setup', setupRoutes);
 
-// 404 Handler
-app.use((req: Request, res: Response) => {
-    console.warn(`[404] ${req.method} ${req.originalUrl} - Bulunamadı`);
+// 404 Handler - Catch everything else
+app.all('*', (req: Request, res: Response) => {
+    console.warn(`[404] ${req.method} ${req.originalUrl} - Not Found`);
     res.status(404).json({
+        success: false,
         error: 'Route not found',
         path: req.originalUrl,
         method: req.method,
-        help: 'Check if you included /api prefix and correct endpoint name'
+        help: 'Verify the URL and API prefix (e.g., /api/ping or /ekuafor/api/ping)'
     });
 });
 
