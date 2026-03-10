@@ -492,40 +492,56 @@ class CompanyService {
      */
     async verifyBySmsCode(message: string, phone: string): Promise<Company | null> {
         if (!message || !phone) {
-            console.log('[CompanyService] [ERROR] Mesaj veya Tel bos gonderildi');
+            console.log('[SMS-CB] [ERROR] Mesaj veya Tel bos gonderildi');
             return null;
         }
 
-        console.log(`[CompanyService] [START] Mesaj: "${message}", Tel: "${phone}"`);
+        console.log(`[SMS-CB] [START] Mesaj: "${message}", Tel: "${phone}"`);
 
-        // Kod ayıklama
-        const codeMatch = message.match(/[A-Z0-9]{5}/i);
+        // Kod ayıklama (5 karakterli alphanumeric, mesajın içinde herhangi bir yerde olabilir)
+        const codeMatch = message.match(/[A-Z0-9]{5,6}/gi);
         const cleanCode = (codeMatch ? codeMatch[0] : message.trim()).toUpperCase();
-        const cleanPhone = normalizePhone(phone); // 10 hane
 
-        console.log(`[CompanyService] [CLEAN] Kod: ${cleanCode}, Tel: ${cleanPhone}`);
+        // Telefon normalizasyonu (Son 10 hane her zaman en güvenilir olanıdır)
+        const cleanPhone = normalizePhone(phone); // 5336660125
 
-        // Sorgu: Son 10 hane eslesmesi + Kod eslesmesi
+        console.log(`[SMS-CB] [PROC] CleanedCode: ${cleanCode}, CleanedPhone: ${cleanPhone}`);
+
+        // Veritabanında ara:
+        // 1. Onaylanmamış bir firma olmalı
+        // 2. Kod veritabanındakiyle aynı olmalı (Büyük/Küçük harf duyarsız)
+        // 3. Telefon numarasının son 10 hanesi tutmalı (Veritabanındaki numara da temizlenerek kontrol edilir)
         const findRes = await pool.query(
             `SELECT id, name, phone, verification_code FROM companies 
              WHERE (UPPER(verification_code) = $1 OR UPPER(verification_code) = $2)
-             AND (RIGHT(phone, 10) = $3 OR phone LIKE $4 OR phone = $5)
+             AND (
+                REGEXP_REPLACE(phone, '\\D', '', 'g') LIKE '%' || $3
+                OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $3
+             )
              AND is_verified = false 
+             ORDER BY created_at DESC
              LIMIT 1`,
-            [cleanCode, message.trim().toUpperCase(), cleanPhone, `%${cleanPhone}`, phone.replace(/\D/g, '')]
+            [cleanCode, cleanCode.substring(0, 5), cleanPhone]
         );
 
         if (findRes.rows.length === 0) {
-            console.log(`[CompanyService] [FAIL] Eslesme yok: Kod=${cleanCode}, Tel=${cleanPhone}`);
-            // Log pending verifications for easier debugging
-            const pending = await pool.query('SELECT name, phone, verification_code FROM companies WHERE is_verified = false ORDER BY created_at DESC LIMIT 5');
-            console.log('[CompanyService] [DEBUG] Veritabaninda baska ne var?:', JSON.stringify(pending.rows));
+            console.log(`[SMS-CB] [FAIL] Eslesme bulunamadi. Aranan: Code="${cleanCode}", PhoneEndsWith="${cleanPhone}"`);
+
+            // Debug: Onay bekleyen son kayıtları dök ki neyi kaçırdığımızı görelim
+            const pending = await pool.query('SELECT name, phone, verification_code, created_at FROM companies WHERE is_verified = false ORDER BY created_at DESC LIMIT 3');
+            console.log('[SMS-CB] [DEBUG] Veritabaninda Onay Bekleyen Kayitlar:', JSON.stringify(pending.rows, null, 2));
             return null;
         }
 
         const company = findRes.rows[0];
-        console.log(`[CompanyService] [SUCCESS] Bulundu: ${company.name} (ID: ${company.id}). Onaylaniyor...`);
-        return await this.verifyCompany(company.id);
+        console.log(`[SMS-CB] [SUCCESS] Bulundu: "${company.name}" (ID: ${company.id}). Onay sureci baslatiliyor...`);
+
+        try {
+            return await this.verifyCompany(company.id);
+        } catch (err: any) {
+            console.error(`[SMS-CB] [ERROR] verifyCompany(id=${company.id}) HATA:`, err.message);
+            return null;
+        }
     }
 }
 
