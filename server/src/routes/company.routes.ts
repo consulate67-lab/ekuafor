@@ -733,8 +733,8 @@ router.all('/sms-callback', async (req: Request, res: Response) => {
 
         console.log('[SMS Callback] Collected Data:', JSON.stringify(allData));
         
-        const gsm = allData.sourceNumber || allData.source_number || allData.gsm || allData.phone || allData.from || allData.source || allData.number || allData.sender;
-        const msg = allData.content || allData.msg || allData.message || allData.text || allData.body || allData.sms_text;
+        const gsm = allData.ceptel || allData.sourceNumber || allData.source_number || allData.gsm || allData.phone || allData.from || allData.source || allData.number || allData.sender;
+        const msg = allData.mesaj || allData.content || allData.msg || allData.message || allData.text || allData.body || allData.sms_text;
 
         console.log(`[SMS Callback] Detected: GSM=${gsm}, MSG=${msg}`);
 
