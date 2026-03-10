@@ -728,21 +728,16 @@ router.all('/sms-callback', async (req: Request, res: Response) => {
     try {
         console.log(`[SMS Callback] [${new Date().toISOString()}] New Request: ${req.method} ${req.originalUrl}`);
 
-        // Netgsm values can be anywhere
+        // Netgsm and other provider values can be anywhere (query params, body, etc)
         const allData = { ...req.query, ...req.body, ...req.params };
 
-        // Handle cases where POST body is sent as a string (missing headers)
-        if (req.method === 'POST' && typeof req.body === 'string') {
-            try {
-                const parsed = JSON.parse(req.body);
-                Object.assign(allData, parsed);
-            } catch (e) { }
+        console.log('[SMS Callback] Collected Data:', JSON.stringify(allData));
+        if (req.method === 'POST') {
+            console.log('[SMS Callback] Raw Body:', typeof req.body === 'object' ? JSON.stringify(req.body) : req.body);
         }
 
-        console.log('[SMS Callback] Collected Data:', JSON.stringify(allData));
-
-        const gsm = allData.sourceNumber || allData.gsm || allData.phone || allData.from;
-        const msg = allData.content || allData.msg || allData.message || allData.text;
+        const gsm = allData.sourceNumber || allData.source_number || allData.gsm || allData.phone || allData.from || allData.source || allData.number;
+        const msg = allData.content || allData.msg || allData.message || allData.text || allData.body;
 
         console.log(`[SMS Callback] Detected: GSM=${gsm}, MSG=${msg}`);
 

@@ -37,15 +37,9 @@ CREATE TABLE IF NOT EXISTS companies (
     
     -- Adres Bilgileri
     address_line TEXT,
-    province_id INTEGER,
-    province_name VARCHAR(100),
-    district_id INTEGER,
-    district_name VARCHAR(100),
-    neighborhood_id INTEGER,
-    neighborhood_name VARCHAR(100),
-    street_name VARCHAR(100),
-    building_no VARCHAR(20),
-    apartment_no VARCHAR(20),
+    city VARCHAR(100),
+    district VARCHAR(100),
+    neighborhood VARCHAR(100),
     postal_code VARCHAR(10),
     
     -- Konum Bilgileri
@@ -96,8 +90,8 @@ CREATE TABLE IF NOT EXISTS main_companies (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     address_line TEXT,
-    province_id INTEGER,
-    province_name VARCHAR(100),
+    city VARCHAR(100),
+    district VARCHAR(100),
     admin_code VARCHAR(20) UNIQUE,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

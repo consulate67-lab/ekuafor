@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import { Appointment, Service, Company } from '../types';
@@ -394,7 +394,7 @@ export default function AppointmentManagement() {
         setNewAppointment({ ...newAppointment, start_time: startTime, end_time: endTime });
     };
 
-    const handleAddAppointment = async (e: React.FormEvent) => {
+    const handleAddAppointment = async (e: FormEvent) => {
         e.preventDefault();
         setFormError('');
         try {

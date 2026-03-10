@@ -81,6 +81,8 @@ class CompanyService {
 
         try {
             try {
+                await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS city TEXT');
+                await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS district TEXT');
                 await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS neighborhood TEXT');
                 await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS sms_enabled BOOLEAN DEFAULT true');
                 await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS ai_rules TEXT');
@@ -155,7 +157,7 @@ class CompanyService {
                 company.fax_number || null,
                 company.booking_flow || 'SPDT',
                 company.bank_iban || null,
-                company.verification_code || Math.random().toString(36).substring(2, 7).toUpperCase()
+                company.verification_code || Array.from({ length: 5 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 30)]).join('')
             ];
 
             const result = await client.query(`
@@ -414,7 +416,7 @@ class CompanyService {
         licenseEndDate.setDate(licenseEndDate.getDate() + 90);
 
         const result = await pool.query(
-            'UPDATE companies SET is_verified = true, is_active = true, license_end_date = $1 WHERE id = $2 RETURNING *',
+            'UPDATE companies SET is_verified = true, is_active = true, license_status = \'active\', license_end_date = $1 WHERE id = $2 RETURNING *',
             [licenseEndDate, id]
         );
         const company = result.rows[0] || null;
@@ -498,8 +500,9 @@ class CompanyService {
 
         console.log(`[SMS-CB] [START] Mesaj: "${message}", Tel: "${phone}"`);
 
-        // Kod ayıklama (5 karakterli alphanumeric, mesajın içinde herhangi bir yerde olabilir)
-        const codeMatch = message.match(/[A-Z0-9]{5,6}/gi);
+        // Kod ayıklama (5-6 karakterli alphanumeric, mesajın içinde herhangi bir yerde olabilir)
+        // \b word boundary kullanarak telefon numaralarının içindeki parçaların eşleşmesini önlüyoruz
+        const codeMatch = message.match(/\b[A-Z0-9]{5,6}\b/gi);
         const cleanCode = (codeMatch ? codeMatch[0] : message.trim()).toUpperCase();
 
         // Telefon normalizasyonu (Son 10 hane her zaman en güvenilir olanıdır)
@@ -507,16 +510,22 @@ class CompanyService {
 
         console.log(`[SMS-CB] [PROC] CleanedCode: ${cleanCode}, CleanedPhone: ${cleanPhone}`);
 
+        if (!cleanCode || cleanCode.length < 3) {
+            console.log(`[SMS-CB] [FAIL] Kod cok kisa veya gecersiz: "${cleanCode}"`);
+            return null;
+        }
+
         // Veritabanında ara:
         // 1. Onaylanmamış bir firma olmalı
         // 2. Kod veritabanındakiyle aynı olmalı (Büyük/Küçük harf duyarsız)
         // 3. Telefon numarasının son 10 hanesi tutmalı (Veritabanındaki numara da temizlenerek kontrol edilir)
         const findRes = await pool.query(
             `SELECT id, name, phone, verification_code FROM companies 
-             WHERE (UPPER(verification_code) = $1 OR UPPER(verification_code) = $2)
+             WHERE (UPPER(verification_code) = $1 OR UPPER(verification_code) = $2 OR UPPER(admin_key) = $1)
              AND (
                 REGEXP_REPLACE(phone, '\\D', '', 'g') LIKE '%' || $3
                 OR RIGHT(REGEXP_REPLACE(phone, '\\D', '', 'g'), 10) = $3
+                OR phone IS NULL OR phone = ''
              )
              AND is_verified = false 
              ORDER BY created_at DESC

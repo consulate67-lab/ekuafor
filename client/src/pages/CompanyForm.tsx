@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import { LatLng } from 'leaflet';
@@ -165,28 +165,32 @@ export default function CompanyForm() {
     };
 
     useEffect(() => {
-        fetchProvinces();
-        fetchMainCompanies();
-        if (isEdit) {
-            fetchCompany();
-        } else {
-            // Geolocation for new company
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const newPos = new LatLng(position.coords.latitude, position.coords.longitude);
-                        setMapPosition(newPos);
-                        setMapCenter(newPos);
-                        setUserCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
-                    },
-                    (error) => {
-                        console.warn('Konum alınamadı (Varsayılan Ankara kullanılacak):', error.message);
-                    },
-                    { enableHighAccuracy: true }
-                );
+        const init = async () => {
+            await fetchProvinces();
+            await fetchMainCompanies();
+            if (isEdit) {
+                await fetchCompany();
             }
+        };
+
+        init();
+
+        // Geolocation for new company
+        if (!isEdit && navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const newPos = new LatLng(position.coords.latitude, position.coords.longitude);
+                    setMapPosition(newPos);
+                    setMapCenter(newPos);
+                    setUserCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
+                },
+                (error) => {
+                    console.warn('Konum alınamadı (Varsayılan Ankara kullanılacak):', error.message);
+                },
+                { enableHighAccuracy: true }
+            );
         }
-    }, []);
+    }, [isEdit]);
 
     useEffect(() => {
         if (selectedProvince) {
@@ -210,20 +214,24 @@ export default function CompanyForm() {
             const mainArr = mainRes.data.data || [];
             const companyArr = companiesRes.data.data || [];
 
-            // Link both, ensuring unique names/ids if possible
-            // For now, just combining them. If they share the same concept, they should be merged.
-            setMainCompanies([...mainArr, ...companyArr]);
+            const combined = [...mainArr, ...companyArr];
+            setMainCompanies(combined);
+            return combined;
         } catch (err) {
             console.error('Üst firmalar yüklenirken hata:', err);
+            return [];
         }
     };
 
     const fetchProvinces = async () => {
         try {
             const response = await api.get('/address/provinces');
-            setProvinces(response.data.data);
+            const data = response.data.data;
+            setProvinces(data);
+            return data;
         } catch (err) {
             console.error('İller yüklenirken hata:', err);
+            return [];
         }
     };
 
@@ -259,8 +267,14 @@ export default function CompanyForm() {
                 genders: Array.isArray(company.genders) ? company.genders : []
             });
 
+            // Use the current provinces state or fetch if empty (though init ensures it)
+            let currentProvinces = provinces;
+            if (currentProvinces.length === 0) {
+                currentProvinces = await fetchProvinces();
+            }
+
             if (company.city) {
-                const province = provinces.find(p => p.name === company.city);
+                const province = currentProvinces.find(p => p.name === company.city);
                 if (province) {
                     setSelectedProvince(province.id);
                     // Force districts fetch
@@ -299,7 +313,7 @@ export default function CompanyForm() {
         }
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setError('');
         setLoading(true);
@@ -350,7 +364,7 @@ export default function CompanyForm() {
         }
     };
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
         setFormData(prev => ({
             ...prev,

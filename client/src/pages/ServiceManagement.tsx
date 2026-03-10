@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import api from '../lib/api';
 import { Service, Package } from '../types';
 import { Link, useNavigate } from 'react-router-dom';
@@ -68,7 +68,7 @@ export default function ServiceManagement() {
         fetchData();
     }, [user, navigate]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setLoading(true);
         try {

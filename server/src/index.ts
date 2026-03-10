@@ -621,14 +621,27 @@ const runMigrations = async () => {
             await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS original_price DECIMAL(10, 2)');
             await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS collected_price DECIMAL(10, 2)');
 
-            /* 
             // Migrate existing address data if new columns are empty (Legacy - column province_name removed)
             try {
-                await pool.query(`UPDATE companies SET city = province_name WHERE (city IS NULL OR city = '') AND province_name IS NOT NULL AND province_name != ''`);
-                await pool.query(`UPDATE companies SET district = district_name WHERE (district IS NULL OR district = '') AND district_name IS NOT NULL AND district_name != ''`);
-                await pool.query(`UPDATE companies SET neighborhood = neighborhood_name WHERE (neighborhood IS NULL OR neighborhood = '') AND neighborhood_name IS NOT NULL AND neighborhood_name != ''`);
+                // We check if the columns exist first in the query to avoid errors
+                await pool.query(`
+                    DO $$ 
+                    BEGIN
+                        -- Migrate province_name
+                        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'companies' AND column_name = 'province_name') THEN
+                            UPDATE companies SET city = province_name WHERE (city IS NULL OR city = '') AND province_name IS NOT NULL AND province_name != '';
+                        END IF;
+                        -- Migrate district_name
+                        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'companies' AND column_name = 'district_name') THEN
+                            UPDATE companies SET district = district_name WHERE (district IS NULL OR district = '') AND district_name IS NOT NULL AND district_name != '';
+                        END IF;
+                        -- Migrate neighborhood_name
+                        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'companies' AND column_name = 'neighborhood_name') THEN
+                            UPDATE companies SET neighborhood = neighborhood_name WHERE (neighborhood IS NULL OR neighborhood = '') AND neighborhood_name IS NOT NULL AND neighborhood_name != '';
+                        END IF;
+                    END $$;
+                `);
             } catch (e) { }
-            */
 
             // Drop ANY and ALL existing constraints on main_company_id column
             await pool.query(`

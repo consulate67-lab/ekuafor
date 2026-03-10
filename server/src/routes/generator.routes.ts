@@ -164,9 +164,7 @@ router.post('/update-existing-companies', authMiddleware, roleCheck(['super_admi
             AND (
                 city IS NULL OR city = '' OR 
                 district IS NULL OR district = '' OR 
-                province_name IS NULL OR province_name = '' OR
-                district_name IS NULL OR district_name = '' OR
-                neighborhood_name IS NULL OR neighborhood_name = ''
+                neighborhood IS NULL OR neighborhood = ''
             )
             LIMIT 50
         `);
@@ -191,10 +189,8 @@ router.post('/update-existing-companies', authMiddleware, roleCheck(['super_admi
                     await client.query(`
                         UPDATE companies 
                         SET city = $1, 
-                            province_name = $1,
                             district = $2, 
-                            district_name = $2,
-                            neighborhood_name = $3,
+                            neighborhood = $3,
                             address_line = $4
                         WHERE id = $5
                     `, [city, district, neighborhood, finalAddress, company.id]);
@@ -293,7 +289,7 @@ router.post('/import-salons', authMiddleware, roleCheck(['super_admin', 'company
         for (const salon of salons) {
             // Check if already exists by name and city/dist (basic check)
             const check = await client.query(
-                'SELECT id FROM companies WHERE name = $1 AND (city = $2 OR province_name = $2)',
+                'SELECT id FROM companies WHERE name = $1 AND city = $2',
                 [salon.name, salon.city]
             );
 
@@ -307,10 +303,10 @@ router.post('/import-salons', authMiddleware, roleCheck(['super_admin', 'company
             const query = `
                 INSERT INTO companies (
                     name, phone, website, address_line, 
-                    province_name, district_name, neighborhood_name, city, district,
+                    city, district, neighborhood,
                     latitude, longitude, genders, company_type, admin_key,
                     is_active, is_verified, created_by
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
                 RETURNING id
             `;
 
@@ -322,8 +318,6 @@ router.post('/import-salons', authMiddleware, roleCheck(['super_admin', 'company
                 salon.city || null,
                 salon.district || null,
                 salon.neighborhood || null,
-                salon.city || null,
-                salon.district || null,
                 salon.lat,
                 salon.lon,
                 detectedGenders, // detected genders array ['Kadın'] or ['Erkek'] or null
