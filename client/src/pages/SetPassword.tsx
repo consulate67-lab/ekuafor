@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../lib/api';
+import { useAuthStore } from '../store/authStore';
 
 export default function SetPassword() {
     const navigate = useNavigate();
     const location = useLocation();
+    const login = useAuthStore(state => state.login);
     const query = new URLSearchParams(location.search);
     const code = query.get('code');
     const emailFromUrl = query.get('email');
@@ -40,8 +42,20 @@ export default function SetPassword() {
             });
 
             if (res.data.success) {
+                const { token, user } = res.data;
+                login(user, token);
                 setSuccess(true);
-                setTimeout(() => navigate('/login'), 3500);
+                
+                // Redirect based on role
+                setTimeout(() => {
+                    if (user.role === 'staff') {
+                        navigate('/staff-panel');
+                    } else if (user.role === 'company_admin') {
+                        navigate('/dashboard');
+                    } else {
+                        navigate('/login');
+                    }
+                }, 2000);
             }
         } catch (err: any) {
             setError(err.response?.data?.error || 'Bir hata oluştu. Lütfen kodunuzu ve emailinizi kontrol edin.');

@@ -384,16 +384,34 @@ router.post('/set-password', async (req: Request, res: Response) => {
         // Şifreyi hashle
         const passwordHash = await bcrypt.hash(password, 10);
 
-        // Şifreyi güncelle ve board_code'u temizle? 
-        // User may need it for other things, but usually it's better to keep it if they still use it for QR login.
-        // For now, just update password.
+        // Şifreyi güncelle
         await pool.query(
             'UPDATE users SET password = $1 WHERE id = $2',
             [passwordHash, result.rows[0].id]
         );
 
-        res.json({ success: true, message: 'Şifreniz başarıyla oluşturuldu. Giriş yapabilirsiniz.' });
+        // Fetch user data for token
+        const userRes = await pool.query(
+            'SELECT id, email, first_name, last_name, role, company_id FROM users WHERE id = $1',
+            [result.rows[0].id]
+        );
+        const user = userRes.rows[0];
+
+        // Generate token
+        const token = jwt.sign(
+            { id: user.id, email: user.email, role: user.role, company_id: user.company_id },
+            process.env.JWT_SECRET || 'your_secret_key',
+            { expiresIn: '30d' }
+        );
+
+        res.json({ 
+            success: true, 
+            message: 'Şifreniz başarıyla oluşturuldu. Giriş yapılıyor...',
+            token,
+            user
+        });
     } catch (err: any) {
+        console.error('Set Password Error:', err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
