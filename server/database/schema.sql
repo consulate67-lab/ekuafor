@@ -192,6 +192,7 @@ CREATE TABLE IF NOT EXISTS appointments (
     device_id VARCHAR(255),
     rating INTEGER CHECK (rating BETWEEN 1 AND 5),
     comment TEXT,
+    technical_notes TEXT,
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -208,6 +209,7 @@ CREATE TABLE IF NOT EXISTS appointment_services (
     status VARCHAR(20) DEFAULT 'pending',
     start_time VARCHAR(5),
     end_time VARCHAR(5),
+    technical_notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
