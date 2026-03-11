@@ -195,20 +195,32 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
         for (const staff of staffList) {
             if (!staff.first_name || !staff.last_name || !staff.phone || !staff.email) continue;
 
+            const lowerEmail = staff.email.toLowerCase().trim();
+
+            // Check if email already exists
+            const existingUser = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1', [lowerEmail]);
+            if (existingUser.rows.length > 0) {
+                // If user exists, we might want to skip or update, but for "setup-staff" we usually expect new users.
+                // Let's at least log it and continue or return error. 
+                // To keep it simple, let's return error if any email is taken.
+                return res.status(400).json({ 
+                    success: false, 
+                    error: `Bu e-posta adresi zaten kullanımda: ${staff.email}` 
+                });
+            }
+
             const boardCode = Array.from({ length: 4 }, () => Math.floor(Math.random() * 10)).join('');
             const fakePw = '$2b$10$wI5uJmO/P8/1rFzFqI2f/e./6K67UHT71YmQdG5H73A7z241/O6lO'; // "123456"
 
-            const lowerEmail = staff.email.toLowerCase().trim();
             const insertRes = await pool.query(
-                `INSERT INTO users (first_name, last_name, phone, company_id, role, title, is_active, board_code, email, password)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+                `INSERT INTO users (first_name, last_name, phone, company_id, role, is_active, board_code, email, password)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
                 [
                     staff.first_name,
                     staff.last_name,
                     staff.phone,
                     parseInt(id as string),
                     'staff',
-                    'Personel',
                     true,
                     boardCode,
                     lowerEmail,
@@ -228,8 +240,10 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
 
             // Send SMS to staff
             const smsMsg = `Sayin ${staff.first_name}, ${companyName} personeli olarak sisteme eklendiniz. Email: ${staff.email}. Sifrenizi olusturmak icin: https://www.saloontr.com/#/set-password?code=${boardCode}&email=${staff.email}`;
-            import('../services/sms.service').then(m => {
-                m.default.sendSms(null as any, staff.phone, smsMsg).catch(() => { });
+            
+            // Background SMS sending
+            require('../services/sms.service').default.sendSms(null as any, staff.phone, smsMsg).catch((e: any) => { 
+                console.error('SMS Send Error in setup-staff:', e);
             });
 
             results.push(insertRes.rows[0]);
@@ -240,9 +254,13 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
             data: results,
             message: `${results.length} personel basariyla olusturuldu ve SMS gönderildi.`
         });
-    } catch (err) {
+    } catch (err: any) {
         console.error('setup-staff error:', err);
-        res.status(500).json({ success: false, error: 'Personel kurulum hatası' });
+        res.status(500).json({ 
+            success: false, 
+            error: 'Personel kurulum hatası',
+            details: err.message
+        });
     }
 });
 
