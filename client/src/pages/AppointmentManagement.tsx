@@ -112,27 +112,7 @@ export default function AppointmentManagement() {
         }
     };
 
-    const generateHours = () => {
-        if (!company) return Array.from({ length: 14 }, (_, i) => `${String(i + 8).padStart(2, '0')}:00`);
 
-        const [startH, startM] = (company.work_start_time || '08:00').split(':').map(Number);
-        const [endH, endM] = (company.work_end_time || '21:00').split(':').map(Number);
-        const interval = company.slot_interval || 30;
-
-        const res = [];
-        let currentMin = startH * 60 + startM;
-        const endMin = endH * 60 + endM;
-
-        while (currentMin < endMin) {
-            const h = Math.floor(currentMin / 60);
-            const m = currentMin % 60;
-            res.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-            currentMin += interval;
-        }
-        return res;
-    };
-
-    const hours = generateHours();
 
 
 
