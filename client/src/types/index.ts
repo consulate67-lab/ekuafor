@@ -159,6 +159,7 @@ export interface Appointment {
     customer_phone?: string;
     rating?: number;
     comment?: string;
+    technical_notes?: string;
     service_name?: string;
     package_name?: string;
     staff_name?: string;

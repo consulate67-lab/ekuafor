@@ -63,11 +63,15 @@ export default function AppointmentManagement() {
         open: boolean;
         app: Appointment | null;
         amount: number;
+        technical_notes: string;
     }>({
         open: false,
         app: null,
-        amount: 0
+        amount: 0,
+        technical_notes: ''
     });
+    const [customerHistory, setCustomerHistory] = useState<Appointment[]>([]);
+    const [showHistory, setShowHistory] = useState(false);
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
 
     const speak = (text: string) => {
@@ -331,7 +335,8 @@ export default function AppointmentManagement() {
             setCompletionModal({
                 open: true,
                 app: app || null,
-                amount: currentPrice || 0
+                amount: currentPrice || 0,
+                technical_notes: ''
             });
             return;
         }
@@ -1081,6 +1086,33 @@ export default function AppointmentManagement() {
                                             </div>
                                         </div>
                                     )}
+
+                                    {/* Teknik Notlar Bölümü */}
+                                    <div className="p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100 flex flex-col gap-3">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">İşlem Detayları & Geçmiş</span>
+                                            <button 
+                                                onClick={async () => {
+                                                    const phone = selectedAppointment.customer_phone;
+                                                    if (phone) {
+                                                        const res = await api.get('/appointments', { params: { customer_phone: phone } });
+                                                        setCustomerHistory(res.data.data.filter((a: Appointment) => a.id !== selectedAppointment.id && a.technical_notes));
+                                                        setShowHistory(true);
+                                                    }
+                                                }}
+                                                className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest bg-white px-2 py-1 rounded-lg shadow-sm border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all"
+                                            >
+                                                Geçmiş Notlar
+                                            </button>
+                                        </div>
+                                        {selectedAppointment.technical_notes ? (
+                                            <p className="text-xs font-medium text-indigo-900 leading-relaxed bg-white p-3 rounded-xl border border-indigo-100 shadow-sm">
+                                                {selectedAppointment.technical_notes}
+                                            </p>
+                                        ) : (
+                                            <p className="text-[10px] italic text-indigo-300 font-bold uppercase tracking-widest text-center py-2">Not bulunamadı</p>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {selectedAppointment.status !== 'completed' && (
@@ -1241,6 +1273,34 @@ export default function AppointmentManagement() {
                                 </div>
                             </div>
 
+                            <div className="mb-8">
+                                <div className="text-center mb-2">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">İşlem Detayı (Teknik Notlar)</span>
+                                </div>
+                                <textarea
+                                    value={completionModal.technical_notes}
+                                    onChange={(e) => setCompletionModal(prev => ({ ...prev, technical_notes: e.target.value }))}
+                                    placeholder="Kullanılan boya, malzeme veya teknik detaylar..."
+                                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 text-xs font-bold text-slate-700 focus:border-indigo-500 focus:bg-white transition-all outline-none resize-none"
+                                    rows={4}
+                                />
+                                <div className="mt-2 text-right">
+                                    <button 
+                                        onClick={async () => {
+                                            const phone = completionModal.app?.customer_phone;
+                                            if (phone) {
+                                                const res = await api.get('/appointments', { params: { customer_phone: phone } });
+                                                setCustomerHistory(res.data.data.filter((a: Appointment) => a.id !== completionModal.app?.id && a.technical_notes));
+                                                setShowHistory(true);
+                                            }
+                                        }}
+                                        className="text-[9px] font-black text-indigo-500 uppercase tracking-widest hover:underline"
+                                    >
+                                        + Müşteri Geçmişini Gör
+                                    </button>
+                                </div>
+                            </div>
+
                             <div className="space-y-3">
                                 <button
                                     disabled={true}
@@ -1255,9 +1315,10 @@ export default function AppointmentManagement() {
                                             await api.patch(`/appointments/${completionModal.app!.id}/status`, {
                                                 status: 'completed',
                                                 price: completionModal.amount,
-                                                payment_method: 'cash'
+                                                payment_method: 'unspecified',
+                                                technical_notes: completionModal.technical_notes
                                             });
-                                            setCompletionModal({ open: false, app: null, amount: 0 });
+                                            setCompletionModal({ open: false, app: null, amount: 0, technical_notes: '' });
                                             setSelectedAppointment(null);
                                             fetchData();
                                         } catch (e) {
@@ -1277,9 +1338,10 @@ export default function AppointmentManagement() {
                                             await api.patch(`/appointments/${completionModal.app!.id}/status`, {
                                                 status: 'completed',
                                                 price: completionModal.amount,
-                                                payment_method: 'unspecified'
+                                                payment_method: 'unspecified',
+                                                technical_notes: completionModal.technical_notes
                                             });
-                                            setCompletionModal({ open: false, app: null, amount: 0 });
+                                            setCompletionModal({ open: false, app: null, amount: 0, technical_notes: '' });
                                             setSelectedAppointment(null);
                                             fetchData();
                                         } catch (e) {
@@ -1294,7 +1356,7 @@ export default function AppointmentManagement() {
                                 </button>
                                 <button
                                     onClick={() => {
-                                        setCompletionModal({ open: false, app: null, amount: 0 });
+                                        setCompletionModal({ open: false, app: null, amount: 0, technical_notes: '' });
                                         setSelectedAppointment(null);
                                     }}
                                     className="w-full py-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest"
@@ -1412,6 +1474,57 @@ export default function AppointmentManagement() {
                                 className="w-full bg-slate-900 text-white py-5 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl active:scale-[0.98] transition-all hover:bg-slate-800"
                             >
                                 SEÇİMİ TAMAMLA
+                            </button>
+                        </div>
+                    </div>
+                )
+            }
+            {/* History Modal */}
+            {
+                showHistory && (
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-indigo-950/60 backdrop-blur-md animate-in fade-in duration-300">
+                        <div className="bg-white w-full max-w-lg rounded-[3rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300 flex flex-col max-h-[80vh]">
+                            <div className="flex justify-between items-center mb-8">
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase">Müşteri İşlem Geçmişi</h3>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Önceki randevulara ait teknik notlar</p>
+                                </div>
+                                <button onClick={() => setShowHistory(false)} className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar">
+                                {customerHistory.length === 0 ? (
+                                    <div className="text-center py-12">
+                                        <p className="text-slate-300 font-black text-xs uppercase tracking-widest">Kayıtlı işlem detayı bulunamadı</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-6">
+                                        {customerHistory.map((h: Appointment, idx: number) => (
+                                            <div key={h.id || idx} className="bg-slate-50 rounded-[2rem] p-6 border border-slate-100 flex flex-col gap-3">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                                        {new Date(h.appointment_date).toLocaleDateString('tr-TR')} - {h.start_time}
+                                                    </span>
+                                                    <span className="px-3 py-1 bg-indigo-100 text-indigo-600 rounded-full text-[9px] font-black uppercase tracking-widest">
+                                                        {h.service_name}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs font-bold text-slate-700 leading-relaxed italic">
+                                                    "{h.technical_notes}"
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <button
+                                onClick={() => setShowHistory(false)}
+                                className="w-full mt-8 bg-slate-900 text-white py-5 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl transition-all"
+                            >
+                                Kapat
                             </button>
                         </div>
                     </div>

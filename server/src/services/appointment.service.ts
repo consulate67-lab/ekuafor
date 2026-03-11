@@ -21,6 +21,7 @@ export interface Appointment {
     device_id?: string;
     rating?: number;
     comment?: string;
+    technical_notes?: string;
     service_name?: string; // Legacy/Main service name
     services?: any[]; // Detailed services list
 }
@@ -385,7 +386,7 @@ class AppointmentService {
         }
     }
 
-    async updateAppointmentStatus(id: number, status: string, price?: number, payment_method?: string): Promise<Appointment | null> {
+    async updateAppointmentStatus(id: number, status: string, price?: number, payment_method?: string, technical_notes?: string): Promise<Appointment | null> {
         try {
             let result;
             if (price !== undefined && price !== null) {
@@ -393,19 +394,19 @@ class AppointmentService {
                 const finalPaymentMethod = payment_method || ((status === 'completed') ? 'cash' : null);
 
                 result = await pool.query(
-                    'UPDATE appointments SET status = $1, price = $2, payment_status = $3, payment_method = COALESCE(payment_method, $4), collected_price = COALESCE(collected_price, $2) WHERE id = $5 RETURNING *',
-                    [status, price, paymentStatus, finalPaymentMethod, id]
+                    'UPDATE appointments SET status = $1, price = $2, payment_status = $3, payment_method = COALESCE(payment_method, $4), collected_price = COALESCE(collected_price, $2), technical_notes = COALESCE($5, technical_notes) WHERE id = $6 RETURNING *',
+                    [status, price, paymentStatus, finalPaymentMethod, technical_notes || null, id]
                 );
             } else {
                 if (status === 'completed') {
                     result = await pool.query(
-                        'UPDATE appointments SET status = $1, collected_price = COALESCE(collected_price, price) WHERE id = $2 RETURNING *',
-                        [status, id]
+                        'UPDATE appointments SET status = $1, collected_price = COALESCE(collected_price, price), technical_notes = COALESCE($2, technical_notes) WHERE id = $3 RETURNING *',
+                        [status, technical_notes || null, id]
                     );
                 } else {
                     result = await pool.query(
-                        'UPDATE appointments SET status = $1 WHERE id = $2 RETURNING *',
-                        [status, id]
+                        'UPDATE appointments SET status = $1, technical_notes = COALESCE($2, technical_notes) WHERE id = $3 RETURNING *',
+                        [status, technical_notes || null, id]
                     );
                 }
             }
