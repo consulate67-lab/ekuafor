@@ -335,7 +335,7 @@ export default function AppointmentManagement() {
             setCompletionModal({
                 open: true,
                 app: app || null,
-                amount: currentPrice || 0,
+                amount: currentPrice || app?.services?.reduce((sum: number, s: any) => sum + Number(s.price || 0), 0) || 0,
                 technical_notes: ''
             });
             return;

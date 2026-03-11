@@ -387,29 +387,54 @@ class AppointmentService {
     }
 
     async updateAppointmentStatus(id: number, status: string, price?: number, payment_method?: string, technical_notes?: string): Promise<Appointment | null> {
+        const client = await pool.connect();
         try {
+            await client.query('BEGIN');
             let result;
             if (price !== undefined && price !== null) {
                 const paymentStatus = (status === 'completed') ? 'paid' : 'pending';
                 const finalPaymentMethod = payment_method || ((status === 'completed') ? 'cash' : null);
 
-                result = await pool.query(
+                result = await client.query(
                     'UPDATE appointments SET status = $1, price = $2, payment_status = $3, payment_method = COALESCE(payment_method, $4), collected_price = COALESCE(collected_price, $2), technical_notes = COALESCE($5, technical_notes) WHERE id = $6 RETURNING *',
                     [status, price, paymentStatus, finalPaymentMethod, technical_notes || null, id]
                 );
+
+                if (status === 'completed') {
+                    // Sync price to appointment_services for reporting
+                    const servicesRes = await client.query('SELECT id, price FROM appointment_services WHERE appointment_id = $1', [id]);
+                    const services = servicesRes.rows;
+                    
+                    if (services.length === 1) {
+                        await client.query('UPDATE appointment_services SET price = $1, status = \'completed\' WHERE id = $2', [price, services[0].id]);
+                    } else if (services.length > 1) {
+                        const currentSum = services.reduce((sum, s) => sum + Number(s.price || 0), 0);
+                        if (currentSum > 0) {
+                            for (const s of services) {
+                                const distributed = (Number(s.price || 0) / currentSum) * price;
+                                await client.query('UPDATE appointment_services SET price = $1, status = \'completed\' WHERE id = $2', [distributed, s.id]);
+                            }
+                        } else {
+                            const distributed = price / services.length;
+                            await client.query('UPDATE appointment_services SET price = $1, status = \'completed\' WHERE appointment_id = $2', [distributed, id]);
+                        }
+                    }
+                }
             } else {
                 if (status === 'completed') {
-                    result = await pool.query(
+                    result = await client.query(
                         'UPDATE appointments SET status = $1, collected_price = COALESCE(collected_price, price), technical_notes = COALESCE($2, technical_notes) WHERE id = $3 RETURNING *',
                         [status, technical_notes || null, id]
                     );
+                    await client.query('UPDATE appointment_services SET status = \'completed\' WHERE appointment_id = $1', [id]);
                 } else {
-                    result = await pool.query(
+                    result = await client.query(
                         'UPDATE appointments SET status = $1, technical_notes = COALESCE($2, technical_notes) WHERE id = $3 RETURNING *',
                         [status, technical_notes || null, id]
                     );
                 }
             }
+            await client.query('COMMIT');
             const updatedAppointment = result.rows[0];
 
             if (updatedAppointment) {
@@ -486,8 +511,11 @@ class AppointmentService {
 
             return updatedAppointment || null;
         } catch (err) {
+            await client.query('ROLLBACK').catch(() => {});
             console.error('[Service] Update Status Error:', err);
             throw err;
+        } finally {
+            client.release();
         }
     }
 
