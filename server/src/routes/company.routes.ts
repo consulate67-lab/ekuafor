@@ -239,7 +239,8 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
             }
 
             // Send SMS to staff
-            const smsMsg = `Sayin ${staff.first_name}, ${companyName} personeli olarak sisteme eklendiniz. Email: ${staff.email}. Sifrenizi olusturmak icin: https://www.saloontr.com/#/set-password?code=${boardCode}&email=${staff.email}`;
+            const staffEmail = staff.email.toLowerCase().trim();
+            const smsMsg = `Sayin ${staff.first_name}, ${companyName} personeli olarak sisteme eklendiniz. Email: ${staffEmail}. Sifrenizi olusturmak icin tiklayin: https://www.saloontr.com/#/set-password/${boardCode}/${staffEmail}`;
             
             // Background SMS sending
             require('../services/sms.service').default.sendSms(null as any, staff.phone, smsMsg).catch((e: any) => { 

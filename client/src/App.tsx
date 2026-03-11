@@ -217,6 +217,7 @@ function App() {
                     <Route path="/salon-generator" element={<SalonDataGenerator />} />
                     <Route path="/setup-staff/:id" element={<SetupStaff />} />
                     <Route path="/set-password" element={<SetPassword />} />
+                    <Route path="/set-password/:code/:email" element={<SetPassword />} />
                     <Route path="/staff-panel" element={<StaffPanel />} />
 
 

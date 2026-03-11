@@ -1,15 +1,17 @@
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 
 export default function SetPassword() {
     const navigate = useNavigate();
     const location = useLocation();
+    const { code: paramCode, email: paramEmail } = useParams<{ code: string; email: string }>();
     const login = useAuthStore(state => state.login);
     const query = new URLSearchParams(location.search);
-    const code = query.get('code');
-    const emailFromUrl = query.get('email');
+    
+    const code = paramCode || query.get('code');
+    const emailFromUrl = paramEmail || query.get('email');
 
     const [email, setEmail] = useState(emailFromUrl || '');
     const [password, setPassword] = useState('');
