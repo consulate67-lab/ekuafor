@@ -91,6 +91,8 @@ class CompanyService {
                 await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS door_number TEXT');
                 await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS nace_code TEXT');
                 await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS fax_number TEXT');
+                await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS verification_code TEXT');
+                await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS bank_iban TEXT');
                 // Ensure existing companies have this enabled by default if it was null
                 await client.query('UPDATE companies SET sms_enabled = true WHERE sms_enabled IS NULL');
             } catch (e) { /* ignore if fails */ }

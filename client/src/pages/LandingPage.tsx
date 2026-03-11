@@ -51,7 +51,11 @@ export default function LandingPage() {
         e.preventDefault();
         setLoading(true);
         try {
-            const res = await api.post('/companies/register', formData);
+            const normalizedFormData = {
+                ...formData,
+                email: formData.email.toLowerCase().trim()
+            };
+            const res = await api.post('/companies/register', normalizedFormData);
             if (res.data.success) {
                 const { verification_code } = res.data.data;
                 const systemPhone = "+908503058349"; // Tam uluslararası format

@@ -80,6 +80,8 @@ CREATE TABLE IF NOT EXISTS companies (
     created_by INTEGER REFERENCES users(id),
     admin_key VARCHAR(20) UNIQUE, -- Firma yönetim paneli anahtarı
     board_key VARCHAR(20) UNIQUE, -- Salon board anahtarı
+    verification_code VARCHAR(20), -- SMS doğrulama kodu
+    bank_iban VARCHAR(34), -- Banka IBAN
     company_type VARCHAR(20) DEFAULT 'ASIL', -- 'ÜST FİRMA', 'ASIL', 'ŞUBE'
     main_company_id INTEGER -- Üst firmaya (companies tablosundaki ÜST FİRMA) bağlılık
 );

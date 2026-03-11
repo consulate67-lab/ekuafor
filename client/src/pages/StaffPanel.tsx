@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/authStore';
 import api from '../lib/api';
 
 interface StaffInfo {
@@ -16,6 +17,7 @@ interface StaffInfo {
 
 export default function StaffPanel() {
     const navigate = useNavigate();
+    const { logout, user } = useAuthStore();
     const [staffInfo, setStaffInfo] = useState<StaffInfo | null>(null);
     const [company, setCompany] = useState<any>(null);
     const [appointments, setAppointments] = useState<any[]>([]);
@@ -24,9 +26,27 @@ export default function StaffPanel() {
     const [selectedDate] = useState(new Date().toISOString().split('T')[0]);
 
     useEffect(() => {
+        // Eğer zaten auth store'da staff olarak giriş yapmışsa oradan alalım
+        if (user && user.role === 'staff' && user.company_id) {
+            setStaffInfo(user as any);
+            // Şirket bilgisini de çekmemiz gerekebilir veya basitleştirebiliriz
+            (async () => {
+                try {
+                    const compRes = await api.get(`/companies/${user.company_id}`);
+                    setCompany(compRes.data.data);
+                    fetchAppointments(user.company_id!, user.id);
+                } catch (e) {
+                    console.error('Company fetch error', e);
+                } finally {
+                    setLoading(false);
+                }
+            })();
+            return;
+        }
+
         const saved = localStorage.getItem('staff_board_code');
         if (!saved) {
-            navigate('/');
+            navigate('/login'); // Daha şık: Yetkisizse login'e gönder
             return;
         }
 
@@ -40,12 +60,12 @@ export default function StaffPanel() {
                 }
             } catch {
                 localStorage.removeItem('staff_board_code');
-                navigate('/');
+                navigate('/login');
             } finally {
                 setLoading(false);
             }
         })();
-    }, []);
+    }, [user]);
 
     const fetchAppointments = async (companyId: number, staffId: number) => {
         try {
@@ -74,7 +94,8 @@ export default function StaffPanel() {
 
     const handleLogout = () => {
         localStorage.removeItem('staff_board_code');
-        navigate('/');
+        logout();
+        navigate('/login');
     };
 
     const getServiceName = (serviceId: number) => {

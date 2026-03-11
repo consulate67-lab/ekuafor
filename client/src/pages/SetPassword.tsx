@@ -32,8 +32,9 @@ export default function SetPassword() {
 
         setLoading(true);
         try {
+            const normalizedEmail = email.toLowerCase().trim();
             const res = await api.post('/auth/set-password', {
-                email,
+                email: normalizedEmail,
                 code,
                 password
             });

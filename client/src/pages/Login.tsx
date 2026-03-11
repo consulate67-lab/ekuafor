@@ -17,7 +17,8 @@ export default function Login() {
         setLoading(true);
 
         try {
-            const response = await api.post('/auth/login', { email, password });
+            const normalizedEmail = email.toLowerCase().trim();
+            const response = await api.post('/auth/login', { email: normalizedEmail, password });
             const { user, token, redirectKey } = response.data.data;
             login(user, token);
             

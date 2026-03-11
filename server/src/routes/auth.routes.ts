@@ -32,9 +32,10 @@ router.post('/register', async (req: Request, res: Response) => {
         const validatedData = registerSchema.parse(req.body);
 
         // Email kontrolü
+        const lowerEmail = validatedData.email.toLowerCase().trim();
         const existingUser = await pool.query(
-            'SELECT id FROM users WHERE email = $1',
-            [validatedData.email]
+            'SELECT id FROM users WHERE LOWER(email) = $1',
+            [lowerEmail]
         );
 
         if (existingUser.rows.length > 0) {
@@ -53,7 +54,7 @@ router.post('/register', async (req: Request, res: Response) => {
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id, email, first_name, last_name, phone, role, company_id, created_at`,
             [
-                validatedData.email,
+                lowerEmail,
                 passwordHash,
                 validatedData.first_name,
                 validatedData.last_name,
@@ -104,9 +105,10 @@ router.post('/login', async (req: Request, res: Response) => {
         const validatedData = loginSchema.parse(req.body);
 
         // Kullanıcıyı bul
+        const lowerEmail = validatedData.email.toLowerCase().trim();
         const result = await pool.query(
-            'SELECT * FROM users WHERE email = $1',
-            [validatedData.email]
+            'SELECT * FROM users WHERE LOWER(email) = $1',
+            [lowerEmail]
         );
 
         if (result.rows.length === 0) {
@@ -366,9 +368,10 @@ router.post('/set-password', async (req: Request, res: Response) => {
         }
 
         // Kullanıcıyı bul
+        const lowerEmail = email.toLowerCase().trim();
         const result = await pool.query(
-            'SELECT id FROM users WHERE email = $1 AND board_code = $2',
-            [email, code]
+            'SELECT id FROM users WHERE LOWER(email) = $1 AND board_code = $2',
+            [lowerEmail, code]
         );
 
         if (result.rows.length === 0) {

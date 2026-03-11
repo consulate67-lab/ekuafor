@@ -97,6 +97,20 @@ router.post('/register', async (req: Request, res: Response) => {
         });
 
         const validatedData = publicSchema.parse(req.body);
+        const lowerEmail = validatedData.email.toLowerCase().trim();
+
+        // Check if email already exists in users table
+        const existingUser = await pool.query(
+            'SELECT id FROM users WHERE LOWER(email) = $1',
+            [lowerEmail]
+        );
+
+        if (existingUser.rows.length > 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'Bu e-posta adresi zaten kullanımda'
+            });
+        }
 
         const companyData: any = {
             ...validatedData,
@@ -118,7 +132,7 @@ router.post('/register', async (req: Request, res: Response) => {
             `INSERT INTO users (email, password, first_name, last_name, phone, role, company_id, is_active)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
             [
-                validatedData.email,
+                lowerEmail,
                 passwordHash,
                 validatedData.name, // Using company name as temporary first name
                 'Admin',
@@ -126,7 +140,6 @@ router.post('/register', async (req: Request, res: Response) => {
                 'company_admin',
                 company.id,
                 true // Allow login even before full verification if they have email/pw? Or wait? 
-                // User said "ilk firma kaydında kullanılan email firmadmin ekranına ulaşsın"
             ]
         );
 
@@ -141,6 +154,7 @@ router.post('/register', async (req: Request, res: Response) => {
             message: 'Kayıt başvurunuz alındı. Telefonunuzdaki SMS ekranına yönlendiriliyorsunuz.'
         });
     } catch (error) {
+        console.error('Registration Error:', error);
         if (error instanceof z.ZodError) {
             return res.status(400).json({
                 success: false,
@@ -148,7 +162,11 @@ router.post('/register', async (req: Request, res: Response) => {
                 details: error.errors
             });
         }
-        res.status(500).json({ success: false, error: 'Kayıt sırasında sunucu hatası oluştu' });
+        res.status(500).json({ 
+            success: false, 
+            error: 'Kayıt sırasında sunucu hatası oluştu',
+            details: error instanceof Error ? error.message : String(error)
+        });
     }
 });
 
@@ -180,6 +198,7 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
             const boardCode = Array.from({ length: 4 }, () => Math.floor(Math.random() * 10)).join('');
             const fakePw = '$2b$10$wI5uJmO/P8/1rFzFqI2f/e./6K67UHT71YmQdG5H73A7z241/O6lO'; // "123456"
 
+            const lowerEmail = staff.email.toLowerCase().trim();
             const insertRes = await pool.query(
                 `INSERT INTO users (first_name, last_name, phone, company_id, role, title, is_active, board_code, email, password)
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
@@ -192,7 +211,7 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
                     'Personel',
                     true,
                     boardCode,
-                    staff.email,
+                    lowerEmail,
                     fakePw
                 ]
             );
