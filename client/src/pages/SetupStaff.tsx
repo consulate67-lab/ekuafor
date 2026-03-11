@@ -11,7 +11,7 @@ export default function SetupStaff() {
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState(1);
     const [staffCount, setStaffCount] = useState<number>(1);
-    const [staffList, setStaffList] = useState<{ first_name: string; last_name: string; phone: string }[]>([]);
+    const [staffList, setStaffList] = useState<{ first_name: string; last_name: string; phone: string; email: string }[]>([]);
     const [success, setSuccess] = useState(false);
 
     useEffect(() => {
@@ -27,7 +27,7 @@ export default function SetupStaff() {
             alert('Lütfen en az 1 personel seçin.');
             return;
         }
-        setStaffList(Array.from({ length: staffCount }, () => ({ first_name: '', last_name: '', phone: '' })));
+        setStaffList(Array.from({ length: staffCount }, () => ({ first_name: '', last_name: '', phone: '', email: '' })));
         setStep(2);
     };
 
@@ -42,7 +42,7 @@ export default function SetupStaff() {
     const handleNextStep = () => {
         const index = step - 2;
         const current = staffList[index];
-        if (!current.first_name.trim() || !current.last_name.trim() || !current.phone.trim()) {
+        if (!current.first_name.trim() || !current.last_name.trim() || !current.phone.trim() || !current.email.trim()) {
             alert('Lütfen bu personelin bilgilerini eksiksiz doldurun.');
             return;
         }
@@ -53,7 +53,7 @@ export default function SetupStaff() {
         e.preventDefault();
 
         // Final Validation check
-        const isValid = staffList.every(s => s.first_name.trim() && s.last_name.trim() && s.phone.trim());
+        const isValid = staffList.every(s => s.first_name.trim() && s.last_name.trim() && s.phone.trim() && s.email.trim());
         if (!isValid) {
             alert('Lütfen tüm personellerin bilgilerini eksiksiz doldurun.');
             return;
@@ -222,7 +222,18 @@ export default function SetupStaff() {
                                             placeholder="Örn: Kaya"
                                         />
                                     </div>
-                                    <div className="sm:col-span-2 space-y-1.5 sm:space-y-2">
+                                    <div className="space-y-1.5 sm:space-y-2">
+                                        <label className="block text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">E-posta</label>
+                                        <input
+                                            type="email"
+                                            required
+                                            value={staffList[currentStaffIndex]?.email || ''}
+                                            onChange={e => handleStaffChange(currentStaffIndex, 'email', e.target.value)}
+                                            className="w-full bg-slate-950/50 border border-white/10 rounded-xl px-4 py-3 sm:px-5 sm:py-4 text-white text-sm focus:border-indigo-500/50 outline-none transition-all"
+                                            placeholder="personel@salon.com"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5 sm:space-y-2">
                                         <label className="block text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Telefon Numarası</label>
                                         <div className="relative">
                                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 text-[10px] font-bold border-r border-white/10 pr-3">+90</div>

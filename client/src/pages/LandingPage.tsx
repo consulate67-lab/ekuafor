@@ -12,6 +12,8 @@ export default function LandingPage() {
     const [formData, setFormData] = useState({
         name: '',
         phone: '',
+        email: '',
+        password: '',
         address_line: '',
         city: '',
         district: '',
@@ -71,7 +73,7 @@ export default function LandingPage() {
                 setTimeout(() => {
                     setIsModalOpen(false);
                     setSuccess(false);
-                    setFormData({ name: '', phone: '', address_line: '', city: '', district: '', latitude: null, longitude: null, target_genders: [] });
+                    setFormData({ name: '', phone: '', email: '', password: '', address_line: '', city: '', district: '', latitude: null, longitude: null, target_genders: [] });
                 }, 6000);
             }
         } catch (err: any) {
@@ -197,6 +199,31 @@ export default function LandingPage() {
                                 </div>
 
                                 <form onSubmit={handleSubmit} className="space-y-2 sm:space-y-5">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
+                                        <div>
+                                            <label className="block text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 sm:mb-1.5 ml-1">E-posta Adresi</label>
+                                            <input
+                                                type="email"
+                                                required
+                                                value={formData.email}
+                                                onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                                className="w-full bg-slate-900 border border-slate-800 rounded-lg sm:rounded-xl px-2.5 py-1.5 sm:px-4 sm:py-3 text-xs sm:text-base text-white placeholder:text-slate-600 focus:border-indigo-500 transition-all outline-none"
+                                                placeholder="admin@salon.com"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 sm:mb-1.5 ml-1">Giriş Şifresi</label>
+                                            <input
+                                                type="password"
+                                                required
+                                                value={formData.password}
+                                                onChange={e => setFormData({ ...formData, password: e.target.value })}
+                                                className="w-full bg-slate-900 border border-slate-800 rounded-lg sm:rounded-xl px-2.5 py-1.5 sm:px-4 sm:py-3 text-xs sm:text-base text-white placeholder:text-slate-600 focus:border-indigo-500 transition-all outline-none"
+                                                placeholder="••••••••"
+                                            />
+                                        </div>
+                                    </div>
+
                                     <div>
                                         <label className="block text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 sm:mb-1.5 ml-1">Firma Adı</label>
                                         <input

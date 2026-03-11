@@ -25,6 +25,8 @@ import MainCompanyReports from './pages/MainCompanyReports';
 import SalonDataGenerator from './pages/SalonDataGenerator';
 import CustomerLogin from './pages/CustomerLogin';
 import SetupStaff from './pages/SetupStaff';
+import SetPassword from './pages/SetPassword';
+import StaffPanel from './pages/StaffPanel';
 import { useAppointmentSync } from './hooks/useAppointmentSync';
 
 
@@ -214,6 +216,8 @@ function App() {
                     <Route path="/main-reports/:code" element={<MainCompanyReports />} />
                     <Route path="/salon-generator" element={<SalonDataGenerator />} />
                     <Route path="/setup-staff/:id" element={<SetupStaff />} />
+                    <Route path="/set-password" element={<SetPassword />} />
+                    <Route path="/staff-panel" element={<StaffPanel />} />
 
 
                     {/* Protected Routes */}

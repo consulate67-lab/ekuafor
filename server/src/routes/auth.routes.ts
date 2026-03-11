@@ -139,11 +139,21 @@ router.post('/login', async (req: Request, res: Response) => {
         // Şifreyi response'dan çıkar (Güvenlik)
         const { password, ...userWithoutPassword } = user;
 
+        // Extra info for panel redirects
+        let redirectKey = null;
+        if (user.role === 'company_admin' && user.company_id) {
+            const comp = await pool.query('SELECT admin_key FROM companies WHERE id = $1', [user.company_id]);
+            redirectKey = comp.rows[0]?.admin_key;
+        } else if (user.role === 'staff') {
+            redirectKey = user.board_code;
+        }
+
         res.json({
             success: true,
             data: {
                 user: userWithoutPassword,
-                token
+                token,
+                redirectKey
             }
         });
     } catch (error) {
@@ -337,6 +347,51 @@ router.all('/update-company', async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error('Update Company Error:', error);
         res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * POST /api/auth/set-password
+ * Set initial password using board_code
+ */
+router.post('/set-password', async (req: Request, res: Response) => {
+    try {
+        const { email, code, password } = req.body;
+        if (!email || !code || !password) {
+            return res.status(400).json({ success: false, error: 'Tüm alanlar gereklidir' });
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json({ success: false, error: 'Şifre en az 6 karakter olmalıdır' });
+        }
+
+        // Kullanıcıyı bul
+        const result = await pool.query(
+            'SELECT id FROM users WHERE email = $1 AND board_code = $2',
+            [email, code]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Geçersiz email veya doğrulama kodu'
+            });
+        }
+
+        // Şifreyi hashle
+        const passwordHash = await bcrypt.hash(password, 10);
+
+        // Şifreyi güncelle ve board_code'u temizle? 
+        // User may need it for other things, but usually it's better to keep it if they still use it for QR login.
+        // For now, just update password.
+        await pool.query(
+            'UPDATE users SET password = $1 WHERE id = $2',
+            [passwordHash, result.rows[0].id]
+        );
+
+        res.json({ success: true, message: 'Şifreniz başarıyla oluşturuldu. Giriş yapabilirsiniz.' });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 

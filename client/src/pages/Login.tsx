@@ -18,9 +18,26 @@ export default function Login() {
 
         try {
             const response = await api.post('/auth/login', { email, password });
-            const { user, token } = response.data.data;
+            const { user, token, redirectKey } = response.data.data;
             login(user, token);
-            navigate('/dashboard');
+            
+            // Save keys for panels
+            if (user.role === 'company_admin' && redirectKey) {
+                localStorage.setItem('company_admin_key', redirectKey);
+            } else if (user.role === 'staff' && redirectKey) {
+                localStorage.setItem('staff_board_code', redirectKey);
+            }
+
+            // Role based redirect
+            if (user.role === 'company_admin') {
+                navigate('/company-panel');
+            } else if (user.role === 'staff') {
+                navigate('/staff-panel');
+            } else if (user.role === 'super_admin') {
+                navigate('/dashboard');
+            } else {
+                navigate('/app');
+            }
         } catch (err: any) {
             if (!err.response) {
                 setError(`Sunucu şu an başlatılıyor veya ulaşılamıyor. Lütfen 10-15 saniye bekleyip tekrar deneyin. (${api.defaults.baseURL})`);

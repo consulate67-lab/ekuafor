@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import pool from '../config/database';
 import companyService from '../services/company.service';
 import employeeRoutes from './employee.routes';
@@ -85,6 +86,8 @@ router.post('/register', async (req: Request, res: Response) => {
         const publicSchema = z.object({
             name: z.string().min(2, 'Firma adı en az 2 karakter olmalıdır'),
             phone: z.string().min(10, 'Geçerli bir telefon numarası giriniz'),
+            email: z.string().email('Geçerli bir email adresi giriniz'),
+            password: z.string().min(6, 'Şifre en az 6 karakter olmalıdır'),
             address_line: nullableString,
             city: nullableString,
             district: nullableString,
@@ -104,9 +107,28 @@ router.post('/register', async (req: Request, res: Response) => {
             commission_rate: 0
         };
         delete companyData.target_genders;
+        const passwordHash = await bcrypt.hash(validatedData.password, 10);
+        delete companyData.password;
 
         // created_by = null for public self-registration
         const company = await companyService.createCompany(companyData, null as any);
+
+        // Create initial admin user for this company
+        await pool.query(
+            `INSERT INTO users (email, password, first_name, last_name, phone, role, company_id, is_active)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [
+                validatedData.email,
+                passwordHash,
+                validatedData.name, // Using company name as temporary first name
+                'Admin',
+                validatedData.phone,
+                'company_admin',
+                company.id,
+                true // Allow login even before full verification if they have email/pw? Or wait? 
+                // User said "ilk firma kaydında kullanılan email firmadmin ekranına ulaşsın"
+            ]
+        );
 
         res.status(201).json({
             success: true,
@@ -153,14 +175,11 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
 
         const results = [];
         for (const staff of staffList) {
-            if (!staff.first_name || !staff.last_name || !staff.phone) continue;
+            if (!staff.first_name || !staff.last_name || !staff.phone || !staff.email) continue;
 
-            // Benzersiz code ve bcrypt şifre üretimi (basit)
             const boardCode = Array.from({ length: 4 }, () => Math.floor(Math.random() * 10)).join('');
-            const email = `personel_${Date.now()}_${boardCode}@saloontr.com`;
-            const fakePw = '$2b$10$wI5uJmO/P8/1rFzFqI2f/e./6K67UHT71YmQdG5H73A7z241/O6lO'; // "123456" hash edilmiş hali (temsili)
+            const fakePw = '$2b$10$wI5uJmO/P8/1rFzFqI2f/e./6K67UHT71YmQdG5H73A7z241/O6lO'; // "123456"
 
-            // Setup the staff member in db
             const insertRes = await pool.query(
                 `INSERT INTO users (first_name, last_name, phone, company_id, role, title, is_active, board_code, email, password)
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
@@ -173,7 +192,7 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
                     'Personel',
                     true,
                     boardCode,
-                    email,
+                    staff.email,
                     fakePw
                 ]
             );
@@ -189,7 +208,7 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
             }
 
             // Send SMS to staff
-            const smsMsg = `Sayin ${staff.first_name}, ${companyName} personeli olarak sisteme eklendiniz. Yonetim paneli: https://www.saloontr.com/#/dashboard?code=${boardCode}`;
+            const smsMsg = `Sayin ${staff.first_name}, ${companyName} personeli olarak sisteme eklendiniz. Email: ${staff.email}. Sifrenizi olusturmak icin: https://www.saloontr.com/#/set-password?code=${boardCode}&email=${staff.email}`;
             import('../services/sms.service').then(m => {
                 m.default.sendSms(null as any, staff.phone, smsMsg).catch(() => { });
             });
