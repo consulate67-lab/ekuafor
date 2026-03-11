@@ -1330,62 +1330,108 @@ export default function AppointmentManagement() {
             {/* Modern Time Picker Modal */}
             {
                 showTimePicker && (
-                    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300 p-0 sm:p-4">
-                        <div className="bg-white w-full max-w-sm rounded-t-[3rem] sm:rounded-[3rem] p-8 pb-12 sm:pb-8 shadow-2xl animate-in slide-in-from-bottom duration-500 overflow-hidden">
-                            <div className="w-12 h-1.5 bg-slate-100 rounded-full mx-auto mb-8 sm:hidden" />
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300 p-4">
+                        <div className="bg-white w-full max-w-sm rounded-[3rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden">
                             <div className="flex justify-between items-center mb-6">
                                 <div>
-                                    <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase">Saat Seçin</h3>
+                                    <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase">Saat Belirle</h3>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Manuel yazabilir veya seçebilirsiniz</p>
                                 </div>
                                 <button onClick={() => setShowTimePicker(false)} className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
 
-                            <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-6 gap-2 max-h-[400px] overflow-y-auto p-4 bg-slate-50 rounded-[2.5rem] mb-6 shadow-inner">
-                                {hours.map(h => {
-                                    const isSel = newAppointment.start_time === h;
-                                    const [sh, sm] = h.split(':').map(Number);
-                                    const totalMin = sh * 60 + sm;
-                                    const now = new Date();
-                                    const currentTotal = now.getHours() * 60 + now.getMinutes();
-                                    const isPast = newAppointment.appointment_date === getLocalDateString() && totalMin < currentTotal;
+                            {/* Manuel Giriş Alanı */}
+                            <div className="mb-6">
+                                <div className="relative group">
+                                    <input
+                                        type="text"
+                                        placeholder="SS:DD"
+                                        value={newAppointment.start_time}
+                                        onChange={(e) => {
+                                            let val = e.target.value.replace(/[^0-9]/g, '');
+                                            if (val.length > 4) val = val.substring(0, 4);
+                                            
+                                            let formatted = val;
+                                            if (val.length >= 3) {
+                                                formatted = val.substring(0, 2) + ':' + val.substring(2);
+                                            } else if (val.length === 2 && e.nativeEvent instanceof InputEvent && e.nativeEvent.inputType !== 'deleteContentBackward') {
+                                                formatted = val + ':';
+                                            }
+                                            
+                                            // Basic validation for hours and minutes
+                                            if (formatted.includes(':')) {
+                                                const [h, m] = formatted.split(':');
+                                                if (Number(h) > 23) formatted = '23' + (m ? ':' + m : '');
+                                                if (m && Number(m) > 59) formatted = h + ':59';
+                                            }
 
-                                    return (
-                                        <button
-                                            key={h}
-                                            type="button"
-                                            disabled={isPast}
-                                            onClick={() => updateNewAppointmentTime(h)}
-                                            className={`p-3 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-1 ${isSel
-                                                ? 'bg-pink-600 border-pink-600 text-white shadow-lg scale-105'
-                                                : isPast
-                                                    ? 'bg-slate-100 border-transparent text-slate-300 cursor-not-allowed opacity-50'
-                                                    : 'bg-white border-transparent text-slate-600 hover:border-pink-200 hover:bg-pink-50/50'
-                                                }`}
-                                        >
-                                            <span className={`text-[11px] font-black tracking-tight ${isSel ? 'text-white' : 'text-slate-900'}`}>{h}</span>
-                                            {isSel && <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse shadow-sm"></div>}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
-                            {newAppointment.start_time && (
-                                <div className="flex items-center gap-2 px-6 py-4 bg-pink-50 border border-pink-100 rounded-2xl mb-6 animate-in slide-in-from-bottom-2">
-                                    <span className="text-2xl">⏰</span>
-                                    <div className="flex flex-col">
-                                        <span className="text-[10px] font-black text-pink-600 uppercase tracking-widest">Seçilen Saat</span>
-                                        <span className="text-xl font-black text-pink-900 leading-none">{newAppointment.start_time}</span>
+                                            updateNewAppointmentTime(formatted);
+                                        }}
+                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-6 text-center text-4xl font-black text-slate-900 group-focus-within:border-pink-500 group-focus-within:bg-white transition-all outline-none"
+                                    />
+                                    <div className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none group-focus-within:text-pink-500 transition-colors">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                     </div>
                                 </div>
-                            )}
+                            </div>
+
+                            <div className="flex gap-4 mb-4 opacity-60 hover:opacity-100 transition-opacity">
+                                {/* Saat Sütunu */}
+                                <div className="flex-1 bg-slate-50 rounded-[2rem] p-3">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest text-center mb-2">HIZLI SAAT</p>
+                                    <div className="grid grid-cols-2 gap-1.5 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
+                                        {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')).map(h => {
+                                            const currentH = newAppointment.start_time.split(':')[0];
+                                            const isSel = currentH === h;
+                                            return (
+                                                <button
+                                                    key={h}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const m = newAppointment.start_time.split(':')[1] || '00';
+                                                        updateNewAppointmentTime(`${h}:${m}`);
+                                                    }}
+                                                    className={`py-2 rounded-xl font-black text-xs transition-all ${isSel ? 'bg-pink-600 text-white shadow-md' : 'bg-white text-slate-400 hover:bg-pink-50'}`}
+                                                >
+                                                    {h}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Dakika Sütunu */}
+                                <div className="flex-1 bg-slate-50 rounded-[2rem] p-3">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest text-center mb-2">HIZLI DK</p>
+                                    <div className="grid grid-cols-2 gap-1.5 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
+                                        {['00', '15', '30', '45'].map(m => {
+                                            const currentM = newAppointment.start_time.split(':')[1];
+                                            const isSel = currentM === m;
+                                            return (
+                                                <button
+                                                    key={m}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const h = newAppointment.start_time.split(':')[0] || '09';
+                                                        updateNewAppointmentTime(`${h}:${m}`);
+                                                    }}
+                                                    className={`py-2 rounded-xl font-black text-xs transition-all ${isSel ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-400 hover:bg-indigo-50'}`}
+                                                >
+                                                    {m}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
 
                             <button
                                 onClick={() => setShowTimePicker(false)}
-                                className="w-full bg-slate-900 text-white py-5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl active:scale-[0.98] transition-all"
+                                className="w-full bg-slate-900 text-white py-5 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl active:scale-[0.98] transition-all hover:bg-slate-800"
                             >
-                                Tamam
+                                SEÇİMİ TAMAMLA
                             </button>
                         </div>
                     </div>
