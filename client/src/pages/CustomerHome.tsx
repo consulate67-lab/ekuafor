@@ -16,7 +16,7 @@ const formatDialNumber = (phone?: string) => {
     return cleaned;
 };
 
-const CompanyCard = React.memo(({ company: c, navigatingToId, favorites, toggleFavorite, onCompanyClick, onCallClick }: any) => {
+const CompanyCard = React.memo(({ company: c, navigatingToId, favorites, toggleFavorite, onCompanyClick, onCallClick, onReviewClick }: any) => {
     const isNavigating = navigatingToId === c.id;
 
     return (
@@ -96,12 +96,15 @@ const CompanyCard = React.memo(({ company: c, navigatingToId, favorites, toggleF
                 </div>
 
                 <div className="flex items-center gap-3 mb-2">
-                    <div className="flex items-center gap-1 text-[#b45309]">
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); onReviewClick(c); }}
+                        className="flex items-center gap-1 text-[#b45309] hover:opacity-75 transition-opacity"
+                    >
                         <span className="text-xs">★</span>
                         <span className="text-[11px] font-black">{parseFloat(c.rating_avg || 0).toFixed(1)}</span>
-                    </div>
-                    <div className="w-1 h-1 bg-slate-300 rounded-full" />
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{c.review_count || 0} Yorum</span>
+                        <div className="w-1 h-1 bg-slate-300 rounded-full mx-1" />
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest underline decoration-slate-200 underline-offset-2">{c.review_count || 0} Yorum</span>
+                    </button>
                 </div>
 
                 <div className="space-y-1.5">
@@ -159,6 +162,25 @@ export default function CustomerHome() {
     const [navigatingTo, setNavigatingTo] = useState<number | null>(null);
     const [callPicker, setCallPicker] = useState<{ open: boolean, company: any, staff: any[] }>({ open: false, company: null, staff: [] });
     const [fetchingStaff, setFetchingStaff] = useState(false);
+    const [reviewsModal, setReviewsModal] = useState<{ open: boolean, company: any, reviews: any[], loading: boolean, sort: string }>({ 
+        open: false, company: null, reviews: [], loading: false, sort: 'rating_desc' 
+    });
+
+    const fetchCompanyReviews = async (companyId: number, sort: string = 'rating_desc') => {
+        setReviewsModal(prev => ({ ...prev, loading: true, sort }));
+        try {
+            const res = await api.get(`/appointments/companies/${companyId}/reviews`, { params: { sort } });
+            setReviewsModal(prev => ({ ...prev, reviews: res.data.data || [], loading: false }));
+        } catch (err) {
+            console.error('Reviews fetch error:', err);
+            setReviewsModal(prev => ({ ...prev, loading: false }));
+        }
+    };
+
+    const handleReviewClick = (company: any) => {
+        setReviewsModal({ open: true, company, reviews: [], loading: true, sort: 'rating_desc' });
+        fetchCompanyReviews(company.id, 'rating_desc');
+    };
 
     const handleCallClick = async (e: React.MouseEvent, company: any) => {
         e.preventDefault();
@@ -652,8 +674,8 @@ export default function CustomerHome() {
                 style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
                 <div className="max-w-md mx-auto px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-slate-900 to-indigo-900 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                            <span className="text-white font-serif text-xl font-bold">S</span>
+                        <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-indigo-500/20">
+                            <img src="/app-icon.png" alt="Logo" className="w-full h-full object-cover" />
                         </div>
                         <h1 className="text-xl font-black text-slate-900 tracking-tighter">Saloon</h1>
                     </div>
@@ -850,6 +872,7 @@ export default function CustomerHome() {
                             toggleFavorite={toggleFavorite}
                             onCompanyClick={handleCompanyClick}
                             onCallClick={handleCallClick}
+                            onReviewClick={handleReviewClick}
                         />
                     ))
                 )}
@@ -1223,6 +1246,77 @@ export default function CustomerHome() {
                     to { transform: translateY(0); opacity: 1; }
                 }
             `}</style>
+            {/* Reviews Modal */}
+            {reviewsModal.open && (
+                <div className="fixed inset-0 z-[100] flex flex-col bg-slate-50 animate-in slide-in-from-bottom duration-300">
+                    <header className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between sticky top-0 shadow-sm z-10"
+                            style={{ paddingTop: 'env(safe-area-inset-top, 1rem)' }}>
+                        <div className="flex items-center gap-3">
+                            <button 
+                                onClick={() => setReviewsModal(prev => ({ ...prev, open: false }))}
+                                className="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-2xl text-slate-400 active:scale-90"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+                            </button>
+                            <h3 className="font-black text-slate-900 uppercase tracking-tight truncate max-w-[200px]">{reviewsModal.company?.name} / Yorumlar</h3>
+                        </div>
+                        <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+                            <button 
+                                onClick={() => fetchCompanyReviews(reviewsModal.company.id, 'rating_desc')}
+                                className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${reviewsModal.sort === 'rating_desc' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+                            >Puan ↓</button>
+                            <button 
+                                onClick={() => fetchCompanyReviews(reviewsModal.company.id, 'rating_asc')}
+                                className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${reviewsModal.sort === 'rating_asc' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+                            >Puan ↑</button>
+                            <button 
+                                onClick={() => fetchCompanyReviews(reviewsModal.company.id, 'newest')}
+                                className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${reviewsModal.sort === 'newest' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+                            >Yeni</button>
+                        </div>
+                    </header>
+
+                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 pb-12">
+                        {reviewsModal.loading ? (
+                            <div className="flex flex-col items-center justify-center py-20 opacity-50">
+                                <div className="w-10 h-10 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Yükleniyor...</span>
+                            </div>
+                        ) : reviewsModal.reviews.length === 0 ? (
+                            <div className="text-center py-20 opacity-40">
+                                <div className="text-4xl mb-4">💬</div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Henüz yorum yapılmamış.</p>
+                            </div>
+                        ) : (
+                            reviewsModal.reviews.map((r: any) => (
+                                <div key={r.id} className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col gap-3 relative">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center font-black text-indigo-600 text-[10px] uppercase">
+                                                {r.customer_name?.[0] || 'M'}
+                                            </div>
+                                            <h4 className="font-black text-slate-900 text-xs uppercase tracking-tight">{r.customer_name}</h4>
+                                        </div>
+                                        <div className="flex items-center gap-0.5">
+                                            {[...Array(5)].map((_, i) => (
+                                                <svg key={i} className={`w-3 h-3 ${i < r.rating ? 'text-amber-400 fill-current' : 'text-slate-200'}`} viewBox="0 0 20 20">
+                                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                                </svg>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <p className="text-slate-600 text-xs leading-relaxed font-medium italic">"{r.comment}"</p>
+                                    <div className="flex items-center justify-between mt-1 pt-3 border-t border-slate-50">
+                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-tight">{r.service_name || 'Hizmet'}</span>
+                                        <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">{new Date(r.appointment_date).toLocaleDateString('tr-TR')}</span>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
+

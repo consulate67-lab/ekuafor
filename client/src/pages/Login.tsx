@@ -65,8 +65,8 @@ export default function Login() {
 
             <div className="max-w-md w-full px-6 relative z-10">
                 <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#1e1b4b] to-[#b45309] shadow-xl shadow-indigo-500/20 mb-6 rotate-3 hover:rotate-0 transition-transform duration-500">
-                        <span className="text-white text-3xl font-serif">S</span>
+                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-[2rem] overflow-hidden shadow-2xl shadow-indigo-500/20 mb-6 rotate-3 hover:rotate-0 transition-transform duration-500">
+                        <img src="/app-icon.png" alt="Logo" className="w-full h-full object-cover" />
                     </div>
                     <h1 className="text-4xl font-bold heading-serif mb-2 tracking-tight">Saloon</h1>
                     <p className="text-gray-500 font-medium">Hoş geldiniz, devam etmek için giriş yapın</p>

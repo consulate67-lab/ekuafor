@@ -737,6 +737,42 @@ class AppointmentService {
         const result = await pool.query(query, [phone]);
         return result.rows;
     }
+    async getCompanyReviews(companyId: number, sort: string = 'newest'): Promise<any[]> {
+        let orderBy = 'a.appointment_date DESC, a.start_time DESC';
+        if (sort === 'rating_desc') orderBy = 'a.rating DESC, a.appointment_date DESC';
+        if (sort === 'rating_asc') orderBy = 'a.rating ASC, a.appointment_date DESC';
+
+        const query = `
+            SELECT a.id, a.rating, a.comment, a.appointment_date, a.customer_name, a.customer_phone,
+                   s.name as service_name
+            FROM appointments a
+            LEFT JOIN services s ON a.service_id = s.id
+            WHERE a.company_id = $1 AND a.rating IS NOT NULL AND a.rating > 0
+            ORDER BY ${orderBy}
+        `;
+        const result = await pool.query(query, [companyId]);
+        return result.rows;
+    }
+
+    async getCustomerHistory(companyId: number, search: string): Promise<any[]> {
+        // Search by phone or name. Multi-service appointments are aggregated.
+        const cleanPhone = search.replace(/\D/g, '').replace(/^0/, '');
+        const phonePattern = `%${cleanPhone}%`;
+        const namePattern = `%${search}%`;
+
+        const query = `
+            SELECT a.id, a.appointment_date, a.start_time, a.customer_name, a.customer_phone, a.technical_notes,
+                   COALESCE(ms.name, pkg.name, (SELECT string_agg(s.name, ', ') FROM appointment_services aps JOIN services s ON aps.service_id = s.id WHERE aps.appointment_id = a.id)) as service_name
+            FROM appointments a
+            LEFT JOIN services ms ON a.service_id = ms.id
+            LEFT JOIN packages pkg ON a.package_id = pkg.id
+            WHERE a.company_id = $1 
+            AND (a.customer_phone LIKE $2 OR a.customer_name ILIKE $3)
+            ORDER BY a.appointment_date DESC, a.start_time DESC
+        `;
+        const result = await pool.query(query, [companyId, phonePattern, namePattern]);
+        return result.rows;
+    }
 }
 
 export default new AppointmentService();

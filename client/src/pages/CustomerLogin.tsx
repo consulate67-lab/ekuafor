@@ -94,8 +94,8 @@ export default function CustomerLogin() {
 
             <div className="max-w-sm w-full relative z-10">
                 <div className="text-center mb-10">
-                    <div className="w-20 h-20 bg-gradient-to-br from-slate-900 to-indigo-950 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-indigo-200 rotate-6 hover:rotate-0 transition-transform duration-500">
-                        <span className="text-white font-serif text-4xl font-bold">S</span>
+                    <div className="w-24 h-24 rounded-[2rem] overflow-hidden flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-indigo-200 rotate-6 hover:rotate-0 transition-transform duration-500">
+                        <img src="/app-icon.png" alt="Logo" className="w-full h-full object-cover" />
                     </div>
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2 uppercase">Saloon</h1>
                     <p className="text-slate-400 font-bold text-xs uppercase tracking-[0.2em]">Hızlı ve Kolay Randevu</p>

@@ -399,4 +399,31 @@ router.get('/customers/notifications', async (req: Request, res: Response) => {
     }
 });
 
+// Şirket yorumlarını getir
+router.get('/companies/:id/reviews', async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id);
+        const sort = req.query.sort as string;
+        const reviews = await appointmentService.getCompanyReviews(id, sort);
+        res.json({ success: true, data: reviews });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Yorumlar yüklenemedi' });
+    }
+});
+
+// Müşteri geçmişini getir (Dashboard için)
+router.get('/history', authMiddleware, async (req: Request, res: Response) => {
+    try {
+        const companyId = req.user?.companyId;
+        const search = req.query.search as string;
+        if (!companyId) return res.status(403).json({ success: false, error: 'Yetkisiz' });
+        if (!search || search.length < 2) return res.json({ success: true, data: [] });
+
+        const history = await appointmentService.getCustomerHistory(companyId, search);
+        res.json({ success: true, data: history });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Geçmiş yüklenemedi' });
+    }
+});
+
 export default router;

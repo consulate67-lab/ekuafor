@@ -69,6 +69,31 @@ export default function Dashboard() {
     const [ocrLoading, setOcrLoading] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [customersModal, setCustomersModal] = useState({ open: false, search: '', history: [] as any[], loading: false });
+    const searchTimeout = useRef<any>(null);
+
+    const fetchCustomerHistory = async (search: string) => {
+        if (!search || search.length < 2) {
+            setCustomersModal(prev => ({ ...prev, history: [], loading: false, search }));
+            return;
+        }
+
+        setCustomersModal(prev => ({ ...prev, loading: true, search }));
+        try {
+            const res = await api.get('/appointments/history', { params: { search } });
+            setCustomersModal(prev => ({ ...prev, history: res.data.data || [], loading: false }));
+        } catch (err) {
+            console.error('History fetch error:', err);
+            setCustomersModal(prev => ({ ...prev, loading: false }));
+        }
+    };
+
+    const handleCustomerSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setCustomersModal(prev => ({ ...prev, search: val }));
+        if (searchTimeout.current) clearTimeout(searchTimeout.current);
+        searchTimeout.current = setTimeout(() => fetchCustomerHistory(val), 500);
+    };
 
     const handleRenewLicense = async () => {
         try {
@@ -615,8 +640,8 @@ export default function Dashboard() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-4">
                     <div className="relative flex justify-center items-center">
                         <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#1e1b4b] to-[#b45309] flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                                <span className="text-white font-serif text-lg">S</span>
+                            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-indigo-500/20">
+                                <img src="/app-icon.png" alt="Logo" className="w-full h-full object-cover" />
                             </div>
                             <h1 className="text-lg font-black heading-serif text-gray-900 tracking-tight">Saloon Yönetim</h1>
                         </div>
@@ -1009,7 +1034,26 @@ export default function Dashboard() {
                         </button>
                     )}
 
-                    {/* 5. WhatsApp Davet */}
+                    {/* 6. Müşterilerim */}
+                    {(user?.role === 'staff' || user?.role === 'company_admin') && (
+                        <button
+                            onClick={() => setCustomersModal(prev => ({ ...prev, open: true }))}
+                            className="card group hover:scale-[1.02] transition-all duration-300 border-indigo-100 text-left"
+                        >
+                            <div className="flex items-center gap-5">
+                                <div className="bg-indigo-50 p-4 rounded-2xl group-hover:bg-indigo-500 group-hover:text-white transition-colors duration-300">
+                                    <svg className="w-8 h-8 text-indigo-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-gray-900 mb-1">Müşterilerim</h3>
+                                    <p className="text-sm text-gray-500 font-medium leading-relaxed">Müşteri işlem geçmişini sorgula ve detayları gör.</p>
+                                </div>
+                            </div>
+                        </button>
+                    )}
+
                     {/* 5. WhatsApp Davet */}
                     {(user?.role === 'staff' || user?.role === 'company_admin') && (
                         <a
@@ -1248,6 +1292,82 @@ export default function Dashboard() {
             }
 
             {/* Payment Modal removed */}
-        </div >
+            {/* Customers History Modal */}
+            {customersModal.open && (
+                <div className="fixed inset-0 z-[100] flex flex-col bg-slate-50 animate-in slide-in-from-bottom duration-300">
+                    <header className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between sticky top-0 shadow-sm z-10"
+                            style={{ paddingTop: 'env(safe-area-inset-top, 1rem)' }}>
+                        <div className="flex items-center gap-3">
+                            <button 
+                                onClick={() => setCustomersModal(prev => ({ ...prev, open: false }))}
+                                className="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-2xl text-slate-400 active:scale-90"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+                            </button>
+                            <h3 className="font-black text-slate-900 uppercase tracking-tight">Müşterilerim</h3>
+                        </div>
+                    </header>
+
+                    <div className="p-6 bg-white border-b border-slate-100">
+                        <div className="relative">
+                            <input 
+                                type="text"
+                                placeholder="İsim veya telefon numarası ara..."
+                                value={customersModal.search}
+                                onChange={handleCustomerSearch}
+                                className="w-full bg-slate-50 border-none rounded-2xl px-12 py-4 text-slate-950 font-bold focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+                            />
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                                <svg className="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                            </div>
+                            {customersModal.loading && (
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                    <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 pb-12">
+                        {!customersModal.search ? (
+                            <div className="flex flex-col items-center justify-center py-20 opacity-40">
+                                <div className="text-4xl mb-4">🔍</div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Arama yapmak için isim veya<br/>telefon numarası giriniz.</p>
+                            </div>
+                        ) : customersModal.history.length === 0 && !customersModal.loading ? (
+                            <div className="text-center py-20 opacity-40">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Sonuç bulunamadı.</p>
+                            </div>
+                        ) : (
+                            customersModal.history.map((h: any) => (
+                                <div key={h.id} className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col gap-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex flex-col">
+                                            <h4 className="font-black text-slate-900 text-sm uppercase tracking-tight">{h.customer_name}</h4>
+                                            <span className="text-[10px] font-bold text-slate-400">{h.customer_phone}</span>
+                                        </div>
+                                        <span className="text-[9px] font-black px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full uppercase tracking-widest">
+                                            {new Date(h.appointment_date).toLocaleDateString('tr-TR')}
+                                        </span>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-2xl">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase">Hizmet</span>
+                                            <span className="text-[11px] font-black text-slate-700">{h.service_name}</span>
+                                        </div>
+                                        <div className="border-t border-slate-200/50 pt-2">
+                                            <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">Hizmet Notları</span>
+                                            <p className="text-xs text-slate-600 font-medium leading-relaxed italic">
+                                                {h.technical_notes || 'Not girilmemiş.'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }

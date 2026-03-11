@@ -80,8 +80,8 @@ export default function SetPassword() {
 
             <div className="relative w-full max-w-md z-10">
                 <div className="text-center mb-10 animate-fade-in-up">
-                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-indigo-500/40 rotate-3 hover:rotate-0 transition-all duration-500">
-                        <span className="text-white font-black text-3xl italic tracking-tighter">S</span>
+                    <div className="w-24 h-24 rounded-[2rem] overflow-hidden flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-indigo-500/40 rotate-3 hover:rotate-0 transition-all duration-500">
+                        <img src="/app-icon.png" alt="Logo" className="w-full h-full object-cover" />
                     </div>
                     <h1 className="text-4xl font-black text-white tracking-tighter mb-2">Saloon<span className="text-indigo-500">.</span></h1>
                     <p className="text-slate-500 font-bold uppercase tracking-[0.3em] text-[10px]">Personel Aktivasyon</p>

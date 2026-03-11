@@ -1284,21 +1284,6 @@ export default function AppointmentManagement() {
                                     className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 text-xs font-bold text-slate-700 focus:border-indigo-500 focus:bg-white transition-all outline-none resize-none"
                                     rows={4}
                                 />
-                                <div className="mt-2 text-right">
-                                    <button 
-                                        onClick={async () => {
-                                            const phone = completionModal.app?.customer_phone;
-                                            if (phone) {
-                                                const res = await api.get('/appointments', { params: { customer_phone: phone } });
-                                                setCustomerHistory(res.data.data.filter((a: Appointment) => a.id !== completionModal.app?.id && a.technical_notes));
-                                                setShowHistory(true);
-                                            }
-                                        }}
-                                        className="text-[9px] font-black text-indigo-500 uppercase tracking-widest hover:underline"
-                                    >
-                                        + Müşteri Geçmişini Gör
-                                    </button>
-                                </div>
                             </div>
 
                             <div className="space-y-3">

@@ -96,8 +96,8 @@ export default function LandingPage() {
             {/* Navbar */}
             <nav className="relative z-10 flex items-center justify-between px-6 py-8 max-w-7xl mx-auto">
                 <div className="flex items-center gap-3 cursor-pointer">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-pink-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-pink-500/20">
-                        <span className="text-white font-black text-xl italic tracking-tighter">S</span>
+                    <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-pink-500/20">
+                        <img src="/app-icon.png" alt="Logo" className="w-full h-full object-cover" />
                     </div>
                     <span className="text-2xl font-black tracking-tight text-white">saloontr.com</span>
                 </div>
