@@ -48,15 +48,9 @@ export default function SetPassword() {
                 login(user, token);
                 setSuccess(true);
                 
-                // Redirect based on role
+                // Redirect to dashboard for all roles as requested
                 setTimeout(() => {
-                    if (user.role === 'staff') {
-                        navigate('/staff-panel');
-                    } else if (user.role === 'company_admin') {
-                        navigate('/dashboard');
-                    } else {
-                        navigate('/login');
-                    }
+                    navigate('/dashboard');
                 }, 2000);
             }
         } catch (err: any) {

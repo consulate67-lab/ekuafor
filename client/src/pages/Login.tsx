@@ -33,7 +33,7 @@ export default function Login() {
             if (user.role === 'company_admin') {
                 navigate('/company-panel');
             } else if (user.role === 'staff') {
-                navigate('/staff-panel');
+                navigate('/dashboard');
             } else if (user.role === 'super_admin') {
                 navigate('/dashboard');
             } else {
