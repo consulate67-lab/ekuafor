@@ -23,7 +23,7 @@ if (!baseUrl) {
 }
 
 // Debug logging
-console.log('--- Saloon API Connection ---');
+console.log('--- SaloonTR API Connection ---');
 console.log('Hostname:', window.location.hostname);
 console.log('Target API:', baseUrl);
 console.log('-----------------------------');

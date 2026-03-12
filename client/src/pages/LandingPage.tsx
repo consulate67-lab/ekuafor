@@ -119,7 +119,7 @@ export default function LandingPage() {
                 </h1>
 
                 <p className="text-lg md:text-xl text-slate-400 max-w-2xl mb-12 leading-relaxed font-medium animate-fade-in-up animation-delay-200">
-                    Saloontr ile randevularınızı yönetin, personellerinizi takip edin ve Iyzico pazaryeri entegrasyonuyla ödemelerinizi anında alın. Dijital dönüşümünüze bugün başlayın.
+                    SaloonTR ile randevularınızı yönetin, personellerinizi takip edin ve Iyzico pazaryeri entegrasyonuyla ödemelerinizi anında alın. Dijital dönüşümünüze bugün başlayın.
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-center gap-4 animate-fade-in-up animation-delay-300">
@@ -199,7 +199,7 @@ export default function LandingPage() {
                                         </svg>
                                     </div>
                                     <h2 className="text-xl sm:text-3xl font-black text-white tracking-tight mb-0 sm:mb-2 pt-1 sm:pt-0">Firmamızı Kaydet</h2>
-                                    <p className="hidden sm:block text-xs sm:text-sm text-slate-400 font-medium leading-tight mb-2 sm:mb-0">Saloontr'da yerinizi almak için formu doldurun.</p>
+                                    <p className="hidden sm:block text-xs sm:text-sm text-slate-400 font-medium leading-tight mb-2 sm:mb-0">SaloonTR'da yerinizi almak için formu doldurun.</p>
                                 </div>
 
                                 <form onSubmit={handleSubmit} className="space-y-2 sm:space-y-5">
@@ -236,7 +236,7 @@ export default function LandingPage() {
                                             value={formData.name}
                                             onChange={e => setFormData({ ...formData, name: e.target.value })}
                                             className="w-full bg-slate-900 border border-slate-800 rounded-lg sm:rounded-xl px-2.5 py-1.5 sm:px-4 sm:py-3 text-xs sm:text-base text-white placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all outline-none"
-                                            placeholder="Örn: Saloon Güzellik Merkezi"
+                                            placeholder="Örn: SaloonTR Güzellik Merkezi"
                                         />
                                     </div>
 

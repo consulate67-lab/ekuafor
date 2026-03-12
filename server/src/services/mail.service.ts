@@ -25,7 +25,7 @@ class MailService {
             }
 
             const info = await this.transporter.sendMail({
-                from: `"Saloon Management" <${process.env.SMTP_USER}>`,
+                from: `"SaloonTR Management" <${process.env.SMTP_USER}>`,
                 to: to,
                 subject: `📊 Günlük Performans Raporu - ${companyName}`,
                 html: reportHtml,

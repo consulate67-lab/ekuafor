@@ -127,7 +127,7 @@ const CompanyCard = React.memo(({ company: c, navigatingToId, favorites, toggleF
     );
 });
 
-// Saloon - V1.9.6 - QR Scanner Fix
+// SaloonTR - V1.9.6 - QR Scanner Fix
 export default function CustomerHome() {
     const navigate = useNavigate();
     const [companies, setCompanies] = useState<Company[]>([]);
@@ -677,7 +677,7 @@ export default function CustomerHome() {
                         <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-indigo-500/20">
                             <img src="/app-icon.png" alt="Logo" className="w-full h-full object-cover" />
                         </div>
-                        <h1 className="text-xl font-black text-slate-900 tracking-tighter">Saloon</h1>
+                        <h1 className="text-xl font-black text-slate-900 tracking-tighter">SaloonTR</h1>
                     </div>
                     <div className="flex items-center gap-2">
                         <button
@@ -1234,7 +1234,7 @@ export default function CustomerHome() {
                             >
                                 Kapat
                             </button>
-                            <p className="text-[9px] text-slate-300 text-center mt-4 font-black uppercase tracking-widest">Saloontr v1.9.9</p>
+                            <p className="text-[9px] text-slate-300 text-center mt-4 font-black uppercase tracking-widest">SaloonTR v1.9.9</p>
                         </div>
                     </div>
                 )

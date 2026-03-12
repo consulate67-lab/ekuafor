@@ -1,4 +1,4 @@
-# Saloon Projesi - Geliştirme Notları
+# SaloonTR Projesi - Geliştirme Notları
 
 ## Proje Durumu: Faz 2 Tamamlandı ✅
 
@@ -173,7 +173,7 @@ Bu tablo sayesinde:
 
 Sorularınız için:
 - GitHub Issues
-- Email: support@saloon.com (örnek)
+- Email: support@saloonTR.com (örnek)
 
 ---
 

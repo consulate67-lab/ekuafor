@@ -68,7 +68,7 @@ export default function Login() {
                     <div className="inline-flex items-center justify-center w-20 h-20 rounded-[2rem] overflow-hidden shadow-2xl shadow-indigo-500/20 mb-6 rotate-3 hover:rotate-0 transition-transform duration-500">
                         <img src="/app-icon.png" alt="Logo" className="w-full h-full object-cover" />
                     </div>
-                    <h1 className="text-4xl font-bold heading-serif mb-2 tracking-tight">Saloon</h1>
+                    <h1 className="text-4xl font-bold heading-serif mb-2 tracking-tight">SaloonTR</h1>
                     <p className="text-gray-500 font-medium">Hoş geldiniz, devam etmek için giriş yapın</p>
                 </div>
 
@@ -141,7 +141,7 @@ export default function Login() {
                 </div>
 
                 <div className="mt-8 text-center">
-                    <p className="text-xs text-gray-400">© 2026 Saloon Management System. Tüm hakları saklıdır.</p>
+                    <p className="text-xs text-gray-400">© 2026 SaloonTR Management System. Tüm hakları saklıdır.</p>
                 </div>
             </div>
         </div>

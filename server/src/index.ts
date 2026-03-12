@@ -89,7 +89,7 @@ app.get('/ekuafor/api/companies/verify-test', commonVerify);
 
 // Root Route
 app.get('/', (req, res) => {
-    res.send('<h1>Saloon Backend is Live!</h1> <p>Try <a href="/api/ping">/api/ping</a></p>');
+    res.send('<h1>SaloonTR Backend is Live!</h1> <p>Try <a href="/api/ping">/api/ping</a></p>');
 });
 
 // Health Checks (Explicit)

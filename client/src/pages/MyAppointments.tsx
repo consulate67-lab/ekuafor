@@ -179,7 +179,7 @@ export default function MyAppointments() {
         const statusLabel = app.status === 'approved' ? 'ONAYLANDI ✅' :
             app.status === 'cancelled' ? 'REDDEDİLDİ 🚫' : app.status;
         if (Notification.permission === "granted") {
-            new Notification(`${app.company_name || 'Saloon'} Randevu Durumu`, {
+            new Notification(`${app.company_name || 'SaloonTR'} Randevu Durumu`, {
                 body: `${app.service_name} randevunuz ${statusLabel}. Saati: ${app.start_time}`,
                 icon: '/ekuafor/favicon.ico'
             });

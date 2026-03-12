@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../lib/api';
 import { Camera, CameraResultType, CameraSource, CameraDirection } from '@capacitor/camera';
 
@@ -4536,7 +4536,7 @@ export default function CompanyPanel() {
                                     value={currentAccountForm.title}
                                     onChange={e => setCurrentAccountForm({ ...currentAccountForm, title: e.target.value })}
                                     className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
-                                    placeholder="Saloon Bilişim Ltd. Şti."
+                                    placeholder="SaloonTR Bilişim Ltd. Şti."
                                 />
                             </div>
 
