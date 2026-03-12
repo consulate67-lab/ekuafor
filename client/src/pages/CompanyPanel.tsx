@@ -17,6 +17,8 @@ interface StaffBoard {
     department_id: number;
     department_name: string;
     photo: string | null;
+    email: string;
+    phone: string;
 }
 
 interface CurrentAccount {
@@ -68,6 +70,7 @@ export default function CompanyPanel() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [showDeptModal, setShowDeptModal] = useState(false);
     const [showStaffModal, setShowStaffModal] = useState(false);
+    const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
     const [deptName, setDeptName] = useState('');
     const [staffForm, setStaffForm] = useState({
         first_name: '',
@@ -76,7 +79,10 @@ export default function CompanyPanel() {
         department_id: '',
         photo: '' as string | null,
         quantity: '' as string | number,
-        unit: ''
+        unit: '',
+        email: '',
+        phone: '',
+        password: ''
     });
     const [copiedField, setCopiedField] = useState('');
     const [isCreating, setIsCreating] = useState(false);
@@ -627,20 +633,31 @@ export default function CompanyPanel() {
         if (!staffForm.first_name.trim() || !staffForm.last_name.trim() || !company) return;
         setIsCreating(true);
         try {
-            await api.post(`/companies/${company.id}/create-staff-board`, {
+            const data = {
                 first_name: staffForm.first_name.trim(),
                 last_name: staffForm.last_name.trim(),
                 gender: staffForm.gender,
                 department_id: staffForm.department_id || null,
                 photo: staffForm.photo,
                 quantity: staffForm.quantity ? Number(staffForm.quantity) : null,
-                unit: staffForm.unit || null
-            });
-            setStaffForm({ first_name: '', last_name: '', gender: 'erkek', department_id: '', photo: null, quantity: '', unit: '' });
+                unit: staffForm.unit || null,
+                email: staffForm.email.trim() || undefined,
+                phone: staffForm.phone.trim() || undefined,
+                password: staffForm.password || undefined
+            };
+
+            if (selectedStaffId) {
+                await api.put(`/companies/${company.id}/staff/${selectedStaffId}`, data);
+            } else {
+                await api.post(`/companies/${company.id}/create-staff-board`, data);
+            }
+
+            setStaffForm({ first_name: '', last_name: '', gender: 'erkek', department_id: '', photo: null, quantity: '', unit: '', email: '', phone: '', password: '' });
+            setSelectedStaffId(null);
             setShowStaffModal(false);
             fetchData(company.id);
         } catch (err: any) {
-            const msg = err.response?.data?.error || err.message || 'Personel kodu oluşturulamadı';
+            const msg = err.response?.data?.error || err.message || 'Personel işlemi gerçekleştirilemedi';
             alert(msg);
         } finally {
             setIsCreating(false);
@@ -2110,7 +2127,11 @@ export default function CompanyPanel() {
                     {activeTab === 'staff' && (
                         <div className="space-y-4">
                             <button
-                                onClick={() => setShowStaffModal(true)}
+                                onClick={() => {
+                                    setSelectedStaffId(null);
+                                    setStaffForm({ first_name: '', last_name: '', gender: 'erkek', department_id: '', photo: null, quantity: '', unit: '', email: '', phone: '', password: '' });
+                                    setShowStaffModal(true);
+                                }}
                                 className="w-full py-5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl font-black text-base tracking-wide shadow-xl shadow-emerald-500/20 active:scale-95 transition-all"
                             >
                                 + Personel Board Kodu Oluştur
@@ -2171,15 +2192,41 @@ export default function CompanyPanel() {
 
                                         {/* QR Code */}
                                         <div className="bg-slate-50 rounded-2xl p-5 text-center relative">
-                                            <button
-                                                onClick={() => handleDeleteStaff(staff.id)}
-                                                className="absolute top-4 right-4 w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-100 transition-all shadow-sm"
-                                                title="Personeli Sil"
-                                            >
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                            </button>
+                                            <div className="absolute top-4 right-4 flex gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedStaffId(staff.id);
+                                                        setStaffForm({
+                                                            first_name: staff.first_name,
+                                                            last_name: staff.last_name,
+                                                            gender: staff.gender,
+                                                            department_id: String(staff.department_id || ''),
+                                                            photo: staff.photo,
+                                                            quantity: (staff as any).quantity || '',
+                                                            unit: (staff as any).unit || '',
+                                                            email: staff.email || '',
+                                                            phone: staff.phone || '',
+                                                            password: ''
+                                                        });
+                                                        setShowStaffModal(true);
+                                                    }}
+                                                    className="w-10 h-10 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center hover:bg-indigo-100 transition-all shadow-sm"
+                                                    title="Personeli Düzenle"
+                                                >
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                    </svg>
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteStaff(staff.id)}
+                                                    className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-100 transition-all shadow-sm"
+                                                    title="Personeli Sil"
+                                                >
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                </button>
+                                            </div>
                                             <div className="bg-white border-2 border-slate-900 rounded-xl p-3 inline-block mb-3">
                                                 <img
                                                     src={qrApiUrl(staff.board_code, 150)}
@@ -3274,7 +3321,7 @@ export default function CompanyPanel() {
                         <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-10 shadow-2xl" onClick={e => e.stopPropagation()}
                             style={{ animation: 'slideUp 0.3s ease-out' }}>
                             <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-8" />
-                            <h2 className="text-2xl font-black text-slate-900 mb-6">Personel Board Kodu Oluştur</h2>
+                            <h2 className="text-2xl font-black text-slate-900 mb-6">{selectedStaffId ? 'Personeli Düzenle' : 'Personel Board Kodu Oluştur'}</h2>
 
                             <div className="flex flex-col items-center mb-8">
                                 <div className="relative group">
@@ -3314,6 +3361,38 @@ export default function CompanyPanel() {
                                         value={staffForm.last_name}
                                         onChange={e => setStaffForm(p => ({ ...p, last_name: e.target.value }))}
                                         placeholder="Soyisim"
+                                        className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 text-base font-bold text-slate-900 outline-none"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Telefon</label>
+                                        <input
+                                            type="tel"
+                                            value={staffForm.phone}
+                                            onChange={e => setStaffForm(p => ({ ...p, phone: e.target.value }))}
+                                            placeholder="5XX XXX XX XX"
+                                            className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 text-base font-bold text-slate-900 outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Email</label>
+                                        <input
+                                            type="email"
+                                            value={staffForm.email}
+                                            onChange={e => setStaffForm(p => ({ ...p, email: e.target.value }))}
+                                            placeholder="eposta@adres.com"
+                                            className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 text-base font-bold text-slate-900 outline-none"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Şifre {selectedStaffId && '(Değiştirmek istemiyorsanız boş bırakın)'}</label>
+                                    <input
+                                        type="password"
+                                        value={staffForm.password}
+                                        onChange={e => setStaffForm(p => ({ ...p, password: e.target.value }))}
+                                        placeholder="••••••"
                                         className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 text-base font-bold text-slate-900 outline-none"
                                     />
                                 </div>
@@ -3398,9 +3477,9 @@ export default function CompanyPanel() {
                                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                             </svg>
-                                            Oluşturuluyor...
+                                            {selectedStaffId ? 'Güncelleniyor...' : 'Oluşturuluyor...'}
                                         </>
-                                    ) : 'Oluştur'}
+                                    ) : (selectedStaffId ? 'Güncelle' : 'Oluştur')}
                                 </button>
                             </div>
                         </div>

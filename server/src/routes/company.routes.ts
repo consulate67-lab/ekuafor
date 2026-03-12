@@ -629,6 +629,56 @@ router.patch('/:id/staff/:userId/photo', async (req: Request, res: Response) => 
         });
     }
 });
+
+/**
+ * PUT /api/companies/:id/staff/:userId
+ * Personel bilgilerini güncelle (İsim, Soyisim, Email, Telefon, Şifre vb.)
+ */
+router.put('/:id/staff/:userId', async (req: Request, res: Response) => {
+    try {
+        const { userId } = req.params;
+        const { first_name, last_name, email, phone, password, gender, department_id, quantity, unit } = req.body;
+
+        const updates: string[] = [];
+        const values: any[] = [];
+        let i = 1;
+
+        if (first_name !== undefined) { updates.push(`first_name = $${i++}`); values.push(first_name); }
+        if (last_name !== undefined) { updates.push(`last_name = $${i++}`); values.push(last_name); }
+        if (email !== undefined) { updates.push(`email = $${i++}`); values.push(email.toLowerCase().trim()); }
+        if (phone !== undefined) { updates.push(`phone = $${i++}`); values.push(phone); }
+        if (gender !== undefined) { updates.push(`gender = $${i++}`); values.push(gender); }
+        if (department_id !== undefined) { updates.push(`department_id = $${i++}`); values.push(department_id || null); }
+        if (quantity !== undefined) { updates.push(`quantity = $${i++}`); values.push(quantity || null); }
+        if (unit !== undefined) { updates.push(`unit = $${i++}`); values.push(unit || null); }
+
+        if (password) {
+            const passwordHash = await bcrypt.hash(password, 10);
+            updates.push(`password = $${i++}`);
+            values.push(passwordHash);
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ success: false, error: 'Güncellenecek veri yok' });
+        }
+
+        values.push(userId);
+        const query = `UPDATE users SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`;
+        
+        const result = await pool.query(query, values);
+        if (result.rowCount === 0) {
+            return res.status(404).json({ success: false, error: 'Personel bulunamadı' });
+        }
+
+        res.json({ success: true, data: result.rows[0] });
+    } catch (error) {
+        console.error('Staff Update Error:', error);
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Personel güncellenirken hata oluştu'
+        });
+    }
+});
 /**
  * POST /api/companies/staff-login
  * Çalışan board_code ile giriş (cihaz bazlı)
@@ -684,7 +734,7 @@ router.post('/staff-login', async (req: Request, res: Response) => {
  */
 router.post('/check-code', async (req: Request, res: Response) => {
     try {
-        const { code } = req.body;
+        const { code, password } = req.body;
         if (!code) {
             return res.status(400).json({ success: false, error: 'Kod gereklidir' });
         }
@@ -701,17 +751,40 @@ router.post('/check-code', async (req: Request, res: Response) => {
         }
 
         // Önce admin_key mi kontrol et
-        const adminResult = await pool.query('SELECT id, name, admin_key, license_end_date FROM companies WHERE UPPER(admin_key) = UPPER($1)', [code]);
+        const adminResult = await pool.query('SELECT id, name, admin_key, license_end_date, password FROM companies WHERE UPPER(admin_key) = UPPER($1)', [code]);
         if (adminResult.rows.length > 0) {
             const comp = adminResult.rows[0];
+
+            // Eğer şifre varsa kontrol et (admin_key için opsiyonel olabilir ama güvenliik için iyi olur)
+            // Ancak mevcut admin_key mantığı genelde sadece key ile çalışıyor. 
+            // Eğer kullanıcı "board şifre" diyorsa ve admin key giriyorsa, admin şifresini kontrol edelim.
+            if (comp.password && password) {
+                const isMatch = await bcrypt.compare(password, comp.password);
+                if (!isMatch) {
+                    return res.status(401).json({ success: false, error: 'Hatalı şifre' });
+                }
+            } else if (comp.password && !password) {
+                 return res.status(401).json({ success: false, error: 'Bu kod için şifre gereklidir' });
+            }
+
             const isLicenseExpired = comp.license_end_date && new Date(comp.license_end_date) < new Date();
+
+            // JWT token oluştur - firma admini olarak giriş yapsın
+            const token = jwt.sign(
+                { userId: comp.id, email: `admin_${comp.id}@saloontr.local`, role: 'company_admin', companyId: comp.id },
+                process.env.JWT_SECRET || 'your-secret-key',
+                { expiresIn: '30d' }
+            );
 
             return res.json({
                 success: true,
                 data: {
                     type: 'admin',
-                    redirect: `/company-panel?key=${comp.admin_key}`,
+                    redirect: `/company-panel`,
                     company_name: comp.name,
+                    company_id: comp.id,
+                    user_id: comp.id,
+                    token: token,
                     is_license_expired: isLicenseExpired
                 }
             });
@@ -719,7 +792,7 @@ router.post('/check-code', async (req: Request, res: Response) => {
 
         // Sonra board_code mu kontrol et
         const staffResult = await pool.query(
-            `SELECT u.id, u.first_name, u.last_name, u.board_code, u.company_id, u.photo, c.name as company_name, c.license_end_date
+            `SELECT u.id, u.first_name, u.last_name, u.board_code, u.company_id, u.photo, u.password, c.name as company_name, c.license_end_date
              FROM users u
              JOIN companies c ON u.company_id = c.id
              WHERE UPPER(u.board_code) = UPPER($1)`,
@@ -727,6 +800,18 @@ router.post('/check-code', async (req: Request, res: Response) => {
         );
         if (staffResult.rows.length > 0) {
             const sr = staffResult.rows[0];
+
+            // Personel Şifre Kontrolü
+            if (sr.password) {
+                if (!password) {
+                    return res.status(401).json({ success: false, error: 'Şifre gereklidir' });
+                }
+                const isMatch = await bcrypt.compare(password, sr.password);
+                if (!isMatch) {
+                    return res.status(401).json({ success: false, error: 'Hatalı şifre' });
+                }
+            }
+
             const isLicenseExpired = sr.license_end_date && new Date(sr.license_end_date) < new Date();
 
             // JWT token oluştur - personel dashboard'a erişsin
