@@ -438,6 +438,7 @@ export default function Dashboard() {
     };
 
     const handlePhotoUpload = async (photo: string) => {
+        if (!user) return;
         setLoading(true);
         try {
             // Staff should update their own photo, Admin should update company photo
