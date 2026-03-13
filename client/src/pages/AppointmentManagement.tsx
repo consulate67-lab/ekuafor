@@ -300,7 +300,7 @@ export default function AppointmentManagement() {
         if (phone.length === 10) phone = '90' + phone;
 
         const date = new Date(app.appointment_date).toLocaleDateString('tr-TR');
-        const message = `Merhaba ${customerName}, ${company?.name || 'Salon Cebimde'} bünyesindeki randevunuz ${date} günü saat ${app.start_time} - ${app.end_time} için onaylanmıştır. İyi günler dileriz.`;
+        const message = `Merhaba ${customerName}, ${company?.name || 'Salon Cebinde'} bünyesindeki randevunuz ${date} günü saat ${app.start_time} - ${app.end_time} için onaylanmıştır. İyi günler dileriz.`;
 
         const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
         window.open(waUrl, '_blank');

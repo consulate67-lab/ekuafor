@@ -1,4 +1,4 @@
-# Salon Cebimde Projesi - Geliştirme Notları
+# Salon Cebinde Projesi - Geliştirme Notları
 
 ## Proje Durumu: Faz 2 Tamamlandı ✅
 
@@ -134,7 +134,7 @@ Bu tablo sayesinde:
 ### Test Senaryosu
 
 1. **Admin Girişi**
-   - Email: admin@saloncebimde.com
+   - Email: admin@saloncebinde.com
    - Şifre: admin123
 
 2. **Firma Ekleme**
@@ -173,7 +173,7 @@ Bu tablo sayesinde:
 
 Sorularınız için:
 - GitHub Issues
-- Email: support@saloncebimde.com (örnek)
+- Email: support@saloncebinde.com (örnek)
 
 ---
 

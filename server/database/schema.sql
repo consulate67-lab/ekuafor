@@ -1,4 +1,4 @@
--- Salon Cebimde Randevu Sistemi Veritabanı Şeması
+-- Salon Cebinde Randevu Sistemi Veritabanı Şeması
 
 -- Kullanıcı Rolleri (Eğer yoksa oluştur)
 DO $$
@@ -304,7 +304,7 @@ END$$;
 
 -- Varsayılan Admin (Çakışma varsa yapma)
 INSERT INTO users (email, password, role, first_name, last_name) 
-VALUES ('admin@saloncebimde.com', '$2a$10$YourHashedPasswordHere', 'super_admin', 'Super', 'Admin')
+VALUES ('admin@saloncebinde.com', '$2a$10$YourHashedPasswordHere', 'super_admin', 'Super', 'Admin')
 ON CONFLICT (email) DO NOTHING;
 
 -- DATA MIGRATION: Populate company_users from users table (if missing)

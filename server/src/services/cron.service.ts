@@ -80,7 +80,7 @@ class CronService {
                 </table>
 
                 <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center;">
-                    Bu mail Salon Cebimde Yönetim Sistemi tarafından otomatik olarak oluşturulmuştur.
+                    Bu mail Salon Cebinde Yönetim Sistemi tarafından otomatik olarak oluşturulmuştur.
                 </div>
             </div>
         `;

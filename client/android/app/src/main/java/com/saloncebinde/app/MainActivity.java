@@ -1,4 +1,4 @@
-package com.saloon.app;
+package com.saloncebinde.app;
 
 import com.getcapacitor.BridgeActivity;
 

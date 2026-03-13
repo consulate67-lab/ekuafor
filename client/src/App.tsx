@@ -139,7 +139,7 @@ function App() {
             const listener = CapApp.addListener('appUrlOpen', async (data) => {
                 const url = data.url;
 
-                // Example URL: saloncebimde://dashboard?code=ABCD or https://www.saloncebimde.com/dashboard?code=ABCD
+                // Example URL: saloncebinde://dashboard?code=ABCD or https://www.saloncebinde.com/dashboard?code=ABCD
                 if (url.includes('code=')) {
                     try {
                         const urlObj = new URL(url);

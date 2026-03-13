@@ -33,7 +33,7 @@ export default function SmsSettingsPage() {
     const [logs, setLogs] = useState<SmsLog[]>([]);
     const [loading, setLoading] = useState(false);
     const [testPhone, setTestPhone] = useState('');
-    const [testMessage, setTestMessage] = useState('Salon Cebimde Test Mesajıdır.');
+    const [testMessage, setTestMessage] = useState('Salon Cebinde Test Mesajıdır.');
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     useEffect(() => {

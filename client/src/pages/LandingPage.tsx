@@ -99,7 +99,7 @@ export default function LandingPage() {
                     <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-pink-500/20">
                         <img src="/app-icon.png" alt="Logo" className="w-full h-full object-cover" />
                     </div>
-                    <span className="text-2xl font-black tracking-tight text-white">saloncebimde.com</span>
+                    <span className="text-2xl font-black tracking-tight text-white">saloncebinde.com</span>
                 </div>
                 <div className="flex items-center gap-4">
                     {/* Auth actions removed per request */}
@@ -119,7 +119,7 @@ export default function LandingPage() {
                 </h1>
 
                 <p className="text-lg md:text-xl text-slate-400 max-w-2xl mb-12 leading-relaxed font-medium animate-fade-in-up animation-delay-200">
-                    Salon Cebimde ile randevularınızı yönetin, personellerinizi takip edin ve Iyzico pazaryeri entegrasyonuyla ödemelerinizi anında alın. Dijital dönüşümünüze bugün başlayın.
+                    Salon Cebinde ile randevularınızı yönetin, personellerinizi takip edin ve Iyzico pazaryeri entegrasyonuyla ödemelerinizi anında alın. Dijital dönüşümünüze bugün başlayın.
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-center gap-4 animate-fade-in-up animation-delay-300">
@@ -199,7 +199,7 @@ export default function LandingPage() {
                                         </svg>
                                     </div>
                                     <h2 className="text-xl sm:text-3xl font-black text-white tracking-tight mb-0 sm:mb-2 pt-1 sm:pt-0">Firmamızı Kaydet</h2>
-                                    <p className="hidden sm:block text-xs sm:text-sm text-slate-400 font-medium leading-tight mb-2 sm:mb-0">Salon Cebimde'de yerinizi almak için formu doldurun.</p>
+                                    <p className="hidden sm:block text-xs sm:text-sm text-slate-400 font-medium leading-tight mb-2 sm:mb-0">Salon Cebinde'de yerinizi almak için formu doldurun.</p>
                                 </div>
 
                                 <form onSubmit={handleSubmit} className="space-y-2 sm:space-y-5">
@@ -236,7 +236,7 @@ export default function LandingPage() {
                                             value={formData.name}
                                             onChange={e => setFormData({ ...formData, name: e.target.value })}
                                             className="w-full bg-slate-900 border border-slate-800 rounded-lg sm:rounded-xl px-2.5 py-1.5 sm:px-4 sm:py-3 text-xs sm:text-base text-white placeholder:text-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all outline-none"
-                                            placeholder="Örn: Salon Cebimde Güzellik Merkezi"
+                                            placeholder="Örn: Salon Cebinde Güzellik Merkezi"
                                         />
                                     </div>
 
