@@ -330,7 +330,13 @@ export default function BookingPage() {
                 setServices(servicesRes.data?.data || []);
                 setPackages(packagesRes.data?.data || []);
                 const usersRes = await api.get(`/companies/${id}/employees`);
-                setStaff(usersRes.data?.data || []);
+                const allStaff = usersRes.data?.data || [];
+                // Admin veya role bazlı filtreleme: Randevu sisteminde 'company_admin' görünmemeli
+                setStaff(allStaff.filter((u: any) => 
+                    u.role !== 'company_admin' && 
+                    !u.first_name?.toLowerCase().includes('admin') &&
+                    !u.last_name?.toLowerCase().includes('admin')
+                ));
                 const today = new Date().toLocaleDateString('en-CA');
                 const futureDate = new Date();
                 futureDate.setDate(futureDate.getDate() + 60);

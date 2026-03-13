@@ -751,22 +751,9 @@ router.post('/check-code', async (req: Request, res: Response) => {
         }
 
         // Önce admin_key mi kontrol et
-        const adminResult = await pool.query('SELECT id, name, admin_key, license_end_date, password FROM companies WHERE UPPER(admin_key) = UPPER($1)', [code]);
+        const adminResult = await pool.query('SELECT id, name, admin_key, license_end_date FROM companies WHERE UPPER(admin_key) = UPPER($1)', [code]);
         if (adminResult.rows.length > 0) {
             const comp = adminResult.rows[0];
-
-            // Eğer şifre varsa kontrol et (admin_key için opsiyonel olabilir ama güvenliik için iyi olur)
-            // Ancak mevcut admin_key mantığı genelde sadece key ile çalışıyor. 
-            // Eğer kullanıcı "board şifre" diyorsa ve admin key giriyorsa, admin şifresini kontrol edelim.
-            if (comp.password && password) {
-                const isMatch = await bcrypt.compare(password, comp.password);
-                if (!isMatch) {
-                    return res.status(401).json({ success: false, error: 'Hatalı şifre' });
-                }
-            } else if (comp.password && !password) {
-                 return res.status(401).json({ success: false, error: 'Bu kod için şifre gereklidir' });
-            }
-
             const isLicenseExpired = comp.license_end_date && new Date(comp.license_end_date) < new Date();
 
             // JWT token oluştur - firma admini olarak giriş yapsın
@@ -792,7 +779,7 @@ router.post('/check-code', async (req: Request, res: Response) => {
 
         // Sonra board_code mu kontrol et
         const staffResult = await pool.query(
-            `SELECT u.id, u.first_name, u.last_name, u.board_code, u.company_id, u.photo, u.password, c.name as company_name, c.license_end_date
+            `SELECT u.id, u.first_name, u.last_name, u.board_code, u.company_id, u.photo, c.name as company_name, c.license_end_date
              FROM users u
              JOIN companies c ON u.company_id = c.id
              WHERE UPPER(u.board_code) = UPPER($1)`,
@@ -800,18 +787,6 @@ router.post('/check-code', async (req: Request, res: Response) => {
         );
         if (staffResult.rows.length > 0) {
             const sr = staffResult.rows[0];
-
-            // Personel Şifre Kontrolü
-            if (sr.password) {
-                if (!password) {
-                    return res.status(401).json({ success: false, error: 'Şifre gereklidir' });
-                }
-                const isMatch = await bcrypt.compare(password, sr.password);
-                if (!isMatch) {
-                    return res.status(401).json({ success: false, error: 'Hatalı şifre' });
-                }
-            }
-
             const isLicenseExpired = sr.license_end_date && new Date(sr.license_end_date) < new Date();
 
             // JWT token oluştur - personel dashboard'a erişsin

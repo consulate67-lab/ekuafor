@@ -31,23 +31,14 @@ const CompanyCard = React.memo(({ company: c, navigatingToId, favorites, toggleF
             )}
             <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent opacity-50" />
 
-            <div className="absolute top-4 right-4 flex flex-col items-center gap-3 z-10">
-                <button
-                    onClick={(e) => toggleFavorite(e, c.id)}
-                    className={`w-10 h-10 flex items-center justify-center rounded-2xl transition-all shadow-lg active:scale-90 ${favorites.includes(c.id) ? 'bg-rose-500 text-white shadow-rose-200 ring-4 ring-rose-50' : 'bg-white text-slate-300 hover:text-rose-500 border border-slate-100'}`}
-                >
-                    <svg className={`w-5 h-5 ${favorites.includes(c.id) ? 'fill-current' : 'fill-none'}`} stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                    </svg>
-                </button>
-
+            <div className="absolute top-4 right-4 flex flex-col items-center gap-4 z-10">
                 <a
                     href={c.latitude && c.longitude && parseFloat(c.latitude) !== 0 ? `https://www.google.com/maps/dir/?api=1&destination=${c.latitude},${c.longitude}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${c.name} ${c.address_line || ''} ${c.district || ''} ${c.city || ''}`)}`}
                     onClick={(e) => { e.stopPropagation(); e.preventDefault(); window.open(e.currentTarget.href, '_blank'); }}
-                    className="w-10 h-10 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-2xl transition-all hover:bg-indigo-600 hover:text-white shadow-md shadow-indigo-100 border border-indigo-100 active:scale-90"
+                    className="w-12 h-12 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-2xl transition-all hover:bg-indigo-600 hover:text-white shadow-md shadow-indigo-100 border border-indigo-100 active:scale-90"
                     title="Yol Tarifi"
                 >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
@@ -56,37 +47,56 @@ const CompanyCard = React.memo(({ company: c, navigatingToId, favorites, toggleF
                 {c.phone && (
                     <button
                         onClick={(e) => { e.stopPropagation(); onCallClick(e, c); }}
-                        className="w-10 h-10 flex items-center justify-center bg-emerald-50 text-emerald-600 rounded-2xl transition-all hover:bg-emerald-600 hover:text-white shadow-md shadow-emerald-100 border border-emerald-100 active:scale-90"
+                        className="w-12 h-12 flex items-center justify-center bg-emerald-50 text-emerald-600 rounded-2xl transition-all hover:bg-emerald-600 hover:text-white shadow-md shadow-emerald-100 border border-emerald-100 active:scale-90"
                         title="Telefon"
                     >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                         </svg>
                     </button>
                 )}
             </div>
 
-            <div className="w-20 h-20 rounded-[1.5rem] flex-shrink-0 flex items-center justify-center shadow-inner border border-slate-200/50 group-hover:scale-105 transition-transform overflow-hidden relative bg-slate-100">
-                <img
-                    src={
-                        c.photo ? c.photo : (
-                            (c.genders && c.genders.includes('Kadın'))
-                                ? 'https://images.pexels.com/photos/3993472/pexels-photo-3993472.jpeg?auto=compress&cs=tinysrgb&w=400'
-                                : ((c.genders && c.genders.includes('Erkek'))
-                                    ? 'https://images.pexels.com/photos/1813272/pexels-photo-1813272.jpeg?auto=compress&cs=tinysrgb&w=400'
-                                    : 'https://images.pexels.com/photos/705255/pexels-photo-705255.jpeg?auto=compress&cs=tinysrgb&w=400')
-                        )
-                    }
-                    alt={c.name}
-                    className="w-full h-full object-cover absolute inset-0 z-10"
-                    onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                    }}
-                />
-                <div className="absolute inset-0 flex items-center justify-center text-4xl z-0">
-                    {(c.genders && c.genders.includes('Kadın')) ? '👩‍🦰' : ((c.genders && c.genders.includes('Erkek')) ? '🧔' : '💈')}
+            <div className="flex flex-col items-center gap-2 flex-shrink-0">
+                <div className="w-20 h-20 rounded-[1.5rem] flex items-center justify-center shadow-inner border border-slate-200/50 group-hover:scale-105 transition-transform overflow-hidden relative bg-slate-100">
+                    <img
+                        src={
+                            c.photo ? c.photo : (
+                                (c.genders && c.genders.includes('Kadın'))
+                                    ? 'https://images.pexels.com/photos/3993472/pexels-photo-3993472.jpeg?auto=compress&cs=tinysrgb&w=400'
+                                    : ((c.genders && c.genders.includes('Erkek'))
+                                        ? 'https://images.pexels.com/photos/1813272/pexels-photo-1813272.jpeg?auto=compress&cs=tinysrgb&w=400'
+                                        : 'https://images.pexels.com/photos/705255/pexels-photo-705255.jpeg?auto=compress&cs=tinysrgb&w=400')
+                            )
+                        }
+                        alt={c.name}
+                        className="w-full h-full object-cover absolute inset-0 z-10"
+                        onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                        }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center text-4xl z-0">
+                        {(c.genders && c.genders.includes('Kadın')) ? '👩‍🦰' : ((c.genders && c.genders.includes('Erkek')) ? '🧔' : '💈')}
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent z-20 pointer-events-none"></div>
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent z-20 pointer-events-none"></div>
+
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={(e) => toggleFavorite(e, c.id)}
+                        className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-md active:scale-90 ${favorites.includes(c.id) ? 'bg-rose-500 text-white shadow-rose-200' : 'bg-white text-slate-300 hover:text-rose-500 border border-slate-100'}`}
+                    >
+                        <svg className={`w-4 h-4 ${favorites.includes(c.id) ? 'fill-current' : 'fill-none'}`} stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                        </svg>
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onReviewClick(c); }}
+                        className="w-9 h-9 flex items-center justify-center bg-amber-50 text-amber-600 rounded-xl border border-amber-100 shadow-md transition-all hover:bg-amber-600 hover:text-white active:scale-90"
+                    >
+                        <span className="text-lg">💬</span>
+                    </button>
+                </div>
             </div>
 
             <div className="flex-1 min-w-0 pr-12">
@@ -192,7 +202,18 @@ export default function CustomerHome() {
         try {
             const res = await api.get(`/companies/${company.id}/employees`);
             const allStaff = res.data?.data || [];
-            const staffWithPhone = allStaff.filter((s: any) => (s.phone && s.phone.trim().length > 5) || (s.user_phone && s.user_phone.trim().length > 5));
+            // Filtreleme: Personel telefonu firma ana hattı ile aynı ise veya Admin ise gösterme
+            const staffWithPhone = allStaff.filter((s: any) => {
+                if (s.role === 'company_admin' || 
+                    s.first_name?.toLowerCase().includes('admin') || 
+                    s.last_name?.toLowerCase().includes('admin')) {
+                    return false;
+                }
+                const phone = s.phone || s.user_phone;
+                if (!phone || phone.trim().length <= 5) return false;
+                // Normalize and compare
+                return formatDialNumber(phone) !== formatDialNumber(company.phone);
+            });
 
             if (staffWithPhone.length === 0) {
                 window.location.href = `tel:${formatDialNumber(company.phone)}`;
@@ -1260,21 +1281,29 @@ export default function CustomerHome() {
                             </button>
                             <h3 className="font-black text-slate-900 uppercase tracking-tight truncate max-w-[200px]">{reviewsModal.company?.name} / Yorumlar</h3>
                         </div>
-                        <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+                        <div className="flex bg-slate-100 p-1 rounded-2xl gap-1 w-fit mx-auto shadow-inner border border-slate-200">
                             <button 
                                 onClick={() => fetchCompanyReviews(reviewsModal.company.id, 'rating_desc')}
-                                className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${reviewsModal.sort === 'rating_desc' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${reviewsModal.sort === 'rating_desc' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 opacity-60'}`}
                             >Puan ↓</button>
                             <button 
                                 onClick={() => fetchCompanyReviews(reviewsModal.company.id, 'rating_asc')}
-                                className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${reviewsModal.sort === 'rating_asc' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${reviewsModal.sort === 'rating_asc' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 opacity-60'}`}
                             >Puan ↑</button>
                             <button 
                                 onClick={() => fetchCompanyReviews(reviewsModal.company.id, 'newest')}
-                                className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${reviewsModal.sort === 'newest' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${reviewsModal.sort === 'newest' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 opacity-60'}`}
                             >Yeni</button>
                         </div>
                     </header>
+
+                    <div className="bg-white/80 backdrop-blur-sm px-6 py-3 border-b border-slate-100 flex justify-center">
+                         <div className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full">
+                            <span className="text-xs">★</span>
+                            <span className="text-[11px] font-black">{parseFloat(reviewsModal.company?.rating_avg || 0).toFixed(1)}</span>
+                            <span className="text-[10px] font-bold opacity-60 ml-1">({reviewsModal.company?.review_count || 0} Yorum)</span>
+                         </div>
+                    </div>
 
                     <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 pb-12">
                         {reviewsModal.loading ? (

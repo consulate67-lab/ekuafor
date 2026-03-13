@@ -88,6 +88,32 @@ export default function Dashboard() {
         }
     };
 
+    // Back button support for Customers Modal
+    useEffect(() => {
+        const handlePopState = () => {
+            if (customersModal.open) {
+                setCustomersModal(prev => ({ ...prev, open: false }));
+            }
+        };
+
+        if (customersModal.open) {
+            window.addEventListener('popstate', handlePopState);
+        }
+
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [customersModal.open]);
+
+    const openCustomersModal = () => {
+        window.history.pushState({ modal: 'customers' }, '');
+        setCustomersModal(prev => ({ ...prev, open: true }));
+    };
+
+    const closeCustomersModal = () => {
+        if (customersModal.open) {
+            window.history.back();
+        }
+    };
+
     const handleCustomerSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         setCustomersModal(prev => ({ ...prev, search: val }));
@@ -412,13 +438,21 @@ export default function Dashboard() {
     };
 
     const handlePhotoUpload = async (photo: string) => {
-        if (!user?.company_id) return;
         setLoading(true);
         try {
-            const res = await api.put(`/companies/${user.company_id}`, { photo });
-            if (res.data.success) {
-                alert('Firma fotoğrafı başarıyla güncellendi');
-                window.location.reload();
+            // Staff should update their own photo, Admin should update company photo
+            if (user?.role === 'staff') {
+                const res = await api.patch(`/companies/${user.company_id}/staff/${user.id}/photo`, { photo });
+                if (res.data.success) {
+                    alert('Profil fotoğrafınız başarıyla güncellendi');
+                    window.location.reload();
+                }
+            } else {
+                const res = await api.put(`/companies/${user.company_id}`, { photo });
+                if (res.data.success) {
+                    alert('Firma fotoğrafı başarıyla güncellendi');
+                    window.location.reload();
+                }
             }
         } catch (err: any) {
             alert(err.response?.data?.error || 'Fotoğraf yüklenemedi');
@@ -676,11 +710,15 @@ export default function Dashboard() {
                         onClick={handlePhotoClick}
                         className="cursor-pointer group relative"
                     >
-                        {companyInfo?.photo ? (
+                        {(user?.role === 'staff' ? user.photo : companyInfo?.photo) ? (
                             <img
-                                src={companyInfo.photo}
-                                alt={companyInfo.name}
-                                className="w-32 h-32 rounded-[2.5rem] object-cover shadow-2xl border-4 border-white transition-all group-hover:scale-105 active:scale-95"
+                                src={user?.role === 'staff' ? user.photo : companyInfo.photo}
+                                alt={companyInfo?.name || user?.first_name}
+                                className="w-32 h-32 rounded-[2.5rem] object-cover shadow-2xl border-4 border-white transition-all group-hover:scale-105 active:scale-95 text-xs text-transparent"
+                                onError={(e) => {
+                                    // Fallback if image fails to load
+                                    e.currentTarget.style.display = 'none';
+                                }}
                             />
                         ) : (
                             <div className="w-32 h-32 rounded-[2.5rem] bg-gradient-to-tr from-indigo-500 to-indigo-600 flex items-center justify-center text-white font-black text-4xl shadow-2xl border-4 border-white transition-all group-hover:scale-105 active:scale-95">
@@ -1037,7 +1075,7 @@ export default function Dashboard() {
                     {/* 6. Müşterilerim */}
                     {(user?.role === 'staff' || user?.role === 'company_admin') && (
                         <button
-                            onClick={() => setCustomersModal(prev => ({ ...prev, open: true }))}
+                            onClick={openCustomersModal}
                             className="card group hover:scale-[1.02] transition-all duration-300 border-indigo-100 text-left"
                         >
                             <div className="flex items-center gap-5">
@@ -1299,7 +1337,7 @@ export default function Dashboard() {
                             style={{ paddingTop: 'env(safe-area-inset-top, 1rem)' }}>
                         <div className="flex items-center gap-3">
                             <button 
-                                onClick={() => setCustomersModal(prev => ({ ...prev, open: false }))}
+                                onClick={closeCustomersModal}
                                 className="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-2xl text-slate-400 active:scale-90"
                             >
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
@@ -1356,11 +1394,19 @@ export default function Dashboard() {
                                             <span className="text-[11px] font-black text-slate-700">{h.service_name}</span>
                                         </div>
                                         <div className="border-t border-slate-200/50 pt-2">
-                                            <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">Hizmet Notları</span>
+                                            <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">İşlem Notu</span>
                                             <p className="text-xs text-slate-600 font-medium leading-relaxed italic">
                                                 {h.technical_notes || 'Not girilmemiş.'}
                                             </p>
                                         </div>
+                                        {h.used_materials && (
+                                            <div className="border-t border-slate-200/50 pt-2 mt-2">
+                                                <span className="text-[9px] font-black text-slate-400 uppercase block mb-1">Kullanılan Malzemeler</span>
+                                                <p className="text-xs text-slate-600 font-medium leading-relaxed italic">
+                                                    {h.used_materials}
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))

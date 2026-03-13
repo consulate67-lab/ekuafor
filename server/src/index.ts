@@ -611,6 +611,7 @@ const runMigrations = async () => {
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS comment TEXT');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS iyzico_token VARCHAR(255)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS payment_id VARCHAR(255)');
+        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS used_materials TEXT');
 
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS photo TEXT');
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS department_id INTEGER');

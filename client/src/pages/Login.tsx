@@ -34,19 +34,18 @@ export default function Login() {
 
                 // Role based redirect
                 if (user.role === 'company_admin') {
-                    navigate('/company-panel');
+                    navigate('/company-panel', { replace: true });
                 } else if (user.role === 'staff') {
-                    navigate('/dashboard');
+                    navigate('/dashboard', { replace: true });
                 } else if (user.role === 'super_admin') {
-                    navigate('/dashboard');
+                    navigate('/dashboard', { replace: true });
                 } else {
-                    navigate('/app');
+                    navigate('/app', { replace: true });
                 }
             } else {
                 // Board Code Login
                 const response = await api.post('/api/companies/check-code', { 
-                    code: boardCode.toUpperCase().trim(),
-                    password: password 
+                    code: boardCode.toUpperCase().trim()
                 });
                 const { type, token, redirect, staff_name, company_name, board_code, company_id, user_id, photo } = response.data.data;
 
@@ -69,11 +68,11 @@ export default function Login() {
                         localStorage.setItem('company_admin_key', boardCode.toUpperCase().trim());
                     }
 
-                    navigate(redirect);
+                    navigate(redirect, { replace: true });
                 } else if (type === 'board') {
                     // Salon Board doesn't necessarily need a full user login in the store, 
                     // but we redirect to it.
-                    navigate(redirect);
+                    navigate(redirect, { replace: true });
                 }
             }
         } catch (err: any) {
@@ -178,20 +177,6 @@ export default function Login() {
                                         autoFocus
                                     />
                                     <p className="text-[10px] text-gray-400 mt-2 text-center uppercase font-bold tracking-widest">Kişisel board kodunuzu girin</p>
-                                </div>
-                            )}
-
-                            {loginType === 'board' && (
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">Şifre</label>
-                                    <input
-                                        type="password"
-                                        className="input-field"
-                                        placeholder="••••••••"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        required
-                                    />
                                 </div>
                             )}
 

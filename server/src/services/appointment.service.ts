@@ -386,7 +386,7 @@ class AppointmentService {
         }
     }
 
-    async updateAppointmentStatus(id: number, status: string, price?: number, payment_method?: string, technical_notes?: string): Promise<Appointment | null> {
+    async updateAppointmentStatus(id: number, status: string, price?: number, payment_method?: string, technical_notes?: string, used_materials?: string): Promise<Appointment | null> {
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
@@ -396,8 +396,8 @@ class AppointmentService {
                 const finalPaymentMethod = payment_method || ((status === 'completed') ? 'cash' : null);
 
                 result = await client.query(
-                    'UPDATE appointments SET status = $1, price = $2, payment_status = $3, payment_method = COALESCE(payment_method, $4), collected_price = COALESCE(collected_price, $2), technical_notes = COALESCE($5, technical_notes) WHERE id = $6 RETURNING *',
-                    [status, price, paymentStatus, finalPaymentMethod, technical_notes || null, id]
+                    'UPDATE appointments SET status = $1, price = $2, payment_status = $3, payment_method = COALESCE(payment_method, $4), collected_price = COALESCE(collected_price, $2), technical_notes = COALESCE($5, technical_notes), used_materials = COALESCE($6, used_materials) WHERE id = $7 RETURNING *',
+                    [status, price, paymentStatus, finalPaymentMethod, technical_notes || null, used_materials || null, id]
                 );
 
                 if (status === 'completed') {
@@ -423,14 +423,14 @@ class AppointmentService {
             } else {
                 if (status === 'completed') {
                     result = await client.query(
-                        'UPDATE appointments SET status = $1, collected_price = COALESCE(collected_price, price), technical_notes = COALESCE($2, technical_notes) WHERE id = $3 RETURNING *',
-                        [status, technical_notes || null, id]
+                        'UPDATE appointments SET status = $1, collected_price = COALESCE(collected_price, price), technical_notes = COALESCE($2, technical_notes), used_materials = COALESCE($3, used_materials) WHERE id = $4 RETURNING *',
+                        [status, technical_notes || null, used_materials || null, id]
                     );
                     await client.query('UPDATE appointment_services SET status = \'completed\' WHERE appointment_id = $1', [id]);
                 } else {
                     result = await client.query(
-                        'UPDATE appointments SET status = $1, technical_notes = COALESCE($2, technical_notes) WHERE id = $3 RETURNING *',
-                        [status, technical_notes || null, id]
+                        'UPDATE appointments SET status = $1, technical_notes = COALESCE($2, technical_notes), used_materials = COALESCE($3, used_materials) WHERE id = $4 RETURNING *',
+                        [status, technical_notes || null, used_materials || null, id]
                     );
                 }
             }
@@ -761,7 +761,7 @@ class AppointmentService {
         const namePattern = `%${search}%`;
 
         const query = `
-            SELECT a.id, a.appointment_date, a.start_time, a.customer_name, a.customer_phone, a.technical_notes,
+            SELECT a.id, a.appointment_date, a.start_time, a.customer_name, a.customer_phone, a.technical_notes, a.used_materials,
                    COALESCE(ms.name, pkg.name, (SELECT string_agg(s.name, ', ') FROM appointment_services aps JOIN services s ON aps.service_id = s.id WHERE aps.appointment_id = a.id)) as service_name
             FROM appointments a
             LEFT JOIN services ms ON a.service_id = ms.id

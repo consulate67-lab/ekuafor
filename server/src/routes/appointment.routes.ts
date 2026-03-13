@@ -302,8 +302,8 @@ router.post('/', async (req: Request, res: Response) => {
 router.patch('/:id/status', async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
-        const { status, price, payment_method, technical_notes } = req.body;
-        const appointment = await appointmentService.updateAppointmentStatus(id, status, price, payment_method, technical_notes);
+        const { status, price, payment_method, technical_notes, used_materials } = req.body;
+        const appointment = await appointmentService.updateAppointmentStatus(id, status, price, payment_method, technical_notes, used_materials);
         if (!appointment) {
             return res.status(404).json({ success: false, error: 'Randevu bulunamadı' });
         }
@@ -342,7 +342,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
         const id = parseInt(req.params.id);
         const { status } = req.body;
         if (status) {
-            const appointment = await appointmentService.updateAppointmentStatus(id, status);
+            const appointment = await appointmentService.updateAppointmentStatus(id, status, undefined, undefined, req.body.technical_notes, req.body.used_materials);
             return res.json({ success: true, data: appointment });
         }
         res.status(400).json({ success: false, error: 'Status gereklidir' });
