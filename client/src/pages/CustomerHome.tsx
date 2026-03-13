@@ -280,8 +280,14 @@ export default function CustomerHome() {
             let finalResult = resultWithDistance;
             if (loc) {
                 const threshold = dist || distanceLimit;
+                // Filter by distance
                 finalResult = resultWithDistance.filter((c: any) => c.distance === undefined || c.distance <= threshold);
-                finalResult.sort((a: any, b: any) => (a.distance || 9999) - (b.distance || 9999));
+                
+                // Only sort by distance if user hasn't explicitly chosen a different sort (like 'rating' or 'reviews')
+                // The API already returns records sorted by rating or reviews if requested.
+                if (sort !== 'rating' && sort !== 'reviews') {
+                    finalResult.sort((a: any, b: any) => (a.distance || 9999) - (b.distance || 9999));
+                }
             }
 
             setCompanies(allCompanies);
@@ -1270,7 +1276,7 @@ export default function CustomerHome() {
             {/* Reviews Modal */}
             {reviewsModal.open && (
                 <div className="fixed inset-0 z-[100] flex flex-col bg-slate-50 animate-in slide-in-from-bottom duration-300">
-                    <header className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between sticky top-0 shadow-sm z-10"
+                    <header className="bg-white px-6 py-4 flex items-center justify-between sticky top-0 z-20"
                             style={{ paddingTop: 'env(safe-area-inset-top, 1rem)' }}>
                         <div className="flex items-center gap-3">
                             <button 
@@ -1279,33 +1285,42 @@ export default function CustomerHome() {
                             >
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
                             </button>
-                            <h3 className="font-black text-slate-900 uppercase tracking-tight truncate max-w-[200px]">{reviewsModal.company?.name} / Yorumlar</h3>
-                        </div>
-                        <div className="flex bg-slate-100 p-1 rounded-2xl gap-1 w-fit mx-auto shadow-inner border border-slate-200">
-                            <button 
-                                onClick={() => fetchCompanyReviews(reviewsModal.company.id, 'rating_desc')}
-                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${reviewsModal.sort === 'rating_desc' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 opacity-60'}`}
-                            >Puan ↓</button>
-                            <button 
-                                onClick={() => fetchCompanyReviews(reviewsModal.company.id, 'rating_asc')}
-                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${reviewsModal.sort === 'rating_asc' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 opacity-60'}`}
-                            >Puan ↑</button>
-                            <button 
-                                onClick={() => fetchCompanyReviews(reviewsModal.company.id, 'newest')}
-                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${reviewsModal.sort === 'newest' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 opacity-60'}`}
-                            >Yeni</button>
+                            <div className="flex flex-col">
+                                <h3 className="font-black text-slate-900 uppercase tracking-tight truncate max-w-[200px]">{reviewsModal.company?.name}</h3>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Müşteri Yorumları</p>
+                            </div>
                         </div>
                     </header>
 
-                    <div className="bg-white/80 backdrop-blur-sm px-6 py-3 border-b border-slate-100 flex justify-center">
-                         <div className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full">
-                            <span className="text-xs">★</span>
-                            <span className="text-[11px] font-black">{parseFloat(reviewsModal.company?.rating_avg || 0).toFixed(1)}</span>
-                            <span className="text-[10px] font-bold opacity-60 ml-1">({reviewsModal.company?.review_count || 0} Yorum)</span>
-                         </div>
+                    {/* Sorting and Summary - Modern Centered */}
+                    <div className="bg-white border-b border-slate-100 px-6 py-8 flex flex-col items-center gap-6 sticky top-0 z-10 shadow-sm">
+                        <div className="flex items-center gap-2 bg-amber-50 px-8 py-4 rounded-[2.5rem] border border-amber-100 shadow-inner">
+                            <span className="text-3xl">★</span>
+                            <span className="text-4xl font-black text-amber-900 tracking-tighter">{parseFloat(reviewsModal.company?.rating_avg || 0).toFixed(1)}</span>
+                            <div className="w-1.5 h-1.5 bg-amber-200 rounded-full mx-3" />
+                            <div className="flex flex-col">
+                                <span className="text-xs font-black text-amber-700 uppercase tracking-[0.2em]">{reviewsModal.company?.review_count || 0} Yorum</span>
+                                <span className="text-[9px] font-bold text-amber-600/60 uppercase">Genel Puan</span>
+                            </div>
+                        </div>
+
+                        <div className="flex bg-slate-100 p-1.5 rounded-[2rem] gap-1 shadow-inner border border-slate-200">
+                            <button 
+                                onClick={() => fetchCompanyReviews(reviewsModal.company.id, 'rating_desc')}
+                                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${reviewsModal.sort === 'rating_desc' ? 'bg-white text-indigo-600 shadow-xl scale-105' : 'text-slate-400 opacity-60 hover:opacity-100'}`}
+                            >Puan ↓</button>
+                            <button 
+                                onClick={() => fetchCompanyReviews(reviewsModal.company.id, 'rating_asc')}
+                                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${reviewsModal.sort === 'rating_asc' ? 'bg-white text-indigo-600 shadow-xl scale-105' : 'text-slate-400 opacity-60 hover:opacity-100'}`}
+                            >Puan ↑</button>
+                            <button 
+                                onClick={() => fetchCompanyReviews(reviewsModal.company.id, 'newest')}
+                                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${reviewsModal.sort === 'newest' ? 'bg-white text-indigo-600 shadow-xl scale-105' : 'text-slate-400 opacity-60 hover:opacity-100'}`}
+                            >Yeni</button>
+                        </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 pb-12">
+                    <div className="flex-1 overflow-y-auto px-6 py-8 space-y-4 pb-12">
                         {reviewsModal.loading ? (
                             <div className="flex flex-col items-center justify-center py-20 opacity-50">
                                 <div className="w-10 h-10 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
