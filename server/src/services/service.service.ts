@@ -1,4 +1,5 @@
 import pool from '../config/database';
+import redis from '../config/redis';
 
 export interface Service {
     id?: number;
@@ -15,6 +16,19 @@ export interface Service {
 }
 
 class ServiceService {
+    private async clearCompanyCache() {
+        if (!redis) return;
+        try {
+            const keys = await redis.keys('companies:list:*');
+            if (keys.length > 0) {
+                await redis.del(...keys);
+                console.log(`[Redis] ServiceService cleared ${keys.length} cache keys`);
+            }
+        } catch (err) {
+            console.error('[Redis] ServiceService cache clear error:', err);
+        }
+    }
+
     async createService(service: Service): Promise<Service> {
         const query = `
       INSERT INTO services (company_id, name, description, duration_minutes, price, department_id, quantity, unit, photo)
@@ -33,6 +47,7 @@ class ServiceService {
             service.photo || null
         ];
         const result = await pool.query(query, values);
+        await this.clearCompanyCache();
         return result.rows[0];
     }
 
@@ -71,6 +86,7 @@ class ServiceService {
       RETURNING *
     `;
         const result = await pool.query(query, values);
+        if (result.rows[0]) await this.clearCompanyCache();
         return result.rows[0] || null;
     }
 
@@ -79,6 +95,7 @@ class ServiceService {
             'UPDATE services SET is_active = false WHERE id = $1',
             [id]
         );
+        if ((result.rowCount ?? 0) > 0) await this.clearCompanyCache();
         return (result.rowCount ?? 0) > 0;
     }
 }

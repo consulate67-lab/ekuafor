@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import axios from 'axios';
 import pool from '../config/database';
 import { authMiddleware, roleCheck } from '../middleware/auth.middleware';
+import redis from '../config/redis';
 
 const router = Router();
 
@@ -207,6 +208,11 @@ router.post('/update-existing-companies', authMiddleware, roleCheck(['super_admi
             }
         }
 
+        if (updatedCount > 0 && redis) {
+            const keys = await redis.keys('companies:list:*');
+            if (keys.length > 0) await redis.del(...keys);
+        }
+
         res.json({
             success: true,
             message: `${updatedCount} firma güncellendi. ${errorCount > 0 ? errorCount + ' hata oluştu.' : ''}`,
@@ -258,6 +264,11 @@ router.post('/auto-categorize-genders', authMiddleware, roleCheck(['super_admin'
             )
             RETURNING id
         `);
+
+        if (result.rowCount && result.rowCount > 0 && redis) {
+            const keys = await redis.keys('companies:list:*');
+            if (keys.length > 0) await redis.del(...keys);
+        }
 
         res.json({
             success: true,
@@ -333,6 +344,11 @@ router.post('/import-salons', authMiddleware, roleCheck(['super_admin', 'company
         }
 
         await client.query('COMMIT');
+
+        if (importedIds.length > 0 && redis) {
+            const keys = await redis.keys('companies:list:*');
+            if (keys.length > 0) await redis.del(...keys);
+        }
 
         res.json({
             success: true,

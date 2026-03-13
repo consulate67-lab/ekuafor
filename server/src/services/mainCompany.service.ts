@@ -1,4 +1,5 @@
 import pool from '../config/database';
+import redis from '../config/redis';
 
 export interface MainCompany {
     id?: number;
@@ -14,6 +15,19 @@ export interface MainCompany {
 }
 
 class MainCompanyService {
+    private async clearCompanyCache() {
+        if (!redis) return;
+        try {
+            const keys = await redis.keys('companies:list:*');
+            if (keys.length > 0) {
+                await redis.del(...keys);
+                console.log(`[Redis] MainCompanyService cleared ${keys.length} cache keys`);
+            }
+        } catch (err) {
+            console.error('[Redis] MainCompanyService cache clear error:', err);
+        }
+    }
+
     async create(data: any): Promise<MainCompany> {
         const query = `
             INSERT INTO companies (name, description, address_line, city, district, admin_key, board_key, company_type)
@@ -22,6 +36,7 @@ class MainCompanyService {
         `;
         const values = [data.name, data.description, data.address_line, data.city, data.district, data.admin_key || data.admin_code, data.board_key];
         const result = await pool.query(query, values);
+        await this.clearCompanyCache();
         return result.rows[0];
     }
 
@@ -65,6 +80,7 @@ class MainCompanyService {
         values.push(id);
         const query = `UPDATE companies SET ${fields.join(', ')} WHERE id = $${i} AND company_type = 'ÜST FİRMA' RETURNING id, name, description, address_line, city, district, admin_key as admin_code, board_key, is_active, created_at`;
         const result = await pool.query(query, values);
+        if (result.rows[0]) await this.clearCompanyCache();
         return result.rows[0] || null;
     }
 
@@ -134,6 +150,7 @@ class MainCompanyService {
             const result = await client.query('DELETE FROM companies WHERE id = $1 AND company_type = \'ÜST FİRMA\'', [id]);
 
             await client.query('COMMIT');
+            if ((result.rowCount || 0) > 0) await this.clearCompanyCache();
             return (result.rowCount || 0) > 0;
         } catch (error) {
             await client.query('ROLLBACK');

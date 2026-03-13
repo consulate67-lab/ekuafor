@@ -1,5 +1,6 @@
 import pool from '../config/database';
 import smsService from './sms.service';
+import redis from '../config/redis';
 
 export interface Appointment {
     id?: number;
@@ -27,6 +28,19 @@ export interface Appointment {
 }
 
 class AppointmentService {
+    private async clearCompanyCache() {
+        if (!redis) return;
+        try {
+            const keys = await redis.keys('companies:list:*');
+            if (keys.length > 0) {
+                await redis.del(...keys);
+                console.log(`[Redis] AppointmentService cleared ${keys.length} cache keys`);
+            }
+        } catch (err) {
+            console.error('[Redis] AppointmentService cache clear error:', err);
+        }
+    }
+
     async createAppointment(appointment: Appointment): Promise<Appointment> {
         // Fetch package details if provided to get correct defaults
         let pkg: any = null;
@@ -691,6 +705,9 @@ class AppointmentService {
             'UPDATE appointments SET rating = $1, comment = $2 WHERE id = $3 RETURNING *',
             [rating, comment || null, id]
         );
+        if (result.rows[0]) {
+            await this.clearCompanyCache();
+        }
         return result.rows[0] || null;
     }
 
