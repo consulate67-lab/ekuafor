@@ -1,4 +1,4 @@
-# Saloon - Kurulum Kılavuzu
+# Salon Cebimde - Kurulum Kılavuzu
 
 ## Gereksinimler
 - Node.js (v18 veya üzeri)
@@ -12,14 +12,14 @@
 PostgreSQL'i yükleyin ve çalıştırın. Ardından yeni bir veritabanı oluşturun:
 
 ```sql
-CREATE DATABASE saloon_db;
+CREATE DATABASE saloncebimde_db;
 ```
 
 ### 2. Veritabanı Şemasını Oluşturun
 
 ```bash
 # PostgreSQL'e bağlanın
-psql -U postgres -d saloon_db
+psql -U postgres -d saloncebimde_db
 
 # Şema dosyasını çalıştırın
 \i server/database/schema.sql
@@ -48,7 +48,7 @@ cp .env.example .env
 # .env dosyasını düzenleyin ve veritabanı bilgilerinizi girin
 # DB_HOST=localhost
 # DB_PORT=5432
-# DB_NAME=saloon_db
+# DB_NAME=saloncebimde_db
 # DB_USER=postgres
 # DB_PASSWORD=your_password
 
@@ -73,7 +73,7 @@ Frontend http://localhost:5173 adresinde çalışacaktır.
 ## Giriş Bilgileri
 
 Varsayılan admin hesabı:
-- **Email:** admin@saloon.com
+- **Email:** admin@saloncebimde.com
 - **Şifre:** admin123
 
 ## API Endpoints
@@ -141,7 +141,7 @@ Varsayılan admin hesabı:
 ## Proje Yapısı
 
 ```
-saloon/
+saloncebimde/
 ├── server/                 # Backend
 │   ├── src/
 │   │   ├── config/        # Konfigürasyon

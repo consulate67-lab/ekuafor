@@ -530,7 +530,7 @@ class CompanyService {
             if (company.phone) {
                 try {
                     const protocol = 'https://';
-                    const baseUrl = 'www.saloontr.com';
+                    const baseUrl = 'www.saloncebimde.com';
                     const message = `Sayın ${company.name}, başvurunuz onaylanmıştır. Firma Yönetim Paneliniz: ${protocol}${baseUrl}/#/company-panel?key=${company.admin_key} Çalışanlarınızı Tanıtmak İçin: ${protocol}${baseUrl}/#/setup-staff/${company.id}?key=${company.admin_key}`;
 
                     await smsService.sendSms(null, company.phone, message);

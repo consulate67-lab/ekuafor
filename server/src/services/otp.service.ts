@@ -38,7 +38,7 @@ class OtpService {
             );
 
             // SMS gönder
-            const message = `Doğrulama kodunuz: ${code}. SaloonTR uygulamasına giriş yapmak için kullanabilirsiniz.`;
+            const message = `Doğrulama kodunuz: ${code}. Salon Cebimde uygulamasına giriş yapmak için kullanabilirsiniz.`;
             const sent = await smsService.sendSms(null, formattedPhone, message);
 
             if (!sent) {
@@ -54,7 +54,7 @@ class OtpService {
                         await pushService.sendNotification(
                             token,
                             'Giriş Kodu',
-                            `SaloonTR giriş kodunuz: ${code}`,
+                            `Salon Cebimde giriş kodunuz: ${code}`,
                             { type: 'otp', code: code },
                             formattedPhone
                         );

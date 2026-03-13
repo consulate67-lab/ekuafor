@@ -83,7 +83,7 @@ export default function SetPassword() {
                     <div className="w-24 h-24 rounded-[2rem] overflow-hidden flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-indigo-500/40 rotate-3 hover:rotate-0 transition-all duration-500">
                         <img src="/app-icon.png" alt="Logo" className="w-full h-full object-cover" />
                     </div>
-                    <h1 className="text-4xl font-black text-white tracking-tighter mb-2">SaloonTR<span className="text-indigo-500">.</span></h1>
+                    <h1 className="text-4xl font-black text-white tracking-tighter mb-2">Salon Cebimde<span className="text-indigo-500">.</span></h1>
                     <p className="text-slate-500 font-bold uppercase tracking-[0.3em] text-[10px]">Personel Aktivasyon</p>
                 </div>
 
@@ -184,7 +184,7 @@ export default function SetPassword() {
                 </div>
 
                 <div className="mt-8 text-center animate-fade-in-up delay-300">
-                    <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">© 2026 SaloonTR MANAGEMENT SYSTEMS</p>
+                    <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">© 2026 Salon Cebimde MANAGEMENT SYSTEMS</p>
                 </div>
             </div>
 

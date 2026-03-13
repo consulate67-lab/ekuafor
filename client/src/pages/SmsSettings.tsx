@@ -33,7 +33,7 @@ export default function SmsSettingsPage() {
     const [logs, setLogs] = useState<SmsLog[]>([]);
     const [loading, setLoading] = useState(false);
     const [testPhone, setTestPhone] = useState('');
-    const [testMessage, setTestMessage] = useState('SaloonTR Test Mesajıdır.');
+    const [testMessage, setTestMessage] = useState('Salon Cebimde Test Mesajıdır.');
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     useEffect(() => {
@@ -194,7 +194,7 @@ export default function SmsSettingsPage() {
                                 <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Mesaj Başlığı (Sender ID)</label>
                                 <input
                                     type="text"
-                                    placeholder="Örn: SALOON"
+                                    placeholder="Örn: SALON"
                                     className="input-field"
                                     value={settings.sender_id}
                                     onChange={e => setSettings({ ...settings, sender_id: e.target.value })}

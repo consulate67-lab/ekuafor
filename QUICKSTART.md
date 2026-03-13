@@ -1,4 +1,4 @@
-# 🎯 Saloon Projesi - Hızlı Başlangıç Rehberi
+# 🎯 Salon Cebimde Projesi - Hızlı Başlangıç Rehberi
 
 ## 📌 Proje Durumu
 
@@ -25,10 +25,10 @@ Sisteminizde bunlar yüklü olmalı:
 
 ```bash
 # PostgreSQL'de yeni veritabanı oluştur
-createdb saloon_db
+createdb saloncebimde_db
 
 # Şemayı yükle
-psql -d saloon_db -f server/database/schema.sql
+psql -d saloncebimde_db -f server/database/schema.sql
 ```
 
 **ÖNEMLİ**: Admin şifresini hash'leyin:
@@ -64,7 +64,7 @@ npm run dev
 ### 5️⃣ Giriş Yapın
 
 Tarayıcınızda http://localhost:5173 adresine gidin:
-- **Email**: admin@saloon.com
+- **Email**: admin@saloncebimde.com
 - **Şifre**: admin123
 
 ## 📋 İlk Firma Ekleyin
@@ -115,7 +115,7 @@ curl http://localhost:3000/health
 # Login
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@saloon.com","password":"admin123"}'
+  -d '{"email":"admin@saloncebimde.com","password":"admin123"}'
 
 # Firmaları listele
 curl http://localhost:3000/api/companies \

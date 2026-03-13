@@ -89,7 +89,7 @@ app.get('/ekuafor/api/companies/verify-test', commonVerify);
 
 // Root Route
 app.get('/', (req, res) => {
-    res.send('<h1>SaloonTR Backend is Live!</h1> <p>Try <a href="/api/ping">/api/ping</a></p>');
+    res.send('<h1>Salon Cebimde Backend is Live!</h1> <p>Try <a href="/api/ping">/api/ping</a></p>');
 });
 
 // Health Checks (Explicit)
@@ -789,7 +789,7 @@ const runMigrations = async () => {
         await pool.query(`
             INSERT INTO users (email, password, role, first_name, last_name, phone, is_active)
             VALUES (
-                'sarpyilmaz@saloon.com',
+                'sarpyilmaz@saloncebimde.com',
                 '$2a$10$Ba0KuHHWuOcEFC/OnP/6gu3CFAcF.Z.4iz2h.ira1C0.xH4vdy4a6',
                 'super_admin',
                 'sarp',

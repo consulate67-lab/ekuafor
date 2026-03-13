@@ -3,7 +3,7 @@ import axios from 'axios';
 let baseUrl = import.meta.env.VITE_API_URL;
 
 // Akıllı Otomatik Bağlantı: Neredeyiz?
-const isProdDomain = window.location.hostname.includes('saloontr.com') || window.location.hostname.includes('github.io');
+const isProdDomain = window.location.hostname.includes('saloncebimde.com') || window.location.hostname.includes('github.io');
 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
 import { Capacitor } from '@capacitor/core';
@@ -11,7 +11,7 @@ const isNative = Capacitor.isNativePlatform();
 
 if (!baseUrl) {
     if (isProdDomain) {
-        // Canlıda (Saloontr veya GitHub) yeni üretim sunucusunu kullan
+        // Canlıda (Salon Cebimde veya GitHub) yeni üretim sunucusunu kullan
         baseUrl = 'https://ekuafor-production-344a.up.railway.app/api';
     } else if (isLocal && !isNative) {
         // Sadece yerel geliştirmede (ve native değilse) localhost
@@ -23,7 +23,7 @@ if (!baseUrl) {
 }
 
 // Debug logging
-console.log('--- SaloonTR API Connection ---');
+console.log('--- Salon Cebimde API Connection ---');
 console.log('Hostname:', window.location.hostname);
 console.log('Target API:', baseUrl);
 console.log('-----------------------------');

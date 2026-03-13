@@ -15,8 +15,8 @@ async function deploy() {
     const client = new ftp.Client();
     client.ftp.verbose = true;
 
-    const host = process.env.FTP_HOST || 'ftp.saloontr.com';
-    const user = process.env.FTP_USER || 'saloon@saloontr.com';
+    const host = process.env.FTP_HOST || 'ftp.saloncebimde.com';
+    const user = process.env.FTP_USER || 'root@saloncebimde.com';
     const password = process.env.FTP_PASSWORD;
 
     try {

@@ -240,7 +240,7 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
 
             // Send SMS to staff
             const staffEmail = staff.email.toLowerCase().trim();
-            const smsMsg = `Sayin ${staff.first_name}, ${companyName} personeli olarak sisteme eklendiniz. Email: ${staffEmail}. Sifrenizi olusturmak icin tiklayin: https://www.saloontr.com/#/set-password/${boardCode}/${staffEmail}`;
+            const smsMsg = `Sayin ${staff.first_name}, ${companyName} personeli olarak sisteme eklendiniz. Email: ${staffEmail}. Sifrenizi olusturmak icin tiklayin: https://www.saloncebimde.com/#/set-password/${boardCode}/${staffEmail}`;
             
             // Background SMS sending
             require('../services/sms.service').default.sendSms(null as any, staff.phone, smsMsg).catch((e: any) => { 
@@ -758,7 +758,7 @@ router.post('/check-code', async (req: Request, res: Response) => {
 
             // JWT token oluştur - firma admini olarak giriş yapsın
             const token = jwt.sign(
-                { userId: comp.id, email: `admin_${comp.id}@saloontr.local`, role: 'company_admin', companyId: comp.id },
+                { userId: comp.id, email: `admin_${comp.id}@saloncebimde.local`, role: 'company_admin', companyId: comp.id },
                 process.env.JWT_SECRET || 'your-secret-key',
                 { expiresIn: '30d' }
             );

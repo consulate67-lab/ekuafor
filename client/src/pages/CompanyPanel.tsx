@@ -4615,7 +4615,7 @@ export default function CompanyPanel() {
                                     value={currentAccountForm.title}
                                     onChange={e => setCurrentAccountForm({ ...currentAccountForm, title: e.target.value })}
                                     className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
-                                    placeholder="SaloonTR Bilişim Ltd. Şti."
+                                    placeholder="Salon Cebimde Bilişim Ltd. Şti."
                                 />
                             </div>
 

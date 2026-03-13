@@ -45,7 +45,7 @@ export function useAppointmentSync() {
         const statusLabel = statusLabels[app.status] || app.status;
 
         if (Notification.permission === "granted") {
-            new Notification(`${app.company_name || 'SaloonTR'} Randevu Durumu`, {
+            new Notification(`${app.company_name || 'Salon Cebimde'} Randevu Durumu`, {
                 body: `${app.service_name || 'Randevunuz'} ${statusLabel}. Saati: ${app.start_time?.substring(0, 5)}`,
                 icon: '/ekuafor/favicon.ico'
             });

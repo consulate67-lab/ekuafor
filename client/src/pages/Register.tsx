@@ -70,7 +70,7 @@ export default function Register() {
                         <img src="/app-icon.png" alt="Logo" className="w-full h-full object-cover" />
                     </div>
                     <h1 className="text-3xl font-bold heading-serif mb-2 tracking-tight">Hesap Oluştur</h1>
-                    <p className="text-gray-500 font-medium text-sm">SaloonTR ailesine katılın ve işletmenizi yönetmeye başlayın</p>
+                    <p className="text-gray-500 font-medium text-sm">Salon Cebimde ailesine katılın ve işletmenizi yönetmeye başlayın</p>
                 </div>
 
                 <div className="card glass-card">
@@ -203,7 +203,7 @@ export default function Register() {
                 </div>
 
                 <div className="mt-8 text-center">
-                    <p className="text-xs text-gray-400">© 2026 SaloonTR Management System. Tüm hakları saklıdır.</p>
+                    <p className="text-xs text-gray-400">© 2026 Salon Cebimde Management System. Tüm hakları saklıdır.</p>
                 </div>
             </div>
         </div>

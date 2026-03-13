@@ -1,5 +1,5 @@
 {
-  "name": "saloon-backend",
+  "name": "saloncebimde-backend",
   "version": "1.69.11",
   "description": "Güzellik Merkezi Randevu Sistemi - Backend",
   "main": "dist/index.js",
@@ -10,7 +10,7 @@
     "db:migrate": "node -r dotenv/config scripts/migrate.js || node -e \"process.exit(0)\""
   },
   "keywords": [
-    "saloon",
+    "saloncebimde",
     "appointment",
     "booking"
   ],

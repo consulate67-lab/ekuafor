@@ -24,7 +24,7 @@ const initializeDB = () => {
             id: 1,
             email: 'admin@saloon.com',
             password: 'admin',
-            first_name: 'SaloonTR',
+            first_name: 'Salon Cebimde',
             last_name: 'Super Admin',
             role: 'super_admin',
             company_id: 1,
