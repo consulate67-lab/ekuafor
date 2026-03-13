@@ -594,7 +594,7 @@ router.get('/:id/staff-boards', async (req: Request, res: Response) => {
              FROM users u
              LEFT JOIN departments d ON u.department_id = d.id
              LEFT JOIN company_users cu ON cu.user_id = u.id AND cu.company_id = $1
-             WHERE (u.company_id = $1 OR cu.company_id = $1) AND u.role != 'customer'
+             WHERE (u.company_id = $1 OR cu.company_id = $1) AND u.role NOT IN ('customer', 'company_admin', 'super_admin')
              ORDER BY u.first_name`,
             [companyId]
         );

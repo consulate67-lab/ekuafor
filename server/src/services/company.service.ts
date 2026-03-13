@@ -390,8 +390,9 @@ class CompanyService {
                 GROUP BY company_id
             ) service_stats ON service_stats.company_id = c.id
             WHERE ${whereClauses.join(' AND ')}
-            ${filters?.sort === 'rating' ? 'ORDER BY rating_avg DESC, review_count DESC' :
-                (filters?.sort === 'reviews' ? 'ORDER BY review_count DESC, rating_avg DESC' : 'ORDER BY c.created_at DESC')}
+            ORDER BY relation_count DESC, 
+            ${filters?.sort === 'rating' ? 'rating_avg DESC, review_count DESC' :
+                (filters?.sort === 'reviews' ? 'review_count DESC, rating_avg DESC' : 'c.created_at DESC')}
         `;
 
         const result = await pool.query(query, values);

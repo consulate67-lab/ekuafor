@@ -443,19 +443,12 @@ export default function Dashboard() {
         
         setLoading(true);
         try {
-            // Staff should update their own photo, Admin should update company photo
-            if (currentUser.role === 'staff') {
-                const res = await api.patch(`/companies/${currentUser.company_id}/staff/${currentUser.id}/photo`, { photo });
-                if (res.data.success) {
-                    alert('Profil fotoğrafınız başarıyla güncellendi');
-                    window.location.reload();
-                }
-            } else {
-                const res = await api.put(`/companies/${currentUser.company_id}`, { photo });
-                if (res.data.success) {
-                    alert('Firma fotoğrafı başarıyla güncellendi');
-                    window.location.reload();
-                }
+            // Everyone (Staff & Admin) should update their own personal photo
+            // Company logo update is managed separately in Company Panel
+            const res = await api.patch(`/companies/${currentUser.company_id}/staff/${currentUser.id}/photo`, { photo });
+            if (res.data.success) {
+                alert('Profil fotoğrafınız başarıyla güncellendi');
+                window.location.reload();
             }
         } catch (err: any) {
             alert(err.response?.data?.error || 'Fotoğraf yüklenemedi');
@@ -713,10 +706,10 @@ export default function Dashboard() {
                         onClick={handlePhotoClick}
                         className="cursor-pointer group relative"
                     >
-                        {(user?.role === 'staff' ? user.photo : companyInfo?.photo) ? (
+                        {(user?.photo || companyInfo?.photo) ? (
                             <img
-                                src={user?.role === 'staff' ? user.photo : companyInfo.photo}
-                                alt={companyInfo?.name || user?.first_name}
+                                src={user?.photo || companyInfo?.photo}
+                                alt={user?.first_name || companyInfo?.name}
                                 className="w-32 h-32 rounded-[2.5rem] object-cover shadow-2xl border-4 border-white transition-all group-hover:scale-105 active:scale-95 text-xs text-transparent"
                                 onError={(e) => {
                                     // Fallback if image fails to load

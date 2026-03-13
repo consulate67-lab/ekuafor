@@ -5,11 +5,19 @@ import api from '../lib/api';
 import { Company } from '../types';
 import { Geolocation } from '@capacitor/geolocation';
 import { Camera } from '@capacitor/camera';
+import { App as CapApp } from '@capacitor/app';
 
 // Optimize individual item render - Moved outside to prevent recreation on every render
 const formatDialNumber = (phone?: string) => {
     if (!phone) return "";
     let cleaned = phone.replace(/[^0-9]/g, "");
+    // Türkiye için 10 haneli (5xx...), 11 haneli (05xx...), 12 haneli (905xx...) durumlarını normalize et
+    if (cleaned.length === 12 && cleaned.startsWith('90')) {
+        cleaned = cleaned.substring(2);
+    } else if (cleaned.length === 11 && cleaned.startsWith('0')) {
+        cleaned = cleaned.substring(1);
+    }
+    // Başına '0' ekleyerek standardı sağla (10 hane ise 0 ekle)
     if (cleaned.length === 10 && cleaned.startsWith('5')) {
         return '0' + cleaned;
     }
@@ -35,7 +43,7 @@ const CompanyCard = React.memo(({ company: c, navigatingToId, favorites, toggleF
                 <a
                     href={c.latitude && c.longitude && parseFloat(c.latitude) !== 0 ? `https://www.google.com/maps/dir/?api=1&destination=${c.latitude},${c.longitude}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${c.name} ${c.address_line || ''} ${c.district || ''} ${c.city || ''}`)}`}
                     onClick={(e) => { e.stopPropagation(); e.preventDefault(); window.open(e.currentTarget.href, '_blank'); }}
-                    className="w-12 h-12 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-2xl transition-all hover:bg-indigo-600 hover:text-white shadow-md shadow-indigo-100 border border-indigo-100 active:scale-90"
+                    className="w-14 h-14 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-2xl transition-all hover:bg-indigo-600 hover:text-white shadow-md shadow-indigo-100 border border-indigo-100 active:scale-90"
                     title="Yol Tarifi"
                 >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,7 +55,7 @@ const CompanyCard = React.memo(({ company: c, navigatingToId, favorites, toggleF
                 {c.phone && (
                     <button
                         onClick={(e) => { e.stopPropagation(); onCallClick(e, c); }}
-                        className="w-12 h-12 flex items-center justify-center bg-emerald-50 text-emerald-600 rounded-2xl transition-all hover:bg-emerald-600 hover:text-white shadow-md shadow-emerald-100 border border-emerald-100 active:scale-90"
+                        className="w-14 h-14 flex items-center justify-center bg-emerald-50 text-emerald-600 rounded-2xl transition-all hover:bg-emerald-600 hover:text-white shadow-md shadow-emerald-100 border border-emerald-100 active:scale-90"
                         title="Telefon"
                     >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -84,17 +92,17 @@ const CompanyCard = React.memo(({ company: c, navigatingToId, favorites, toggleF
                 <div className="flex items-center gap-2">
                     <button
                         onClick={(e) => toggleFavorite(e, c.id)}
-                        className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-md active:scale-90 ${favorites.includes(c.id) ? 'bg-rose-500 text-white shadow-rose-200' : 'bg-white text-slate-300 hover:text-rose-500 border border-slate-100'}`}
+                        className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-all shadow-md active:scale-90 ${favorites.includes(c.id) ? 'bg-rose-500 text-white shadow-rose-200' : 'bg-white text-slate-300 hover:text-rose-500 border border-slate-100'}`}
                     >
-                        <svg className={`w-4 h-4 ${favorites.includes(c.id) ? 'fill-current' : 'fill-none'}`} stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className={`w-5 h-5 ${favorites.includes(c.id) ? 'fill-current' : 'fill-none'}`} stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                         </svg>
                     </button>
                     <button
                         onClick={(e) => { e.stopPropagation(); onReviewClick(c); }}
-                        className="w-9 h-9 flex items-center justify-center bg-amber-50 text-amber-600 rounded-xl border border-amber-100 shadow-md transition-all hover:bg-amber-600 hover:text-white active:scale-90"
+                        className="w-11 h-11 flex items-center justify-center bg-amber-50 text-amber-600 rounded-2xl border border-amber-100 shadow-md transition-all hover:bg-amber-600 hover:text-white active:scale-90"
                     >
-                        <span className="text-lg">💬</span>
+                        <span className="text-xl">💬</span>
                     </button>
                 </div>
             </div>
@@ -106,15 +114,12 @@ const CompanyCard = React.memo(({ company: c, navigatingToId, favorites, toggleF
                 </div>
 
                 <div className="flex items-center gap-3 mb-2">
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); onReviewClick(c); }}
-                        className="flex items-center gap-1 text-[#b45309] hover:opacity-75 transition-opacity"
-                    >
+                    <div className="flex items-center gap-1 text-[#b45309]">
                         <span className="text-xs">★</span>
                         <span className="text-[11px] font-black">{parseFloat(c.rating_avg || 0).toFixed(1)}</span>
                         <div className="w-1 h-1 bg-slate-300 rounded-full mx-1" />
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest underline decoration-slate-200 underline-offset-2">{c.review_count || 0} Yorum</span>
-                    </button>
+                    </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -458,11 +463,39 @@ export default function CustomerHome() {
         }
         fetchData(searchQuery, location, distanceLimit);
     }, [selectedGender, sort, fetchData]);
+    
+    // BACK BUTTON HANDLER
+    useEffect(() => {
+        const backHandler = (CapApp as any).addListener('backButton', () => {
+            if (reviewsModal.open) {
+                setReviewsModal(prev => ({ ...prev, open: false }));
+            } else if (callPicker.open) {
+                setCallPicker(prev => ({ ...prev, open: false }));
+            } else if (showCodeModal) {
+                setShowCodeModal(false);
+            } else if (showSettingsModal) {
+                setShowSettingsModal(false);
+            } else {
+                navigate(-1);
+            }
+        });
+        return () => { backHandler.then((h: any) => h.remove()); };
+    }, [reviewsModal.open, callPicker.open, showCodeModal, showSettingsModal, navigate]);
 
 
-    const favoriteCompanies = useMemo(() => {
-        const favSet = new Set(favorites);
-        return companies.filter(c => favSet.has(c.id!));
+    const [favoriteCompanies, setFavoriteCompanies] = useState<Company[]>([]);
+
+    useEffect(() => {
+        setFavoriteCompanies(prev => {
+            const currentFavIds = new Set(favorites);
+            // Sadece hala favori olanları tut
+            const stillFavs = prev.filter(c => currentFavIds.has(c.id!));
+            // Mevcut şirketler listesinde olup henüz favori state'imizde olmayanları ekle
+            const alreadyInFavs = new Set(stillFavs.map(c => c.id));
+            const newFavsFromList = companies.filter(c => currentFavIds.has(c.id!) && !alreadyInFavs.has(c.id!));
+            
+            return [...stillFavs, ...newFavsFromList];
+        });
     }, [companies, favorites]);
 
     const handleCheckCode = async (overrideCode?: string) => {
@@ -832,46 +865,59 @@ export default function CustomerHome() {
             {favorites.length > 0 && (
                 <div className="max-w-md mx-auto py-2">
                     <div className="flex items-center justify-between px-6 mb-3">
-                        <h3 className="font-black text-slate-900 uppercase tracking-widest text-[10px]">Favorilerim</h3>
-                        <span className="bg-orange-50 text-orange-600 px-2.5 py-1 rounded-full text-[9px] font-black">❤️ {favorites.length}</span>
+                        <div className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                            <h3 className="font-black text-slate-900 uppercase tracking-widest text-[10px]">Favorilerim</h3>
+                        </div>
+                        <span className="bg-rose-50 text-rose-600 px-3 py-1 rounded-full text-[9px] font-black border border-rose-100 shadow-sm">❤️ {favorites.length}</span>
                     </div>
-                    <div className="flex gap-3 overflow-x-auto px-6 pb-4 hide-scrollbar">
+                    <div className="flex gap-4 overflow-x-auto px-6 pb-6 hide-scrollbar">
                         {favoriteCompanies.map((c: any) => (
-                            <button
-                                onClick={() => handleCompanyClick(c)}
-                                key={c.id}
-                                className={`flex-shrink-0 w-28 bg-white rounded-3xl p-3 shadow-lg shadow-slate-200/30 border border-slate-50 text-center group active:scale-95 transition-all relative overflow-hidden ${navigatingTo === c.id ? 'opacity-50' : ''}`}
-                            >
-                                {navigatingTo === c.id && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-white/20">
-                                        <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                            <div key={c.id} className="relative group flex-shrink-0">
+                                <button
+                                    onClick={() => handleCompanyClick(c)}
+                                    className={`w-32 bg-white rounded-[2rem] p-4 shadow-lg shadow-slate-200/40 border border-slate-50 text-center active:scale-95 transition-all relative overflow-hidden ${navigatingTo === c.id ? 'opacity-50' : ''}`}
+                                >
+                                    {navigatingTo === c.id && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[1px] z-20">
+                                            <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                                        </div>
+                                    )}
+                                    <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-3 group-hover:bg-rose-50 group-hover:scale-105 transition-all overflow-hidden relative border border-slate-100/50">
+                                        {c.photo ? (
+                                            <img src={c.photo} alt={c.name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <span>💈</span>
+                                        )}
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent"></div>
                                     </div>
-                                )}
-                                <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-xl mx-auto mb-2 group-hover:bg-orange-50 transition-colors">
-                                    💈
-                                </div>
-                                <h4 className="font-black text-slate-900 text-[10px] truncate">{c.name}</h4>
-                                <p className="text-slate-400 text-[8px] font-bold mt-0.5">{c.district || 'Merkez'}</p>
-                                {/* Action Buttons Overlay */}
-                                <div className="absolute top-2 left-2 right-2 flex justify-between items-center pointer-events-none">
-                                    <button
-                                        onClick={(e) => toggleFavorite(e, c.id)}
-                                        className="w-6 h-6 bg-rose-50 text-rose-500 rounded-lg flex items-center justify-center active:scale-90 pointer-events-auto shadow-sm border border-rose-100/50"
-                                        title="Favorilerden Çıkar"
-                                    >
-                                        <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                                            <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); handleCallClick(e, c); }}
-                                        className="w-6 h-6 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center active:scale-90 pointer-events-auto shadow-sm border border-emerald-100/50"
-                                        title="Ara"
-                                    >
-                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                                    </button>
-                                </div>
-                            </button>
+                                    <h4 className="font-black text-slate-900 text-xs truncate uppercase tracking-tighter">{c.name}</h4>
+                                    <p className="text-slate-400 text-[9px] font-bold mt-1 uppercase tracking-widest">{c.district || 'Merkez'}</p>
+                                    
+                                    <div className="flex items-center justify-center gap-1 mt-2 text-amber-500">
+                                        <span className="text-[10px]">★</span>
+                                        <span className="text-[10px] font-black">{parseFloat(c.rating_avg || 0).toFixed(1)}</span>
+                                    </div>
+                                </button>
+
+                                {/* Removal Button - Always visible X for clarity on mobile */}
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); toggleFavorite(e, c.id); }}
+                                    className="absolute -top-2 -right-2 w-10 h-10 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-2xl border-2 border-white active:scale-75 transition-all z-40"
+                                    title="Favorilerden Çıkar"
+                                >
+                                    <span className="text-xl font-black leading-none select-none">×</span>
+                                </button>
+
+                                {/* Call Button */}
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); handleCallClick(e, c); }}
+                                    className="absolute bottom-16 -left-1 w-8 h-8 bg-emerald-500 text-white rounded-xl flex items-center justify-center shadow-lg active:scale-75 transition-all z-30 border-2 border-white"
+                                    title="Ara"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                </button>
+                            </div>
                         ))}
                     </div>
                 </div>
@@ -1284,90 +1330,131 @@ export default function CustomerHome() {
                     to { transform: translateY(0); opacity: 1; }
                 }
             `}</style>
-            {/* Reviews Modal */}
+            {/* Reviews Modal - Premium Redesign */}
             {reviewsModal.open && (
-                <div className="fixed inset-0 z-[100] flex flex-col bg-slate-50 animate-in slide-in-from-bottom duration-300">
-                    <header className="bg-white px-6 py-4 flex items-center justify-between sticky top-0 z-20"
-                            style={{ paddingTop: 'env(safe-area-inset-top, 1rem)' }}>
-                        <div className="flex items-center gap-3">
-                            <button 
-                                onClick={() => setReviewsModal(prev => ({ ...prev, open: false }))}
-                                className="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-2xl text-slate-400 active:scale-90"
-                            >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
-                            </button>
-                            <div className="flex flex-col">
-                                <h3 className="font-black text-slate-900 uppercase tracking-tight truncate max-w-[200px]">{reviewsModal.company?.name}</h3>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Müşteri Yorumları</p>
+                <div className="fixed inset-0 z-[100] flex flex-col bg-slate-50 animate-in slide-in-from-bottom duration-500">
+                    {/* Floating Header */}
+                    <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-2xl border-b border-slate-100/50 shadow-sm"
+                         style={{ paddingTop: 'env(safe-area-inset-top, 1rem)' }}>
+                        <div className="max-w-md mx-auto px-6 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <button 
+                                    onClick={() => setReviewsModal(prev => ({ ...prev, open: false }))}
+                                    className="w-12 h-12 flex items-center justify-center bg-slate-100/80 text-slate-900 rounded-[1.25rem] active:scale-90 transition-all border border-slate-200/50"
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+                                </button>
+                                <div className="flex flex-col">
+                                    <h3 className="font-black text-slate-900 uppercase tracking-tighter text-base leading-tight truncate max-w-[180px]">{reviewsModal.company?.name}</h3>
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="flex text-amber-500">
+                                            {[...Array(5)].map((_, i) => (
+                                                <span key={i} className="text-[10px]">{i < Math.round(reviewsModal.company?.rating_avg || 0) ? '★' : '☆'}</span>
+                                            ))}
+                                        </div>
+                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">({reviewsModal.company?.review_count || 0} DEĞERLENDİRME)</span>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </header>
-
-                    {/* Sorting and Summary - Modern Centered */}
-                    <div className="bg-white border-b border-slate-100 px-6 py-8 flex flex-col items-center gap-6 sticky top-0 z-10 shadow-sm">
-                        <div className="flex items-center gap-2 bg-amber-50 px-8 py-4 rounded-[2.5rem] border border-amber-100 shadow-inner">
-                            <span className="text-3xl">★</span>
-                            <span className="text-4xl font-black text-amber-900 tracking-tighter">{parseFloat(reviewsModal.company?.rating_avg || 0).toFixed(1)}</span>
-                            <div className="w-1.5 h-1.5 bg-amber-200 rounded-full mx-3" />
-                            <div className="flex flex-col">
-                                <span className="text-xs font-black text-amber-700 uppercase tracking-[0.2em]">{reviewsModal.company?.review_count || 0} Yorum</span>
-                                <span className="text-[9px] font-bold text-amber-600/60 uppercase">Genel Puan</span>
+                            <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-slate-50 shadow-sm bg-slate-100 flex items-center justify-center text-xl">
+                                {reviewsModal.company?.photo ? (
+                                    <img src={reviewsModal.company.photo} className="w-full h-full object-cover" />
+                                ) : '💈'}
                             </div>
-                        </div>
-
-                        <div className="flex bg-slate-100 p-1.5 rounded-[2rem] gap-1 shadow-inner border border-slate-200">
-                            <button 
-                                onClick={() => fetchCompanyReviews(reviewsModal.company.id, 'rating_desc')}
-                                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${reviewsModal.sort === 'rating_desc' ? 'bg-white text-indigo-600 shadow-xl scale-105' : 'text-slate-400 opacity-60 hover:opacity-100'}`}
-                            >Puan ↓</button>
-                            <button 
-                                onClick={() => fetchCompanyReviews(reviewsModal.company.id, 'rating_asc')}
-                                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${reviewsModal.sort === 'rating_asc' ? 'bg-white text-indigo-600 shadow-xl scale-105' : 'text-slate-400 opacity-60 hover:opacity-100'}`}
-                            >Puan ↑</button>
-                            <button 
-                                onClick={() => fetchCompanyReviews(reviewsModal.company.id, 'newest')}
-                                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${reviewsModal.sort === 'newest' ? 'bg-white text-indigo-600 shadow-xl scale-105' : 'text-slate-400 opacity-60 hover:opacity-100'}`}
-                            >Yeni</button>
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto px-6 py-8 space-y-4 pb-12">
-                        {reviewsModal.loading ? (
-                            <div className="flex flex-col items-center justify-center py-20 opacity-50">
-                                <div className="w-10 h-10 border-4 border-slate-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Yükleniyor...</span>
-                            </div>
-                        ) : reviewsModal.reviews.length === 0 ? (
-                            <div className="text-center py-20 opacity-40">
-                                <div className="text-4xl mb-4">💬</div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Henüz yorum yapılmamış.</p>
-                            </div>
-                        ) : (
-                            reviewsModal.reviews.map((r: any) => (
-                                <div key={r.id} className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col gap-3 relative">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center font-black text-indigo-600 text-[10px] uppercase">
-                                                {r.customer_name?.[0] || 'M'}
-                                            </div>
-                                            <h4 className="font-black text-slate-900 text-xs uppercase tracking-tight">{r.customer_name}</h4>
+                    <div className="flex-1 overflow-y-auto hide-scrollbar">
+                        {/* Hero Rating Section */}
+                        <div className="bg-white px-6 pt-10 pb-12 rounded-b-[3.5rem] shadow-xl shadow-slate-200/50 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
+                            <div className="absolute bottom-0 left-0 w-48 h-48 bg-amber-500/5 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl"></div>
+
+                            <div className="relative z-10 flex flex-col items-center gap-8">
+                                <div className="flex flex-col items-center group">
+                                    <div className="relative">
+                                        <div className="absolute inset-0 bg-amber-400/20 blur-2xl rounded-full scale-150 group-hover:scale-175 transition-transform duration-700"></div>
+                                        <div className="relative w-32 h-32 bg-gradient-to-br from-amber-400 to-orange-500 rounded-[2.5rem] flex flex-col items-center justify-center shadow-2xl shadow-amber-200 border-4 border-white rotate-3 group-hover:rotate-0 transition-all duration-500">
+                                            <span className="text-4xl font-black text-white tracking-tighter">{parseFloat(reviewsModal.company?.rating_avg || 0).toFixed(1)}</span>
+                                            <div className="flex text-white/50 text-[8px] mt-1 tracking-widest uppercase font-bold">PUAN</div>
                                         </div>
-                                        <div className="flex items-center gap-0.5">
-                                            {[...Array(5)].map((_, i) => (
-                                                <svg key={i} className={`w-3 h-3 ${i < r.rating ? 'text-amber-400 fill-current' : 'text-slate-200'}`} viewBox="0 0 20 20">
-                                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                                </svg>
+                                    </div>
+                                    <div className="mt-8 flex flex-col items-center">
+                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-3">Sıralama Seçenekleri</h4>
+                                        <div className="flex bg-slate-50 p-1.5 rounded-[1.75rem] gap-1 border border-slate-100 shadow-inner">
+                                            {[
+                                                { id: 'rating_desc', label: 'En Yüksek', icon: '💎' },
+                                                { id: 'rating_asc', label: 'En Düşük', icon: '❄️' },
+                                                { id: 'newest', label: 'En Yeni', icon: '✨' }
+                                            ].map(s => (
+                                                <button 
+                                                    key={s.id}
+                                                    onClick={() => fetchCompanyReviews(reviewsModal.company.id, s.id)}
+                                                    className={`px-5 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all duration-500 flex items-center gap-2 ${reviewsModal.sort === s.id ? 'bg-white text-indigo-600 shadow-lg shadow-indigo-100/50 scale-105' : 'text-slate-400 hover:text-slate-600'}`}
+                                                >
+                                                    <span className="text-sm">{s.icon}</span>
+                                                    {s.label}
+                                                </button>
                                             ))}
                                         </div>
                                     </div>
-                                    <p className="text-slate-600 text-xs leading-relaxed font-medium italic">"{r.comment}"</p>
-                                    <div className="flex items-center justify-between mt-1 pt-3 border-t border-slate-50">
-                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-tight">{r.service_name || 'Hizmet'}</span>
-                                        <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">{new Date(r.appointment_date).toLocaleDateString('tr-TR')}</span>
-                                    </div>
                                 </div>
-                            ))
-                        )}
+                            </div>
+                        </div>
+
+                        {/* Reviews List */}
+                        <div className="max-w-md mx-auto px-6 py-10 space-y-6">
+                            {reviewsModal.loading ? (
+                                <div className="flex flex-col items-center justify-center py-20">
+                                    <div className="w-12 h-12 border-[5px] border-slate-100 border-t-indigo-500 rounded-full animate-spin mb-6"></div>
+                                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] animate-pulse">Yorumlar Getiriliyor...</span>
+                                </div>
+                            ) : reviewsModal.reviews.length === 0 ? (
+                                <div className="text-center py-24 bg-white rounded-[2.5rem] border-2 border-dashed border-slate-100 p-10">
+                                    <div className="text-5xl mb-6 opacity-20">💬</div>
+                                    <p className="text-slate-400 font-black mb-1 uppercase tracking-tighter">Henüz Yorum Yok</p>
+                                    <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest leading-relaxed">Bu işletme hakkında ilk yorumu<br />siz yapabilirsiniz!</p>
+                                </div>
+                            ) : (
+                                reviewsModal.reviews.map((r: any, idx: number) => (
+                                    <div 
+                                        key={r.id} 
+                                        className="bg-white p-6 rounded-[2rem] shadow-xl shadow-slate-200/40 border border-slate-50 relative animate-in fade-in slide-in-from-bottom-4 duration-500"
+                                        style={{ animationDelay: `${idx * 100}ms` }}
+                                    >
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center font-black text-slate-900 text-xs shadow-inner">
+                                                    {r.customer_name?.[0] || 'M'}
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <h4 className="font-black text-slate-900 text-xs uppercase tracking-tight leading-none mb-1">{r.customer_name}</h4>
+                                                    <span className="text-[8px] font-bold text-slate-300 uppercase tracking-widest">{new Date(r.appointment_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-0.5 bg-amber-50 px-2.5 py-1.5 rounded-xl border border-amber-100/50 shadow-sm">
+                                                <span className="text-[10px] font-black text-amber-600 mr-1">{r.rating}.0</span>
+                                                {[...Array(5)].map((_, i) => (
+                                                    <svg key={i} className={`w-2.5 h-2.5 ${i < r.rating ? 'text-amber-500 fill-current' : 'text-slate-200'}`} viewBox="0 0 20 20">
+                                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                                    </svg>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="relative">
+                                            <svg className="absolute -top-1 -left-1 w-4 h-4 text-slate-100" fill="currentColor" viewBox="0 0 24 24"><path d="M14.017 21L14.017 18C14.017 16.8954 14.9124 16 16.017 16H19.017C19.5693 16 20.017 15.5523 20.017 15V9C20.017 8.44772 19.5693 8 19.017 8H15.017C14.4647 8 14.017 7.55228 14.017 7V5C14.017 4.44772 14.4647 4 15.017 4H21.017C21.5693 4 22.017 4.44772 22.017 5V15C22.017 18.3137 19.3307 21 16.017 21H14.017ZM3.017 21L3.017 18C3.017 16.8954 3.91243 16 5.017 16H8.017C8.56928 16 9.017 15.5523 9.017 15V9C9.017 8.44772 8.56928 8 8.017 8H4.017C3.46472 8 3.017 7.55228 3.017 7V5C3.017 4.44772 3.46472 4 4.017 4H10.017C10.5693 4 11.017 4.44772 11.017 5V15C11.017 18.3137 8.33072 21 5.017 21H3.017Z" /></svg>
+                                            <p className="text-slate-600 text-[13px] leading-relaxed font-medium pl-5 italic group-hover:text-slate-900 transition-colors">"{r.comment}"</p>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 mt-5 pt-4 border-t border-slate-50/50">
+                                            <div className="w-1 h-3 bg-indigo-500 rounded-full"></div>
+                                            <span className="text-[10px] font-black text-indigo-900 uppercase tracking-tighter">{r.service_name || 'Hizmet Alındı'}</span>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

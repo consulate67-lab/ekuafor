@@ -51,7 +51,7 @@ class EmployeeService {
                 true as is_active
             FROM users u
             LEFT JOIN departments d ON u.department_id = d.id
-            WHERE u.company_id = $1
+            WHERE u.company_id = $1 AND u.role NOT IN ('company_admin', 'super_admin')
             ORDER BY u.first_name ASC
         `;
         const result = await pool.query(query, [companyId]);

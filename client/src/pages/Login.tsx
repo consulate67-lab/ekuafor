@@ -24,7 +24,7 @@ export default function Login() {
                 const response = await api.post('/auth/login', { email: normalizedEmail, password });
                 const { user, token, redirectKey } = response.data.data;
                 login(user, token);
-                
+
                 // Save keys for panels
                 if (user.role === 'company_admin' && redirectKey) {
                     localStorage.setItem('company_admin_key', redirectKey);
@@ -44,7 +44,7 @@ export default function Login() {
                 }
             } else {
                 // Board Code Login
-                const response = await api.post('/api/companies/check-code', { 
+                const response = await api.post('/api/companies/check-code', {
                     code: boardCode.toUpperCase().trim()
                 });
                 const { type, token, redirect, staff_name, company_name, board_code, company_id, user_id, photo } = response.data.data;
