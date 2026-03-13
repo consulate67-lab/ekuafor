@@ -415,13 +415,13 @@ class CompanyService {
             LEFT JOIN (
                 SELECT company_id, COUNT(*) as cnt 
                 FROM users 
-                WHERE is_active = true 
+                WHERE COALESCE(is_active, true) = true 
                 GROUP BY company_id
             ) staff_stats ON staff_stats.company_id = c.id
             LEFT JOIN (
                 SELECT company_id, COUNT(*) as cnt 
                 FROM services 
-                WHERE is_active = true 
+                WHERE COALESCE(is_active, true) = true 
                 GROUP BY company_id
             ) service_stats ON service_stats.company_id = c.id
             WHERE ${whereClauses.join(' AND ')}

@@ -34,10 +34,9 @@ class EmployeeService {
      * Firmanın tüm çalışanlarını listele
      */
     async getEmployeesByCompany(companyId: number): Promise<Employee[]> {
-        // Basit ve Güvenli Yöntem: Sadece users tablosuna bak.
-        // company_users tablosu oluşturulmamışsa bile çalışır.
+        // Gelişmiş Yöntem: Hem users.company_id hem de company_users tablosuna bak.
         const query = `
-            SELECT 
+            SELECT DISTINCT
                 u.id as user_id,
                 u.company_id,
                 u.first_name,
@@ -47,11 +46,15 @@ class EmployeeService {
                 u.role,
                 u.photo,
                 u.department_id,
+                u.quantity,
+                u.unit,
                 d.name as department_name,
-                true as is_active
+                COALESCE(u.is_active, true) as is_active
             FROM users u
             LEFT JOIN departments d ON u.department_id = d.id
-            WHERE u.company_id = $1 AND u.role NOT IN ('company_admin', 'super_admin')
+            LEFT JOIN company_users cu ON cu.user_id = u.id AND cu.company_id = $1
+            WHERE (u.company_id = $1 OR cu.company_id = $1) 
+            AND u.role NOT IN ('company_admin', 'super_admin', 'customer')
             ORDER BY u.first_name ASC
         `;
         const result = await pool.query(query, [companyId]);
