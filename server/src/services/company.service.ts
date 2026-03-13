@@ -2,6 +2,7 @@ import pool from '../config/database';
 import iyzicoService from './iyzico.service';
 import smsService from './sms.service';
 import { normalizePhone } from '../utils/phone';
+import redis from '../config/redis';
 
 
 export interface Company {
@@ -180,6 +181,8 @@ class CompanyService {
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48)
                 RETURNING *
             `, values);
+
+            await this.clearCompanyCache();
             return result.rows[0];
         } finally {
             client.release();
@@ -265,6 +268,7 @@ class CompanyService {
 
             if (result.rows[0]) {
                 console.log(`[DB Success] Company ${id} updated. Genders in DB:`, result.rows[0].genders);
+                await this.clearCompanyCache();
             }
 
             return result.rows[0] || null;
@@ -286,6 +290,22 @@ class CompanyService {
     }
 
     /**
+     * Cache temizleme yardımcısı
+     */
+    private async clearCompanyCache() {
+        if (!redis) return;
+        try {
+            const keys = await redis.keys('companies:list:*');
+            if (keys.length > 0) {
+                await redis.del(...keys);
+                console.log(`[Redis] Cleared ${keys.length} cache keys`);
+            }
+        } catch (err) {
+            console.error('[Redis] Cache clear error:', err);
+        }
+    }
+
+    /**
      * Tüm firmaları getir
      */
     async getAllCompanies(filters?: {
@@ -300,6 +320,21 @@ class CompanyService {
         exclude_parent?: boolean;
         sort?: 'rating' | 'reviews' | 'newest';
     }): Promise<Company[]> {
+        // --- REDIS CACHE CHECK ---
+        const cacheKey = `companies:list:${JSON.stringify(filters || {})}`;
+        if (redis) {
+            try {
+                const cached = await redis.get(cacheKey);
+                if (cached) {
+                    console.log('[Redis] Cache Hit:', cacheKey);
+                    return JSON.parse(cached);
+                }
+            } catch (err) {
+                console.error('[Redis] Cache Read Error:', err);
+            }
+        }
+        // -------------------------
+
         const values: any[] = [];
         let paramIndex = 1;
 
@@ -396,7 +431,20 @@ class CompanyService {
         `;
 
         const result = await pool.query(query, values);
-        return result.rows;
+        const companies = result.rows;
+
+        // --- SAVE TO REDIS ---
+        if (redis && companies.length > 0) {
+            try {
+                // Cache for 30 minutes
+                await redis.setex(cacheKey, 1800, JSON.stringify(companies));
+            } catch (err) {
+                console.error('[Redis] Cache Set Error:', err);
+            }
+        }
+        // ---------------------
+
+        return companies;
     }
 
     /**
@@ -407,6 +455,9 @@ class CompanyService {
             'DELETE FROM companies WHERE id = $1 RETURNING id',
             [id]
         );
+        if (result.rowCount) {
+            await this.clearCompanyCache();
+        }
         return result.rowCount ? result.rowCount > 0 : false;
     }
 
@@ -425,6 +476,7 @@ class CompanyService {
         const company = result.rows[0] || null;
 
         if (company) {
+            await this.clearCompanyCache();
             // Hizmet Cinsiyetine Göre Şablon Hizmet Ekleme
             try {
                 const genders = company.genders || [];
