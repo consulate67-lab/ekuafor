@@ -438,18 +438,20 @@ export default function Dashboard() {
     };
 
     const handlePhotoUpload = async (photo: string) => {
-        if (!user) return;
+        const currentUser = user;
+        if (!currentUser) return;
+        
         setLoading(true);
         try {
             // Staff should update their own photo, Admin should update company photo
-            if (user?.role === 'staff') {
-                const res = await api.patch(`/companies/${user.company_id}/staff/${user.id}/photo`, { photo });
+            if (currentUser.role === 'staff') {
+                const res = await api.patch(`/companies/${currentUser.company_id}/staff/${currentUser.id}/photo`, { photo });
                 if (res.data.success) {
                     alert('Profil fotoğrafınız başarıyla güncellendi');
                     window.location.reload();
                 }
             } else {
-                const res = await api.put(`/companies/${user.company_id}`, { photo });
+                const res = await api.put(`/companies/${currentUser.company_id}`, { photo });
                 if (res.data.success) {
                     alert('Firma fotoğrafı başarıyla güncellendi');
                     window.location.reload();
