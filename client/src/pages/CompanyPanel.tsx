@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import api from '../lib/api';
 import { Camera, CameraResultType, CameraSource, CameraDirection } from '@capacitor/camera';
+import { Capacitor, registerPlugin } from '@capacitor/core';
+
+interface AIAssistantPlugin {
+    syncStaffData(options: { token: string; baseUrl: string; isStaff: boolean }): Promise<void>;
+}
+
+const AIAssistant = registerPlugin<AIAssistantPlugin>('AIAssistant');
 
 interface Department {
     id: number;
@@ -43,7 +50,7 @@ interface CurrentAccount {
     balance?: number;
 }
 
-type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'finance' | 'ai' | 'reports' | 'profile' | 'integration';
+type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'finance' | 'ai' | 'reports' | 'profile' | 'integration' | 'voice-assistant';
 
 const menuItems: { key: TabKey; icon: string; label: string }[] = [
     { key: 'home', icon: '🏠', label: 'Ana Sayfa' },
@@ -148,6 +155,33 @@ export default function CompanyPanel() {
     const [showPurchaseModal, setShowPurchaseModal] = useState(false);
     const [showCashModal, setShowCashModal] = useState(false);
     const [vknCheckResult, setVknCheckResult] = useState<{ vkn: string; isEInvoice: boolean } | null>(null);
+
+    // AI Voice Assistant states
+    const [isListening, setIsListening] = useState(false);
+    const [detectedInfo, setDetectedInfo] = useState<any>(null);
+    const [lastTranscription, setLastTranscription] = useState('');
+    const [isProcessingVoice, setIsProcessingVoice] = useState(false);
+
+    // Native Sync
+    useEffect(() => {
+        const syncMobileData = async () => {
+            if (Capacitor.isNativePlatform()) {
+                const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+                const baseUrl = window.location.origin;
+                try {
+                    await AIAssistant.syncStaffData({
+                        token: token || '',
+                        baseUrl: baseUrl,
+                        isStaff: true
+                    });
+                    console.log('Mobile AI Assistant synced');
+                } catch (e) {
+                    console.warn('Mobile sync skipped or failed:', e);
+                }
+            }
+        };
+        syncMobileData();
+    }, []);
     const [checkingVkn, setCheckingVkn] = useState(false);
     const [purchaseForm, setPurchaseForm] = useState({
         supplier_name: '',
@@ -1352,6 +1386,7 @@ export default function CompanyPanel() {
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Hızlı İşlemler</p>
                                 {[
                                     { icon: '📅', label: 'Müşteri Randevu QR Kodu', desc: 'Müşterilerin randevu alması için', tab: 'booking' as TabKey },
+                                    { icon: '🎙️', label: 'AI Görüşme Asistanı', desc: 'Telefon konuşmasından randevu yakala', tab: 'voice-assistant' as TabKey },
                                     { icon: '✂️', label: (company.service_label || 'Hizmet') + ' ve Paket Yönetimi', desc: 'Fiyat ve süre tanımlamaları', tab: 'services' as TabKey },
                                     { icon: '👤', label: 'Yeni Personel Ekle', desc: 'Board kodu ile giriş yapacak', tab: 'staff' as TabKey },
                                     { icon: '🏢', label: 'Departman Yönet', desc: 'Birimlerinizi düzenleyin', tab: 'dept' as TabKey },
@@ -2420,6 +2455,135 @@ export default function CompanyPanel() {
                                         <span>Her zaman bugün tarihini baz al.</span>
                                     </li>
                                 </ul>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* AI VOICE ASSISTANT TAB */}
+                    {activeTab === 'voice-assistant' && (
+                        <div className="space-y-6">
+                            <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40 relative overflow-hidden">
+                                <div className="absolute -top-10 -right-10 w-40 h-40 bg-pink-50 rounded-full blur-3xl opacity-50"></div>
+                                <div className="flex items-center gap-4 mb-8">
+                                    <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-emerald-500 rounded-3xl flex items-center justify-center text-3xl shadow-lg shadow-indigo-200">🎙️</div>
+                                    <div>
+                                        <h2 className="text-2xl font-black text-slate-900 leading-tight">AI Görüşme Asistanı</h2>
+                                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Arama Esnasında Randevu Dinleme</p>
+                                    </div>
+                                </div>
+                                <div className="bg-indigo-50 border border-indigo-100 rounded-3xl p-6 mb-8 text-indigo-700">
+                                    <p className="font-black text-xs uppercase tracking-widest mb-3 flex items-center gap-2"><span>🛠️</span> Prototip Çalışma Modu</p>
+                                    <p className="text-sm leading-relaxed text-indigo-600/80">
+                                        Bu panel, çalışanınızın telefon görüşmesi yaparken AI'nın nasıl çalıştığını simüle eder. 
+                                        <b> "Dinlemeyi Başlat"</b> butonuna basıp konuşun, AI otomatik olarak randevuyu yakalayacaktır.
+                                    </p>
+                                </div>
+                                <div className="flex flex-col items-center justify-center p-10 border-4 border-dashed border-slate-100 rounded-[3rem] bg-slate-50/50">
+                                    <button
+                                        onClick={() => {
+                                            if (isListening) {
+                                                setIsListening(false);
+                                                if (lastTranscription) {
+                                                    setIsProcessingVoice(true);
+                                                    api.post('/ai/process-text-appointment', { text: lastTranscription })
+                                                        .then(res => { if (res.data.success) setDetectedInfo(res.data.data); })
+                                                        .finally(() => setIsProcessingVoice(false));
+                                                }
+                                                if ((window as any)._recognition) (window as any)._recognition.stop();
+                                            } else {
+                                                setIsListening(true); setDetectedInfo(null); setLastTranscription('');
+                                                const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+                                                if (SpeechRecognition) {
+                                                    const recognition = new SpeechRecognition();
+                                                    recognition.lang = 'tr-TR'; recognition.continuous = true;
+                                                    recognition.onresult = (event: any) => {
+                                                        const transcript = event.results[event.results.length - 1][0].transcript;
+                                                        setLastTranscription(prev => prev + ' ' + transcript);
+                                                    };
+                                                    recognition.start(); (window as any)._recognition = recognition;
+                                                } else { alert('Tarayıcınız ses tanımayı desteklemiyor.'); }
+                                            }
+                                        }}
+                                        className={`w-32 h-32 rounded-full flex items-center justify-center text-4xl shadow-2xl transition-all active:scale-90 ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-indigo-600 text-white'}`}
+                                    >
+                                        {isListening ? '⏹️' : '🎙️'}
+                                    </button>
+                                    <p className="mt-6 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                        {isListening ? 'Sizi Dinliyorum... Durdurmak için basın.' : 'Dinlemeyi Başlatmak İçin Tıklayın'}
+                                    </p>
+                                </div>
+                                {lastTranscription && (
+                                    <div className="mt-8 p-6 bg-slate-900 rounded-[2rem] text-slate-300">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Yakalanan Metin:</p>
+                                        <p className="text-sm italic">"{lastTranscription}"</p>
+                                    </div>
+                                )}
+                                {isProcessingVoice && (
+                                    <div className="mt-8 flex items-center justify-center gap-3 p-6 bg-indigo-50 rounded-[2rem]">
+                                        <div className="w-5 h-5 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                                        <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Yapay Zeka Analiz Ediyor...</p>
+                                    </div>
+                                )}
+                                {detectedInfo && (
+                                    <div className="mt-8 bg-emerald-50 border-2 border-emerald-200 rounded-[2.5rem] p-8 animate-in fade-in slide-in-from-bottom-5">
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <div className="w-10 h-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center text-xl">✨</div>
+                                            <h3 className="font-black text-emerald-900 uppercase tracking-widest text-sm">Randevu Yakalandı!</h3>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="bg-white/80 p-4 rounded-2xl">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Müşteri</p>
+                                                <p className="text-sm font-bold text-slate-900">{detectedInfo.customerName || 'Bilinmiyor'}</p>
+                                            </div>
+                                            <div className="bg-white/80 p-4 rounded-2xl">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Hizmet</p>
+                                                <p className="text-sm font-bold text-slate-900">{detectedInfo.serviceName || 'Belirtilmedi'}</p>
+                                            </div>
+                                            <div className="bg-white/80 p-4 rounded-2xl">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tarih</p>
+                                                <p className="text-sm font-bold text-slate-900">{detectedInfo.date || 'Belirtilmedi'}</p>
+                                            </div>
+                                            <div className="bg-white/80 p-4 rounded-2xl">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Saat</p>
+                                                <p className="text-sm font-bold text-slate-900">{detectedInfo.time || 'Belirtilmedi'}</p>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => alert('Ajandaya kayıt özelliği yakında eklenecek.')} className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all">Ajandaya Kaydet</button>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-10 opacity-10">
+                                    <span className="text-9xl">📱</span>
+                                </div>
+                                <div className="relative z-10 text-left">
+                                    <h3 className="text-xl font-black mb-4 italic">Android Arka Plan Modu</h3>
+                                    <p className="text-xs text-slate-400 leading-relaxed max-w-md mb-6">
+                                        Bu özellik aktif olduğunda, telefonunuz çaldığında ve açıldığında uygulama <b>otomatik olarak</b> mikrofonu devreye alır. 
+                                        Bu sadece çalışanlar için geçerli gizli bir özelliktir.
+                                    </p>
+                                    
+                                    <div className="flex flex-wrap gap-3">
+                                        <button 
+                                            onClick={async () => {
+                                                if (Capacitor.isNativePlatform()) {
+                                                    alert('Arka plan izinleri PHP (READ_PHONE_STATE) ve Mikrofon izinleri istendi. Lütfen telefondan onay verin.');
+                                                } else {
+                                                    alert('Bu özellik sadece Android APK üzerinde çalışır.');
+                                                }
+                                            }}
+                                            className="px-6 py-3 bg-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-emerald-700"
+                                        >
+                                            📞 Otomatik Dinlemeyi Yetkilendir
+                                        </button>
+                                        <button className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all">
+                                            Asistan APK İndir (.apk)
+                                        </button>
+                                    </div>
+                                    <p className="mt-4 text-[9px] text-slate-500 font-bold uppercase tracking-widest">
+                                        Üye Tipi: Çalışan • Durum: {Capacitor.isNativePlatform() ? '✅ APK Aktif' : '💻 Web Modu'}
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     )}

@@ -19,6 +19,7 @@ import financeRoutes from './routes/finance.routes';
 import generatorRoutes from './routes/generator.routes';
 import paymentRoutes from './routes/payment.routes';
 import expenseRoutes from './routes/expense.routes';
+import aiRoutes from './routes/ai.routes';
 import companyService from './services/company.service';
 import cronService from './services/cron.service';
 
@@ -152,6 +153,9 @@ app.use('/ekuafor/api/payments', paymentRoutes);
 
 app.use('/api/expenses', expenseRoutes);
 app.use('/ekuafor/api/expenses', expenseRoutes);
+
+app.use('/api/ai', aiRoutes);
+app.use('/ekuafor/api/ai', aiRoutes);
 
 
 // Setup Route (For DB Init)
