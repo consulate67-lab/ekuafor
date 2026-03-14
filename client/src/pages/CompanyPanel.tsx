@@ -62,6 +62,7 @@ const menuItems: { key: TabKey; icon: string; label: string }[] = [
     { key: 'integration', icon: '🔌', label: 'Entegrasyon' },
     { key: 'booking', icon: '📅', label: 'Müşteri QR' },
     { key: 'ai', icon: '🤖', label: 'Yapay Zeka' },
+    { key: 'voice-assistant', icon: '🎙️', label: 'Sesli Asistan (Beta)' },
     { key: 'qr', icon: '🔑', label: 'Yönetim Kodu' },
     { key: 'dept', icon: '🏢', label: 'Departmanlar' },
     { key: 'staff', icon: '👥', label: 'Personeller' },
@@ -2452,6 +2453,27 @@ export default function CompanyPanel() {
                                     <div>
                                         <h2 className="text-2xl font-black text-slate-900 leading-tight">Yapay Zeka Asistanı</h2>
                                         <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Randevu Akıllı Çıkarım Kuralları</p>
+                                    </div>
+                                </div>
+
+                                {/* Sesli Asistan Tanıtımı - Yeni */}
+                                <div className="bg-indigo-50 border border-indigo-100 rounded-3xl p-6 mb-8 text-indigo-700">
+                                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                                        <div className="flex-1">
+                                            <p className="font-black text-xs uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                <span>🎙️</span> Sesli Görüşme Asistanı (Telefon)
+                                            </p>
+                                            <p className="text-xs font-bold text-indigo-600/70 leading-relaxed">
+                                                Telefon görüşmeleri sırasında sesleri dinleyip otomatik randevu oluşturmak ister misiniz? 
+                                                Mobil uygulamamız üzerinden bu özelliği aktif edebilirsiniz.
+                                            </p>
+                                        </div>
+                                        <button 
+                                            onClick={() => setActiveTab('voice-assistant')}
+                                            className="whitespace-nowrap px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all"
+                                        >
+                                            Asistan Ayarları & Test
+                                        </button>
                                     </div>
                                 </div>
 

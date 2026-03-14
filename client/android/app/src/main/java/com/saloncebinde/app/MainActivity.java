@@ -23,10 +23,12 @@ public class MainActivity extends BridgeActivity {
             String aiResult = intent.getStringExtra("ai_result");
             AIAssistantPlugin.lastAIResult = aiResult;
             
-            // Correct way to trigger event in Capacitor 5+
-            JSObject data = new JSObject();
-            data.put("detail", aiResult);
-            getBridge().triggerWindowJSEvent("ai_appointment_detected", data.toString());
+            // This is the most reliable way to send global events to the webview
+            // We use evaluateJavascript to directly trigger the event on window
+            getBridge().getWebView().post(() -> {
+                String js = "window.dispatchEvent(new CustomEvent('ai_appointment_detected', { detail: " + aiResult + " }));";
+                getBridge().getWebView().evaluateJavascript(js, null);
+            });
         }
     }
 }
