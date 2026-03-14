@@ -255,6 +255,9 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
             results.push({ id: userId });
         }
 
+        // Sync Stats
+        companyService.syncCompanyStats(parseInt(id)).catch(() => {});
+
         res.json({
             success: true,
             data: results,
@@ -587,6 +590,9 @@ router.post('/:id/create-staff-board', async (req: Request, res: Response) => {
             // company_users ekleme başarısız olsa bile devam et
         }
 
+        // Sync Stats
+        companyService.syncCompanyStats(companyId).catch(() => {});
+
         res.status(201).json({ success: true, data: userResult.rows[0] });
     } catch (error) {
         res.status(500).json({
@@ -643,6 +649,9 @@ router.delete('/:id/staff-boards/:userId', async (req: Request, res: Response) =
             'UPDATE users SET company_id = NULL, board_code = NULL WHERE id = $1 AND company_id = $2',
             [userId, id]
         );
+
+        // Sync Stats
+        companyService.syncCompanyStats(parseInt(id)).catch(() => {});
 
         res.json({ success: true, message: 'Personel başarıyla silindi' });
     } catch (error) {

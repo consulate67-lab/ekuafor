@@ -411,38 +411,16 @@ class CompanyService {
             paramIndex += 3;
         }
 
-        // Akıllı filtreleme ve stats birleştirme (JOIN performansı için scalar subquery yerine önerilir)
+        // Optimized calculation using denormalized columns
         const query = `
             SELECT 
                 c.*,
-                COALESCE(stats.rating_avg, 0) as rating_avg,
-                COALESCE(stats.review_count, 0) as review_count,
-                COALESCE(staff_stats.cnt, 0) as staff_count,
-                COALESCE(service_stats.cnt, 0) as service_count,
-                (CASE WHEN service_stats.cnt > 0 AND staff_stats.cnt > 0 THEN 1 ELSE 0 END) as relation_count
+                (CASE WHEN c.service_count > 0 AND c.staff_count > 0 THEN 1 ELSE 0 END) as relation_count
             FROM companies c
-            LEFT JOIN (
-                SELECT company_id, AVG(rating) as rating_avg, COUNT(rating) as review_count 
-                FROM appointments 
-                WHERE rating IS NOT NULL 
-                GROUP BY company_id
-            ) stats ON stats.company_id = c.id
-            LEFT JOIN (
-                SELECT company_id, COUNT(*) as cnt 
-                FROM users 
-                WHERE COALESCE(is_active, true) = true 
-                GROUP BY company_id
-            ) staff_stats ON staff_stats.company_id = c.id
-            LEFT JOIN (
-                SELECT company_id, COUNT(*) as cnt 
-                FROM services 
-                WHERE COALESCE(is_active, true) = true 
-                GROUP BY company_id
-            ) service_stats ON service_stats.company_id = c.id
             WHERE ${whereClauses.join(' AND ')}
             ORDER BY relation_count DESC, 
-            ${filters?.sort === 'rating' ? 'rating_avg DESC, review_count DESC' :
-                (filters?.sort === 'reviews' ? 'review_count DESC, rating_avg DESC' : 'c.created_at DESC')}
+            ${filters?.sort === 'rating' ? 'c.rating_avg DESC, c.review_count DESC' :
+                (filters?.sort === 'reviews' ? 'c.review_count DESC, c.rating_avg DESC' : 'c.created_at DESC')}
         `;
 
         const result = await pool.query(query, values);
@@ -451,8 +429,8 @@ class CompanyService {
         // --- SAVE TO REDIS ---
         if (redis && companies.length > 0) {
             try {
-                // Cache for 30 minutes
-                await redis.setex(cacheKey, 1800, JSON.stringify(companies));
+                // Cache for 1 hour
+                await redis.setex(cacheKey, 3600, JSON.stringify(companies));
             } catch (err) {
                 console.error('[Redis] Cache Set Error:', err);
             }
@@ -629,6 +607,25 @@ class CompanyService {
         } catch (err: any) {
             console.error(`[SMS-CB] [ERROR] verifyCompany(id=${company.id}) HATA:`, err.message);
             return null;
+        }
+    }
+
+    /**
+     * Re-calculate and sync denormalized stats for a company
+     */
+    async syncCompanyStats(id: number) {
+        try {
+            await pool.query(`
+                UPDATE companies c SET 
+                    rating_avg = COALESCE((SELECT AVG(rating) FROM appointments WHERE company_id = $1 AND rating IS NOT NULL), 0),
+                    review_count = COALESCE((SELECT COUNT(rating) FROM appointments WHERE company_id = $1 AND rating IS NOT NULL), 0),
+                    staff_count = COALESCE((SELECT COUNT(*) FROM users WHERE company_id = $1 AND is_active = true), 0),
+                    service_count = COALESCE((SELECT COUNT(*) FROM services WHERE company_id = $1 AND is_active = true), 0)
+                WHERE id = $1;
+            `, [id]);
+            await this.clearCompanyCache(id);
+        } catch (e) {
+            console.error('[SyncStats] Failed:', e);
         }
     }
 }

@@ -82,7 +82,11 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
 
         const validatedData = serviceSchema.parse(req.body);
         const service = await serviceService.createService({ ...validatedData, company_id: companyId });
-        console.log('Hizmet başarıyla oluşturuldu:', service.id);
+        
+        // Sync Stats
+        const companyService = require('../services/company.service').default;
+        companyService.syncCompanyStats(companyId).catch(() => {});
+
         res.status(201).json({ success: true, data: service });
     } catch (error: any) {
         console.error('Hizmet oluşturma hatası:', error);
@@ -132,6 +136,14 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
         if (!success) {
             return res.status(404).json({ success: false, error: 'Hizmet bulunamadı' });
         }
+
+        // Sync Stats (Need companyId, so we get it from req.user)
+        const companyId = req.user?.companyId;
+        if (companyId) {
+            const companyService = require('../services/company.service').default;
+            companyService.syncCompanyStats(companyId).catch(() => {});
+        }
+
         res.json({ success: true, message: 'Hizmet silindi' });
     } catch (error) {
         res.status(500).json({ success: false, error: 'Hizmet silinirken hata oluştu' });

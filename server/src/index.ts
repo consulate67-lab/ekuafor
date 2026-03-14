@@ -637,8 +637,24 @@ const runMigrations = async () => {
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS license_end_date TIMESTAMP WITH TIME ZONE');
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS license_status VARCHAR(20) DEFAULT \'active\'');
 
-            await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS original_price DECIMAL(10, 2)');
-            await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS collected_price DECIMAL(10, 2)');
+            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS original_price DECIMAL(10, 2)');
+            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS collected_price DECIMAL(10, 2)');
+
+            // Denormalization columns for speed
+            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS rating_avg DECIMAL(3, 2) DEFAULT 0');
+            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS review_count INTEGER DEFAULT 0');
+            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS staff_count INTEGER DEFAULT 0');
+            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS service_count INTEGER DEFAULT 0');
+
+            // Quick one-time sync of these columns
+            await pool.query(`
+                UPDATE companies c SET 
+                    rating_avg = COALESCE((SELECT AVG(rating) FROM appointments WHERE company_id = c.id AND rating IS NOT NULL), 0),
+                    review_count = COALESCE((SELECT COUNT(rating) FROM appointments WHERE company_id = c.id AND rating IS NOT NULL), 0),
+                    staff_count = COALESCE((SELECT COUNT(*) FROM users WHERE company_id = c.id AND is_active = true), 0),
+                    service_count = COALESCE((SELECT COUNT(*) FROM services WHERE company_id = c.id AND is_active = true), 0)
+                WHERE rating_avg = 0 AND review_count = 0 AND staff_count = 0 AND service_count = 0;
+            `);
 
             // Migrate existing address data if new columns are empty (Legacy - column province_name removed)
             try {

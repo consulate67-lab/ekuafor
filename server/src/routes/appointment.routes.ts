@@ -378,6 +378,11 @@ router.patch('/:id/rate', async (req: Request, res: Response) => {
         if (!appointment) {
             return res.status(404).json({ success: false, error: 'Randevu bulunamadı' });
         }
+        
+        // Background sync stats
+        const companyService = require('../services/company.service').default;
+        companyService.syncCompanyStats(appointment.company_id).catch(() => {});
+
         res.json({ success: true, data: appointment });
     } catch (err) {
         console.error('Rating Error:', err);
