@@ -13,10 +13,11 @@ import android.os.IBinder;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
 
+import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
@@ -31,19 +32,17 @@ public class VoiceAssistantService extends Service {
         String action = intent != null ? intent.getAction() : null;
 
         if ("START_RECORDING".equals(action)) {
-            startForegroundService();
+            startForegroundService("Görüşme Kaydediliyor...");
             startRecording();
         } else if ("STOP_RECORDING".equals(action)) {
             stopRecording();
-            uploadRecording();
-            stopForeground(true);
-            stopSelf();
+            uploadAndNotify();
         }
 
         return START_NOT_STICKY;
     }
 
-    private void startForegroundService() {
+    private void startForegroundService(String text) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
@@ -56,8 +55,9 @@ public class VoiceAssistantService extends Service {
 
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Saloon Cebinde")
-            .setContentText("AI Görüşme Asistanı Aktif...")
+            .setContentText(text)
             .setSmallIcon(android.R.drawable.presence_audio_busy)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build();
 
         startForeground(1, notification);
@@ -65,21 +65,18 @@ public class VoiceAssistantService extends Service {
 
     private void startRecording() {
         if (recorder != null) return;
-
-        audioFilePath = getExternalFilesDir(null).getAbsolutePath() + "/call_" + System.currentTimeMillis() + ".m4a";
-        Log.d(TAG, "Starting recording: " + audioFilePath);
-
-        recorder = new MediaRecorder();
-        recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-        recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-        recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
-        recorder.setOutputFile(audioFilePath);
-
         try {
+            audioFilePath = getExternalFilesDir(null).getAbsolutePath() + "/call_" + System.currentTimeMillis() + ".m4a";
+            recorder = new MediaRecorder();
+            recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+            recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+            recorder.setOutputFile(audioFilePath);
             recorder.prepare();
             recorder.start();
-        } catch (IOException e) {
-            Log.e(TAG, "Recording failed", e);
+            Log.d(TAG, "Recording started: " + audioFilePath);
+        } catch (Exception e) {
+            Log.e(TAG, "Recording start failed", e);
         }
     }
 
@@ -95,9 +92,13 @@ public class VoiceAssistantService extends Service {
         }
     }
 
-    private void uploadRecording() {
-        final String finalPath = audioFilePath;
-        if (finalPath == null) return;
+    private void uploadAndNotify() {
+        if (audioFilePath == null) {
+            stopSelf();
+            return;
+        }
+
+        startForegroundService("Randevu Analiz Ediliyor...");
 
         new Thread(() -> {
             try {
@@ -105,8 +106,11 @@ public class VoiceAssistantService extends Service {
                 String token = prefs.getString("auth_token", "");
                 String baseUrl = prefs.getString("base_url", "https://www.saloncebinde.com");
                 
-                File file = new File(finalPath);
-                if (!file.exists()) return;
+                File file = new File(audioFilePath);
+                if (!file.exists()) {
+                    stopSelf();
+                    return;
+                }
 
                 String boundary = "*****";
                 String lineEnd = "\r\n";
@@ -118,7 +122,6 @@ public class VoiceAssistantService extends Service {
                 conn.setDoOutput(true);
                 conn.setUseCaches(false);
                 conn.setRequestMethod("POST");
-                conn.setRequestProperty("Connection", "Keep-Alive");
                 conn.setRequestProperty("Authorization", "Bearer " + token);
                 conn.setRequestProperty("Content-Type", "multipart/form-data;boundary=" + boundary);
 
@@ -136,26 +139,37 @@ public class VoiceAssistantService extends Service {
                 dos.writeBytes(lineEnd);
                 dos.writeBytes(twoHyphens + boundary + twoHyphens + lineEnd);
 
-                int serverResponseCode = conn.getResponseCode();
-                Log.d(TAG, "Upload response code: " + serverResponseCode);
+                int responseCode = conn.getResponseCode();
+                StringBuilder response = new StringBuilder();
+                if (responseCode == 200) {
+                    BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                    String inputLine;
+                    while ((inputLine = in.readLine()) != null) response.append(inputLine);
+                    in.close();
+                    file.delete(); // Success
+                }
 
                 fis.close();
                 dos.flush();
                 dos.close();
 
-                // Delete file after upload
-                if (serverResponseCode == 200) {
-                    file.delete();
+                // Bring App to Foreground
+                Intent launchIntent = new Intent(this, MainActivity.class);
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                if (responseCode == 200) {
+                    launchIntent.putExtra("ai_result", response.toString());
                 }
+                startActivity(launchIntent);
 
             } catch (Exception e) {
-                Log.e(TAG, "Upload failed", e);
+                Log.e(TAG, "Process failed", e);
+            } finally {
+                stopForeground(true);
+                stopSelf();
             }
         }).start();
     }
 
     @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
+    public IBinder onBind(Intent intent) { return null; }
 }

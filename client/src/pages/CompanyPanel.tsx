@@ -5,6 +5,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 
 interface AIAssistantPlugin {
     syncStaffData(options: { token: string; baseUrl: string; isStaff: boolean }): Promise<void>;
+    getLastResult(): Promise<{ result: string | null }>;
 }
 
 const AIAssistant = registerPlugin<AIAssistantPlugin>('AIAssistant');
@@ -181,7 +182,35 @@ export default function CompanyPanel() {
             }
         };
         syncMobileData();
-    }, []);
+
+        // Listen for Native Detections
+        const handleNativeDetection = (data: any) => {
+            try {
+                const result = typeof data === 'string' ? JSON.parse(data) : data;
+                if (result && result.success && result.data) {
+                    setDetectedInfo(result.data.extractedInfo);
+                    setLastTranscription(result.data.transcription);
+                    setActiveTab('voice-assistant');
+                    setSidebarOpen(false);
+                }
+            } catch (e) {
+                console.error('Failed to parse native AI result:', e);
+            }
+        };
+
+        if (Capacitor.isNativePlatform()) {
+            (window as any).addEventListener('ai_appointment_detected', (event: any) => {
+                handleNativeDetection(event.detail);
+            });
+            
+            // Check for missed result on start/resume
+            const checkMissed = async () => {
+                const { result } = await AIAssistant.getLastResult();
+                if (result) handleNativeDetection(result);
+            };
+            checkMissed();
+        }
+    }, [activeTab]);
     const [checkingVkn, setCheckingVkn] = useState(false);
     const [purchaseForm, setPurchaseForm] = useState({
         supplier_name: '',
