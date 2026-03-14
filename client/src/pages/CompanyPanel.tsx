@@ -1116,6 +1116,95 @@ export default function CompanyPanel() {
             setIsSavingAI(false);
         }
     };
+
+    const handleSaveAIAppointment = async () => {
+        if (!detectedInfo || !company) return;
+
+        try {
+            setIsProcessingVoice(true);
+
+            // 1. Hizmet Eşleştirme (Basit isim eşleştirme)
+            let matchedServiceId = null;
+            let price = 0;
+            let duration = 30;
+
+            if (detectedInfo.serviceName) {
+                const sName = detectedInfo.serviceName.toLocaleLowerCase('tr-TR');
+                const matchedService = companyServices.find(s => 
+                    s.name.toLocaleLowerCase('tr-TR').includes(sName) || 
+                    sName.includes(s.name.toLocaleLowerCase('tr-TR'))
+                );
+                if (matchedService) {
+                    matchedServiceId = matchedService.id;
+                    price = matchedService.price;
+                    duration = matchedService.duration_minutes || 30;
+                }
+            }
+
+            // Eğer hizmet bulunamadıysa ilk hizmeti varsayılan yap (veya uyarı ver)
+            if (!matchedServiceId && companyServices.length > 0) {
+                matchedServiceId = companyServices[0].id;
+                price = companyServices[0].price;
+                duration = companyServices[0].duration_minutes || 30;
+            }
+
+            // 2. Personel Atama (Şimdilik ilk personeli ata)
+            let staffId = null;
+            if (staffBoards.length > 0) {
+                staffId = staffBoards[0].id;
+            }
+
+            // 3. Tarih/Saat Formatlama
+            let appDate = detectedInfo.date || new Date().toISOString().split('T')[0];
+            // "yarın" gibi metinleri basitçe bugüne çevir (Geliştirilebilir)
+            if (appDate === 'yarın') {
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                appDate = tomorrow.toISOString().split('T')[0];
+            } else if (!/^\d{4}-\d{2}-\d{2}$/.test(appDate)) {
+                // Eğer format hatalıysa bugünü kullan
+                appDate = new Date().toISOString().split('T')[0];
+            }
+
+            let startTime = detectedInfo.time || '10:00';
+            if (startTime.length === 4 && startTime.includes(':')) startTime = '0' + startTime;
+            if (!startTime.includes(':')) startTime = '10:00';
+
+            // Bitiş saati hesapla
+            const [h, m] = startTime.split(':').map(Number);
+            const totalMin = h * 60 + m + duration;
+            const endH = Math.floor(totalMin / 60) % 24;
+            const endM = totalMin % 60;
+            const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+            // 4. Randevu Oluştur
+            const appointmentData = {
+                company_id: company.id,
+                service_id: matchedServiceId,
+                staff_id: staffId,
+                customer_name: detectedInfo.customerName || 'Sesli Kayıt Müşterisi',
+                appointment_date: appDate,
+                start_time: startTime,
+                end_time: endTime,
+                price: price,
+                notes: `AI ASİSTAN NOTU: ${detectedInfo.note || '-'} | Konuşma: ${lastTranscription}`,
+                status: 'approved'
+            };
+
+            const response = await api.post('/appointments', appointmentData);
+
+            if (response.data.success) {
+                alert(`Randevu Başarıyla Oluşturuldu!\n\nMüşteri: ${appointmentData.customer_name}\nTarih: ${appDate}\nSaat: ${startTime}`);
+                setDetectedInfo(null);
+                setLastTranscription('');
+            }
+        } catch (e: any) {
+            console.error('AI Appointment Save Error:', e);
+            alert('Randevu oluşturulurken hata: ' + (e.response?.data?.error || e.message));
+        } finally {
+            setIsProcessingVoice(false);
+        }
+    };
     const handleLogout = () => {
         localStorage.removeItem('company_admin_key');
         localStorage.removeItem('token');
@@ -2618,7 +2707,13 @@ export default function CompanyPanel() {
                                                 <p className="text-sm font-bold text-slate-900">{detectedInfo.time || 'Belirtilmedi'}</p>
                                             </div>
                                         </div>
-                                        <button onClick={() => alert('Ajandaya kayıt özelliği yakında eklenecek.')} className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all">Ajandaya Kaydet</button>
+                                        <button 
+                                            onClick={handleSaveAIAppointment} 
+                                            disabled={isProcessingVoice}
+                                            className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-95 transition-all disabled:opacity-50"
+                                        >
+                                            {isProcessingVoice ? 'Kaydediliyor...' : 'Ajandaya Kaydet'}
+                                        </button>
                                     </div>
                                 )}
                             </div>

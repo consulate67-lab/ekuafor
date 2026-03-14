@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import aiAssistantService from '../services/ai-assistant.service';
 import { authMiddleware } from '../middleware/auth.middleware';
+import pool from '../config/database';
 
 const router = Router();
 
@@ -30,11 +31,18 @@ router.post('/process-call-audio', authMiddleware as any, (upload.single('audio'
     }
 
     try {
+        // Fetch company rules
+        let rules = '';
+        if (req.user?.company_id) {
+            const compRes = await pool.query('SELECT ai_rules FROM companies WHERE id = $1', [req.user.company_id]);
+            rules = compRes.rows[0]?.ai_rules || '';
+        }
+
         // 1. Transcribe the audio
         const transcription = await aiAssistantService.transcribeAudio(audioFile.path);
         
         // 2. Extract info
-        const info = await aiAssistantService.extractAppointmentInfo(transcription);
+        const info = await aiAssistantService.extractAppointmentInfo(transcription, rules);
 
         // 3. Cleanup local file
         fs.unlink(audioFile.path, () => {});
@@ -67,7 +75,14 @@ router.post('/process-text-appointment', authMiddleware as any, async (req: any,
     if (!text) return res.status(400).json({ success: false, error: 'Metin gerekli.' });
 
     try {
-        const info = await aiAssistantService.extractAppointmentInfo(text);
+        // Fetch company rules
+        let rules = '';
+        if (req.user?.company_id) {
+            const compRes = await pool.query('SELECT ai_rules FROM companies WHERE id = $1', [req.user.company_id]);
+            rules = compRes.rows[0]?.ai_rules || '';
+        }
+
+        const info = await aiAssistantService.extractAppointmentInfo(text, rules);
         res.json({ success: true, data: info });
     } catch (err: any) {
         res.status(500).json({ success: false, error: err.message });

@@ -35,13 +35,17 @@ class AIAssistantService {
     /**
      * Extracts appointment information from text using GPT-4
      */
-    async extractAppointmentInfo(text: string): Promise<ExtractionResult | null> {
+    async extractAppointmentInfo(text: string, rules?: string): Promise<ExtractionResult | null> {
         try {
             const prompt = `
             Aşağıdaki metin bir kuaför dükkanındaki çalışan ile müşterisi arasındaki telefon görüşmesinin bir kısmıdır.
             Bu metinden randevu bilgilerini ayıkla ve JSON formatında döndür.
             Eğer bir bilgi metinde yoksa "null" bırak.
             
+            ${rules ? `ÖNEMLİ ÖZEL KURALLAR:
+            ${rules}
+            ` : ''}
+
             Gerekli alanlar:
             - customerName: Müşterinin ismi
             - serviceName: İstenen hizmet (saç kesimi, boya, fön vb.)
