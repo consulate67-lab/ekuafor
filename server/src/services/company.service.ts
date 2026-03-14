@@ -281,21 +281,36 @@ class CompanyService {
      * Firma getir
      */
     async getCompanyById(id: number): Promise<Company | null> {
+        const cacheKey = `company:detail:${id}`;
+        if (redis) {
+            try {
+                const cached = await redis.get(cacheKey);
+                if (cached) return JSON.parse(cached);
+            } catch (err) { }
+        }
+
         const result = await pool.query('SELECT * FROM companies WHERE id = $1', [id]);
         const company = result.rows[0] || null;
-        if (company) {
-            console.log(`[DB Fetch] Company ${id} found. Name: ${company.name}, Genders:`, company.genders);
+        
+        if (redis && company) {
+            try {
+                await redis.setex(cacheKey, 3600, JSON.stringify(company)); // 1 hour cache
+            } catch (err) { }
         }
+        
         return company;
     }
 
     /**
      * Cache temizleme yardımcısı
      */
-    private async clearCompanyCache() {
+    private async clearCompanyCache(id?: number) {
         if (!redis) return;
         try {
             const keys = await redis.keys('companies:list:*');
+            if (id) {
+                keys.push(`company:detail:${id}`);
+            }
             if (keys.length > 0) {
                 await redis.del(...keys);
                 console.log(`[Redis] Cleared ${keys.length} cache keys`);

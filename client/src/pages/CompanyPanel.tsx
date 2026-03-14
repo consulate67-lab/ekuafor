@@ -14,11 +14,13 @@ interface StaffBoard {
     last_name: string;
     board_code: string;
     gender: string;
-    department_id: number;
+    department_id: number | string | null;
     department_name: string;
     photo: string | null;
     email: string;
     phone: string;
+    quantity?: number | string | null;
+    unit?: string | null;
 }
 
 interface CurrentAccount {
@@ -229,6 +231,8 @@ export default function CompanyPanel() {
             setInputKey(key);
             if (!is_license_expired) {
                 fetchData(comp.id);
+                if (comp.city) fetchDistricts(comp.city);
+                // Note: Neighborhood fetching usually needs the district ID which we get after fetchDistricts
             }
 
             // Load AI rules - Backend'den geleni önceliklendir
@@ -1118,15 +1122,30 @@ export default function CompanyPanel() {
                 localStorage.setItem(`ai_rules_${company.id}`, aiRules);
                 alert('Firma bilgileri başarıyla güncellendi.');
             } else {
-                alert(response.data.error || 'Güncelleme başarısız oldu.');
+                let errorMsg = response.data.error || 'Güncelleme başarısız oldu.';
+                if (response.data.details && Array.isArray(response.data.details)) {
+                    const details = response.data.details.map((d: any) => d.message).join('\n- ');
+                    errorMsg += `\n\nDetaylar:\n- ${details}`;
+                }
+                alert(errorMsg);
             }
         } catch (err: any) {
-            console.error('Company update error:', err);
-            const errorMsg = err.response?.data?.error || err.response?.data?.details?.[0]?.message || 'Güncelleme sırasında hata oluştu';
-            alert(errorMsg);
+            console.error('Update Company Error:', err);
+            const msg = err.response?.data?.error || err.message || 'Bir hata oluştu.';
+            const details = err.response?.data?.details;
+            let fullMsg = msg;
+            if (details && Array.isArray(details)) {
+                fullMsg += '\n\n' + details.map((d: any) => d.message).join('\n');
+            }
+            alert(fullMsg);
         } finally {
             setLoading(false);
         }
+    };
+
+    const generateBoardKey = () => {
+        const newKey = Math.random().toString(36).substring(2, 10).toUpperCase();
+        setCompany((prev: any) => prev ? ({ ...prev, board_key: newKey }) : null);
     };
 
     // MAIN PANEL
@@ -1473,30 +1492,53 @@ export default function CompanyPanel() {
                                     <div className="grid grid-cols-3 gap-4">
                                         <div>
                                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">İl (Şehir)</label>
-                                            <input
-                                                type="text"
-                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                            <select
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900 outline-none appearance-none"
                                                 value={company.city || ''}
-                                                onChange={e => setCompany({ ...company, city: e.target.value })}
-                                            />
+                                                onChange={e => {
+                                                    const cityName = e.target.value;
+                                                    setCompany({ ...company, city: cityName, district: '', neighborhood: '' });
+                                                    fetchDistricts(cityName);
+                                                }}
+                                            >
+                                                <option value="">Seçiniz</option>
+                                                {geoProvinces.map(p => (
+                                                    <option key={p.id} value={p.name}>{p.name}</option>
+                                                ))}
+                                            </select>
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">İlçe</label>
-                                            <input
-                                                type="text"
-                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                            <select
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900 outline-none appearance-none"
                                                 value={company.district || ''}
-                                                onChange={e => setCompany({ ...company, district: e.target.value })}
-                                            />
+                                                onChange={e => {
+                                                    const districtName = e.target.value;
+                                                    const dist = geoDistricts.find(d => d.name === districtName);
+                                                    setCompany({ ...company, district: districtName, neighborhood: '' });
+                                                    if (dist) fetchNeighborhoods(dist.id);
+                                                }}
+                                                disabled={!company.city}
+                                            >
+                                                <option value="">Seçiniz</option>
+                                                {geoDistricts.map(d => (
+                                                    <option key={d.id} value={d.name}>{d.name}</option>
+                                                ))}
+                                            </select>
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Mahalle</label>
-                                            <input
-                                                type="text"
-                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                            <select
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900 outline-none appearance-none"
                                                 value={company.neighborhood || ''}
                                                 onChange={e => setCompany({ ...company, neighborhood: e.target.value })}
-                                            />
+                                                disabled={!company.district}
+                                            >
+                                                <option value="">Seçiniz</option>
+                                                {geoNeighborhoods.map(n => (
+                                                    <option key={n.id} value={n.name}>{n.name}</option>
+                                                ))}
+                                            </select>
                                         </div>
                                     </div>
 
@@ -2070,21 +2112,26 @@ export default function CompanyPanel() {
 
                             {/* Board Key Card */}
                             <div className="bg-white rounded-2xl p-5 shadow-lg shadow-slate-200/20 w-full max-w-md mt-5 flex items-center justify-between">
-                                <div>
+                                <div className="flex-1">
                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Salon Board Anahtarı</p>
-                                    <p className="text-base font-black text-slate-900 tracking-widest font-mono">{company.board_key || '—'}</p>
+                                    <div className="flex items-center gap-3">
+                                        <p className="text-base font-black text-slate-900 tracking-widest font-mono">{company.board_key || '—'}</p>
+                                        {!company.board_key && (
+                                            <button
+                                                onClick={generateBoardKey}
+                                                className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-indigo-100"
+                                            >
+                                                Anahtar Oluştur
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
-                                {company.board_key && (
-                                    <button
-                                        onClick={() => copyText(company.board_key, 'board-key')}
-                                        className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all ${copiedField === 'board-key'
-                                            ? 'bg-emerald-100 text-emerald-700'
-                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                            }`}
-                                    >
-                                        {copiedField === 'board-key' ? '✅ Kopyalandı!' : '📋 Kopyala'}
-                                    </button>
-                                )}
+                                <button
+                                    onClick={() => copyText(company.board_key || '', 'board-key')}
+                                    className={`px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${copiedField === 'board-key' ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white shadow-lg shadow-slate-200'}`}
+                                >
+                                    {copiedField === 'board-key' ? 'Kopyalandı' : 'Kodu Kopyala'}
+                                </button>
                             </div>
                         </div>
                     )}
@@ -2159,17 +2206,17 @@ export default function CompanyPanel() {
                                                         first_name: staff.first_name,
                                                         last_name: staff.last_name,
                                                         gender: staff.gender,
-                                                        department_id: String(staff.department_id || ''),
-                                                        photo: staff.photo,
-                                                        quantity: (staff as any).quantity || '',
-                                                        unit: (staff as any).unit || '',
+                                                        department_id: staff.department_id ? String(staff.department_id) : '',
+                                                        photo: staff.photo || null,
+                                                        quantity: staff.quantity || '',
+                                                        unit: staff.unit || '',
                                                         email: staff.email || '',
                                                         phone: staff.phone || '',
                                                         password: ''
                                                     });
                                                     setShowStaffModal(true);
                                                 }}
-                                                className="w-9 h-9 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center hover:bg-indigo-100 transition-all shadow-sm"
+                                                className="w-9 h-9 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center hover:bg-indigo-100 transition-all shadow-sm"
                                                 title="Personeli Düzenle"
                                             >
                                                 <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2230,49 +2277,55 @@ export default function CompanyPanel() {
                                                                 📞 {staff.phone}
                                                             </span>
                                                         )}
-                                                        {(staff as any).quantity && (staff as any).unit && (
+                                                        {staff.quantity && staff.unit && (
                                                             <span className="px-2 py-0.5 bg-violet-50 text-violet-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-violet-100 flex items-center gap-1">
-                                                                ⚖️ {(staff as any).quantity} {(staff as any).unit}
+                                                                ⚖️ {staff.quantity} {staff.unit}
                                                             </span>
                                                         )}
                                                     </div>
                                                 </div>
                                             </div>
+                                        </div>
 
-                                            {/* QR Code */}
-                                            <div className="bg-slate-50 rounded-2xl p-5 text-center mt-2">
-                                            <div className="bg-white border-2 border-slate-900 rounded-xl p-3 inline-block mb-3">
-                                                <img
-                                                    src={qrApiUrl(staff.board_code, 150)}
-                                                    alt={`${staff.first_name} QR`}
-                                                    className="w-28 h-28"
-                                                />
-                                            </div>
-                                            <p className="text-xl font-black text-slate-900 tracking-[0.3em] font-mono">{staff.board_code}</p>
-                                            <div className="flex gap-2 justify-center mt-3">
-                                                <button
-                                                    onClick={() => copyText(staff.board_code, `staff-${staff.id}`)}
-                                                    className={`px-4 py-2 rounded-xl text-[11px] font-black active:scale-95 transition-all ${copiedField === `staff-${staff.id}`
-                                                        ? 'bg-emerald-600 text-white'
-                                                        : 'bg-slate-900 text-white'
-                                                        }`}
-                                                >
-                                                    {copiedField === `staff-${staff.id}` ? '✅ Kopyalandı!' : '📋 Kopyala'}
-                                                </button>
-                                                <button
-                                                    onClick={() => window.print()}
-                                                    className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[11px] font-black active:scale-95 transition-all"
-                                                >
-                                                    🖨️ Yazdır
-                                                </button>
+                                        {/* QR Code Section */}
+                                        <div className="mt-6 pt-6 border-t border-slate-50">
+                                            <div className="bg-slate-50 rounded-[2rem] p-6 flex flex-col md:flex-row items-center gap-6">
+                                                <div className="bg-white border-4 border-white shadow-xl shadow-slate-200/50 rounded-3xl p-4 flex-shrink-0">
+                                                    <img
+                                                        src={qrApiUrl(staff.board_code, 200)}
+                                                        alt={`${staff.first_name} QR`}
+                                                        className="w-32 h-32"
+                                                    />
+                                                </div>
+                                                <div className="flex-1 text-center md:text-left">
+                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Personel Giriş Kodu</p>
+                                                    <p className="text-3xl font-black text-indigo-600 tracking-[0.2em] font-mono leading-none mb-4">{staff.board_code}</p>
+                                                    <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                                                        <button
+                                                            onClick={() => copyText(staff.board_code, `staff-${staff.id}`)}
+                                                            className={`px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-sm ${copiedField === `staff-${staff.id}`
+                                                                ? 'bg-emerald-600 text-white'
+                                                                : 'bg-slate-900 text-white hover:bg-slate-800'
+                                                                }`}
+                                                        >
+                                                            {copiedField === `staff-${staff.id}` ? '✅ Kopyalandı' : '📋 Kodu Kopyala'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => window.print()}
+                                                            className="px-5 py-3 bg-white border-2 border-slate-100 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all hover:bg-slate-50"
+                                                        >
+                                                            🖨️ Yazdır
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))
-                        )}
+                                ))
+                            )}
                         </div>
                     )}
+
                     {/* AI TAB - Yapay Zeka Ayarları */}
                     {activeTab === 'ai' && (
                         <div className="space-y-6">

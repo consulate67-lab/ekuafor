@@ -810,6 +810,42 @@ const runMigrations = async () => {
         await pool.query('CREATE INDEX IF NOT EXISTS idx_appointment_services_appointment ON appointment_services(appointment_id)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_appointments_company ON appointments(company_id)');
+        // Performance Extensions
+        await pool.query('CREATE EXTENSION IF NOT EXISTS pg_trgm');
+        
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_name_trgm ON companies USING gist (name gist_trgm_ops)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_city_trgm ON companies USING gist (city gist_trgm_ops)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_district_trgm ON companies USING gist (district gist_trgm_ops)');
+
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_search_tr ON companies USING gin (to_tsvector(\'turkish\', name || \' \' || COALESCE(city, \'\') || \' \' || COALESCE(district, \'\')));');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_search ON companies (name, city, district, neighborhood)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_active_verified ON companies(is_active, is_verified)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_main_company_id ON companies(main_company_id)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_is_active ON companies(is_active)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_is_verified ON companies(is_verified)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_admin_key ON companies(admin_key)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_board_key ON companies(board_key)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_city ON companies(city)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_district ON companies(district)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_neighborhood ON companies(neighborhood)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_name ON companies(name)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_company_type ON companies(company_type)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_created_at ON companies(created_at)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_updated_at ON companies(updated_at)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_license_status ON companies(license_status)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_license_end_date ON companies(license_end_date)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_tax_number ON companies(tax_number)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_tax_office ON companies(tax_office)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_nace_code ON companies(nace_code)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_qnb_vkn ON companies(qnb_vkn)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_ubl_incoming_alias ON companies(ubl_incoming_alias)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_ubl_outgoing_alias ON companies(ubl_outgoing_alias)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_sms_enabled ON companies(sms_enabled)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_booking_flow ON companies(booking_flow)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_staff_label ON companies(staff_label)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_service_label ON companies(service_label)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_bank_iban ON companies(bank_iban)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_verification_code ON companies(verification_code)');
 
         console.log('✅ Auto-migrations and seeding completed.');
     } catch (err) {
