@@ -450,35 +450,49 @@ class AppointmentService {
             }
             await client.query('COMMIT');
             const updatedAppointment = result.rows[0];
-
             if (updatedAppointment) {
-                const phone = updatedAppointment.customer_phone;
-                const name = updatedAppointment.customer_name || 'Değerli Müşterimiz';
-                const rawDate = updatedAppointment.appointment_date;
-                const date = (rawDate && rawDate instanceof Date)
-                    ? rawDate.toLocaleDateString('tr-TR')
-                    : rawDate;
-                const time = updatedAppointment.start_time;
-
                 try {
                     console.log(`[Notification] Processing status change: ${status} for App ID: ${id}`);
 
-                    // Fetch details including sms_enabled flag
+                    // Fetch details including sms_enabled flag and customer phone from users table if needed
                     const detailsRes = await pool.query(`
-                        SELECT c.name as company_name, c.sms_enabled, u.first_name, u.last_name, s.name as service_name
+                        SELECT 
+                            c.name as company_name, 
+                            c.sms_enabled, 
+                            st.first_name as staff_first, 
+                            st.last_name as staff_last, 
+                            s.name as service_name,
+                            a.customer_phone as app_phone,
+                            cust.phone as cust_phone,
+                            a.customer_name as app_customer_name,
+                            cust.first_name as cust_first,
+                            cust.last_name as cust_last
                         FROM appointments a
                         LEFT JOIN companies c ON a.company_id = c.id
-                        LEFT JOIN users u ON a.staff_id = u.id
+                        LEFT JOIN users st ON a.staff_id = st.id
                         LEFT JOIN services s ON a.service_id = s.id
+                        LEFT JOIN users cust ON a.customer_id = cust.id
                         WHERE a.id = $1
                     `, [id]);
+                    
                     const details = detailsRes.rows[0];
-                    const companyName = details?.company_name || 'İşletme';
-                    const isSmsEnabled = details?.sms_enabled !== false; // Default true
-                    const staffName = (details?.first_name || details?.last_name) ? `${details.first_name || ''} ${details.last_name || ''}`.trim() : 'Uzman personelimiz';
-                    const serviceName = details?.service_name || 'Hizmet';
+                    if (!details) return updatedAppointment;
 
-                    let smsSent = false;
+                    const phone = details.app_phone || details.cust_phone;
+                    const name = details.app_customer_name || (details.cust_first ? `${details.cust_first} ${details.cust_last || ''}`.trim() : 'Değerli Müşterimiz');
+                    
+                    const rawDate = updatedAppointment.appointment_date;
+                    const date = (rawDate && rawDate instanceof Date)
+                        ? rawDate.toLocaleDateString('tr-TR')
+                        : rawDate;
+                    const time = updatedAppointment.start_time;
+
+                    const companyName = details.company_name || 'İşletme';
+                    const isSmsEnabled = details.sms_enabled !== false; // Default true
+                    const staffName = (details.staff_first || details.staff_last) 
+                        ? `${details.staff_first || ''} ${details.staff_last || ''}`.trim() 
+                        : 'Uzman personelimiz';
+                    const serviceName = details.service_name || 'Hizmet';
 
                     // 1. SMS NOTIFICATION (Priority if enabled)
                     if (phone && (status === 'approved' || status === 'cancelled')) {
@@ -487,18 +501,15 @@ class AppointmentService {
                                 ? `Sayın ${name}, ${companyName} işletmesinde ${staffName} ile ${serviceName} hizmeti için ${date} ${time} randevunuz ONAYLANMIŞTIR. Bekliyoruz!`
                                 : `Sayın ${name}, ${companyName} işletmesindeki ${date} tarihli randevunuz İPTAL EDİLMİŞTİR.`;
 
-                            console.log(`[Notification] Attempting SMS for app ID ${id}...`);
-                            smsSent = await smsService.sendSms(updatedAppointment.company_id, phone, message);
-                            console.log(`[Notification] SMS send result: ${smsSent}`);
+                            console.log(`[Notification] Attempting SMS for app ID ${id} to ${phone}...`);
+                            await smsService.sendSms(updatedAppointment.company_id, phone, message);
                         } else {
                             console.log(`[Notification] SMS is DISABLED for company ${updatedAppointment.company_id}. Skipping SMS.`);
                         }
                     }
 
                     // 2. PUSH NOTIFICATION (Fallback or Parallel)
-                    // If status is approved/cancelled, we check for push. 
                     if (phone && (status === 'approved' || status === 'cancelled')) {
-                        // Dynamically import pushService
                         const pushService = require('./push.service').default;
                         const token = await pushService.getPushTokenByPhone(phone);
 
@@ -509,17 +520,14 @@ class AppointmentService {
                                 ? `Sayın ${name}, ${companyName} işletmesinde ${staffName} ile ${date} ${time} randevunuz onaylanmıştır.`
                                 : `Sayın ${name}, ${companyName} işletmesindeki ${date} ${time} randevunuz iptal edilmiştir.`;
 
-                            const pushResult = await pushService.sendNotification(token, title, body, {
+                            await pushService.sendNotification(token, title, body, {
                                 appointmentId: id.toString(),
                                 status: status
                             }, phone);
-                            console.log(`[Notification] Push notification result for ${id}: ${pushResult}`);
-                        } else {
-                            console.log(`[Notification] No push token found for phone: ${phone} in customer_devices table.`);
                         }
                     }
-                } catch (smsError) {
-                    console.error(`[Notification] Error in notification flow:`, smsError);
+                } catch (notifError) {
+                    console.error(`[Notification] Error in notification flow:`, notifError);
                 }
             }
 
