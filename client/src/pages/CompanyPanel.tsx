@@ -2268,8 +2268,9 @@ export default function CompanyPanel() {
                                             </div>
                                         </div>
                                     </div>
-                                ))
-                            )}
+                                </div>
+                            ))
+                        )}
                         </div>
                     )}
                     {/* AI TAB - Yapay Zeka Ayarları */}
