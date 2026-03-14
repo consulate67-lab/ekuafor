@@ -129,7 +129,6 @@ export default function CompanyPanel() {
 
     // AI states
     const [aiRules, setAiRules] = useState('');
-    const [isSavingAI, setIsSavingAI] = useState(false);
 
     // Reports states
     const [reportData, setReportData] = useState<any>(null);
@@ -156,12 +155,6 @@ export default function CompanyPanel() {
     const [showCashModal, setShowCashModal] = useState(false);
     const [vknCheckResult, setVknCheckResult] = useState<{ vkn: string; isEInvoice: boolean } | null>(null);
 
-    // AI Voice Assistant states
-    const [isListening, setIsListening] = useState(false);
-    const [detectedInfo, setDetectedInfo] = useState<any>(null);
-    const [lastTranscription, setLastTranscription] = useState('');
-    const [isProcessingVoice, setIsProcessingVoice] = useState(false);
-
     // Native Sync
     useEffect(() => {
         const syncMobileData = async () => {
@@ -181,34 +174,6 @@ export default function CompanyPanel() {
             }
         };
         syncMobileData();
-
-        // Listen for Native Detections
-        const handleNativeDetection = (data: any) => {
-            try {
-                const result = typeof data === 'string' ? JSON.parse(data) : data;
-                if (result && result.success && result.data) {
-                    setDetectedInfo(result.data.extractedInfo);
-                    setLastTranscription(result.data.transcription);
-                    setActiveTab('voice-assistant');
-                    setSidebarOpen(false);
-                }
-            } catch (e) {
-                console.error('Failed to parse native AI result:', e);
-            }
-        };
-
-        if (Capacitor.isNativePlatform()) {
-            (window as any).addEventListener('ai_appointment_detected', (event: any) => {
-                handleNativeDetection(event.detail);
-            });
-            
-            // Check for missed result on start/resume
-            const checkMissed = async () => {
-                const { result } = await AIAssistant.getLastResult();
-                if (result) handleNativeDetection(result);
-            };
-            checkMissed();
-        }
     }, [activeTab]);
     const [checkingVkn, setCheckingVkn] = useState(false);
     const [purchaseForm, setPurchaseForm] = useState({
@@ -317,14 +282,6 @@ export default function CompanyPanel() {
         }
     }, []);
 
-    const fetchAIContent = async (cid: number) => {
-        try {
-            const res = await api.get(`/companies/${cid}/ai-config`);
-            if (res.data.success) {
-                setAiRules(res.data.data.rules || '');
-            }
-        } catch (err) { }
-    };
 
     const fetchFinanceData = async (cid?: number) => {
         const targetCid = cid || company?.id;
@@ -1093,115 +1050,6 @@ export default function CompanyPanel() {
         ]
     };
 
-    const handleSaveAIRules = async () => {
-        if (!company) return;
-        setIsSavingAI(true);
-        try {
-            // LocalStorage'ı da güncelle
-            localStorage.setItem(`ai_rules_${company.id}`, aiRules);
-
-            // API üzerinden güncelle
-            const response = await api.put(`/companies/${company.id}`, { ai_rules: aiRules });
-
-            if (response.data.success) {
-                setCompany(response.data.data);
-                alert('Yapay zeka kuralları başarıyla kaydedildi.');
-            }
-        } catch (e: any) {
-            alert(e.response?.data?.error || 'Kurallar kaydedilemedi');
-        } finally {
-            setIsSavingAI(false);
-        }
-    };
-
-    const handleSaveAIAppointment = async () => {
-        if (!detectedInfo || !company) return;
-
-        try {
-            setIsProcessingVoice(true);
-
-            // 1. Hizmet Eşleştirme (Basit isim eşleştirme)
-            let matchedServiceId = null;
-            let price = 0;
-            let duration = 30;
-
-            if (detectedInfo.serviceName) {
-                const sName = detectedInfo.serviceName.toLocaleLowerCase('tr-TR');
-                const matchedService = companyServices.find(s => 
-                    s.name.toLocaleLowerCase('tr-TR').includes(sName) || 
-                    sName.includes(s.name.toLocaleLowerCase('tr-TR'))
-                );
-                if (matchedService) {
-                    matchedServiceId = matchedService.id;
-                    price = matchedService.price;
-                    duration = matchedService.duration_minutes || 30;
-                }
-            }
-
-            // Eğer hizmet bulunamadıysa ilk hizmeti varsayılan yap (veya uyarı ver)
-            if (!matchedServiceId && companyServices.length > 0) {
-                matchedServiceId = companyServices[0].id;
-                price = companyServices[0].price;
-                duration = companyServices[0].duration_minutes || 30;
-            }
-
-            // 2. Personel Atama (Şimdilik ilk personeli ata)
-            let staffId = null;
-            if (staffBoards.length > 0) {
-                staffId = staffBoards[0].id;
-            }
-
-            // 3. Tarih/Saat Formatlama
-            let appDate = detectedInfo.date || new Date().toISOString().split('T')[0];
-            // "yarın" gibi metinleri basitçe bugüne çevir (Geliştirilebilir)
-            if (appDate === 'yarın') {
-                const tomorrow = new Date();
-                tomorrow.setDate(tomorrow.getDate() + 1);
-                appDate = tomorrow.toISOString().split('T')[0];
-            } else if (!/^\d{4}-\d{2}-\d{2}$/.test(appDate)) {
-                // Eğer format hatalıysa bugünü kullan
-                appDate = new Date().toISOString().split('T')[0];
-            }
-
-            let startTime = detectedInfo.time || '10:00';
-            if (startTime.length === 4 && startTime.includes(':')) startTime = '0' + startTime;
-            if (!startTime.includes(':')) startTime = '10:00';
-
-            // Bitiş saati hesapla
-            const [h, m] = startTime.split(':').map(Number);
-            const totalMin = h * 60 + m + duration;
-            const endH = Math.floor(totalMin / 60) % 24;
-            const endM = totalMin % 60;
-            const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-
-            // 4. Randevu Oluştur
-            const appointmentData = {
-                company_id: company.id,
-                service_id: matchedServiceId,
-                staff_id: staffId,
-                customer_name: detectedInfo.customerName || 'Sesli Kayıt Müşterisi',
-                appointment_date: appDate,
-                start_time: startTime,
-                end_time: endTime,
-                price: price,
-                notes: `AI ASİSTAN NOTU: ${detectedInfo.note || '-'} | Konuşma: ${lastTranscription}`,
-                status: 'approved'
-            };
-
-            const response = await api.post('/appointments', appointmentData);
-
-            if (response.data.success) {
-                alert(`Randevu Başarıyla Oluşturuldu!\n\nMüşteri: ${appointmentData.customer_name}\nTarih: ${appDate}\nSaat: ${startTime}`);
-                setDetectedInfo(null);
-                setLastTranscription('');
-            }
-        } catch (e: any) {
-            console.error('AI Appointment Save Error:', e);
-            alert('Randevu oluşturulurken hata: ' + (e.response?.data?.error || e.message));
-        } finally {
-            setIsProcessingVoice(false);
-        }
-    };
     const handleLogout = () => {
         localStorage.removeItem('company_admin_key');
         localStorage.removeItem('token');
