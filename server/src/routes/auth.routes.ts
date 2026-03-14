@@ -399,8 +399,8 @@ router.post('/set-password', async (req: Request, res: Response) => {
 
         // Generate token
         const token = jwt.sign(
-            { id: user.id, email: user.email, role: user.role, company_id: user.company_id },
-            process.env.JWT_SECRET || 'your_secret_key',
+            { userId: user.id, email: user.email, role: user.role, companyId: user.company_id },
+            process.env.JWT_SECRET || 'your-secret-key',
             { expiresIn: '30d' }
         );
 

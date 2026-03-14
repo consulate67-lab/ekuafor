@@ -44,7 +44,7 @@ export default function Login() {
                 }
             } else {
                 // Board Code Login
-                const response = await api.post('/api/companies/check-code', {
+                const response = await api.post('/companies/check-code', {
                     code: boardCode.toUpperCase().trim()
                 });
                 const { type, token, redirect, staff_name, company_name, board_code, company_id, user_id, photo } = response.data.data;
