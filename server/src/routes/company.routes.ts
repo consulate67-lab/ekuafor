@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import { formatPhoneTo12Digits } from '../utils/phone';
 import bcrypt from 'bcryptjs';
 import pool from '../config/database';
 import companyService from '../services/company.service';
@@ -198,41 +199,45 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
             const lowerEmail = staff.email.toLowerCase().trim();
 
             // Check if email already exists
-            const existingUser = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1', [lowerEmail]);
+            const existingUser = await pool.query('SELECT id, role FROM users WHERE LOWER(email) = $1', [lowerEmail]);
+            
+            let userId: number;
+            let boardCode = Array.from({ length: 6 }, () => Math.floor(Math.random() * 10)).join(''); // Use 6 digits for more security
+
             if (existingUser.rows.length > 0) {
-                // If user exists, we might want to skip or update, but for "setup-staff" we usually expect new users.
-                // Let's at least log it and continue or return error. 
-                // To keep it simple, let's return error if any email is taken.
-                return res.status(400).json({ 
-                    success: false, 
-                    error: `Bu e-posta adresi zaten kullanımda: ${staff.email}` 
-                });
+                userId = existingUser.rows[0].id;
+                // If user exists, update their record with company_id and ensure role is 'staff' if they aren't admin
+                const updateRole = existingUser.rows[0].role === 'customer' ? 'staff' : existingUser.rows[0].role;
+                await pool.query(
+                    'UPDATE users SET company_id = $1, role = $2, phone = $3, first_name = $4, last_name = $5 WHERE id = $6',
+                    [parseInt(id as string), updateRole, formatPhoneTo12Digits(staff.phone), staff.first_name, staff.last_name, userId]
+                );
+            } else {
+                const fakePw = '$2b$10$wI5uJmO/P8/1rFzFqI2f/e./6K67UHT71YmQdG5H73A7z241/O6lO'; // "123456"
+
+                const insertRes = await pool.query(
+                    `INSERT INTO users (first_name, last_name, phone, company_id, role, is_active, board_code, email, password)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+                    [
+                        staff.first_name,
+                        staff.last_name,
+                        formatPhoneTo12Digits(staff.phone),
+                        parseInt(id as string),
+                        'staff',
+                        true,
+                        boardCode,
+                        lowerEmail,
+                        fakePw
+                    ]
+                );
+                userId = insertRes.rows[0].id;
             }
-
-            const boardCode = Array.from({ length: 4 }, () => Math.floor(Math.random() * 10)).join('');
-            const fakePw = '$2b$10$wI5uJmO/P8/1rFzFqI2f/e./6K67UHT71YmQdG5H73A7z241/O6lO'; // "123456"
-
-            const insertRes = await pool.query(
-                `INSERT INTO users (first_name, last_name, phone, company_id, role, is_active, board_code, email, password)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-                [
-                    staff.first_name,
-                    staff.last_name,
-                    staff.phone,
-                    parseInt(id as string),
-                    'staff',
-                    true,
-                    boardCode,
-                    lowerEmail,
-                    fakePw
-                ]
-            );
 
             // FIX: company_users tablosuna da ekle ki yetki hatası almasınlar
             try {
                 await pool.query(
                     'INSERT INTO company_users (company_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
-                    [parseInt(id as string), insertRes.rows[0].id, 'staff']
+                    [parseInt(id as string), userId, 'staff']
                 );
             } catch (e) {
                 console.error('Error adding to company_users:', e);
@@ -247,7 +252,7 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
                 console.error('SMS Send Error in setup-staff:', e);
             });
 
-            results.push(insertRes.rows[0]);
+            results.push({ id: userId });
         }
 
         res.json({
@@ -543,6 +548,9 @@ router.post('/admin-login', async (req: Request, res: Response) => {
 router.post('/:id/create-staff-board', async (req: Request, res: Response) => {
     try {
         const companyId = parseInt(req.params.id);
+        console.log('--- Staff Creation Request ---');
+        console.log('Company ID:', companyId);
+        console.log('Body:', req.body);
         const { first_name, last_name, gender, department_id, photo, quantity, unit, email: providedEmail, phone, password } = req.body;
 
         if (!first_name || !last_name) {
@@ -566,7 +574,7 @@ router.post('/:id/create-staff-board', async (req: Request, res: Response) => {
             `INSERT INTO users (email, password, role, first_name, last_name, phone, company_id, board_code, gender, department_id, photo, quantity, unit)
              VALUES ($1, $2, 'staff', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
              RETURNING *`,
-            [email, passwordHash, first_name, last_name, phone || '', companyId, board_code, gender || null, department_id || null, photo || null, quantity || null, unit || null]
+            [email, passwordHash, first_name, last_name, formatPhoneTo12Digits(phone), companyId, board_code, gender || null, department_id || null, photo || null, quantity || null, unit || null]
         );
 
         // company_users bağlantısı ekle (constraint yoksa hata vermeden devam et)
@@ -613,6 +621,37 @@ router.get('/:id/staff-boards', async (req: Request, res: Response) => {
         });
     }
 });
+
+/**
+ * DELETE /api/companies/:id/staff-boards/:userId
+ * Firma personel board kodunu/ilişkisini sil
+ */
+router.delete('/:id/staff-boards/:userId', async (req: Request, res: Response) => {
+    try {
+        const { id, userId } = req.params;
+        
+        // Önce company_users'dan sil
+        await pool.query(
+            'DELETE FROM company_users WHERE company_id = $1 AND user_id = $2',
+            [id, userId]
+        );
+
+        // Eğer kullanıcı sadece bu firmaya bağlıysa ve başka firmada yoksa tamamen silinebilir veya pasif edilebilir
+        // Ama şimdilik sadece bağı koparmak yeterli olabilir. 
+        // Eğer u.company_id == id ise onu da temizleyelim
+        await pool.query(
+            'UPDATE users SET company_id = NULL, board_code = NULL WHERE id = $1 AND company_id = $2',
+            [userId, id]
+        );
+
+        res.json({ success: true, message: 'Personel başarıyla silindi' });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Personel silinirken hata oluştu'
+        });
+    }
+});
 /**
  * PATCH /api/companies/:id/staff/:userId/photo
  * Personel fotoğrafını güncelle
@@ -652,7 +691,10 @@ router.put('/:id/staff/:userId', async (req: Request, res: Response) => {
         if (first_name !== undefined) { updates.push(`first_name = $${i++}`); values.push(first_name); }
         if (last_name !== undefined) { updates.push(`last_name = $${i++}`); values.push(last_name); }
         if (email !== undefined) { updates.push(`email = $${i++}`); values.push(email.toLowerCase().trim()); }
-        if (phone !== undefined) { updates.push(`phone = $${i++}`); values.push(phone); }
+        if (phone !== undefined) { 
+            updates.push(`phone = $${i++}`); 
+            values.push(phone ? formatPhoneTo12Digits(phone) : ''); 
+        }
         if (gender !== undefined) { updates.push(`gender = $${i++}`); values.push(gender); }
         if (department_id !== undefined) { updates.push(`department_id = $${i++}`); values.push(department_id || null); }
         if (quantity !== undefined) { updates.push(`quantity = $${i++}`); values.push(quantity || null); }

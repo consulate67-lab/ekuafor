@@ -5,6 +5,7 @@ import pool from '../config/database';
 import { z } from 'zod';
 import otpService from '../services/otp.service';
 import appointmentService from '../services/appointment.service';
+import { formatPhoneTo12Digits } from '../utils/phone';
 
 const router = Router();
 
@@ -58,7 +59,7 @@ router.post('/register', async (req: Request, res: Response) => {
                 passwordHash,
                 validatedData.first_name,
                 validatedData.last_name,
-                validatedData.phone || null,
+                validatedData.phone ? formatPhoneTo12Digits(validatedData.phone) : null,
                 validatedData.role,
                 validatedData.company_id || null
             ]
@@ -202,11 +203,9 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
         }
 
         // Formata getir (905...)
-        let formattedPhone = phone.replace(/\D/g, '');
-        if (formattedPhone.startsWith('0')) {
-            formattedPhone = '90' + formattedPhone.substring(1);
-        } else if (!formattedPhone.startsWith('90')) {
-            formattedPhone = '90' + formattedPhone;
+        const formattedPhone = formatPhoneTo12Digits(phone);
+        if (!formattedPhone) {
+            return res.status(400).json({ success: false, error: 'Geçersiz telefon numarası' });
         }
 
         // Kullanıcıyı bul veya oluştur

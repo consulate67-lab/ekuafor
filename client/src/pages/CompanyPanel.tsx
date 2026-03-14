@@ -649,6 +649,11 @@ export default function CompanyPanel() {
             if (selectedStaffId) {
                 await api.put(`/companies/${company.id}/staff/${selectedStaffId}`, data);
             } else {
+                // The user provided server-side code for logging, which cannot be directly inserted here.
+                // Assuming the intent was to add client-side logging before the API call.
+                console.log('--- Client-side Staff Creation Request ---');
+                console.log('Company ID:', company.id);
+                console.log('Body:', data);
                 await api.post(`/companies/${company.id}/create-staff-board`, data);
             }
 
@@ -2166,32 +2171,41 @@ export default function CompanyPanel() {
                                                         </svg>
                                                     </button>
                                                 </div>
-                                                <div>
-                                                    <p className="font-black text-slate-900 text-xl">{staff.first_name} {staff.last_name}</p>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${staff.gender === 'erkek'
-                                                            ? 'bg-blue-50 text-blue-600'
-                                                            : 'bg-pink-50 text-pink-600'
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-black text-slate-900 text-xl truncate">{staff.first_name} {staff.last_name}</p>
+                                                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-1 ${staff.gender === 'erkek'
+                                                            ? 'bg-blue-50 text-blue-600 border border-blue-100'
+                                                            : 'bg-pink-50 text-pink-600 border border-pink-100'
                                                             }`}>
                                                             {staff.gender === 'erkek' ? '♂ Erkek' : '♀ Kadın'}
                                                         </span>
                                                         {staff.department_name && (
-                                                            <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[9px] font-black uppercase tracking-widest">
-                                                                {staff.department_name}
+                                                            <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-1 border border-slate-200">
+                                                                🏢 {staff.department_name}
+                                                            </span>
+                                                        )}
+                                                        {staff.email && (
+                                                            <span className="px-2 py-0.5 bg-indigo-50 text-indigo-500 rounded-full text-[9px] font-black uppercase tracking-widest border border-indigo-100 flex items-center gap-1">
+                                                                📧 {staff.email}
+                                                            </span>
+                                                        )}
+                                                        {staff.phone && (
+                                                            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100 flex items-center gap-1">
+                                                                📞 {staff.phone}
                                                             </span>
                                                         )}
                                                         {(staff as any).quantity && (staff as any).unit && (
-                                                            <span className="px-2 py-0.5 bg-violet-50 text-violet-600 rounded-full text-[9px] font-black uppercase tracking-widest">
-                                                                {(staff as any).quantity} {(staff as any).unit}
+                                                            <span className="px-2 py-0.5 bg-violet-50 text-violet-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-violet-100 flex items-center gap-1">
+                                                                ⚖️ {(staff as any).quantity} {(staff as any).unit}
                                                             </span>
                                                         )}
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
 
-                                        {/* QR Code */}
-                                        <div className="bg-slate-50 rounded-2xl p-5 text-center relative">
+                                            {/* QR Code */}
+                                            <div className="bg-slate-50 rounded-2xl p-5 text-center relative mt-6">
                                             <div className="absolute top-4 right-4 flex gap-2">
                                                 <button
                                                     onClick={() => {

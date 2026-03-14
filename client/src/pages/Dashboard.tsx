@@ -718,7 +718,7 @@ export default function Dashboard() {
                             />
                         ) : (
                             <div className="w-32 h-32 rounded-[2.5rem] bg-gradient-to-tr from-indigo-500 to-indigo-600 flex items-center justify-center text-white font-black text-4xl shadow-2xl border-4 border-white transition-all group-hover:scale-105 active:scale-95">
-                                {companyInfo?.name?.[0] || user?.first_name?.[0]}{companyInfo?.name?.[1] || user?.last_name?.[0]}
+                                {(user?.first_name?.[0] || companyInfo?.name?.[0] || 'K')}{(user?.last_name?.[0] || companyInfo?.name?.[1] || 'U')}
                             </div>
                         )}
                         <div className="absolute inset-0 bg-black/20 rounded-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
