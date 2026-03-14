@@ -334,12 +334,19 @@ export default function CompanyPanel() {
 
     useEffect(() => {
         const fetchProvinces = async () => {
+            const cached = localStorage.getItem('geo_provinces');
+            if (cached) {
+                setGeoProvinces(JSON.parse(cached));
+                return;
+            }
+
             setLoadingGeo(p => ({ ...p, provinces: true }));
             try {
-                const res = await fetch('https://turkiyeapi.dev/api/v1/provinces?limit=82');
-                const data = await res.json();
-                if (data.status === 'OK') {
-                    setGeoProvinces(data.data.sort((a: any, b: any) => a.name.localeCompare(b.name, 'tr-TR')));
+                const res = await api.get('/address/provinces');
+                if (res.data.success) {
+                    const sorted = res.data.data.sort((a: any, b: any) => a.name.localeCompare(b.name, 'tr-TR'));
+                    setGeoProvinces(sorted);
+                    localStorage.setItem('geo_provinces', JSON.stringify(sorted));
                 }
             } catch (err) {
                 console.error('İller yüklenemedi:', err);
@@ -354,14 +361,22 @@ export default function CompanyPanel() {
         const province = geoProvinces.find(p => p.name === provinceName);
         if (!province) return;
 
+        const cacheKey = `geo_districts_${province.id}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+            setGeoDistricts(JSON.parse(cached));
+            return;
+        }
+
         setLoadingGeo(p => ({ ...p, districts: true }));
         setGeoDistricts([]);
         setGeoNeighborhoods([]);
         try {
-            const res = await fetch(`https://turkiyeapi.dev/api/v1/districts?provinceId=${province.id}`);
-            const data = await res.json();
-            if (data.status === 'OK') {
-                setGeoDistricts(data.data.sort((a: any, b: any) => a.name.localeCompare(b.name, 'tr-TR')));
+            const res = await api.get(`/address/provinces/${province.id}/districts`);
+            if (res.data.success) {
+                const sorted = res.data.data.sort((a: any, b: any) => a.name.localeCompare(b.name, 'tr-TR'));
+                setGeoDistricts(sorted);
+                localStorage.setItem(cacheKey, JSON.stringify(sorted));
             }
         } catch (err) {
             console.error('İlçeler yüklenemedi:', err);
@@ -370,14 +385,25 @@ export default function CompanyPanel() {
         }
     };
 
-    const fetchNeighborhoods = async (districtId: number) => {
+    const fetchNeighborhoods = async (provinceName: string, districtId: number) => {
+        const province = geoProvinces.find(p => p.name === provinceName);
+        if (!province) return;
+
+        const cacheKey = `geo_neighborhoods_${province.id}_${districtId}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+            setGeoNeighborhoods(JSON.parse(cached));
+            return;
+        }
+
         setLoadingGeo(p => ({ ...p, neighborhoods: true }));
         setGeoNeighborhoods([]);
         try {
-            const res = await fetch(`https://turkiyeapi.dev/api/v1/neighborhoods?districtId=${districtId}`);
-            const data = await res.json();
-            if (data.status === 'OK') {
-                setGeoNeighborhoods(data.data.sort((a: any, b: any) => a.name.localeCompare(b.name, 'tr-TR')));
+            const res = await api.get(`/address/provinces/${province.id}/districts/${districtId}/neighborhoods`);
+            if (res.data.success) {
+                const sorted = res.data.data.sort((a: any, b: any) => a.name.localeCompare(b.name, 'tr-TR'));
+                setGeoNeighborhoods(sorted);
+                localStorage.setItem(cacheKey, JSON.stringify(sorted));
             }
         } catch (err) {
             console.error('Mahalleler yüklenemedi:', err);
@@ -1113,6 +1139,11 @@ export default function CompanyPanel() {
                 if (f in data) delete data[f];
             });
 
+            // Ensure empty strings are sent as null for unique columns (board_key, admin_key etc)
+            ['board_key', 'admin_key', 'email', 'phone', 'tax_number'].forEach(key => {
+                if (data[key] === '') data[key] = null;
+            });
+
             console.log('Updating company with data:', data);
 
             const response = await api.put(`/companies/${company.id}`, data);
@@ -1146,6 +1177,7 @@ export default function CompanyPanel() {
     const generateBoardKey = () => {
         const newKey = Math.random().toString(36).substring(2, 10).toUpperCase();
         setCompany((prev: any) => prev ? ({ ...prev, board_key: newKey }) : null);
+        alert(`Yeni Salon Board Anahtarınız oluşturuldu: ${newKey}\n\nDeğişiklikleri Kaydet butonuna basarak kaydedebilirsiniz.`);
     };
 
     // MAIN PANEL
@@ -1516,7 +1548,7 @@ export default function CompanyPanel() {
                                                     const districtName = e.target.value;
                                                     const dist = geoDistricts.find(d => d.name === districtName);
                                                     setCompany({ ...company, district: districtName, neighborhood: '' });
-                                                    if (dist) fetchNeighborhoods(dist.id);
+                                                    if (dist) fetchNeighborhoods(company.city, dist.id);
                                                 }}
                                                 disabled={!company.city}
                                             >
@@ -1997,10 +2029,10 @@ export default function CompanyPanel() {
                                 <p className="text-xs text-slate-400 mb-2">Müşterileriniz bu QR'ı taratarak randevu alabilir</p>
                                 <p className="text-[10px] text-slate-300 font-mono break-all px-4">{bookingUrl}</p>
 
-                                <div className="flex gap-3 justify-center mt-6">
+                                <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6">
                                     <button
                                         onClick={() => copyText(bookingUrl, 'booking-url')}
-                                        className={`px-5 py-3 rounded-2xl text-sm font-black active:scale-95 transition-all ${copiedField === 'booking-url'
+                                        className={`px-5 py-3 rounded-2xl text-sm font-black active:scale-95 transition-all w-full sm:w-auto ${copiedField === 'booking-url'
                                             ? 'bg-emerald-600 text-white'
                                             : 'bg-slate-900 text-white hover:bg-slate-800'
                                             }`}
@@ -2009,7 +2041,7 @@ export default function CompanyPanel() {
                                     </button>
                                     <button
                                         onClick={() => window.print()}
-                                        className="px-5 py-3 bg-amber-600 text-white rounded-2xl text-sm font-black hover:bg-amber-500 active:scale-95 transition-all"
+                                        className="px-5 py-3 bg-amber-600 text-white rounded-2xl text-sm font-black hover:bg-amber-500 active:scale-95 transition-all w-full sm:w-auto"
                                     >
                                         🖨️ Yazdır
                                     </button>
@@ -2116,14 +2148,12 @@ export default function CompanyPanel() {
                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Salon Board Anahtarı</p>
                                     <div className="flex items-center gap-3">
                                         <p className="text-base font-black text-slate-900 tracking-widest font-mono">{company.board_key || '—'}</p>
-                                        {!company.board_key && (
-                                            <button
-                                                onClick={generateBoardKey}
-                                                className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-indigo-100"
-                                            >
-                                                Anahtar Oluştur
-                                            </button>
-                                        )}
+                                        <button
+                                            onClick={generateBoardKey}
+                                            className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-indigo-100 hover:bg-indigo-100 transition-colors"
+                                        >
+                                            {company.board_key ? 'Anahtarı Değiştir' : 'Anahtar Oluştur'}
+                                        </button>
                                     </div>
                                 </div>
                                 <button
@@ -4763,7 +4793,7 @@ export default function CompanyPanel() {
                                             const districtName = e.target.value;
                                             const dist = geoDistricts.find(d => d.name === districtName);
                                             setCurrentAccountForm({ ...currentAccountForm, district: districtName });
-                                            if (dist) fetchNeighborhoods(dist.id);
+                                            if (dist) fetchNeighborhoods(currentAccountForm.city || '', dist.id);
                                         }}
                                         disabled={!currentAccountForm.city || loadingGeo.districts}
                                         className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold disabled:opacity-50 focus:ring-2 focus:ring-indigo-500 transition-all"

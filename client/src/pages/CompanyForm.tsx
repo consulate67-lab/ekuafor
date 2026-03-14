@@ -131,7 +131,7 @@ export default function CompanyForm() {
             } else {
                 setMapResults([]);
             }
-        }, 500);
+        }, 300);
 
         return () => clearTimeout(timer);
     }, [mapSearchQuery]);
@@ -164,15 +164,23 @@ export default function CompanyForm() {
         }
     };
 
-    useEffect(() => {
-        const init = async () => {
-            await fetchProvinces();
-            await fetchMainCompanies();
-            if (isEdit) {
-                await fetchCompany();
-            }
-        };
+    const init = async () => {
+        setLoading(true);
+        try {
+            await Promise.all([
+                fetchProvinces(),
+                fetchMainCompanies()
+            ]).then(() => {
+                if (isEdit) return fetchCompany();
+            });
+        } catch (err) {
+            console.error('Initialization error:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
+    useEffect(() => {
         init();
 
         // Geolocation for new company
@@ -224,11 +232,19 @@ export default function CompanyForm() {
     };
 
     const fetchProvinces = async () => {
+        const cached = localStorage.getItem('geo_provinces');
+        if (cached) {
+            setProvinces(JSON.parse(cached));
+            return JSON.parse(cached);
+        }
+
         try {
             const response = await api.get('/address/provinces');
             const data = response.data.data;
-            setProvinces(data);
-            return data;
+            const sorted = data.sort((a: any, b: any) => a.name.localeCompare(b.name, 'tr-TR'));
+            setProvinces(sorted);
+            localStorage.setItem('geo_provinces', JSON.stringify(sorted));
+            return sorted;
         } catch (err) {
             console.error('İller yüklenirken hata:', err);
             return [];
@@ -237,22 +253,41 @@ export default function CompanyForm() {
 
     const fetchDistricts = async (provinceId: number) => {
         if (!provinceId || isNaN(provinceId)) return;
+        
+        const cacheKey = `geo_districts_${provinceId}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+            setDistricts(JSON.parse(cached));
+            return;
+        }
+
         try {
             const response = await api.get(`/address/provinces/${provinceId}/districts`);
-            setDistricts(response.data.data || []);
-            setNeighborhoods([]);
+            const sorted = response.data.data.sort((a: any, b: any) => a.name.localeCompare(b.name, 'tr-TR'));
+            setDistricts(sorted);
+            localStorage.setItem(cacheKey, JSON.stringify(sorted));
         } catch (err) {
             console.error('İlçeler yüklenirken hata:', err);
         }
     };
-
     const fetchNeighborhoods = async (provinceId: number, districtId: number) => {
         if (!provinceId || isNaN(provinceId) || !districtId || isNaN(districtId)) return;
+        
+        const cacheKey = `geo_neighborhoods_${provinceId}_${districtId}`;
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+            setNeighborhoods(JSON.parse(cached));
+            return;
+        }
+
         try {
             const response = await api.get(
                 `/address/provinces/${provinceId}/districts/${districtId}/neighborhoods`
             );
-            setNeighborhoods(response.data.data || []);
+            const data = response.data.data || [];
+            const sorted = data.sort((a: any, b: any) => a.name.localeCompare(b.name, 'tr-TR'));
+            setNeighborhoods(sorted);
+            localStorage.setItem(cacheKey, JSON.stringify(sorted));
         } catch (err) {
             console.error('Mahalleler yüklenirken hata:', err);
         }
@@ -277,7 +312,8 @@ export default function CompanyForm() {
                 const province = currentProvinces.find(p => p.name === company.city);
                 if (province) {
                     setSelectedProvince(province.id);
-                    // Force districts fetch
+                    
+                    // Parallelize district and neighborhood finding if names are available
                     const distRes = await api.get(`/address/provinces/${province.id}/districts`);
                     const districtsArr = distRes.data.data || [];
                     setDistricts(districtsArr);
@@ -286,7 +322,6 @@ export default function CompanyForm() {
                         const district = districtsArr.find((d: any) => d.name === company.district);
                         if (district) {
                             setSelectedDistrict(district.id);
-                            // Force neighborhoods fetch
                             const neighRes = await api.get(`/address/provinces/${province.id}/districts/${district.id}/neighborhoods`);
                             const neighborhoodsArr = neighRes.data.data || [];
                             setNeighborhoods(neighborhoodsArr);

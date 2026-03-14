@@ -177,6 +177,7 @@ export default function CustomerHome() {
     const [navigatingTo, setNavigatingTo] = useState<number | null>(null);
     const [callPicker, setCallPicker] = useState<{ open: boolean, company: any, staff: any[] }>({ open: false, company: null, staff: [] });
     const [fetchingStaff, setFetchingStaff] = useState(false);
+    const searchDebounceRef = useRef<any>(null);
     const [reviewsModal, setReviewsModal] = useState<{ open: boolean, company: any, reviews: any[], loading: boolean, sort: string }>({ 
         open: false, company: null, reviews: [], loading: false, sort: 'rating_desc' 
     });
@@ -444,7 +445,12 @@ export default function CustomerHome() {
 
     const handleSearch = useCallback((query: string) => {
         setSearchQuery(query);
-        fetchData(query, location, distanceLimit);
+        
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+        
+        searchDebounceRef.current = setTimeout(() => {
+            fetchData(query, location, distanceLimit);
+        }, 400); // 400ms debounce for better mobile balance
     }, [fetchData, location, distanceLimit]);
 
     const handleDistanceChange = useCallback((dist: number) => {
@@ -461,8 +467,14 @@ export default function CustomerHome() {
             }
             return;
         }
-        fetchData(searchQuery, location, distanceLimit);
-    }, [selectedGender, sort, fetchData]);
+        
+        // Use a small delay for gender/sort changes to prevent multiple rapid fetches
+        const timeout = setTimeout(() => {
+            fetchData(searchQuery, location, distanceLimit);
+        }, 100);
+        
+        return () => clearTimeout(timeout);
+    }, [selectedGender, sort]);
     
     // BACK BUTTON HANDLER
     useEffect(() => {

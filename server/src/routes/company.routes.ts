@@ -245,7 +245,7 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
 
             // Send SMS to staff
             const staffEmail = staff.email.toLowerCase().trim();
-            const smsMsg = `Sayin ${staff.first_name}, ${companyName} personeli olarak sisteme eklendiniz. Email: ${staffEmail}. Sifrenizi olusturmak icin tiklayin: https://www.saloncebinde.com/#/set-password/${boardCode}/${staffEmail}`;
+            const smsMsg = `Sn. ${staff.first_name}, ${companyName} personeli olarak eklendiniz. Email: ${staffEmail}. Giris sifrenizi olusturmak icin: https://www.saloncebinde.com/#/set-password/${boardCode}/${staffEmail}`;
             
             // Background SMS sending
             require('../services/sms.service').default.sendSms(null as any, staff.phone, smsMsg).catch((e: any) => { 

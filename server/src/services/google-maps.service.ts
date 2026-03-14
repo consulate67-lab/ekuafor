@@ -1,4 +1,5 @@
 import axios from 'axios';
+import redis from '../config/redis';
 
 export interface MapsBusiness {
     name: string;
@@ -19,6 +20,14 @@ class GoogleMapsService {
     }
 
     async searchBusinesses(query: string, lat?: number, lng?: number): Promise<MapsBusiness[]> {
+        const cacheKey = `maps:google:search:${query}:${lat}:${lng}`;
+        if (redis) {
+            try {
+                const cached = await redis.get(cacheKey);
+                if (cached) return JSON.parse(cached);
+            } catch (err) { }
+        }
+
         if (!this.apiKey) {
             console.warn('[GoogleMapsService] API Key is missing. Returning mock data.');
             return this.getMockData(query);
@@ -51,6 +60,12 @@ class GoogleMapsService {
                 user_ratings_total: item.user_ratings_total
             }));
 
+            if (redis && businesses.length > 0) {
+                try {
+                    await redis.setex(cacheKey, 604800, JSON.stringify(businesses)); // 7 days
+                } catch (err) { }
+            }
+
             return businesses;
         } catch (error) {
             console.error('[GoogleMapsService] Search Error:', error);
@@ -59,6 +74,14 @@ class GoogleMapsService {
     }
 
     async getPlaceDetails(placeId: string): Promise<Partial<MapsBusiness>> {
+        const cacheKey = `maps:google:detail:${placeId}`;
+        if (redis) {
+            try {
+                const cached = await redis.get(cacheKey);
+                if (cached) return JSON.parse(cached);
+            } catch (err) { }
+        }
+
         if (!this.apiKey) return {};
 
         try {
@@ -66,13 +89,21 @@ class GoogleMapsService {
             const response = await axios.get(detailUrl);
             const result = response.data.result;
 
-            return {
+            const details = {
                 name: result.name,
                 address: result.formatted_address,
                 phone: result.formatted_phone_number,
                 latitude: result.geometry.location.lat,
                 longitude: result.geometry.location.lng
             };
+
+            if (redis && details.name) {
+                try {
+                    await redis.setex(cacheKey, 604800, JSON.stringify(details)); // 7 days
+                } catch (err) { }
+            }
+
+            return details;
         } catch (error) {
             console.error('[GoogleMapsService] Detail Error:', error);
             throw error;

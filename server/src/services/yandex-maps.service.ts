@@ -1,4 +1,5 @@
 import axios from 'axios';
+import redis from '../config/redis';
 import { MapsBusiness } from './google-maps.service';
 
 class YandexMapsService {
@@ -10,6 +11,12 @@ class YandexMapsService {
     }
 
     async searchBusinesses(query: string, lat?: number, lng?: number): Promise<MapsBusiness[]> {
+        const cacheKey = `maps:yandex:search:${query}:${lat}:${lng}`;
+        if (redis) {
+            const cached = await redis.get(cacheKey);
+            if (cached) return JSON.parse(cached);
+        }
+
         if (!this.apiKey) {
             console.warn('[YandexMapsService] API Key is missing. Returning empty or mock.');
             return [];
@@ -29,7 +36,7 @@ class YandexMapsService {
             const response = await axios.get(url);
             const features = response.data.features || [];
 
-            return features.map((f: any) => {
+            const businesses = features.map((f: any) => {
                 const props = f.properties.CompanyMetaData;
                 const coords = f.geometry.coordinates; // [lng, lat]
 
@@ -43,6 +50,12 @@ class YandexMapsService {
                     rating: props.Hours?.text ? undefined : undefined // Yandex schema is complex, mapping basic
                 };
             });
+
+            if (redis && businesses.length > 0) {
+                await redis.setex(cacheKey, 604800, JSON.stringify(businesses)); // 7 days cache
+            }
+
+            return businesses;
         } catch (error) {
             console.error('[YandexMapsService] Search Error:', error);
             return [];

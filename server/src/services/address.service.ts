@@ -1,4 +1,5 @@
 import axios from 'axios';
+import redis from '../config/redis';
 
 const TURKEY_API_BASE = process.env.TURKEY_API_BASE_URL || 'https://turkiyeapi.dev/api/v1';
 
@@ -26,13 +27,25 @@ export interface Neighborhood {
 }
 
 class AddressService {
+    private CACHE_TTL = 86400; // 24 hours
+
     /**
      * Tüm illeri getir
      */
     async getProvinces(): Promise<Province[]> {
+        const cacheKey = 'address:provinces';
+        if (redis) {
+            const cached = await redis.get(cacheKey);
+            if (cached) return JSON.parse(cached);
+        }
+
         try {
             const response = await axios.get(`${TURKEY_API_BASE}/provinces`);
-            return response.data.data || [];
+            const data = response.data.data || [];
+            if (redis && data.length > 0) {
+                await redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(data));
+            }
+            return data;
         } catch (error) {
             console.error('Error fetching provinces:', error);
             throw new Error('İller yüklenirken hata oluştu');
@@ -43,9 +56,19 @@ class AddressService {
      * Belirli bir ili getir
      */
     async getProvinceById(id: number): Promise<Province | null> {
+        const cacheKey = `address:province:${id}`;
+        if (redis) {
+            const cached = await redis.get(cacheKey);
+            if (cached) return JSON.parse(cached);
+        }
+
         try {
             const response = await axios.get(`${TURKEY_API_BASE}/provinces/${id}`);
-            return response.data.data || null;
+            const data = response.data.data || null;
+            if (redis && data) {
+                await redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(data));
+            }
+            return data;
         } catch (error) {
             console.error(`Error fetching province ${id}:`, error);
             return null;
@@ -56,29 +79,31 @@ class AddressService {
      * İl adına göre il getir
      */
     async getProvinceByName(name: string): Promise<Province | null> {
-        try {
-            const response = await axios.get(`${TURKEY_API_BASE}/provinces`, {
-                params: { name }
-            });
-            const provinces = response.data.data || [];
-            return provinces.find((p: Province) =>
-                p.name.toLowerCase() === name.toLowerCase()
-            ) || null;
-        } catch (error) {
-            console.error(`Error fetching province by name ${name}:`, error);
-            return null;
-        }
+        const provinces = await this.getProvinces();
+        return provinces.find((p: Province) =>
+            p.name.toLowerCase() === name.toLowerCase()
+        ) || null;
     }
 
     /**
      * Belirli bir ilin ilçelerini getir
      */
     async getDistricts(provinceId: number): Promise<District[]> {
+        const cacheKey = `address:districts:${provinceId}`;
+        if (redis) {
+            const cached = await redis.get(cacheKey);
+            if (cached) return JSON.parse(cached);
+        }
+
         try {
             const response = await axios.get(`${TURKEY_API_BASE}/districts`, {
                 params: { provinceId }
             });
-            return response.data.data || [];
+            const data = response.data.data || [];
+            if (redis && data.length > 0) {
+                await redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(data));
+            }
+            return data;
         } catch (error) {
             console.error(`Error fetching districts for province ${provinceId}:`, error);
             throw new Error('İlçeler yüklenirken hata oluştu');
@@ -89,11 +114,21 @@ class AddressService {
      * Belirli bir ilçenin mahallelerini getir
      */
     async getNeighborhoods(provinceId: number, districtId: number): Promise<Neighborhood[]> {
+        const cacheKey = `address:neighborhoods:${districtId}`;
+        if (redis) {
+            const cached = await redis.get(cacheKey);
+            if (cached) return JSON.parse(cached);
+        }
+
         try {
             const response = await axios.get(`${TURKEY_API_BASE}/neighborhoods`, {
                 params: { districtId }
             });
-            return response.data.data || [];
+            const data = response.data.data || [];
+            if (redis && data.length > 0) {
+                await redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(data));
+            }
+            return data;
         } catch (error) {
             console.error(`Error fetching neighborhoods:`, error);
             throw new Error('Mahalleler yüklenirken hata oluştu');
@@ -106,8 +141,6 @@ class AddressService {
     async findNearestProvince(lat: number, lng: number): Promise<Province | null> {
         try {
             const provinces = await this.getProvinces();
-            // Not: API'den koordinat bilgisi gelmiyorsa, 
-            // ayrı bir koordinat veritabanı kullanmanız gerekebilir
             return provinces[0] || null;
         } catch (error) {
             console.error('Error finding nearest province:', error);

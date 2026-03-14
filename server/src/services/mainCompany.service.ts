@@ -19,6 +19,7 @@ class MainCompanyService {
         if (!redis) return;
         try {
             const keys = await redis.keys('companies:list:*');
+            keys.push('main_companies:all');
             if (keys.length > 0) {
                 await redis.del(...keys);
                 console.log(`[Redis] MainCompanyService cleared ${keys.length} cache keys`);
@@ -41,8 +42,19 @@ class MainCompanyService {
     }
 
     async getAll(): Promise<MainCompany[]> {
+        const cacheKey = 'main_companies:all';
+        if (redis) {
+            const cached = await redis.get(cacheKey);
+            if (cached) return JSON.parse(cached);
+        }
+
         const result = await pool.query('SELECT id, name, description, address_line, city, district, admin_key as admin_code, is_active, created_at FROM companies WHERE company_type = \'ÜST FİRMA\' ORDER BY created_at DESC');
-        return result.rows;
+        const data = result.rows;
+
+        if (redis && data.length > 0) {
+            await redis.setex(cacheKey, 3600, JSON.stringify(data)); // 1 hour cache
+        }
+        return data;
     }
 
     async getById(id: number): Promise<MainCompany | null> {
