@@ -2596,7 +2596,21 @@ export default function CompanyPanel() {
                                         <button 
                                             onClick={async () => {
                                                 if (Capacitor.isNativePlatform()) {
-                                                    alert('Arka plan izinleri PHP (READ_PHONE_STATE) ve Mikrofon izinleri istendi. Lütfen telefondan onay verin.');
+                                                    // This uses a generic approach to trigger permission dialogs
+                                                    // In a real scenario, you'd use a specific Capacitor plugin for Permissions
+                                                    // but we can also trigger them via custom bridge or app state
+                                                    try {
+                                                        const token = localStorage.getItem('token');
+                                                        const baseUrl = window.location.origin;
+                                                        await AIAssistant.syncStaffData({
+                                                            token: token || '',
+                                                            baseUrl: baseUrl,
+                                                            isStaff: true
+                                                        });
+                                                        alert('Lütfen gelen ekranda "Telefon" ve "Mikrofon" erişimine İZİN VERİN. Ayrıca uygulamanın "Pil Tasarrufu" modunu "Kısıtlama Yok" yapmayı unutmayın.');
+                                                    } catch (e) {
+                                                        console.error(e);
+                                                    }
                                                 } else {
                                                     alert('Bu özellik sadece Android APK üzerinde çalışır.');
                                                 }
