@@ -1810,6 +1810,25 @@ export default function CompanyPanel() {
                                         </div>
                                     </div>
 
+                                    {/* SMS Bildirim Ayarı - Yeni Eklendi */}
+                                    <div className="pt-4 border-t border-slate-100">
+                                        <div className="flex items-center justify-between p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50">
+                                            <div className="flex-1">
+                                                <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                                                    <span>💬</span> SMS Bildirimleri
+                                                </h4>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight mt-0.5">Müşterilere otomatik randevu SMS'i gönderilsin mi?</p>
+                                            </div>
+                                            <button
+                                                onClick={() => setCompany({ ...company, sms_enabled: !company.sms_enabled })}
+                                                className={`w-14 h-8 rounded-full transition-all relative ${company.sms_enabled !== false ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                                            >
+                                                <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${company.sms_enabled !== false ? 'right-1' : 'left-1'}`} />
+                                            </button>
+                                        </div>
+                                        <p className="text-[9px] text-slate-300 font-bold ml-1 mt-2">ℹ️ SMS gönderimi için SMS Sunucu Ayarlarınızın yapılmış olması gerekmektedir.</p>
+                                    </div>
+
                                     {/* Randevu Akış Sırası Ayarı */}
                                     <div className="pt-4 border-t border-slate-100">
                                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Randevu Akış Sırası</label>

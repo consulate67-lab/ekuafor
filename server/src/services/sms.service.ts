@@ -23,6 +23,19 @@ export interface SmsLog {
 
 class SmsService {
     /**
+     * Turkce karakterleri ASCII karsiliklarina cevirir
+     */
+    private trToEn(text: string): string {
+        return text
+            .replace(/ğ/g, 'g').replace(/Ğ/g, 'G')
+            .replace(/ü/g, 'u').replace(/Ü/g, 'U')
+            .replace(/ş/g, 's').replace(/Ş/g, 'S')
+            .replace(/ı/g, 'i').replace(/İ/g, 'I')
+            .replace(/ö/g, 'o').replace(/Ö/g, 'O')
+            .replace(/ç/g, 'c').replace(/Ç/g, 'C');
+    }
+
+    /**
      * Firma için SMS ayarlarını getir
      */
     async getSettings(companyId: number | null): Promise<SmsSettings | null> {
@@ -93,6 +106,13 @@ class SmsService {
                 ...(cid ? [cid] : [])
             ];
             const result = await pool.query(query, values);
+            
+            // Sync with company table: if SMS is activated here, enable it for the company too
+            if (settings.is_active && cid) {
+                await pool.query('UPDATE companies SET sms_enabled = true WHERE id = $1', [cid]);
+                console.log(`[SMS Service] Sync: Enabled sms_enabled for company ${cid} (on update)`);
+            }
+
             return result.rows[0];
         } else {
             const query = `
@@ -109,6 +129,13 @@ class SmsService {
                 settings.sender_id
             ];
             const result = await pool.query(query, values);
+
+            // Sync with company table: if SMS is activated here, enable it for the company too
+            if (settings.is_active && cid) {
+                await pool.query('UPDATE companies SET sms_enabled = true WHERE id = $1', [cid]);
+                console.log(`[SMS Service] Sync: Enabled sms_enabled for company ${cid} (on insert)`);
+            }
+
             return result.rows[0];
         }
     }
@@ -184,6 +211,7 @@ class SmsService {
                     headers: settings.api_key ? { 'Authorization': settings.api_key, 'X-API-Key': settings.api_key } : {},
                     timeout: 10000
                 });
+                console.log(`[SMS] Provider Response (local_gateway):`, response.data);
             } else if (settings.provider === 'vodafone_official') {
                 // Vodafone Official API (Turkey) usually uses SOAP or different REST structure
                 // Placeholder for official integration
@@ -232,6 +260,7 @@ class SmsService {
                     });
 
                     const resStr = String(response.data).trim();
+                    console.log(`[SMS] Netgsm XML Raw Response: ${resStr}`);
                     const netgsmErrors = ['20', '30', '40', '50', '51', '70', '00', '01', '02'];
 
                     if (resStr.includes('error') || netgsmErrors.includes(resStr) || resStr.length < 5) {
@@ -252,18 +281,31 @@ class SmsService {
                     const postUrl = targetApiUrl || 'https://api.netgsm.com.tr/sms/send/get/';
                     console.log(`[SMS] Sending via Netgsm Parametric POST to: ${postUrl}`);
 
+                    const cleanMessage = this.trToEn(formattedMessage);
+                    console.log(`[SMS] Cleaned Message for Netgsm: ${cleanMessage}`);
+
                     const params = new URLSearchParams();
                     params.append('usercode', usercode);
                     params.append('password', password);
-                    params.append('gsmno', phone10);
-                    params.append('message', formattedMessage);
+                    params.append('gsmno', phone10); // Back to 10 digits as OTP works with this
+                    params.append('message', cleanMessage);
                     params.append('msgheader', senderId);
                     params.append('dil', 'TR');
+                    params.append('type', '1:n');
 
-                    response = await axios.post(postUrl, params, {
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        timeout: 10000
-                    });
+
+                    if (postUrl.includes('/send/get')) {
+                        console.log(`[SMS] Using manual GET construction for Netgsm...`);
+                        // Manual construction to ensure no double encoding or + issues
+                        const finalUrl = `${postUrl}${postUrl.includes('?') ? '&' : '?'}usercode=${usercode}&password=${encodeURIComponent(password)}&gsmno=${phone10}&message=${encodeURIComponent(cleanMessage)}&msgheader=${encodeURIComponent(senderId)}&dil=TR&type=1:n`;
+                        
+                        response = await axios.get(finalUrl, { timeout: 10000 });
+                    } else {
+                        response = await axios.post(postUrl, params, {
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            timeout: 10000
+                        });
+                    }
 
                     const resStr = String(response.data).trim();
                     console.log(`[SMS] Netgsm Raw Response: ${resStr}`);

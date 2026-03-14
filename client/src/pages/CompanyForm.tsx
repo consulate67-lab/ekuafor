@@ -847,15 +847,15 @@ export default function CompanyForm() {
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     IBAN
                                 </label>
-                                <input
-                                    type="text"
-                                    name="iban"
-                                    value={formData.iban}
-                                    onChange={handleChange}
-                                    className="input-field"
-                                    placeholder="TR00 0000 0000 0000 0000 0000 00"
-                                    maxLength={34}
-                                />
+                                    <input
+                                        type="text"
+                                        name="bank_iban"
+                                        value={formData.bank_iban || ''}
+                                        onChange={handleChange}
+                                        className="input-field"
+                                        placeholder="TR00 0000 0000 0000 0000 0000 00"
+                                        maxLength={34}
+                                    />
                             </div>
 
                             <div>

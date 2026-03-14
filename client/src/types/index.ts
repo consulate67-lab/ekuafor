@@ -37,6 +37,7 @@ export interface Company {
     bank_name?: string;
     bank_branch?: string;
     iban?: string;
+    bank_iban?: string;
     account_holder_name?: string;
 
     // Ödeme
