@@ -61,8 +61,6 @@ const menuItems: { key: TabKey; icon: string; label: string }[] = [
     { key: 'profile', icon: '🏢', label: 'Firma Tanıtımı' },
     { key: 'integration', icon: '🔌', label: 'Entegrasyon' },
     { key: 'booking', icon: '📅', label: 'Müşteri QR' },
-    { key: 'ai', icon: '🤖', label: 'Yapay Zeka' },
-    { key: 'voice-assistant', icon: '🎙️', label: 'Sesli Asistan (Beta)' },
     { key: 'qr', icon: '🔑', label: 'Yönetim Kodu' },
     { key: 'dept', icon: '🏢', label: 'Departmanlar' },
     { key: 'staff', icon: '👥', label: 'Personeller' },
@@ -680,7 +678,6 @@ export default function CompanyPanel() {
                 console.warn('Reports tab active but NO token found in localStorage!');
             }
         }
-        if (activeTab === 'ai' && company) fetchAIContent(company.id);
         if (activeTab === 'finance' && company) fetchFinanceData(company.id);
     }, [activeTab, reportPeriod, company, activeFinanceTab, financeDateRange, financeSearch]);
 
@@ -1505,7 +1502,6 @@ export default function CompanyPanel() {
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Hızlı İşlemler</p>
                                 {[
                                     { icon: '📅', label: 'Müşteri Randevu QR Kodu', desc: 'Müşterilerin randevu alması için', tab: 'booking' as TabKey },
-                                    { icon: '🎙️', label: 'AI Görüşme Asistanı', desc: 'Telefon konuşmasından randevu yakala', tab: 'voice-assistant' as TabKey },
                                     { icon: '✂️', label: (company.service_label || 'Hizmet') + ' ve Paket Yönetimi', desc: 'Fiyat ve süre tanımlamaları', tab: 'services' as TabKey },
                                     { icon: '👤', label: 'Yeni Personel Ekle', desc: 'Board kodu ile giriş yapacak', tab: 'staff' as TabKey },
                                     { icon: '🏢', label: 'Departman Yönet', desc: 'Birimlerinizi düzenleyin', tab: 'dept' as TabKey },
@@ -1917,6 +1913,37 @@ export default function CompanyPanel() {
                                             </button>
                                         </div>
                                         <p className="text-[9px] text-slate-300 font-bold ml-1 mt-2">ℹ️ SMS gönderimi için SMS Sunucu Ayarlarınızın yapılmış olması gerekmektedir.</p>
+                                    </div>
+
+                                    {/* AI Görüşme Asistanı Ayarı - Yeni Eklendi */}
+                                    <div className="pt-4 border-t border-slate-100">
+                                        <div className="flex items-center justify-between p-4 bg-purple-50/50 rounded-2xl border border-purple-100/50">
+                                            <div className="flex-1">
+                                                <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                                                    <span>🎙️</span> Sesli Görüşme Asistanı (AI)
+                                                </h4>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight mt-0.5">Telefon görüşmelerinde randevu yakalama aktif olsun mu?</p>
+                                            </div>
+                                            <button
+                                                onClick={() => setCompany({ ...company, ai_enabled: !company.ai_enabled })}
+                                                className={`w-14 h-8 rounded-full transition-all relative ${company.ai_enabled !== false ? 'bg-purple-600' : 'bg-slate-200'}`}
+                                            >
+                                                <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${company.ai_enabled !== false ? 'right-1' : 'left-1'}`} />
+                                            </button>
+                                        </div>
+                                        {company.ai_enabled !== false && (
+                                            <div className="mt-4 p-4 bg-white rounded-2xl border border-slate-100 space-y-3">
+                                                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Zeka Modeli Kuralları (Prompts)</label>
+                                                <textarea
+                                                    value={aiRules}
+                                                    onChange={e => setAiRules(e.target.value)}
+                                                    rows={4}
+                                                    placeholder="Örn: 19:00'dan sonrasını alama..."
+                                                    className="w-full p-4 bg-slate-50 rounded-xl border-none text-xs font-medium text-slate-700 outline-none resize-none"
+                                                />
+                                                <p className="text-[8px] text-slate-300 italic">Personelin Android uygulaması üzerinden "Otomatik Dinleme" iznini vermiş olması gerekir.</p>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Randevu Akış Sırası Ayarı */}
@@ -2530,242 +2557,6 @@ export default function CompanyPanel() {
                     )}
 
                     {/* AI TAB - Yapay Zeka Ayarları */}
-                    {activeTab === 'ai' && (
-                        <div className="space-y-6">
-                            <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40 relative overflow-hidden">
-                                <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-50 rounded-full blur-3xl opacity-50"></div>
-
-                                <div className="flex items-center gap-4 mb-8">
-                                    <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center text-3xl shadow-lg shadow-indigo-200">
-                                        🤖
-                                    </div>
-                                    <div>
-                                        <h2 className="text-2xl font-black text-slate-900 leading-tight">Yapay Zeka Asistanı</h2>
-                                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Randevu Akıllı Çıkarım Kuralları</p>
-                                    </div>
-                                </div>
-
-                                {/* Sesli Asistan Tanıtımı - Yeni */}
-                                <div className="bg-indigo-50 border border-indigo-100 rounded-3xl p-6 mb-8 text-indigo-700">
-                                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                                        <div className="flex-1">
-                                            <p className="font-black text-xs uppercase tracking-widest mb-2 flex items-center gap-2">
-                                                <span>🎙️</span> Sesli Görüşme Asistanı (Telefon)
-                                            </p>
-                                            <p className="text-xs font-bold text-indigo-600/70 leading-relaxed">
-                                                Telefon görüşmeleri sırasında sesleri dinleyip otomatik randevu oluşturmak ister misiniz? 
-                                                Mobil uygulamamız üzerinden bu özelliği aktif edebilirsiniz.
-                                            </p>
-                                        </div>
-                                        <button 
-                                            onClick={() => setActiveTab('voice-assistant')}
-                                            className="whitespace-nowrap px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition-all"
-                                        >
-                                            Asistan Ayarları & Test
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="bg-amber-50 border border-amber-100 rounded-3xl p-6 mb-8 text-amber-700">
-                                    <p className="font-black text-xs uppercase tracking-widest mb-2 flex items-center gap-2">
-                                        <span>💡</span> AI Nasıl Çalışır?
-                                    </p>
-                                    <p className="text-sm leading-relaxed">
-                                        Müşterileriniz veya çalışanlarınız sesli komut verdiğinde, sistem bu metni analiz eder.
-                                        Aşağıdaki alana AI'nın nasıl davranması gerektiğine dair kurallar yazabilirsiniz.
-                                    </p>
-                                </div>
-
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">Yapay Zeka Yönergesi (Prompts)</label>
-                                        <textarea
-                                            value={aiRules}
-                                            onChange={e => setAiRules(e.target.value)}
-                                            rows={12}
-                                            placeholder="Örn: Eğer müşteri saat belirtmezse bugün için en yakın 15 dakikalık boşluğa randevu oluştur. Eğer hizmet belirtmezse 'Saç Kesimi' seçeneğini varsayılan yap..."
-                                            className="w-full p-6 bg-slate-50 rounded-[2rem] border-2 border-slate-100 focus:border-indigo-500 text-sm font-medium text-slate-800 outline-none resize-none leading-relaxed transition-all"
-                                        />
-                                    </div>
-
-                                    <button
-                                        onClick={handleSaveAIRules}
-                                        disabled={isSavingAI}
-                                        className="w-full py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl font-black text-base tracking-wide shadow-xl shadow-indigo-500/30 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
-                                    >
-                                        {isSavingAI ? 'Kaydediliyor...' : 'Kuralları Uygula & Kaydet'}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="bg-indigo-900 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-indigo-200">
-                                <h3 className="font-black text-lg mb-4">Örnek Kurallar</h3>
-                                <ul className="space-y-3 text-sm text-indigo-100">
-                                    <li className="flex gap-3">
-                                        <span className="text-indigo-400">🔹</span>
-                                        <span>Saat 7 denirse akşam 19:00 olarak algıla.</span>
-                                    </li>
-                                    <li className="flex gap-3">
-                                        <span className="text-indigo-400">🔹</span>
-                                        <span>Hizmet belirtilmezse süreyi 30 dakika varsay.</span>
-                                    </li>
-                                    <li className="flex gap-3">
-                                        <span className="text-indigo-400">🔹</span>
-                                        <span>Her zaman bugün tarihini baz al.</span>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* AI VOICE ASSISTANT TAB */}
-                    {activeTab === 'voice-assistant' && (
-                        <div className="space-y-6">
-                            <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/40 relative overflow-hidden">
-                                <div className="absolute -top-10 -right-10 w-40 h-40 bg-pink-50 rounded-full blur-3xl opacity-50"></div>
-                                <div className="flex items-center gap-4 mb-8">
-                                    <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-emerald-500 rounded-3xl flex items-center justify-center text-3xl shadow-lg shadow-indigo-200">🎙️</div>
-                                    <div>
-                                        <h2 className="text-2xl font-black text-slate-900 leading-tight">AI Görüşme Asistanı</h2>
-                                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Arama Esnasında Randevu Dinleme</p>
-                                    </div>
-                                </div>
-                                <div className="bg-indigo-50 border border-indigo-100 rounded-3xl p-6 mb-8 text-indigo-700">
-                                    <p className="font-black text-xs uppercase tracking-widest mb-3 flex items-center gap-2"><span>🛠️</span> Prototip Çalışma Modu</p>
-                                    <p className="text-sm leading-relaxed text-indigo-600/80">
-                                        Bu panel, çalışanınızın telefon görüşmesi yaparken AI'nın nasıl çalıştığını simüle eder. 
-                                        <b> "Dinlemeyi Başlat"</b> butonuna basıp konuşun, AI otomatik olarak randevuyu yakalayacaktır.
-                                    </p>
-                                </div>
-                                <div className="flex flex-col items-center justify-center p-10 border-4 border-dashed border-slate-100 rounded-[3rem] bg-slate-50/50">
-                                    <button
-                                        onClick={() => {
-                                            if (isListening) {
-                                                setIsListening(false);
-                                                if (lastTranscription) {
-                                                    setIsProcessingVoice(true);
-                                                    api.post('/ai/process-text-appointment', { text: lastTranscription })
-                                                        .then(res => { if (res.data.success) setDetectedInfo(res.data.data); })
-                                                        .finally(() => setIsProcessingVoice(false));
-                                                }
-                                                if ((window as any)._recognition) (window as any)._recognition.stop();
-                                            } else {
-                                                setIsListening(true); setDetectedInfo(null); setLastTranscription('');
-                                                const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-                                                if (SpeechRecognition) {
-                                                    const recognition = new SpeechRecognition();
-                                                    recognition.lang = 'tr-TR'; recognition.continuous = true;
-                                                    recognition.onresult = (event: any) => {
-                                                        const transcript = event.results[event.results.length - 1][0].transcript;
-                                                        setLastTranscription(prev => prev + ' ' + transcript);
-                                                    };
-                                                    recognition.start(); (window as any)._recognition = recognition;
-                                                } else { alert('Tarayıcınız ses tanımayı desteklemiyor.'); }
-                                            }
-                                        }}
-                                        className={`w-32 h-32 rounded-full flex items-center justify-center text-4xl shadow-2xl transition-all active:scale-90 ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-indigo-600 text-white'}`}
-                                    >
-                                        {isListening ? '⏹️' : '🎙️'}
-                                    </button>
-                                    <p className="mt-6 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                        {isListening ? 'Sizi Dinliyorum... Durdurmak için basın.' : 'Dinlemeyi Başlatmak İçin Tıklayın'}
-                                    </p>
-                                </div>
-                                {lastTranscription && (
-                                    <div className="mt-8 p-6 bg-slate-900 rounded-[2rem] text-slate-300">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Yakalanan Metin:</p>
-                                        <p className="text-sm italic">"{lastTranscription}"</p>
-                                    </div>
-                                )}
-                                {isProcessingVoice && (
-                                    <div className="mt-8 flex items-center justify-center gap-3 p-6 bg-indigo-50 rounded-[2rem]">
-                                        <div className="w-5 h-5 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                                        <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Yapay Zeka Analiz Ediyor...</p>
-                                    </div>
-                                )}
-                                {detectedInfo && (
-                                    <div className="mt-8 bg-emerald-50 border-2 border-emerald-200 rounded-[2.5rem] p-8 animate-in fade-in slide-in-from-bottom-5">
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <div className="w-10 h-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center text-xl">✨</div>
-                                            <h3 className="font-black text-emerald-900 uppercase tracking-widest text-sm">Randevu Yakalandı!</h3>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="bg-white/80 p-4 rounded-2xl">
-                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Müşteri</p>
-                                                <p className="text-sm font-bold text-slate-900">{detectedInfo.customerName || 'Bilinmiyor'}</p>
-                                            </div>
-                                            <div className="bg-white/80 p-4 rounded-2xl">
-                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Hizmet</p>
-                                                <p className="text-sm font-bold text-slate-900">{detectedInfo.serviceName || 'Belirtilmedi'}</p>
-                                            </div>
-                                            <div className="bg-white/80 p-4 rounded-2xl">
-                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tarih</p>
-                                                <p className="text-sm font-bold text-slate-900">{detectedInfo.date || 'Belirtilmedi'}</p>
-                                            </div>
-                                            <div className="bg-white/80 p-4 rounded-2xl">
-                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Saat</p>
-                                                <p className="text-sm font-bold text-slate-900">{detectedInfo.time || 'Belirtilmedi'}</p>
-                                            </div>
-                                        </div>
-                                        <button 
-                                            onClick={handleSaveAIAppointment} 
-                                            disabled={isProcessingVoice}
-                                            className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-200 hover:bg-emerald-700 active:scale-95 transition-all disabled:opacity-50"
-                                        >
-                                            {isProcessingVoice ? 'Kaydediliyor...' : 'Ajandaya Kaydet'}
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-10 opacity-10">
-                                    <span className="text-9xl">📱</span>
-                                </div>
-                                <div className="relative z-10 text-left">
-                                    <h3 className="text-xl font-black mb-4 italic">Android Arka Plan Modu</h3>
-                                    <p className="text-xs text-slate-400 leading-relaxed max-w-md mb-6">
-                                        Bu özellik aktif olduğunda, telefonunuz çaldığında ve açıldığında uygulama <b>otomatik olarak</b> mikrofonu devreye alır. 
-                                        Bu sadece çalışanlar için geçerli gizli bir özelliktir.
-                                    </p>
-                                    
-                                    <div className="flex flex-wrap gap-3">
-                                        <button 
-                                            onClick={async () => {
-                                                if (Capacitor.isNativePlatform()) {
-                                                    // This uses a generic approach to trigger permission dialogs
-                                                    // In a real scenario, you'd use a specific Capacitor plugin for Permissions
-                                                    // but we can also trigger them via custom bridge or app state
-                                                    try {
-                                                        const token = localStorage.getItem('token');
-                                                        const baseUrl = window.location.origin;
-                                                        await AIAssistant.syncStaffData({
-                                                            token: token || '',
-                                                            baseUrl: baseUrl,
-                                                            isStaff: true
-                                                        });
-                                                        alert('Lütfen gelen ekranda "Telefon" ve "Mikrofon" erişimine İZİN VERİN. Ayrıca uygulamanın "Pil Tasarrufu" modunu "Kısıtlama Yok" yapmayı unutmayın.');
-                                                    } catch (e) {
-                                                        console.error(e);
-                                                    }
-                                                } else {
-                                                    alert('Bu özellik sadece Android APK üzerinde çalışır.');
-                                                }
-                                            }}
-                                            className="px-6 py-3 bg-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-emerald-700"
-                                        >
-                                            📞 Otomatik Dinlemeyi Yetkilendir
-                                        </button>
-                                        <button className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all">
-                                            Asistan APK İndir (.apk)
-                                        </button>
-                                    </div>
-                                    <p className="mt-4 text-[9px] text-slate-500 font-bold uppercase tracking-widest">
-                                        Üye Tipi: Çalışan • Durum: {Capacitor.isNativePlatform() ? '✅ APK Aktif' : '💻 Web Modu'}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
 
                     {/* SERVICES TAB */}
                     {activeTab === 'services' && (

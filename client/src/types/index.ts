@@ -66,6 +66,8 @@ export interface Company {
     staff_label?: string;
     service_label?: string;
     sms_enabled?: boolean;
+    ai_enabled?: boolean;
+    ai_rules?: string;
 }
 
 export interface Province {

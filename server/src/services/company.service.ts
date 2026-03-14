@@ -65,6 +65,7 @@ export interface Company {
     license_end_date?: string | Date | null;
     sms_enabled?: boolean | null;
     ai_rules?: string | null;
+    ai_enabled?: boolean | null;
     photo?: string | null;
     building_number?: string | null;
     door_number?: string | null;
@@ -94,8 +95,10 @@ class CompanyService {
                 await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS fax_number TEXT');
                 await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS verification_code TEXT');
                 await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS bank_iban TEXT');
+                await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN DEFAULT true');
                 // Ensure existing companies have this enabled by default if it was null
                 await client.query('UPDATE companies SET sms_enabled = true WHERE sms_enabled IS NULL');
+                await client.query('UPDATE companies SET ai_enabled = true WHERE ai_enabled IS NULL');
             } catch (e) { /* ignore if fails */ }
 
             if (company.main_company_id) {

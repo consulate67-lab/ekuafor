@@ -31,11 +31,18 @@ router.post('/process-call-audio', authMiddleware as any, (upload.single('audio'
     }
 
     try {
-        // Fetch company rules
+        // Fetch company rules and status
         let rules = '';
         if (req.user?.company_id) {
-            const compRes = await pool.query('SELECT ai_rules FROM companies WHERE id = $1', [req.user.company_id]);
-            rules = compRes.rows[0]?.ai_rules || '';
+            const compRes = await pool.query('SELECT ai_rules, ai_enabled FROM companies WHERE id = $1', [req.user.company_id]);
+            const companyData = compRes.rows[0];
+            
+            if (companyData && companyData.ai_enabled === false) {
+                if (audioFile) fs.unlink(audioFile.path, () => {});
+                return res.status(403).json({ success: false, error: 'Yapay Zeka asistanı bu firma için kapalı.' });
+            }
+            
+            rules = companyData?.ai_rules || '';
         }
 
         // 1. Transcribe the audio
@@ -75,11 +82,17 @@ router.post('/process-text-appointment', authMiddleware as any, async (req: any,
     if (!text) return res.status(400).json({ success: false, error: 'Metin gerekli.' });
 
     try {
-        // Fetch company rules
+        // Fetch company rules and status
         let rules = '';
         if (req.user?.company_id) {
-            const compRes = await pool.query('SELECT ai_rules FROM companies WHERE id = $1', [req.user.company_id]);
-            rules = compRes.rows[0]?.ai_rules || '';
+            const compRes = await pool.query('SELECT ai_rules, ai_enabled FROM companies WHERE id = $1', [req.user.company_id]);
+            const companyData = compRes.rows[0];
+            
+            if (companyData && companyData.ai_enabled === false) {
+                return res.status(403).json({ success: false, error: 'Yapay Zeka asistanı bu firma için kapalı.' });
+            }
+            
+            rules = companyData?.ai_rules || '';
         }
 
         const info = await aiAssistantService.extractAppointmentInfo(text, rules);
