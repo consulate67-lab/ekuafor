@@ -237,14 +237,15 @@ export default function CompanyPanel() {
                 const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
                 const baseUrl = window.location.origin;
                 try {
+                    await (AIAssistant as any).requestPermissions();
                     await AIAssistant.syncStaffData({
                         token: token || '',
                         baseUrl: baseUrl,
                         isStaff: true
                     });
-                    console.log('Mobile AI Assistant synced');
+                    console.log('Mobile AI Assistant synced and permissions requested');
                 } catch (e) {
-                    console.warn('Mobile sync skipped or failed:', e);
+                    console.warn('Mobile sync/permissions skipped or failed:', e);
                 }
             }
         };

@@ -13,7 +13,14 @@ public class CallReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        // Debug Toast - Show every state change
         String state = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
+        Log.d(TAG, "onReceive intent: " + intent.getAction() + " state: " + state);
+        
+        if (state != null) {
+            Toast.makeText(context, "Telefon Durumu: " + state, Toast.LENGTH_SHORT).show();
+        }
+        
         if (state == null) return;
 
         Log.d(TAG, "Call State: " + state);
