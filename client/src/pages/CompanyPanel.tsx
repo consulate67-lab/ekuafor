@@ -56,7 +56,8 @@ type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'finan
     'finance-purchases-dashboard' | 'finance-purchases-reports' | 'finance-purchases-list' |
     'finance-cash-dashboard' | 'finance-cash-reports' | 'finance-cash-list' |
     'finance-contacts' | 'finance-contacts-balance' |
-    'header-invoices' | 'header-cash' | 'header-contacts';
+    'header-invoices' | 'header-cash' | 'header-contacts' |
+    'customers-list' | 'customers-marketing' | 'customers-automations' | 'crm';
 
 interface MenuItem {
     key: TabKey;
@@ -89,6 +90,16 @@ const menuItems: MenuItem[] = [
             { key: 'header-contacts', label: '👤 CARİLER', icon: '' },
             { key: 'finance-contacts', label: 'Cari Kartlar', icon: '📇' },
             { key: 'finance-contacts-balance', label: 'Toplu Bakiye Raporu', icon: '⚖️' },
+        ]
+    },
+    {
+        key: 'crm',
+        icon: '👥',
+        label: 'Müşteriler (CRM)',
+        children: [
+            { key: 'customers-list', label: 'Müşteri Rehberi', icon: '📇' },
+            { key: 'customers-marketing', label: 'Pazarlama & SMS', icon: '📱' },
+            { key: 'customers-automations', label: 'Akıllı Otomasyonlar', icon: '🤖' },
         ]
     },
     { key: 'reports', icon: '📊', label: 'Genel Raporlar' },
@@ -184,6 +195,10 @@ export default function CompanyPanel() {
     const [cashTransactions, setCashTransactions] = useState<any[]>([]);
     const [openingBalance, setOpeningBalance] = useState(0);
     const [purchaseInvoices, setPurchaseInvoices] = useState<any[]>([]);
+    const [customers, setCustomers] = useState<any[]>([]);
+    const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+    const [loadingCustomers, setLoadingCustomers] = useState(false);
+    const [customerSearch, setCustomerSearch] = useState('');
     const [invoices, setInvoices] = useState<any[]>([]);
     const [contactsBalance, setContactsBalance] = useState<any[]>([]);
     const [salesSubTab, setSalesSubTab] = useState<'pending' | 'invoiced'>('pending');
@@ -192,7 +207,7 @@ export default function CompanyPanel() {
     const [vknCheckResult, setVknCheckResult] = useState<{ vkn: string; isEInvoice: boolean } | null>(null);
     const [lastAIResult, setLastAIResult] = useState<any>(null);
     const [showAIResultModal, setShowAIResultModal] = useState(false);
-    const [expandedMenus, setExpandedMenus] = useState<string[]>(['finance']);
+    const [expandedMenus, setExpandedMenus] = useState<string[]>(['finance', 'crm']);
 
     // Native Sync
     useEffect(() => {
@@ -444,6 +459,24 @@ export default function CompanyPanel() {
             console.error('Finans verisi yüklenemedi:', err);
         } finally {
             setLoadingFinance(false);
+        }
+    };
+
+    const fetchCustomersData = async (cid?: number) => {
+        const targetCid = cid || company?.id;
+        if (!targetCid) return;
+        setLoadingCustomers(true);
+        try {
+            const res = await api.get(`/appointments/company/${targetCid}/customers-crm`, {
+                params: { search: customerSearch }
+            });
+            if (res.data.success) {
+                setCustomers(res.data.data || []);
+            }
+        } catch (err) {
+            console.error('Müşteri verisi yüklenemedi:', err);
+        } finally {
+            setLoadingCustomers(false);
         }
     };
 
@@ -1173,6 +1206,8 @@ export default function CompanyPanel() {
         // Handle parent menu selection
         if (tab === 'finance') {
             targetTab = 'finance-sales-list';
+        } else if (tab === 'crm') {
+            targetTab = 'customers-list';
         }
         
         setActiveTab(targetTab);
@@ -1191,6 +1226,9 @@ export default function CompanyPanel() {
                 setActiveFinanceTab(fTab);
                 setExpandedMenus(prev => prev.includes('finance') ? prev : [...prev, 'finance']);
                 fetchFinanceData(company.id);
+            }
+            else if (targetTab.startsWith('customers')) {
+                fetchCustomersData(company.id);
             }
             // For other tabs (staff, dept, services), fetchData(company.id) covers all of them
             else if (['staff', 'dept', 'services'].includes(targetTab)) {
@@ -3530,6 +3568,260 @@ export default function CompanyPanel() {
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {/* CUSTOMERS CRM TAB */}
+                    {activeTab.startsWith('customers') && (
+                        <div className="space-y-6">
+                            {activeTab === 'customers-list' && (
+                                <div className="space-y-6">
+                                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-50 shadow-sm">
+                                        <div>
+                                            <h3 className="font-black text-slate-900 uppercase text-xs tracking-[0.2em]">Müşteri Rehberi</h3>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Hizmet alan müşterilerinizin geçmişi ve iletişim verileri</p>
+                                        </div>
+                                        <div className="relative group min-w-[300px]">
+                                            <input
+                                                type="text"
+                                                placeholder="İsim veya telefon ile ara..."
+                                                value={customerSearch}
+                                                onChange={(e) => {
+                                                    setCustomerSearch(e.target.value);
+                                                    if (e.target.value.length === 0 || e.target.value.length > 2) fetchCustomersData(company.id);
+                                                }}
+                                                className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl px-12 py-4 text-sm font-bold focus:bg-white focus:border-indigo-100 outline-none transition-all placeholder:text-slate-300"
+                                            />
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl opacity-30 group-focus-within:opacity-100 transition-opacity">🔍</span>
+                                        </div>
+                                    </div>
+
+                                    {loadingCustomers ? (
+                                        <div className="text-center py-20">
+                                            <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                                            <p className="text-slate-400 font-black text-[10px] uppercase tracking-widest">Müşteriler Getiriliyor...</p>
+                                        </div>
+                                    ) : customers.length === 0 ? (
+                                        <div className="bg-white rounded-3xl p-20 text-center shadow-lg border border-slate-50">
+                                            <span className="text-5xl block mb-4">👥</span>
+                                            <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest">Müşteri bulunamadı</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 gap-4">
+                                            {customers.map(cust => (
+                                                <div 
+                                                    key={cust.phone} 
+                                                    className="bg-white rounded-[2rem] p-6 lg:p-8 shadow-sm border border-slate-100 hover:shadow-xl hover:border-indigo-200 transition-all group cursor-pointer"
+                                                    onClick={() => setSelectedCustomer(cust)}
+                                                >
+                                                    <div className="flex flex-col lg:flex-row gap-6 items-center">
+                                                        <div className="w-16 h-16 bg-gradient-to-br from-slate-100 to-indigo-50 rounded-2xl flex items-center justify-center text-2xl shadow-inner flex-shrink-0 group-hover:from-indigo-500 group-hover:to-purple-600 group-hover:text-white transition-all duration-500">
+                                                            {cust.name.charAt(0).toUpperCase()}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-3 mb-1">
+                                                                <h4 className="font-black text-slate-900 text-xl leading-tight truncate">{cust.name}</h4>
+                                                                {cust.is_iys_approved && (
+                                                                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-lg text-[8px] font-black uppercase tracking-widest">İYS ONAYLI</span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-xs font-bold text-slate-400 font-mono tracking-wider">{cust.phone}</p>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-3 lg:gap-8 w-full lg:w-auto">
+                                                            <div className="bg-slate-50 px-5 py-3 rounded-2xl border border-slate-100 text-center min-w-[120px]">
+                                                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">SON GELİŞ</p>
+                                                                <p className="text-xs font-black text-slate-900">{cust.last_visit ? new Date(cust.last_visit).toLocaleDateString('tr-TR') : '---'}</p>
+                                                            </div>
+                                                            <div className="bg-slate-50 px-5 py-3 rounded-2xl border border-slate-100 text-center min-w-[100px]">
+                                                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">RANDEVU</p>
+                                                                <p className="text-xs font-black text-slate-900">{cust.appointment_count} Adet</p>
+                                                            </div>
+                                                            <div className="bg-indigo-50 px-5 py-3 rounded-2xl border border-indigo-100 text-center min-w-[120px]">
+                                                                <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-1">TOPLAM CİRO</p>
+                                                                <p className="text-xs font-black text-indigo-600">{(cust.total_spent || 0).toLocaleString('tr-TR')} ₺</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-indigo-50 group-hover:text-indigo-500 transition-all">
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {activeTab === 'customers-marketing' && (
+                                <div className="space-y-6">
+                                    <div className="bg-white p-10 rounded-[3rem] shadow-xl shadow-slate-200/20 border border-slate-100 text-center">
+                                        <div className="w-24 h-24 bg-indigo-50 rounded-[2rem] flex items-center justify-center text-4xl mx-auto mb-6 shadow-inner">📱</div>
+                                        <h3 className="text-2xl font-black text-slate-900 uppercase italic">Pazarlama & SMS Paneli</h3>
+                                        <p className="text-slate-400 mt-2 max-w-lg mx-auto font-medium">Müşterilerinize toplu kampanya mesajları, bayram tebrikleri veya özel indirim kodları gönderin.</p>
+                                        
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
+                                            <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 hover:border-indigo-200 transition-all group">
+                                                <span className="text-3xl mb-4 block group-hover:scale-125 transition-transform">📊</span>
+                                                <h4 className="font-black text-slate-900 text-sm uppercase mb-2">Hedef Kitle Seçimi</h4>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase leading-relaxed">Son 3 ay gelmeyenlere veya belirli tutar üzeri harcama yapanlara odaklanın.</p>
+                                            </div>
+                                            <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 hover:border-indigo-200 transition-all group">
+                                                <span className="text-3xl mb-4 block group-hover:scale-125 transition-transform">📝</span>
+                                                <h4 className="font-black text-slate-900 text-sm uppercase mb-2">İYS Kontrolü</h4>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase leading-relaxed">Mesajlarınız sadece ticari ileti izni olan (İYS onaylı) kişilere ulaşır.</p>
+                                            </div>
+                                            <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 hover:border-indigo-200 transition-all group">
+                                                <span className="text-3xl mb-4 block group-hover:scale-125 transition-transform">🚀</span>
+                                                <h4 className="font-black text-slate-900 text-sm uppercase mb-2">Hızlı Gönderim</h4>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase leading-relaxed">Onayladığınız mesajlar operatör üzerinden anında kuyruğa alınır.</p>
+                                            </div>
+                                        </div>
+
+                                        <button className="mt-12 px-12 py-5 bg-indigo-600 text-white rounded-3xl font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95">
+                                            Yeni Kampanya Oluştur
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'customers-automations' && (
+                                <div className="space-y-6">
+                                    <div className="bg-white p-10 rounded-[3rem] shadow-xl shadow-slate-200/20 border border-slate-100">
+                                        <div className="flex items-center gap-4 mb-8">
+                                            <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-3xl flex items-center justify-center text-3xl shadow-lg shadow-amber-200">🤖</div>
+                                            <div>
+                                                <h3 className="text-2xl font-black text-slate-900 uppercase">Akıllı Otomasyonlar</h3>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Siz uyurken çalışan sadakat sisteminiz</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 flex items-center justify-between group hover:bg-white hover:shadow-xl transition-all cursor-pointer">
+                                                <div className="flex items-center gap-6">
+                                                    <span className="text-3xl">🎨</span>
+                                                    <div>
+                                                        <h4 className="font-black text-slate-900 uppercase text-sm">Boya Tazeleme Hatırlatıcısı</h4>
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">"Boya" işlemi üzerinden 45 gün geçince otomatik SMS gönder.</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase">AKTİF</span>
+                                                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-300 shadow-sm transition-transform group-hover:rotate-12 group-hover:text-indigo-500">+</div>
+                                                </div>
+                                            </div>
+
+                                            <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 flex items-center justify-between group hover:bg-white hover:shadow-xl transition-all cursor-pointer opacity-60">
+                                                <div className="flex items-center gap-6">
+                                                    <span className="text-3xl">🎂</span>
+                                                    <div>
+                                                        <h4 className="font-black text-slate-900 uppercase text-sm">Doğum Günü Kutlaması</h4>
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Müşterilerin doğum günlerinde %20 indirim tanımla ve kutla.</p>
+                                                    </div>
+                                                </div>
+                                                <button className="px-6 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase">ETKİNLEŞTİR</button>
+                                            </div>
+
+                                            <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 flex items-center justify-between group hover:bg-white hover:shadow-xl transition-all cursor-pointer opacity-60">
+                                                <div className="flex items-center gap-6">
+                                                    <span className="text-3xl">💎</span>
+                                                    <div>
+                                                        <h4 className="font-black text-slate-900 uppercase text-sm">VİP Geri Kazanım</h4>
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Son 6 ay gelmeyen VİP müşterilere özel kampanya gönder (5+ randevu olanlar).</p>
+                                                    </div>
+                                                </div>
+                                                <button className="px-6 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase">ETKİNLEŞTİR</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* MÜŞTERİ DETAY MODALI */}
+                    {selectedCustomer && (
+                        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[200] flex items-center justify-center p-4 lg:p-10 animate-fade-in" onClick={() => setSelectedCustomer(null)}>
+                            <div className="bg-white w-full max-w-5xl h-full lg:h-auto lg:max-h-[90vh] rounded-[3rem] shadow-2xl overflow-hidden flex flex-col animate-scale-up" onClick={e => e.stopPropagation()}>
+                                {/* Modal Header */}
+                                <div className="p-8 bg-gradient-to-r from-slate-900 to-indigo-950 text-white relative flex flex-col lg:flex-row gap-8 items-start lg:items-center">
+                                    <div className="w-24 h-24 bg-white/10 backdrop-blur-md rounded-[2rem] flex items-center justify-center text-5xl flex-shrink-0 animate-bounce-subtle">
+                                        {selectedCustomer.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-4 mb-2">
+                                            <h2 className="text-4xl font-black italic">{selectedCustomer.name}</h2>
+                                            <span className="px-3 py-1 bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest">{selectedCustomer.phone}</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-6 text-white/50 text-[11px] font-black uppercase tracking-[0.2em]">
+                                            <span className="flex items-center gap-2 text-indigo-300">📅 SON GELİŞ: {selectedCustomer.last_visit ? new Date(selectedCustomer.last_visit).toLocaleDateString('tr-TR') : 'YOK'}</span>
+                                            <span className="flex items-center gap-2 text-indigo-300">📊 TOPLAM RANDEVU: {selectedCustomer.appointment_count}</span>
+                                            <span className="flex items-center gap-2 text-indigo-300">💰 TOPLAM HARCAMA: {(selectedCustomer.total_spent || 0).toLocaleString('tr-TR')} ₺</span>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setSelectedCustomer(null)} className="absolute top-8 right-8 w-14 h-14 bg-white/10 hover:bg-white/20 rounded-2xl flex items-center justify-center transition-all">
+                                        <span className="text-2xl">✕</span>
+                                    </button>
+                                </div>
+
+                                {/* Modal Body (History Table) */}
+                                <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] mb-8 flex items-center gap-3">
+                                        <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span> Randevu ve İşlem Geçmişi
+                                    </h3>
+
+                                    {!selectedCustomer.appointments || selectedCustomer.appointments.length === 0 ? (
+                                        <div className="text-center py-20 bg-slate-50 rounded-[2.5rem] border border-slate-100 border-dashed">
+                                            <span className="text-4xl mb-4 block">📜</span>
+                                            <p className="text-slate-400 font-bold uppercase text-[10px]">İşlem geçmişi bulunamadı</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            <table className="w-full text-left border-collapse">
+                                                <thead>
+                                                    <tr className="border-b border-slate-100">
+                                                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tarih</th>
+                                                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Hizmet / İşlem</th>
+                                                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Personel</th>
+                                                        <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Ücret</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {selectedCustomer.appointments.map((apt: any) => (
+                                                        <tr key={apt.id} className="group hover:bg-slate-50/50 transition-colors">
+                                                            <td className="px-4 py-6">
+                                                                <p className="text-sm font-black text-slate-900">{new Date(apt.date).toLocaleDateString('tr-TR')}</p>
+                                                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">{apt.time}</p>
+                                                            </td>
+                                                            <td className="px-4 py-6">
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {apt.services?.map((s: any, idx: number) => (
+                                                                        <span key={idx} className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-[9px] font-black uppercase">{s.name}</span>
+                                                                    ))}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-6">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 uppercase">
+                                                                        {apt.staff_name?.charAt(0)}
+                                                                    </div>
+                                                                    <p className="text-xs font-bold text-slate-600">{apt.staff_name}</p>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-6 text-right">
+                                                                <p className="text-sm font-black text-slate-900">{(apt.total_price || 0).toLocaleString('tr-TR')} ₺</p>
+                                                                <span className="text-[8px] font-black px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 uppercase tracking-widest">ÖDENDİ</span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                                    <button onClick={() => setSelectedCustomer(null)} className="px-8 py-4 bg-white border-2 border-slate-200 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all">PENCEREYİ KAPAT</button>
+                                </div>
+                            </div>
                         </div>
                     )}
 
