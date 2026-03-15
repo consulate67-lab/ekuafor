@@ -51,12 +51,39 @@ interface CurrentAccount {
     balance?: number;
 }
 
-type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'finance' | 'ai' | 'reports' | 'profile' | 'integration' | 'voice-assistant';
+type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'finance' | 'ai' | 'reports' | 'profile' | 'integration' | 'voice-assistant' | 
+    'finance-sales-dashboard' | 'finance-sales-reports' | 'finance-sales-list' |
+    'finance-purchases-dashboard' | 'finance-purchases-reports' | 'finance-purchases-list' |
+    'finance-cash-dashboard' | 'finance-cash-reports' | 'finance-cash-list' |
+    'finance-contacts';
 
-const menuItems: { key: TabKey; icon: string; label: string }[] = [
+interface MenuItem {
+    key: TabKey;
+    icon: string;
+    label: string;
+    children?: { key: TabKey; label: string; icon?: string }[];
+}
+
+const menuItems: MenuItem[] = [
     { key: 'home', icon: '🏠', label: 'Ana Sayfa' },
-    { key: 'finance', icon: '💰', label: 'Finans' },
-    { key: 'reports', icon: '📊', label: 'Raporlar' },
+    { 
+        key: 'finance', 
+        icon: '💰', 
+        label: 'Finans',
+        children: [
+            { key: 'finance-sales-dashboard', label: 'Satış Dashboard', icon: '📈' },
+            { key: 'finance-sales-reports', label: 'Satış Raporları', icon: '📊' },
+            { key: 'finance-sales-list', label: 'Satış Faturaları', icon: '📄' },
+            { key: 'finance-purchases-dashboard', label: 'Alış Dashboard', icon: '📉' },
+            { key: 'finance-purchases-reports', label: 'Alış Raporları', icon: '📊' },
+            { key: 'finance-purchases-list', label: 'Alış Faturaları', icon: '🛒' },
+            { key: 'finance-cash-dashboard', label: 'Kasa Dashboard', icon: '🏦' },
+            { key: 'finance-cash-reports', label: 'Kasa Raporları', icon: '📊' },
+            { key: 'finance-cash-list', label: 'Kasa İşlemleri', icon: '💸' },
+            { key: 'finance-contacts', label: 'Cari Kartlar', icon: '👤' },
+        ]
+    },
+    { key: 'reports', icon: '📊', label: 'Genel Raporlar' },
     { key: 'services', icon: '✂️', label: 'Hizmetler' },
     { key: 'profile', icon: '🏢', label: 'Firma Tanıtımı' },
     { key: 'integration', icon: '🔌', label: 'Entegrasyon' },
@@ -156,6 +183,7 @@ export default function CompanyPanel() {
     const [vknCheckResult, setVknCheckResult] = useState<{ vkn: string; isEInvoice: boolean } | null>(null);
     const [lastAIResult, setLastAIResult] = useState<any>(null);
     const [showAIResultModal, setShowAIResultModal] = useState(false);
+    const [expandedMenus, setExpandedMenus] = useState<string[]>(['finance']);
 
     // Native Sync
     useEffect(() => {
@@ -668,7 +696,7 @@ export default function CompanyPanel() {
                 console.warn('Reports tab active but NO token found in localStorage!');
             }
         }
-        if (activeTab === 'finance' && company) fetchFinanceData(company.id);
+        if ((activeTab === 'finance' || activeTab.startsWith('finance-')) && company) fetchFinanceData(company.id);
     }, [activeTab, reportPeriod, company, activeFinanceTab, financeDateRange, financeSearch]);
 
     const fetchData = async (companyId: number) => {
@@ -1106,6 +1134,17 @@ export default function CompanyPanel() {
 
     const switchTab = (tab: TabKey) => {
         setActiveTab(tab);
+        if (tab.startsWith('finance-sales-')) setActiveFinanceTab('sales');
+        else if (tab.startsWith('finance-purchases-')) setActiveFinanceTab('purchases');
+        else if (tab.startsWith('finance-cash-')) setActiveFinanceTab('cash');
+        else if (tab === 'finance-contacts') setActiveFinanceTab('contacts');
+        else if (tab === 'finance') setActiveFinanceTab('sales');
+
+        // Auto-expand parent if child is selected
+        if (tab.startsWith('finance')) {
+            setExpandedMenus(prev => prev.includes('finance') ? prev : [...prev, 'finance']);
+        }
+
         setSidebarOpen(false);
     };
 
@@ -1236,26 +1275,66 @@ export default function CompanyPanel() {
                 </div>
 
                 {/* Menu Items */}
-                <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-                    {menuItems.map(item => (
-                        <button
-                            key={item.key}
-                            onClick={() => switchTab(item.key)}
-                            className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left font-bold text-sm transition-all ${activeTab === item.key
-                                ? 'bg-white/15 text-white shadow-lg shadow-white/5'
-                                : 'text-white/50 hover:text-white/80 hover:bg-white/5'
-                                }`}
-                        >
-                            <span className="text-lg">{item.icon}</span>
-                            <span>{item.label}</span>
-                            {item.key === 'staff' && staffBoards.length > 0 && (
-                                <span className="ml-auto bg-emerald-500/20 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-full">{staffBoards.length}</span>
-                            )}
-                            {item.key === 'dept' && departments.length > 0 && (
-                                <span className="ml-auto bg-indigo-500/20 text-indigo-300 text-[10px] font-black px-2 py-0.5 rounded-full">{departments.length}</span>
-                            )}
-                        </button>
-                    ))}
+                <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
+                    {menuItems.map(item => {
+                        const isExpanded = expandedMenus.includes(item.key);
+                        const hasChildren = item.children && item.children.length > 0;
+                        const isActive = activeTab === item.key || (item.children?.some(c => c.key === activeTab));
+
+                        return (
+                            <div key={item.key} className="space-y-1">
+                                <button
+                                    onClick={() => {
+                                        if (hasChildren) {
+                                            setExpandedMenus(prev => 
+                                                prev.includes(item.key) 
+                                                ? prev.filter(k => k !== item.key) 
+                                                : [...prev, item.key]
+                                            );
+                                        } else {
+                                            switchTab(item.key);
+                                        }
+                                    }}
+                                    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left font-bold text-sm transition-all ${isActive
+                                        ? 'bg-white/15 text-white shadow-lg shadow-white/5'
+                                        : 'text-white/50 hover:text-white/80 hover:bg-white/5'
+                                        }`}
+                                >
+                                    <span className="text-lg">{item.icon}</span>
+                                    <span>{item.label}</span>
+                                    {hasChildren && (
+                                        <svg className={`ml-auto w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    )}
+                                    {item.key === 'staff' && staffBoards.length > 0 && (
+                                        <span className="ml-auto bg-emerald-500/20 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-full">{staffBoards.length}</span>
+                                    )}
+                                    {item.key === 'dept' && departments.length > 0 && (
+                                        <span className="ml-auto bg-indigo-500/20 text-indigo-300 text-[10px] font-black px-2 py-0.5 rounded-full">{departments.length}</span>
+                                    )}
+                                </button>
+                                
+                                {hasChildren && isExpanded && (
+                                    <div className="ml-9 space-y-1 border-l border-white/10 pl-3">
+                                        {item.children?.map(child => (
+                                            <button
+                                                key={child.key}
+                                                onClick={() => switchTab(child.key)}
+                                                className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-left font-bold text-xs transition-all ${activeTab === child.key
+                                                    ? 'bg-white/10 text-white shadow-sm'
+                                                    : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                                                    }`}
+                                            >
+                                                {child.icon ? <span className="text-sm">{child.icon}</span> : <span className="w-1.5 h-1.5 rounded-full bg-current opacity-30" />}
+                                                <span>{child.label}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
                 </nav>
 
                 {/* Sidebar Footer */}
@@ -2625,90 +2704,162 @@ export default function CompanyPanel() {
                     )}
 
                     {/* FINANCE TAB */}
-                    {activeTab === 'finance' && (
+                    {(activeTab === 'finance' || activeTab.startsWith('finance-')) && (
                         <div className="space-y-6">
-                            {/* Sub Tabs */}
-                            <div className="flex bg-white/50 backdrop-blur-sm p-1.5 rounded-2xl border border-slate-100 shadow-sm gap-1 self-start">
-                                {[
-                                    { key: 'sales', label: 'Satışlar (Randevular)', icon: '📈' },
-                                    { key: 'purchases', label: 'Alış Faturaları', icon: '🛒' },
-                                    { key: 'cash', label: 'Kasa İşlemleri', icon: '🏦' },
-                                    { key: 'contacts', label: 'Cari Kartlar', icon: '👤' }
-                                ].map(tab => (
-                                    <button
-                                        key={tab.key}
-                                        onClick={() => setActiveFinanceTab(tab.key as any)}
-                                        className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeFinanceTab === tab.key ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'text-slate-400 hover:bg-slate-50'}`}
-                                    >
-                                        <span>{tab.icon}</span> {tab.label}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {/* Sales Content */}
-                            {/* Shared Finance Filters */}
-                            <div className="bg-white rounded-[2.5rem] p-8 lg:p-10 shadow-xl shadow-slate-200/20 border border-slate-100">
-                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                                    {/* Left: Date Selection (Stacked) */}
-                                    <div className="lg:col-span-4 space-y-4">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className="text-xl">📅</span>
-                                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Tarih Aralığı</label>
-                                        </div>
-                                        <div className="flex flex-col gap-3">
-                                            <div className="relative">
-                                                <input
-                                                    type="date"
-                                                    value={financeDateRange.start}
-                                                    onChange={e => setFinanceDateRange(p => ({ ...p, start: e.target.value }))}
-                                                    className="w-full p-4 px-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 focus:bg-white outline-none transition-all shadow-sm text-slate-700"
-                                                />
-                                            </div>
-                                            <div className="relative">
-                                                <input
-                                                    type="date"
-                                                    value={financeDateRange.end}
-                                                    onChange={e => setFinanceDateRange(p => ({ ...p, end: e.target.value }))}
-                                                    className="w-full p-4 px-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 focus:bg-white outline-none transition-all shadow-sm text-slate-700"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Right: Search & Action (Expanded) */}
-                                    <div className="lg:col-span-8 space-y-6">
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-4">
-                                                <span className="text-xl">🔍</span>
-                                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Müşteri / Açıklama Arama</label>
-                                            </div>
-                                            <div className="relative">
-                                                <input
-                                                    type="text"
-                                                    value={financeSearch}
-                                                    onChange={e => setFinanceSearch(e.target.value)}
-                                                    placeholder="İsim, telefon veya işlem açıklaması yazın..."
-                                                    onKeyDown={e => e.key === 'Enter' && fetchFinanceData(company?.id)}
-                                                    className="w-full p-5 pl-14 bg-slate-50 rounded-[1.5rem] border-2 border-slate-100 font-bold text-base focus:border-indigo-500 focus:bg-white outline-none transition-all shadow-sm text-slate-800 placeholder:text-slate-300"
-                                                />
-                                                <svg className="absolute left-5 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                                </svg>
-                                            </div>
-                                        </div>
-
-                                        <button
-                                            onClick={() => fetchFinanceData(company?.id)}
-                                            className="w-full py-5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-2xl font-black text-sm uppercase tracking-[0.2em] hover:from-indigo-700 hover:to-blue-700 transition-all shadow-xl shadow-indigo-100 active:scale-[0.98] flex items-center justify-center gap-3"
-                                        >
-                                            <span>✨</span> Verileri Getir ve Filtrele
-                                        </button>
-                                    </div>
+                            {/* Finance Header - Breadcrumb-like */}
+                            <div className="flex items-center gap-3 mb-2 px-1">
+                                <span className="text-2xl">💰</span>
+                                <div>
+                                    <h2 className="text-xl font-black text-slate-900 leading-none">Finans Yönetimi</h2>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                        {activeTab.includes('sales') ? 'Satış Faturaları' : 
+                                         activeTab.includes('purchases') ? 'Alış Faturaları' : 
+                                         activeTab.includes('cash') ? 'Kasa İşlemleri' : 'Cari Kartlar'} 
+                                        {activeTab.endsWith('dashboard') ? ' • Dashboard' : 
+                                         activeTab.endsWith('reports') ? ' • Raporlar' : 
+                                         activeTab.endsWith('list') ? ' • Liste' : ''}
+                                    </p>
                                 </div>
                             </div>
 
-                            {/* Sales Content */}
-                            {activeFinanceTab === 'sales' && (
+                            {/* Shared Finance Filters */}
+                            {activeTab !== 'finance-contacts' && (
+                                <div className="bg-white rounded-[2.5rem] p-8 lg:p-10 shadow-xl shadow-slate-200/20 border border-slate-100">
+                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                                        {/* Left: Date Selection (Stacked) */}
+                                        <div className="lg:col-span-4 space-y-4">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="text-xl">📅</span>
+                                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Tarih Aralığı</label>
+                                            </div>
+                                            <div className="flex flex-col gap-3">
+                                                <div className="relative">
+                                                    <input
+                                                        type="date"
+                                                        value={financeDateRange.start}
+                                                        onChange={e => setFinanceDateRange(p => ({ ...p, start: e.target.value }))}
+                                                        className="w-full p-4 px-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 focus:bg-white outline-none transition-all shadow-sm text-slate-700"
+                                                    />
+                                                </div>
+                                                <div className="relative">
+                                                    <input
+                                                        type="date"
+                                                        value={financeDateRange.end}
+                                                        onChange={e => setFinanceDateRange(p => ({ ...p, end: e.target.value }))}
+                                                        className="w-full p-4 px-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 focus:bg-white outline-none transition-all shadow-sm text-slate-700"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Right: Search */}
+                                        <div className="lg:col-span-8 space-y-4">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="text-xl">🔍</span>
+                                                <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">İşlem / Cari / Fatura Ara</label>
+                                            </div>
+                                            <div className="flex gap-3">
+                                                <div className="relative flex-1 group">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Müşteri adı, fatura no veya açıklama yazın..."
+                                                        value={financeSearch}
+                                                        onChange={e => setFinanceSearch(e.target.value)}
+                                                        className="w-full p-4 px-6 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold text-sm focus:border-indigo-500 focus:bg-white outline-none transition-all shadow-sm text-slate-700"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2 mt-2">
+                                                {['Bugün', 'Bu Hafta', 'Bu Ay', 'Bu Yıl'].map(preset => (
+                                                    <button
+                                                        key={preset}
+                                                        onClick={() => {
+                                                            const d = new Date();
+                                                            const end = d.toISOString().split('T')[0];
+                                                            let start = end;
+                                                            if (preset === 'Bu Hafta') { d.setDate(d.getDate() - 7); start = d.toISOString().split('T')[0]; }
+                                                            else if (preset === 'Bu Ay') { d.setMonth(d.getMonth() - 1); start = d.toISOString().split('T')[0]; }
+                                                            else if (preset === 'Bu Yıl') { d.setFullYear(d.getFullYear() - 1); start = d.toISOString().split('T')[0]; }
+                                                            setFinanceDateRange({ start, end });
+                                                        }}
+                                                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                                    >
+                                                        {preset}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Sub Sections Content */}
+
+                            {/* SALES DASHBOARD */}
+                            {activeTab === 'finance-sales-dashboard' && (
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-6 rounded-[2rem] text-white shadow-xl">
+                                            <p className="text-[10px] font-black uppercase opacity-60 tracking-widest">TOPLAM SATIŞ (CIRO)</p>
+                                            <h2 className="text-3xl font-black italic mt-2">
+                                                {(invoices.reduce((sum, inv) => sum + Number(inv.grand_total || inv.amount || 0), 0) + 
+                                                  completedAppointments.reduce((sum, apt) => sum + Number(apt.price || 0), 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                            </h2>
+                                            <p className="text-[8px] mt-2 font-black uppercase opacity-40">Seçili Tarih Aralığı</p>
+                                        </div>
+                                        <div className="bg-white p-6 rounded-[2rem] shadow-xl shadow-slate-200/20 border border-slate-50">
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Faturalandırılan</p>
+                                            <p className="text-3xl font-black text-emerald-600">
+                                                {invoices.reduce((sum, inv) => sum + Number(inv.grand_total || inv.amount || 0), 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                            </p>
+                                            <p className="text-[8px] mt-2 font-black text-slate-300 uppercase">{invoices.length} Fatura</p>
+                                        </div>
+                                        <div className="bg-white p-6 rounded-[2rem] shadow-xl shadow-slate-200/20 border border-slate-50">
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Bekleyen (Faturasız)</p>
+                                            <p className="text-3xl font-black text-amber-500">
+                                                {completedAppointments.reduce((sum, apt) => sum + Number(apt.price || 0), 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                            </p>
+                                            <p className="text-[8px] mt-2 font-black text-slate-300 uppercase">{completedAppointments.length} Randevu</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="bg-white rounded-[2rem] p-8 shadow-xl shadow-slate-200/20 border border-slate-100 flex items-center justify-between">
+                                        <div>
+                                            <h4 className="font-black text-slate-900 text-lg">Hızlı Rapor</h4>
+                                            <p className="text-sm text-slate-400">Bu dönemde ortalama sepet tutarınız: <b>
+                                                {((invoices.reduce((sum, inv) => sum + Number(inv.grand_total || inv.amount || 0), 0) + 
+                                                  completedAppointments.reduce((sum, apt) => sum + Number(apt.price || 0), 0)) / 
+                                                  Math.max(1, invoices.length + completedAppointments.length)).toLocaleString('tr-TR', { maximumFractionDigits: 0 })} ₺
+                                            </b></p>
+                                        </div>
+                                        <button onClick={() => switchTab('finance-sales-reports')} className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">Detaylı Rapor Gör</button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* SALES REPORTS */}
+                            {activeTab === 'finance-sales-reports' && (
+                                <div className="space-y-6">
+                                    <div className="bg-white rounded-[2rem] p-8 shadow-xl shadow-slate-200/20 border border-slate-100 min-h-[400px] flex items-center justify-center flex-col text-center">
+                                        <div className="text-5xl mb-4">📊</div>
+                                        <h3 className="text-xl font-black text-slate-900">Satış Analizi</h3>
+                                        <p className="text-slate-400 mt-2 max-w-sm">Dönemsel satış grafikleri ve personel bazlı performans raporları burada hazırlanıyor.</p>
+                                        <div className="mt-8 flex gap-3">
+                                            <div className="px-6 py-4 bg-slate-50 rounded-2xl text-center">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase mb-1">En Çok Satan</p>
+                                                <p className="font-bold text-slate-900">---</p>
+                                            </div>
+                                            <div className="px-6 py-4 bg-slate-50 rounded-2xl text-center">
+                                                <p className="text-[10px] font-black text-slate-400 uppercase mb-1">En Yoğun Gün</p>
+                                                <p className="font-bold text-slate-900">Cumartesi</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Sales Content (LIST) */}
+                            {(activeTab === 'finance-sales-list' || activeTab === 'finance') && (
                                 <div className="space-y-6">
                                     {/* Sub Tabs: Bekleyen / Faturalar */}
                                     <div className="flex bg-slate-100/80 p-1.5 rounded-2xl gap-1.5 self-start shadow-inner">
@@ -2926,7 +3077,38 @@ export default function CompanyPanel() {
                             )}
 
                             {/* Purchases Content */}
-                            {activeFinanceTab === 'purchases' && (
+                            {/* PURCHASES DASHBOARD */}
+                            {activeTab === 'finance-purchases-dashboard' && (
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="bg-slate-900 p-8 rounded-[2rem] text-white shadow-xl">
+                                            <p className="text-[10px] font-black uppercase opacity-60 tracking-widest">TOPLAM ALIŞ</p>
+                                            <h2 className="text-4xl font-black italic mt-2">
+                                                {purchaseInvoices.reduce((sum, p) => sum + parseFloat(p.amount), 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                            </h2>
+                                            <p className="text-[8px] mt-2 font-black uppercase opacity-40">Seçili Tarih Aralığı</p>
+                                        </div>
+                                        <div className="bg-white p-8 rounded-[2rem] shadow-xl shadow-slate-200/20 border border-slate-100 flex flex-col justify-center">
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Girdi Sayısı</p>
+                                            <p className="text-3xl font-black text-slate-900">{purchaseInvoices.length} Fatura / İşlem</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* PURCHASES REPORTS */}
+                            {activeTab === 'finance-purchases-reports' && (
+                                <div className="space-y-6">
+                                    <div className="bg-white rounded-[2rem] p-8 shadow-xl shadow-slate-200/20 border border-slate-100 min-h-[400px] flex items-center justify-center flex-col text-center">
+                                        <div className="text-5xl mb-4">📊</div>
+                                        <h3 className="text-xl font-black text-slate-900">Alış ve Gider Raporları</h3>
+                                        <p className="text-slate-400 mt-2 max-w-sm">Tedarikçi bazlı harcamalar ve kategori dağılımları burada analiz edilir.</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Purchases Content (LIST) */}
+                            {activeTab === 'finance-purchases-list' && (
                                 <div className="space-y-6">
                                     <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-slate-50 shadow-sm">
                                         <h3 className="font-black text-slate-900 uppercase text-xs tracking-widest">Alış Faturaları</h3>
@@ -2963,7 +3145,8 @@ export default function CompanyPanel() {
                             )}
 
                             {/* Cash Content */}
-                            {activeFinanceTab === 'cash' && (
+                            {/* CASH DASHBOARD */}
+                            {activeTab === 'finance-cash-dashboard' && (
                                 <div className="space-y-6">
                                     {/* Devir Alanı */}
                                     <div className="bg-white/60 backdrop-blur-md p-5 rounded-3xl border border-white/50 flex items-center justify-between mb-2 shadow-sm">
@@ -3006,6 +3189,26 @@ export default function CompanyPanel() {
                                             <p className="text-[8px] mt-2 font-black uppercase tracking-widest text-indigo-400">Devir + Dönem İçi Net</p>
                                         </div>
                                     </div>
+                                    <div className="bg-white rounded-[2rem] p-8 shadow-xl shadow-slate-200/20 border border-slate-100 text-center">
+                                         <p className="text-slate-400 text-sm">Finansal durumunuz seçili tarih aralığına göre <b>{openingBalance + cashTransactions.reduce((sum, t) => sum + (t.type === 'income' ? (Number(t.debit) || Number(t.amount)) : -(Number(t.credit) || Number(t.amount))), 0) >= 0 ? 'POZİTİF' : 'NEGATİF'}</b> seyrediyor.</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* CASH REPORTS */}
+                            {activeTab === 'finance-cash-reports' && (
+                                <div className="space-y-6">
+                                    <div className="bg-white rounded-[2rem] p-8 shadow-xl shadow-slate-200/20 border border-slate-100 min-h-[400px] flex items-center justify-center flex-col text-center">
+                                        <div className="text-5xl mb-4">📊</div>
+                                        <h3 className="text-xl font-black text-slate-900">Nakit Akış Raporu</h3>
+                                        <p className="text-slate-400 mt-2 max-w-sm">Günlük, haftalık ve aylık nakit giriş-çıkış trendleri burada görselleştirilir.</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Cash Content (LIST) */}
+                            {activeTab === 'finance-cash-list' && (
+                                <div className="space-y-6">
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => setShowCashModal(true)}
@@ -3063,7 +3266,8 @@ export default function CompanyPanel() {
                             )}
 
                             {/* Current Accounts Content */}
-                            {activeFinanceTab === 'contacts' && (
+                            {/* CURRENT ACCOUNTS (CONTACTS) */}
+                            {activeTab === 'finance-contacts' && (
                                 <div className="space-y-6">
                                     <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-slate-50 shadow-sm">
                                         <h3 className="font-black text-slate-900 uppercase text-xs tracking-widest">Cari Kartlar (Müşteri/Tedarikçi)</h3>
