@@ -55,7 +55,8 @@ type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'finan
     'finance-sales-dashboard' | 'finance-sales-reports' | 'finance-sales-list' |
     'finance-purchases-dashboard' | 'finance-purchases-reports' | 'finance-purchases-list' |
     'finance-cash-dashboard' | 'finance-cash-reports' | 'finance-cash-list' |
-    'finance-contacts';
+    'finance-contacts' | 'finance-contacts-balance' |
+    'header-invoices' | 'header-cash' | 'header-contacts';
 
 interface MenuItem {
     key: TabKey;
@@ -71,16 +72,23 @@ const menuItems: MenuItem[] = [
         icon: '💰', 
         label: 'Finans',
         children: [
-            { key: 'finance-sales-dashboard', label: 'Satış Dashboard', icon: '📈' },
+            // Fatura Grubu
+            { key: 'header-invoices', label: '📄 FATURALAR', icon: '' },
+            { key: 'finance-sales-list', label: 'Satış Faturaları', icon: '📈' },
             { key: 'finance-sales-reports', label: 'Satış Raporları', icon: '📊' },
-            { key: 'finance-sales-list', label: 'Satış Faturaları', icon: '📄' },
-            { key: 'finance-purchases-dashboard', label: 'Alış Dashboard', icon: '📉' },
+            { key: 'finance-purchases-list', label: 'Alış Faturaları', icon: '📉' },
             { key: 'finance-purchases-reports', label: 'Alış Raporları', icon: '📊' },
-            { key: 'finance-purchases-list', label: 'Alış Faturaları', icon: '🛒' },
-            { key: 'finance-cash-dashboard', label: 'Kasa Dashboard', icon: '🏦' },
-            { key: 'finance-cash-reports', label: 'Kasa Raporları', icon: '📊' },
+            
+            // Kasa Grubu
+            { key: 'header-cash', label: '🏦 KASA', icon: '' },
+            { key: 'finance-cash-dashboard', label: 'Kasa Dashboard', icon: '📊' },
             { key: 'finance-cash-list', label: 'Kasa İşlemleri', icon: '💸' },
-            { key: 'finance-contacts', label: 'Cari Kartlar', icon: '👤' },
+            { key: 'finance-cash-reports', label: 'Kasa Raporları', icon: '📋' },
+
+            // Cari Grubu
+            { key: 'header-contacts', label: '👤 CARİLER', icon: '' },
+            { key: 'finance-contacts', label: 'Cari Kartlar', icon: '📇' },
+            { key: 'finance-contacts-balance', label: 'Toplu Bakiye Raporu', icon: '⚖️' },
         ]
     },
     { key: 'reports', icon: '📊', label: 'Genel Raporlar' },
@@ -163,7 +171,7 @@ export default function CompanyPanel() {
     const [loadingReport, setLoadingReport] = useState(false);
 
     // Finance states
-    const [activeFinanceTab, setActiveFinanceTab] = useState<'sales' | 'purchases' | 'cash' | 'contacts'>('sales');
+    const [activeFinanceTab, setActiveFinanceTab] = useState<'sales' | 'purchases' | 'cash' | 'contacts' | 'balance'>('sales');
     const [financeDateRange, setFinanceDateRange] = useState({
         start: new Date().toISOString().split('T')[0],
         end: new Date().toISOString().split('T')[0]
@@ -177,6 +185,7 @@ export default function CompanyPanel() {
     const [openingBalance, setOpeningBalance] = useState(0);
     const [purchaseInvoices, setPurchaseInvoices] = useState<any[]>([]);
     const [invoices, setInvoices] = useState<any[]>([]);
+    const [contactsBalance, setContactsBalance] = useState<any[]>([]);
     const [salesSubTab, setSalesSubTab] = useState<'pending' | 'invoiced'>('pending');
     const [showPurchaseModal, setShowPurchaseModal] = useState(false);
     const [showCashModal, setShowCashModal] = useState(false);
@@ -403,6 +412,32 @@ export default function CompanyPanel() {
                 });
                 if (res.data.success) {
                     setCurrentAccounts(res.data.data);
+                }
+            } else if (activeFinanceTab === 'balance') {
+                try {
+                    const res = await api.get('/finance/reports/current-accounts-balance', {
+                        params: { 
+                            startDate: financeDateRange.start, 
+                            endDate: financeDateRange.end, 
+                            search: financeSearch 
+                        }
+                    });
+                    if (res.data.success) {
+                        setContactsBalance(res.data.data);
+                    }
+                } catch (reportErr) {
+                    // Fallback
+                    const res = await api.get('/finance/current-accounts', {
+                        params: { search: financeSearch }
+                    });
+                    if (res.data.success) {
+                        setContactsBalance(res.data.data.map((c: any) => ({
+                            ...c,
+                            carried_balance: 0,
+                            period_debit: c.balance > 0 ? c.balance : 0,
+                            period_credit: c.balance < 0 ? Math.abs(c.balance) : 0
+                        })));
+                    }
                 }
             }
         } catch (err) {
@@ -1137,7 +1172,7 @@ export default function CompanyPanel() {
         
         // Handle parent menu selection
         if (tab === 'finance') {
-            targetTab = 'finance-sales-dashboard';
+            targetTab = 'finance-sales-list';
         }
         
         setActiveTab(targetTab);
@@ -1147,9 +1182,12 @@ export default function CompanyPanel() {
             if (targetTab === 'home') fetchData(company.id);
             else if (targetTab === 'reports') fetchReports(reportPeriod);
             else if (targetTab.startsWith('finance')) {
-                const fTab = targetTab.includes('sales') ? 'sales' : 
-                             targetTab.includes('purchases') ? 'purchases' : 
-                             targetTab.includes('cash') ? 'cash' : 'contacts';
+                let fTab: 'sales' | 'purchases' | 'cash' | 'contacts' | 'balance' = 'sales';
+                if (targetTab.includes('purchases')) fTab = 'purchases';
+                else if (targetTab.includes('cash')) fTab = 'cash';
+                else if (targetTab.includes('balance')) fTab = 'balance';
+                else if (targetTab === 'finance-contacts') fTab = 'contacts';
+                
                 setActiveFinanceTab(fTab);
                 setExpandedMenus(prev => prev.includes('finance') ? prev : [...prev, 'finance']);
                 fetchFinanceData(company.id);
@@ -1332,19 +1370,28 @@ export default function CompanyPanel() {
                                 
                                 {hasChildren && isExpanded && (
                                     <div className="ml-9 space-y-1 border-l border-white/10 pl-3">
-                                        {item.children?.map(child => (
-                                            <button
-                                                key={child.key}
-                                                onClick={() => switchTab(child.key)}
-                                                className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-left font-bold text-xs transition-all ${activeTab === child.key
-                                                    ? 'bg-white/10 text-white shadow-sm'
-                                                    : 'text-white/40 hover:text-white/70 hover:bg-white/5'
-                                                    }`}
-                                            >
-                                                {child.icon ? <span className="text-sm">{child.icon}</span> : <span className="w-1.5 h-1.5 rounded-full bg-current opacity-30" />}
-                                                <span>{child.label}</span>
-                                            </button>
-                                        ))}
+                                        {item.children?.map(child => {
+                                            if (child.key.startsWith('header-')) {
+                                                return (
+                                                    <div key={child.key} className="px-4 pt-4 pb-1">
+                                                        <span className="text-[10px] font-black text-indigo-400/50 uppercase tracking-[0.2em]">{child.label}</span>
+                                                    </div>
+                                                );
+                                            }
+                                            return (
+                                                <button
+                                                    key={child.key}
+                                                    onClick={() => switchTab(child.key)}
+                                                    className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-left font-bold text-xs transition-all ${activeTab === child.key
+                                                        ? 'bg-white/10 text-white shadow-sm'
+                                                        : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                                                        }`}
+                                                >
+                                                    {child.icon ? <span className="text-sm">{child.icon}</span> : <span className="w-1.5 h-1.5 rounded-full bg-current opacity-30" />}
+                                                    <span>{child.label}</span>
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
@@ -3392,6 +3439,94 @@ export default function CompanyPanel() {
                                                 </div>
                                             ))
                                         )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* CURRENT ACCOUNTS BALANCE REPORT */}
+                            {activeTab === 'finance-contacts-balance' && (
+                                <div className="space-y-6">
+                                    <div className="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/20 border border-slate-100 overflow-hidden">
+                                        <div className="flex justify-between items-center mb-10 pb-6 border-b border-indigo-50/50">
+                                            <div>
+                                                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Toplu Cari Bakiye Raporu</h3>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Cari kartlarınızın borç, alacak ve güncel bakiye durumları</p>
+                                            </div>
+                                            <button 
+                                                onClick={() => window.print()}
+                                                className="px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200"
+                                            >
+                                                🖨️ RAPORU YAZDIR
+                                            </button>
+                                        </div>
+
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left border-collapse">
+                                                <thead>
+                                                    <tr className="bg-slate-50">
+                                                        <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest rounded-tl-3xl">Cari Kod</th>
+                                                        <th className="px-6 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest">Ünvan / Tanım</th>
+                                                        {financeDateRange.start && (
+                                                            <th className="px-6 py-5 text-[11px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50/30">Devreden Bakiye</th>
+                                                        )}
+                                                        <th className="px-6 py-5 text-[11px] font-black text-emerald-600 uppercase tracking-widest">Borç (Hizmet/Satış)</th>
+                                                        <th className="px-6 py-5 text-[11px] font-black text-red-600 uppercase tracking-widest">Alacak (Ödeme/Alış)</th>
+                                                        <th className="px-6 py-5 text-[11px] font-black text-slate-900 uppercase tracking-widest rounded-tr-3xl text-right">Güncel Bakiye</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {(contactsBalance.length > 0 ? contactsBalance : currentAccounts).map(c => {
+                                                        const carried = Number(c.carried_balance) || 0;
+                                                        const debit = Number(c.period_debit) || (Number(c.balance) > 0 ? Number(c.balance) : 0);
+                                                        const credit = Number(c.period_credit) || (Number(c.balance) < 0 ? Math.abs(Number(c.balance)) : 0);
+                                                        const net = Number(c.balance) ?? (carried + debit - credit);
+
+                                                        return (
+                                                            <tr key={c.id} className="hover:bg-slate-50 transition-colors group">
+                                                                <td className="px-6 py-5 text-xs font-bold text-slate-400 group-hover:text-slate-900 transition-colors font-mono">{c.code || `C-${c.id}`}</td>
+                                                                <td className="px-6 py-5">
+                                                                    <p className="text-sm font-black text-slate-900 leading-tight">{c.name}</p>
+                                                                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">{c.type === 'CUSTOMER' ? '👤 Müşteri' : '🏬 Tedarikçi'}</p>
+                                                                </td>
+                                                                {financeDateRange.start && (
+                                                                    <td className="px-6 py-5 bg-indigo-50/10">
+                                                                        <span className={`text-sm font-black ${carried > 0 ? 'text-emerald-600' : carried < 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                                                                            {carried.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                                                        </span>
+                                                                    </td>
+                                                                )}
+                                                                <td className="px-6 py-5 text-sm font-black text-emerald-600">{debit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</td>
+                                                                <td className="px-6 py-5 text-sm font-black text-red-600">{credit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</td>
+                                                                <td className="px-6 py-5 text-right">
+                                                                    <span className={`px-4 py-2 rounded-xl text-xs font-black inline-block min-w-[100px] ${net > 0 ? 'bg-emerald-50 text-emerald-600 shadow-sm shadow-emerald-100' : net < 0 ? 'bg-red-50 text-red-600 shadow-sm shadow-red-100' : 'bg-slate-50 text-slate-400'}`}>
+                                                                        {net.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                                <tfoot>
+                                                    <tr className="bg-slate-900 text-white font-black text-sm uppercase">
+                                                        <td colSpan={2} className="px-6 py-6 rounded-bl-3xl">TOPLAM</td>
+                                                        {financeDateRange.start && (
+                                                            <td className="px-6 py-6 text-indigo-300">
+                                                                {contactsBalance.reduce((sum, c) => sum + (Number(c.carried_balance) || 0), 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                                            </td>
+                                                        )}
+                                                        <td className="px-6 py-6 text-emerald-400">
+                                                            {contactsBalance.reduce((sum, c) => sum + (Number(c.period_debit) || (Number(c.balance) > 0 ? Number(c.balance) : 0)), 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                                        </td>
+                                                        <td className="px-6 py-6 text-red-400">
+                                                            {contactsBalance.reduce((sum, c) => sum + (Number(c.period_credit) || (Number(c.balance) < 0 ? Math.abs(Number(c.balance)) : 0)), 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                                        </td>
+                                                        <td className="px-6 py-6 text-right rounded-br-3xl">
+                                                            {contactsBalance.reduce((sum, c) => sum + (Number(c.balance) || 0), 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                                        </td>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
                             )}
