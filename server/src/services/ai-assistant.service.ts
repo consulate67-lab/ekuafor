@@ -40,21 +40,22 @@ class AIAssistantService {
             const prompt = `
             Aşağıdaki metin bir kuaför dükkanındaki çalışan ile müşterisi arasındaki telefon görüşmesinin bir kısmıdır.
             Bu metinden randevu bilgilerini ayıkla ve JSON formatında döndür.
-            Eğer bir bilgi metinde yoksa "null" bırak.
             
-            ${rules ? `ÖNEMLİ ÖZEL KURALLAR:
+            ${rules ? `ÖNEMLİ ÖZEL KURALLAR VE ANAHTAR KELİMELER:
             ${rules}
-            ` : ''}
+            
+            Eğer yukarıdaki kurallarda belirtilen özel anahtar kelimeler (hizmet adları, zaman ifadeleri vb.) metinde geçiyorsa, bunları kesinlikle dikkate alarak randevu oluşturma niyetini doğrula.` : ''}
 
             Gerekli alanlar:
-            - customerName: Müşterinin ismi
+            - customerName: Müşterinin ismi (Metinden çıkarılamıyorsa "Bilinmeyen Müşteri" yazabilirsin)
             - serviceName: İstenen hizmet (saç kesimi, boya, fön vb.)
-            - date: Randevu tarihi (YIL-AY-GÜN formatında veya 'yarın', 'salı' gibi metin)
-            - time: Randevu saati (SAAT:DAKİKA formatında)
-            - note: Diğer önemli notlar
+            - date: Randevu tarihi (YIL-AY-GÜN formatında. 'yarın', 'bugün', 'çarşamba' gibi ifadeleri bugün: ${new Date().toISOString().split('T')[0]} tarihine göre gerçek tarihe çevir)
+            - time: Randevu saati (SAAT:DAKİKA formatında, 24 saatlik sistem)
+            - note: Diğer önemli notlar (varsa sakal, yıkama gibi ek detaylar)
             
             Metin: "${text}"
             
+            Eğer metinde belirgin bir randevu niyeti yoksa tüm alanları "null" döndürebilirsin.
             Cevabı sadece saf JSON olarak ver. Örnek:
             {
                 "customerName": "Mehmet",
