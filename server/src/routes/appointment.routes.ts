@@ -449,4 +449,82 @@ router.get('/company/:companyId/customers-crm', authMiddleware, async (req: Requ
     }
 });
 
+// CRM: Manuel bildirim gönder (Push/SMS)
+router.post('/company/:companyId/send-customer-message', authMiddleware, async (req: Request, res: Response) => {
+    try {
+        const companyId = parseInt(req.params.companyId);
+        const { phone: rawPhone, message, type } = req.body; // type: 'push' | 'sms'
+        const { normalizePhone } = require('../utils/phone');
+        const phone = normalizePhone(rawPhone);
+
+        if (type === 'push') {
+            const pushService = require('../services/push.service').default;
+            const token = await pushService.getPushTokenByPhone(phone);
+            if (!token) return res.status(404).json({ success: false, error: 'Müşterinin push tokeni bulunamadı. Lütfen App kullanıp kullanmadığını kontrol edin.' });
+            
+            await pushService.sendNotification(token, 'Yeni Mesaj', message, { type: 'manual' }, phone);
+        } else if (type === 'sms') {
+            const smsService = require('../services/sms.service').default;
+            await smsService.sendSms(companyId, phone, message);
+        }
+
+        res.json({ success: true, message: 'Mesaj başarıyla gönderildi' });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 export default router;
+
+// CRM: Otomasyon kurallarını getir
+router.get('/company/:companyId/automation-rules', authMiddleware, async (req: Request, res: Response) => {
+    try {
+        const companyId = parseInt(req.params.companyId);
+        if (req.user?.companyId !== companyId && req.user?.role !== 'super_admin') {
+            return res.status(403).json({ success: false, error: 'Yetkisiz' });
+        }
+        const rules = await appointmentService.getAutomationRules(companyId);
+        res.json({ success: true, data: rules });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Kurallar yüklenemedi' });
+    }
+});
+
+// CRM: Yeni otomasyon kuralı oluştur
+router.post('/company/:companyId/automation-rules', authMiddleware, async (req: Request, res: Response) => {
+    try {
+        const companyId = parseInt(req.params.companyId);
+        if (req.user?.companyId !== companyId && req.user?.role !== 'super_admin') {
+            return res.status(403).json({ success: false, error: 'Yetkisiz' });
+        }
+        const rule = await appointmentService.createAutomationRule(companyId, req.body);
+        res.json({ success: true, data: rule });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Kural oluşturulamadı' });
+    }
+});
+
+// CRM: Otomasyon kuralı güncelle
+router.patch('/automation-rules/:id', authMiddleware, async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id);
+        const rule = await appointmentService.updateAutomationRule(id, req.body);
+        res.json({ success: true, data: rule });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Kural güncellenemedi' });
+    }
+});
+
+// CRM: Müşteri kartı güncelle/sync
+router.post('/company/:companyId/customers-sync', authMiddleware, async (req: Request, res: Response) => {
+    try {
+        const companyId = parseInt(req.params.companyId);
+        if (req.user?.companyId !== companyId && req.user?.role !== 'super_admin') {
+            return res.status(403).json({ success: false, error: 'Yetkisiz' });
+        }
+        const customer = await appointmentService.syncCustomer(companyId, req.body);
+        res.json({ success: true, data: customer });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Müşteri güncellenemedi' });
+    }
+});

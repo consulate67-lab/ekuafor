@@ -1,6 +1,7 @@
 import pool from '../config/database';
 import smsService from './sms.service';
 import redis from '../config/redis';
+import { normalizePhone, formatPhoneWithSpaces } from '../utils/phone';
 
 export interface Appointment {
     id?: number;
@@ -42,6 +43,11 @@ class AppointmentService {
     }
 
     async createAppointment(appointment: Appointment): Promise<Appointment> {
+        // Normalize customer phone
+        if (appointment.customer_phone) {
+            appointment.customer_phone = normalizePhone(appointment.customer_phone);
+        }
+
         // Fetch package details if provided to get correct defaults
         let pkg: any = null;
         if (appointment.package_id) {
@@ -800,14 +806,28 @@ class AppointmentService {
     }
 
     async getCustomersCRM(companyId: number, search?: string): Promise<any[]> {
-        let query = `
+        let whereClause = "WHERE a.company_id = $1 AND a.customer_phone IS NOT NULL AND a.customer_phone != ''";
+        let params: any[] = [companyId];
+
+        if (search) {
+            whereClause += " AND (a.customer_phone ILIKE $2 OR a.customer_name ILIKE $2 OR c.email ILIKE $2)";
+            params.push(`%${search}%`);
+        }
+
+        const query = `
             SELECT 
                 a.customer_phone as phone,
-                (array_agg(a.customer_name ORDER BY a.appointment_date DESC, a.start_time DESC))[1] as name,
+                COALESCE(c.name, (
+                    SELECT customer_name FROM appointments 
+                    WHERE customer_phone = a.customer_phone AND company_id = $1 
+                    ORDER BY appointment_date DESC, start_time DESC LIMIT 1
+                )) as name,
+                c.email,
+                c.notes,
+                c.is_iys_approved,
                 MAX(a.appointment_date) as last_visit,
                 COUNT(a.id) as appointment_count,
                 SUM(COALESCE(a.price, 0))::float as total_spent,
-                FALSE as is_iys_approved,
                 json_agg(json_build_object(
                     'id', a.id,
                     'date', a.appointment_date,
@@ -816,35 +836,71 @@ class AppointmentService {
                     'total_price', a.price,
                     'staff_name', st.first_name || ' ' || st.last_name,
                     'services', (
-                        SELECT json_agg(json_build_object('name', s.name))
-                        FROM appointment_services aps
-                        JOIN services s ON aps.service_id = s.id
-                        WHERE aps.appointment_id = a.id
+                        SELECT json_agg(json_build_object('name', ser.name))
+                        FROM appointment_services aser
+                        JOIN services ser ON ser.id = aser.service_id
+                        WHERE aser.appointment_id = a.id
                     )
                 ) ORDER BY a.appointment_date DESC, a.start_time DESC) as appointments
             FROM appointments a
             LEFT JOIN users st ON a.staff_id = st.id
-            WHERE a.company_id = $1 AND a.customer_phone IS NOT NULL AND a.customer_phone != ''
-        `;
-        const values: any[] = [companyId];
-
-        if (search) {
-            query += ` AND (a.customer_phone LIKE $2 OR a.customer_name ILIKE $2)`;
-            values.push(`%${search}%`);
-        }
-
-        query += `
-            GROUP BY a.customer_phone
-            ORDER BY MAX(a.appointment_date) DESC, MAX(a.start_time) DESC
+            LEFT JOIN customers c ON c.phone = a.customer_phone AND c.company_id = a.company_id
+            ${whereClause}
+            GROUP BY a.customer_phone, c.name, c.email, c.notes, c.is_iys_approved, c.id
+            ORDER BY last_visit DESC
         `;
 
-        try {
-            const result = await pool.query(query, values);
-            return result.rows;
-        } catch (err) {
-            console.error('[Service] getCustomersCRM Error:', err);
-            throw err;
-        }
+        const result = await pool.query(query, params);
+        return result.rows.map(row => ({
+            ...row,
+            phone: formatPhoneWithSpaces(row.phone)
+        }));
+    }
+
+    async syncCustomer(companyId: number, data: any) {
+        const { phone, name, email, notes, is_iys_approved } = data;
+        const normalizedPhone = normalizePhone(phone);
+        
+        const query = `
+            INSERT INTO customers (company_id, phone, name, email, notes, is_iys_approved)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (company_id, phone) DO UPDATE SET
+                name = EXCLUDED.name,
+                email = EXCLUDED.email,
+                notes = EXCLUDED.notes,
+                is_iys_approved = EXCLUDED.is_iys_approved,
+                updated_at = NOW()
+            RETURNING *
+        `;
+        const result = await pool.query(query, [companyId, normalizedPhone, name, email, notes, is_iys_approved]);
+        return result.rows[0];
+    }
+
+    async getAutomationRules(companyId: number) {
+        const query = `SELECT * FROM automation_rules WHERE company_id = $1 ORDER BY created_at DESC`;
+        const result = await pool.query(query, [companyId]);
+        return result.rows;
+    }
+
+    async createAutomationRule(companyId: number, data: any) {
+        const { name, schedule_type, schedule_days, sql_script, action_type, message_template } = data;
+        const query = `
+            INSERT INTO automation_rules (company_id, name, schedule_type, schedule_days, sql_script, action_type, message_template)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING *
+        `;
+        const result = await pool.query(query, [companyId, name, schedule_type, schedule_days, sql_script, action_type, message_template]);
+        return result.rows[0];
+    }
+
+    async updateAutomationRule(id: number, data: any) {
+        const fields = Object.keys(data).filter(f => ['name', 'schedule_type', 'schedule_days', 'sql_script', 'action_type', 'is_active', 'message_template'].includes(f));
+        const values = fields.map(f => data[f]);
+        const setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(', ');
+
+        const query = `UPDATE automation_rules SET ${setClause}, updated_at = NOW() WHERE id = $1 RETURNING *`;
+        const result = await pool.query(query, [id, ...values]);
+        return result.rows[0];
     }
 }
 

@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import pool from '../config/database';
 import reportService from './report.service';
 import mailService from './mail.service';
+import automationService from './automation.service';
 
 class CronService {
     init() {
@@ -9,8 +10,9 @@ class CronService {
 
         // At 23:00 (11 PM) every day
         cron.schedule('0 23 * * *', async () => {
-            console.log('📊 Starting daily report generation...');
+            console.log('📊 Starting daily tasks...');
             await this.generateAndSendDailyReports();
+            await automationService.runAutomations();
         });
     }
 

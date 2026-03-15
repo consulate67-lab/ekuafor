@@ -22,7 +22,7 @@ const pool = new Pool({
     ssl: (process.env.DATABASE_URL || isProduction) ? { rejectUnauthorized: false } : false,
     max: 20,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000, // Increased timeout
+    connectionTimeoutMillis: 30000, // Increased timeout to 30s for Railway
 });
 
 pool.on('connect', () => {

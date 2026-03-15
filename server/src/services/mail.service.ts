@@ -18,6 +18,10 @@ class MailService {
     }
 
     async sendReportEmail(to: string, companyName: string, reportHtml: string) {
+        return this.sendEmail(to, `📊 Günlük Performans Raporu - ${companyName}`, reportHtml);
+    }
+
+    async sendEmail(to: string, subject: string, html: string) {
         try {
             if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
                 console.warn('[MailService] SMTP credentials missing. Skipping email.');
@@ -25,10 +29,10 @@ class MailService {
             }
 
             const info = await this.transporter.sendMail({
-                from: `"Salon Cebinde Management" <${process.env.SMTP_USER}>`,
+                from: `"Salon Cebinde" <${process.env.SMTP_USER}>`,
                 to: to,
-                subject: `📊 Günlük Performans Raporu - ${companyName}`,
-                html: reportHtml,
+                subject: subject,
+                html: html,
             });
 
             console.log(`[MailService] Email sent to ${to}: ${info.messageId}`);

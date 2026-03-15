@@ -10,6 +10,23 @@ interface AIAssistantPlugin {
 
 const AIAssistant = registerPlugin<AIAssistantPlugin>('AIAssistant');
 
+// Telefon formatlama yardımcıları
+const normalizePhone = (phone: string | null | undefined): string => {
+    if (!phone) return '';
+    let cleaned = phone.replace(/\D/g, '');
+    if (cleaned.startsWith('90') && cleaned.length > 10) cleaned = cleaned.substring(2);
+    else if (cleaned.startsWith('0') && cleaned.length === 11) cleaned = cleaned.substring(1);
+    if (cleaned.length > 10 && cleaned.startsWith('90')) cleaned = cleaned.substring(2);
+    if (cleaned.length > 10) cleaned = cleaned.slice(-10);
+    return cleaned;
+};
+
+const formatPhoneWithSpaces = (phone: string | null | undefined): string => {
+    const normalized = normalizePhone(phone);
+    if (!normalized || normalized.length !== 10) return phone || '';
+    return `+90 ${normalized.substring(0, 3)} ${normalized.substring(3, 6)} ${normalized.substring(6, 8)} ${normalized.substring(8, 10)}`;
+};
+
 interface Department {
     id: number;
     company_id: number;
@@ -202,6 +219,10 @@ export default function CompanyPanel() {
     const [invoices, setInvoices] = useState<any[]>([]);
     const [contactsBalance, setContactsBalance] = useState<any[]>([]);
     const [salesSubTab, setSalesSubTab] = useState<'pending' | 'invoiced'>('pending');
+    const [automationRules, setAutomationRules] = useState<any[]>([]);
+    const [showAutomationModal, setShowAutomationModal] = useState(false);
+    const [editingRule, setEditingRule] = useState<any>(null);
+    const [loadingRules, setLoadingRules] = useState(false);
     const [showPurchaseModal, setShowPurchaseModal] = useState(false);
     const [showCashModal, setShowCashModal] = useState(false);
     const [vknCheckResult, setVknCheckResult] = useState<{ vkn: string; isEInvoice: boolean } | null>(null);
@@ -477,6 +498,22 @@ export default function CompanyPanel() {
             console.error('Müşteri verisi yüklenemedi:', err);
         } finally {
             setLoadingCustomers(false);
+        }
+    };
+
+    const fetchAutomationRules = async (cid?: number) => {
+        const targetCid = cid || company?.id;
+        if (!targetCid) return;
+        setLoadingRules(true);
+        try {
+            const res = await api.get(`/appointments/company/${targetCid}/automation-rules`);
+            if (res.data.success) {
+                setAutomationRules(res.data.data || []);
+            }
+        } catch (err) {
+            console.error('Otomasyon kuralları yüklenemedi:', err);
+        } finally {
+            setLoadingRules(false);
         }
     };
 
@@ -1230,6 +1267,12 @@ export default function CompanyPanel() {
             else if (targetTab.startsWith('customers')) {
                 fetchCustomersData(company.id);
             }
+            else if (targetTab === 'customers-automations') {
+                fetchAutomationRules(company.id);
+            }
+            else if (targetTab === 'crm') {
+                fetchCustomersData(company.id);
+            }
             // For other tabs (staff, dept, services), fetchData(company.id) covers all of them
             else if (['staff', 'dept', 'services'].includes(targetTab)) {
                 fetchData(company.id);
@@ -1699,6 +1742,7 @@ export default function CompanyPanel() {
                                                 className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
                                                 value={company.phone || ''}
                                                 onChange={e => setCompany({ ...company, phone: e.target.value })}
+                                                onBlur={e => setCompany({ ...company, phone: formatPhoneWithSpaces(e.target.value) })}
                                             />
                                         </div>
                                         <div>
@@ -3687,51 +3731,80 @@ export default function CompanyPanel() {
                             {activeTab === 'customers-automations' && (
                                 <div className="space-y-6">
                                     <div className="bg-white p-10 rounded-[3rem] shadow-xl shadow-slate-200/20 border border-slate-100">
-                                        <div className="flex items-center gap-4 mb-8">
-                                            <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-3xl flex items-center justify-center text-3xl shadow-lg shadow-amber-200">🤖</div>
-                                            <div>
-                                                <h3 className="text-2xl font-black text-slate-900 uppercase">Akıllı Otomasyonlar</h3>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Siz uyurken çalışan sadakat sisteminiz</p>
+                                        <div className="flex items-center justify-between mb-8">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-3xl flex items-center justify-center text-3xl shadow-lg shadow-amber-200">🤖</div>
+                                                <div>
+                                                    <h3 className="text-2xl font-black text-slate-900 uppercase">Akıllı Otomasyonlar</h3>
+                                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Siz uyurken çalışan sadakat sisteminiz</p>
+                                                </div>
                                             </div>
+                                            <button 
+                                                onClick={() => { setEditingRule({ name: '', schedule_type: 'daily', action_type: 'sms', sql_script: '', message_template: '', is_active: true }); setShowAutomationModal(true); }}
+                                                className="px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2"
+                                            >
+                                                <span>➕</span> Yeni Kural Oluştur
+                                            </button>
                                         </div>
 
-                                        <div className="space-y-4">
-                                            <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 flex items-center justify-between group hover:bg-white hover:shadow-xl transition-all cursor-pointer">
-                                                <div className="flex items-center gap-6">
-                                                    <span className="text-3xl">🎨</span>
-                                                    <div>
-                                                        <h4 className="font-black text-slate-900 uppercase text-sm">Boya Tazeleme Hatırlatıcısı</h4>
-                                                        <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">"Boya" işlemi üzerinden 45 gün geçince otomatik SMS gönder.</p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase">AKTİF</span>
-                                                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-300 shadow-sm transition-transform group-hover:rotate-12 group-hover:text-indigo-500">+</div>
-                                                </div>
+                                        {loadingRules ? (
+                                            <div className="text-center py-20">
+                                                <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                                                <p className="text-slate-400 font-black text-[10px] uppercase tracking-widest">Kurallar Yükleniyor...</p>
                                             </div>
-
-                                            <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 flex items-center justify-between group hover:bg-white hover:shadow-xl transition-all cursor-pointer opacity-60">
-                                                <div className="flex items-center gap-6">
-                                                    <span className="text-3xl">🎂</span>
-                                                    <div>
-                                                        <h4 className="font-black text-slate-900 uppercase text-sm">Doğum Günü Kutlaması</h4>
-                                                        <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Müşterilerin doğum günlerinde %20 indirim tanımla ve kutla.</p>
-                                                    </div>
-                                                </div>
-                                                <button className="px-6 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase">ETKİNLEŞTİR</button>
+                                        ) : automationRules.length === 0 ? (
+                                            <div className="text-center py-20 bg-slate-50 rounded-[2.5rem] border border-slate-100 border-dashed">
+                                                <span className="text-5xl block mb-4">⚙️</span>
+                                                <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest">Henüz bir kural tanımlanmamış</p>
+                                                <button 
+                                                    onClick={() => { setEditingRule({ name: '', schedule_type: 'daily', action_type: 'sms', sql_script: '', message_template: '', is_active: true }); setShowAutomationModal(true); }}
+                                                    className="mt-6 text-indigo-600 font-black text-xs uppercase tracking-widest hover:underline"
+                                                >
+                                                    İlk Kuralınızı Şimdi Oluşturun
+                                                </button>
                                             </div>
-
-                                            <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 flex items-center justify-between group hover:bg-white hover:shadow-xl transition-all cursor-pointer opacity-60">
-                                                <div className="flex items-center gap-6">
-                                                    <span className="text-3xl">💎</span>
-                                                    <div>
-                                                        <h4 className="font-black text-slate-900 uppercase text-sm">VİP Geri Kazanım</h4>
-                                                        <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Son 6 ay gelmeyen VİP müşterilere özel kampanya gönder (5+ randevu olanlar).</p>
+                                        ) : (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {automationRules.map(rule => (
+                                                    <div 
+                                                        key={rule.id} 
+                                                        className={`p-8 rounded-[2.5rem] border flex flex-col justify-between group hover:shadow-xl transition-all ${rule.is_active ? 'bg-white border-slate-100' : 'bg-slate-50 border-slate-100 opacity-60'}`}
+                                                    >
+                                                        <div className="flex items-start justify-between mb-6">
+                                                            <div className="flex items-center gap-4">
+                                                                <span className="text-3xl">{rule.action_type === 'sms' ? '📱' : rule.action_type === 'push' ? '🔔' : '📧'}</span>
+                                                                <div>
+                                                                    <h4 className="font-black text-slate-900 uppercase text-sm">{rule.name}</h4>
+                                                                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">
+                                                                        {rule.schedule_type === 'daily' ? 'Her Gün' : 'Haftalık Kontrol'} • {rule.action_type.toUpperCase()}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <div className={`w-3 h-3 rounded-full ${rule.is_active ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button 
+                                                                onClick={() => { setEditingRule(rule); setShowAutomationModal(true); }}
+                                                                className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all"
+                                                            >
+                                                                Düzenle
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    api.patch(`/appointments/automation-rules/${rule.id}`, { is_active: !rule.is_active })
+                                                                       .then(() => fetchAutomationRules(company.id));
+                                                                }}
+                                                                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${rule.is_active ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}
+                                                            >
+                                                                {rule.is_active ? 'Durdur' : 'Başlat'}
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                <button className="px-6 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase">ETKİNLEŞTİR</button>
+                                                ))}
                                             </div>
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -3754,13 +3827,48 @@ export default function CompanyPanel() {
                                         </div>
                                         <div className="flex flex-wrap gap-6 text-white/50 text-[11px] font-black uppercase tracking-[0.2em]">
                                             <span className="flex items-center gap-2 text-indigo-300">📅 SON GELİŞ: {selectedCustomer.last_visit ? new Date(selectedCustomer.last_visit).toLocaleDateString('tr-TR') : 'YOK'}</span>
-                                            <span className="flex items-center gap-2 text-indigo-300">📊 TOPLAM RANDEVU: {selectedCustomer.appointment_count}</span>
-                                            <span className="flex items-center gap-2 text-indigo-300">💰 TOPLAM HARCAMA: {(selectedCustomer.total_spent || 0).toLocaleString('tr-TR')} ₺</span>
+                                            <span className="flex items-center gap-2 text-indigo-300">📧 EMAIL: {selectedCustomer.email || 'BELİRTİLMEMİŞ'}</span>
+                                            <span className="flex items-center gap-2 text-indigo-300">📊 RANDEVU: {selectedCustomer.appointment_count}</span>
+                                            <span className="flex items-center gap-2 text-indigo-300">💰 HARCAMA: {(selectedCustomer.total_spent || 0).toLocaleString('tr-TR')} ₺</span>
                                         </div>
                                     </div>
-                                    <button onClick={() => setSelectedCustomer(null)} className="absolute top-8 right-8 w-14 h-14 bg-white/10 hover:bg-white/20 rounded-2xl flex items-center justify-center transition-all">
-                                        <span className="text-2xl">✕</span>
-                                    </button>
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={() => {
+                                                const msg = prompt('Müşteriye gönderilecek push mesajı:', `Merhaba ${selectedCustomer.name}, müsaitseniz sizi bekleriz!`);
+                                                if (msg) {
+                                                    api.post(`/appointments/company/${company.id}/send-customer-message`, {
+                                                        phone: selectedCustomer.phone,
+                                                        message: msg,
+                                                        type: 'push'
+                                                    }).then(() => alert('Push bildirimi başarıyla gönderildi!'))
+                                                      .catch(e => alert('Hata: ' + (e.response?.data?.error || e.message)));
+                                                }
+                                            }}
+                                            className="h-12 px-6 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all"
+                                            title="Push Gönder"
+                                        >
+                                            <span>📱</span> Push Gönder
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                const email = prompt('Müşteri E-posta Adresi:', selectedCustomer.email || '');
+                                                if (email !== null) {
+                                                    api.post(`/appointments/company/${company.id}/customers-sync`, {
+                                                        phone: selectedCustomer.phone,
+                                                        email: email
+                                                    }).then(() => fetchCustomersData(company.id));
+                                                }
+                                            }}
+                                            className="w-12 h-12 bg-white/10 hover:bg-white/20 rounded-2xl flex items-center justify-center transition-all"
+                                            title="E-posta Düzenle"
+                                        >
+                                            <span>📧</span>
+                                        </button>
+                                        <button onClick={() => setSelectedCustomer(null)} className="w-12 h-12 bg-white/10 hover:bg-white/20 rounded-2xl flex items-center justify-center transition-all">
+                                            <span className="text-2xl">✕</span>
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {/* Modal Body (History Table) */}
@@ -4130,6 +4238,7 @@ export default function CompanyPanel() {
                                             type="tel"
                                             value={staffForm.phone}
                                             onChange={e => setStaffForm(p => ({ ...p, phone: e.target.value }))}
+                                            onBlur={e => setStaffForm(p => ({ ...p, phone: formatPhoneWithSpaces(e.target.value) }))}
                                             placeholder="5XX XXX XX XX"
                                             className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 text-base font-bold text-slate-900 outline-none"
                                         />
@@ -4756,6 +4865,7 @@ export default function CompanyPanel() {
                                         type="text"
                                         value={invoiceForm.customer_phone}
                                         onChange={(e) => setInvoiceForm(prev => ({ ...prev, customer_phone: e.target.value }))}
+                                        onBlur={(e) => setInvoiceForm(prev => ({ ...prev, customer_phone: formatPhoneWithSpaces(e.target.value) }))}
                                         className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all"
                                         placeholder="05..."
                                     />
@@ -5408,6 +5518,7 @@ export default function CompanyPanel() {
                                         type="text"
                                         value={currentAccountForm.phone}
                                         onChange={e => setCurrentAccountForm({ ...currentAccountForm, phone: e.target.value })}
+                                        onBlur={e => setCurrentAccountForm({ ...currentAccountForm, phone: formatPhoneWithSpaces(e.target.value) })}
                                         className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
                                         placeholder="05..."
                                     />
@@ -5600,6 +5711,107 @@ export default function CompanyPanel() {
                                 className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black hover:bg-slate-800 transition-all active:scale-95 shadow-lg"
                             >
                                 Anladım
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showAutomationModal && editingRule && (
+                <div className="fixed inset-0 z-[500] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setShowAutomationModal(false)}>
+                    <div className="bg-white w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh] animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-10">
+                            <div>
+                                <h2 className="text-2xl font-black text-slate-900 uppercase">Kural Paneli</h2>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Otomatik kampanya ve hatırlatma kurallarınızı yönetin</p>
+                            </div>
+                            <button onClick={() => setShowAutomationModal(false)} className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center hover:bg-slate-100 transition-all font-black">✕</button>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Kural Adı (Örn: Boya Tazeleme)</label>
+                                <input 
+                                    type="text" 
+                                    value={editingRule.name} 
+                                    onChange={e => setEditingRule({ ...editingRule, name: e.target.value })}
+                                    className="w-full p-5 bg-slate-50 border-none rounded-2xl font-bold shadow-inner focus:ring-2 focus:ring-amber-400 transition-all"
+                                    placeholder="Kural başlığı giriniz..."
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Kontrol Periyodu</label>
+                                    <select 
+                                        value={editingRule.schedule_type} 
+                                        onChange={e => setEditingRule({ ...editingRule, schedule_type: e.target.value })}
+                                        className="w-full p-5 bg-slate-50 border-none rounded-2xl font-bold shadow-inner"
+                                    >
+                                        <option value="daily">Her Gün (Otomatik)</option>
+                                        <option value="weekly">Haftalık</option>
+                                        <option value="cron">Özel (Cron)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Aksiyon Türü</label>
+                                    <select 
+                                        value={editingRule.action_type} 
+                                        onChange={e => setEditingRule({ ...editingRule, action_type: e.target.value })}
+                                        className="w-full p-5 bg-slate-50 border-none rounded-2xl font-bold shadow-inner"
+                                    >
+                                        <option value="sms">📱 SMS Gönder</option>
+                                        <option value="push">🔔 Bildirim Gönder</option>
+                                        <option value="email">📧 E-Posta Gönder</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="flex justify-between items-center mb-3 ml-1">
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">SQL Filtre Sorgusu (Müşteri Bazlı)</label>
+                                    <button 
+                                        className="text-[9px] font-black text-indigo-500 uppercase hover:underline"
+                                        onClick={() => {
+                                            const example = `SELECT phone, name FROM customers \nWHERE company_id = $\{company_id\} \nAND last_visit < NOW() - INTERVAL '45 days'`;
+                                            setEditingRule({ ...editingRule, sql_script: example });
+                                        }}
+                                    >Örnek Yükle</button>
+                                </div>
+                                <textarea 
+                                    value={editingRule.sql_script} 
+                                    onChange={e => setEditingRule({ ...editingRule, sql_script: e.target.value })}
+                                    className="w-full p-6 bg-slate-900 text-emerald-400 font-mono text-xs rounded-2xl h-48 shadow-2xl focus:ring-2 focus:ring-indigo-500 transition-all"
+                                    placeholder="SELECT phone FROM customers WHERE ..."
+                                />
+                                <p className="text-[9px] text-slate-400 mt-2 font-medium px-2 italic">Not: Sorgu 'phone' ve 'name' kolonlarını döndürmelidir.</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Mesaj Taslağı</label>
+                                <textarea 
+                                    value={editingRule.message_template} 
+                                    onChange={e => setEditingRule({ ...editingRule, message_template: e.target.value })}
+                                    className="w-full p-5 bg-slate-50 border-none rounded-2xl font-bold shadow-inner h-24 focus:ring-2 focus:ring-amber-400 transition-all"
+                                    placeholder="Örn: Merhaba {name}, sizi özledik! Size özel %20 indirim..."
+                                />
+                                <p className="text-[9px] text-slate-400 mt-2 font-medium px-2 italic">Not: {`{name}`} değişkenini kullanabilirsiniz.</p>
+                            </div>
+
+                            <button 
+                                onClick={() => {
+                                    if (!editingRule.name || !editingRule.sql_script) return alert('Lütfen tüm alanları doldurun');
+                                    const method = editingRule.id ? 'patch' : 'post';
+                                    const url = editingRule.id ? `/appointments/automation-rules/${editingRule.id}` : `/appointments/company/${company?.id}/automation-rules`;
+                                    
+                                    api[method](url, editingRule).then(() => {
+                                        fetchAutomationRules(company?.id);
+                                        setShowAutomationModal(false);
+                                    });
+                                }}
+                                className="w-full py-6 bg-slate-950 text-white rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-2xl shadow-slate-200 mt-4 active:scale-95 transition-all"
+                            >
+                                {editingRule.id ? 'Kuralı Güncelle' : 'Otomasyonu Başlat'}
                             </button>
                         </div>
                     </div>

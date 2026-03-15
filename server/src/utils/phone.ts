@@ -38,3 +38,19 @@ export const formatPhoneTo12Digits = (phone: string | null | undefined): string 
     if (!normalized) return '';
     return '90' + normalized;
 };
+
+/**
+ * Kullanıcı dostu format: +90 533 666 01 25
+ */
+export const formatPhoneWithSpaces = (phone: string | null | undefined): string => {
+    const normalized = normalizePhone(phone);
+    if (!normalized || normalized.length !== 10) return phone || '';
+
+    // 533 666 01 25 -> (X, 3, 3, 2, 2)
+    const p1 = normalized.substring(0, 3);
+    const p2 = normalized.substring(3, 6);
+    const p3 = normalized.substring(6, 8);
+    const p4 = normalized.substring(8, 10);
+
+    return `+90 ${p1} ${p2} ${p3} ${p4}`;
+};
