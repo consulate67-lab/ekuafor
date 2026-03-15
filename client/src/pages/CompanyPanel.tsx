@@ -1133,18 +1133,33 @@ export default function CompanyPanel() {
         `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}&color=1e1b4b&bgcolor=ffffff`;
 
     const switchTab = (tab: TabKey) => {
-        setActiveTab(tab);
-        if (tab.startsWith('finance-sales-')) setActiveFinanceTab('sales');
-        else if (tab.startsWith('finance-purchases-')) setActiveFinanceTab('purchases');
-        else if (tab.startsWith('finance-cash-')) setActiveFinanceTab('cash');
-        else if (tab === 'finance-contacts') setActiveFinanceTab('contacts');
-        else if (tab === 'finance') setActiveFinanceTab('sales');
-
-        // Auto-expand parent if child is selected
-        if (tab.startsWith('finance')) {
-            setExpandedMenus(prev => prev.includes('finance') ? prev : [...prev, 'finance']);
+        let targetTab = tab;
+        
+        // Handle parent menu selection
+        if (tab === 'finance') {
+            targetTab = 'finance-sales-dashboard';
         }
-
+        
+        setActiveTab(targetTab);
+        
+        // Trigger generic data fetch if company is loaded
+        if (company) {
+            if (targetTab === 'home') fetchData(company.id);
+            else if (targetTab === 'reports') fetchReports(reportPeriod);
+            else if (targetTab.startsWith('finance')) {
+                const fTab = targetTab.includes('sales') ? 'sales' : 
+                             targetTab.includes('purchases') ? 'purchases' : 
+                             targetTab.includes('cash') ? 'cash' : 'contacts';
+                setActiveFinanceTab(fTab);
+                setExpandedMenus(prev => prev.includes('finance') ? prev : [...prev, 'finance']);
+                fetchFinanceData(company.id);
+            }
+            // For other tabs (staff, dept, services), fetchData(company.id) covers all of them
+            else if (['staff', 'dept', 'services'].includes(targetTab)) {
+                fetchData(company.id);
+            }
+        }
+        
         setSidebarOpen(false);
     };
 
