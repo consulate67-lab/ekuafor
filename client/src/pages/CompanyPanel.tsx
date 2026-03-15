@@ -121,7 +121,7 @@ const menuItems: MenuItem[] = [
     },
     { key: 'reports', icon: '📊', label: 'Genel Raporlar' },
     { key: 'services', icon: '✂️', label: 'Hizmetler' },
-    { key: 'profile', icon: '🏢', label: 'Firma Tanıtımı' },
+    { key: 'profile', icon: '⚙️', label: 'Firma Ayarları' },
     { key: 'integration', icon: '🔌', label: 'Entegrasyon' },
     { key: 'booking', icon: '📅', label: 'Müşteri QR' },
     { key: 'qr', icon: '🔑', label: 'Yönetim Kodu' },
@@ -1408,6 +1408,22 @@ export default function CompanyPanel() {
                     </div>
                 </div>
 
+                {/* AI Status Indicator */}
+                {company.ai_enabled !== false && (
+                    <div className="mx-4 mt-6 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl animate-in fade-in slide-in-from-left duration-500">
+                        <div className="flex items-center gap-3">
+                            <div className="relative flex-shrink-0">
+                                <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-ping absolute inset-0" />
+                                <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full relative" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-[9px] font-black text-indigo-300 uppercase tracking-[0.2em] leading-none">Smart Assist</p>
+                                <p className="text-[13px] font-bold text-white mt-1 truncate">Aktif & Dinlemede...</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Menu Items */}
                 <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
                     {menuItems.map(item => {
@@ -2046,6 +2062,29 @@ export default function CompanyPanel() {
                                                     className="w-full p-4 bg-slate-50 rounded-xl border-none text-xs font-medium text-slate-700 outline-none resize-none"
                                                 />
                                                 <p className="text-[8px] text-slate-300 italic">Personelin Android uygulaması üzerinden "Otomatik Dinleme" iznini vermiş olması gerekir.</p>
+                                                <button 
+                                                    onClick={() => {
+                                                        const detail = {
+                                                            success: true,
+                                                            data: {
+                                                                autoCreated: true,
+                                                                transcription: "Merhaba, yarın saat 14:00 için bir saç kesimi randevusu almak istiyordum. İsmim Ahmet Yılmaz.",
+                                                                extractedInfo: {
+                                                                    customerName: "Ahmet Yılmaz",
+                                                                    serviceName: "Saç Kesimi",
+                                                                    date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+                                                                    time: "14:00",
+                                                                    note: "Telefonla otomatik alındı"
+                                                                }
+                                                            }
+                                                        };
+                                                        const event = new CustomEvent('ai_appointment_detected', { detail });
+                                                        window.dispatchEvent(event);
+                                                    }}
+                                                    className="w-full py-2.5 bg-gradient-to-r from-purple-50 to-indigo-50 text-purple-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:from-purple-100 hover:to-indigo-100 transition-all border border-purple-100 mt-2 flex items-center justify-center gap-2"
+                                                >
+                                                    <span>🚀</span> Akış Simülasyonunu Başlat
+                                                </button>
                                             </div>
                                         )}
                                     </div>
