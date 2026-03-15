@@ -431,4 +431,22 @@ router.get('/history', authMiddleware, async (req: Request, res: Response) => {
     }
 });
 
+// CRM: Müşteri listesini getir (Randevulardan toplanmış)
+router.get('/company/:companyId/customers-crm', authMiddleware, async (req: Request, res: Response) => {
+    try {
+        const companyId = parseInt(req.params.companyId);
+        const search = req.query.search as string;
+
+        if (req.user?.companyId !== companyId && req.user?.role !== 'super_admin') {
+            return res.status(403).json({ success: false, error: 'Bu veriye erişim yetkiniz yok' });
+        }
+
+        const customers = await appointmentService.getCustomersCRM(companyId, search);
+        res.json({ success: true, data: customers });
+    } catch (error) {
+        console.error('CRM Customers Error:', error);
+        res.status(500).json({ success: false, error: 'Müşteri listesi alınamadı' });
+    }
+});
+
 export default router;

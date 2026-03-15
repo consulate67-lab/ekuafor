@@ -798,6 +798,54 @@ class AppointmentService {
         const result = await pool.query(query, [companyId, phonePattern, namePattern]);
         return result.rows;
     }
+
+    async getCustomersCRM(companyId: number, search?: string): Promise<any[]> {
+        let query = `
+            SELECT 
+                a.customer_phone as phone,
+                (array_agg(a.customer_name ORDER BY a.appointment_date DESC, a.start_time DESC))[1] as name,
+                MAX(a.appointment_date) as last_visit,
+                COUNT(a.id) as appointment_count,
+                SUM(COALESCE(a.price, 0))::float as total_spent,
+                FALSE as is_iys_approved,
+                json_agg(json_build_object(
+                    'id', a.id,
+                    'date', a.appointment_date,
+                    'time', a.start_time,
+                    'status', a.status,
+                    'total_price', a.price,
+                    'staff_name', st.first_name || ' ' || st.last_name,
+                    'services', (
+                        SELECT json_agg(json_build_object('name', s.name))
+                        FROM appointment_services aps
+                        JOIN services s ON aps.service_id = s.id
+                        WHERE aps.appointment_id = a.id
+                    )
+                ) ORDER BY a.appointment_date DESC, a.start_time DESC) as appointments
+            FROM appointments a
+            LEFT JOIN users st ON a.staff_id = st.id
+            WHERE a.company_id = $1 AND a.customer_phone IS NOT NULL AND a.customer_phone != ''
+        `;
+        const values: any[] = [companyId];
+
+        if (search) {
+            query += ` AND (a.customer_phone LIKE $2 OR a.customer_name ILIKE $2)`;
+            values.push(`%${search}%`);
+        }
+
+        query += `
+            GROUP BY a.customer_phone
+            ORDER BY MAX(a.appointment_date) DESC, MAX(a.start_time) DESC
+        `;
+
+        try {
+            const result = await pool.query(query, values);
+            return result.rows;
+        } catch (err) {
+            console.error('[Service] getCustomersCRM Error:', err);
+            throw err;
+        }
+    }
 }
 
 export default new AppointmentService();
