@@ -32,7 +32,9 @@ public class VoiceAssistantService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent != null ? intent.getAction() : null;
 
-        if ("START_RECORDING".equals(action)) {
+        if ("WAITING_FOR_CALL".equals(action)) {
+            startForegroundService("Smart Assist Aktif - Çağrı Bekleniyor");
+        } else if ("START_RECORDING".equals(action)) {
             startForegroundService("Görüşme Kaydediliyor...");
             startRecording();
         } else if ("STOP_RECORDING".equals(action)) {

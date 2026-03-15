@@ -27,7 +27,13 @@ public class CallReceiver extends BroadcastReceiver {
             return;
         }
 
-        if (TelephonyManager.EXTRA_STATE_OFFHOOK.equals(state)) {
+        if (TelephonyManager.EXTRA_STATE_RINGING.equals(state)) {
+            Toast.makeText(context, "Yapay Zeka Hazır: Görüşme bekleniyor...", Toast.LENGTH_SHORT).show();
+            // We can also start the service in a 'waiting' mode to ensure it's warmed up
+            Intent serviceIntent = new Intent(context, VoiceAssistantService.class);
+            serviceIntent.setAction("WAITING_FOR_CALL");
+            context.startForegroundService(serviceIntent);
+        } else if (TelephonyManager.EXTRA_STATE_OFFHOOK.equals(state)) {
             Toast.makeText(context, "AI Asistan: Görüşme başladı, dinleniyor...", Toast.LENGTH_SHORT).show();
             Intent serviceIntent = new Intent(context, VoiceAssistantService.class);
             serviceIntent.setAction("START_RECORDING");
