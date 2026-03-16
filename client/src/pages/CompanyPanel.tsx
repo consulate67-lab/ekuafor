@@ -235,7 +235,7 @@ export default function CompanyPanel() {
         const syncMobileData = async () => {
             if (Capacitor.isNativePlatform()) {
                 const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-                const baseUrl = window.location.origin;
+                const baseUrl = (api.defaults.baseURL || window.location.origin).replace(/\/$/, "");
                 try {
                     await (AIAssistant as any).requestPermissions();
                     await AIAssistant.syncStaffData({

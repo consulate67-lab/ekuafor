@@ -25,7 +25,11 @@ import android.os.IBinder;
         ),
         @Permission(
             alias = "phone",
-            strings = {Manifest.permission.READ_PHONE_STATE}
+            strings = {
+                Manifest.permission.READ_PHONE_STATE,
+                Manifest.permission.READ_PHONE_NUMBERS,
+                Manifest.permission.READ_CALL_LOG
+            }
         ),
         @Permission(
             alias = "notifications",

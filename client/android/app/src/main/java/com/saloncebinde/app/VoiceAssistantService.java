@@ -73,8 +73,13 @@ public class VoiceAssistantService extends Service {
             audioFilePath = getExternalFilesDir(null).getAbsolutePath() + "/call_" + System.currentTimeMillis() + ".m4a";
             recorder = new MediaRecorder();
             
-            // Using VOICE_RECOGNITION instead of MIC for better priority during calls
-            recorder.setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION); 
+            // Try VOICE_COMMUNICATION first, it often works best on modern Android for calls
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                recorder.setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION);
+            } else {
+                recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+            }
+            
             recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
             recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
             recorder.setOutputFile(audioFilePath);
@@ -83,9 +88,9 @@ public class VoiceAssistantService extends Service {
             recorder.start();
             Log.d(TAG, "Recording started: " + audioFilePath);
         } catch (Exception e) {
-            Log.e(TAG, "Recording start failed", e);
-            // Fallback to MIC if recognition fails
+            Log.e(TAG, "VOICE_COMMUNICATION failed, trying MIC", e);
             try {
+                if (recorder != null) recorder.release();
                 recorder = new MediaRecorder();
                 recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
                 recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
@@ -93,8 +98,10 @@ public class VoiceAssistantService extends Service {
                 recorder.setOutputFile(audioFilePath);
                 recorder.prepare();
                 recorder.start();
+                Log.d(TAG, "Recording started with MIC");
             } catch (Exception e2) {
                 Log.e(TAG, "MIC recording failed too", e2);
+                showToast("Ses kaydı başlatılamadı!");
             }
         }
     }
@@ -104,6 +111,7 @@ public class VoiceAssistantService extends Service {
             try {
                 recorder.stop();
                 recorder.release();
+                Log.d(TAG, "Recording stopped");
             } catch (Exception e) {
                 Log.e(TAG, "Stop recorder error", e);
             }
@@ -113,28 +121,52 @@ public class VoiceAssistantService extends Service {
 
     private void uploadAndNotify() {
         if (audioFilePath == null) {
-            stopSelf();
+            Log.d(TAG, "audioFilePath is null, skipping upload");
             return;
         }
 
         new Thread(() -> {
             try {
+                // Wait a bit to ensure file is written
+                Thread.sleep(500);
+
                 SharedPreferences prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
                 String token = prefs.getString("auth_token", "");
                 String baseUrl = prefs.getString("base_url", "https://www.saloncebinde.com");
                 
-                File file = new File(audioFilePath);
-                if (!file.exists()) {
-                    stopSelf();
+                if (token.isEmpty()) {
+                    Log.e(TAG, "Auth token is missing!");
+                    showToast("Sistem hatası: Oturum bilgisi eksik.");
                     return;
                 }
 
-                URL url = new URL(baseUrl + "/api/ai/process-call-audio");
+                File file = new File(audioFilePath);
+                if (!file.exists() || file.length() < 100) { // Very small files are probably silence/errors
+                    Log.e(TAG, "File empty or too small: " + (file.exists() ? file.length() : "not found"));
+                    showToast("Görüşme çok kısa veya ses alınamadı.");
+                    return;
+                }
+
+                showToast("Görüşme analizi yapılıyor...");
+                
+                String targetUrl = baseUrl;
+                if (!targetUrl.endsWith("/ai/process-call-audio")) {
+                    if (targetUrl.contains("/api")) {
+                        targetUrl = targetUrl.replaceAll("/$", "") + "/ai/process-call-audio";
+                    } else {
+                        targetUrl = targetUrl.replaceAll("/$", "") + "/api/ai/process-call-audio";
+                    }
+                }
+
+                Log.d(TAG, "Uploading " + file.length() + " bytes to: " + targetUrl);
+                URL url = new URL(targetUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setDoInput(true);
                 conn.setDoOutput(true);
                 conn.setUseCaches(false);
                 conn.setRequestMethod("POST");
+                conn.setConnectTimeout(30000);
+                conn.setReadTimeout(30000);
                 conn.setRequestProperty("Authorization", "Bearer " + token);
                 conn.setRequestProperty("Content-Type", "multipart/form-data;boundary=*****");
 
@@ -143,38 +175,59 @@ public class VoiceAssistantService extends Service {
                 dos.writeBytes("Content-Disposition: form-data; name=\"audio\";filename=\"" + file.getName() + "\"\r\n\r\n");
 
                 FileInputStream fis = new FileInputStream(file);
-                byte[] buffer = new byte[4096];
+                byte[] buffer = new byte[8192];
                 int bytesRead;
                 while ((bytesRead = fis.read(buffer)) != -1) dos.write(buffer, 0, bytesRead);
                 dos.writeBytes("\r\n--*****--\r\n");
+                dos.flush();
+                dos.close();
+                fis.close();
 
                 int responseCode = conn.getResponseCode();
+                Log.d(TAG, "Server Responded: " + responseCode);
+                
                 if (responseCode == 200) {
                     BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                     String line;
                     StringBuilder response = new StringBuilder();
                     while ((line = in.readLine()) != null) response.append(line);
                     in.close();
-                    file.delete();
-
-                    // Success - Open App
+                    
+                    String resStr = response.toString();
+                    Log.d(TAG, "AI Response: " + resStr);
+                    
+                    if (resStr.contains("\"success\":true") && resStr.contains("\"data\"")) {
+                        showToast("Randevu algılandı!");
+                    } else {
+                        showToast("Görüşme analiz edildi, randevu bulunamadı.");
+                    }
+                    
+                    // Success - Open App anyway to show feedback
                     Intent launchIntent = new Intent(this, MainActivity.class);
                     launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                    launchIntent.putExtra("ai_result", response.toString());
+                    launchIntent.putExtra("ai_result", resStr);
                     startActivity(launchIntent);
+                } else {
+                    showToast("Sunucu hatası: " + responseCode);
                 }
                 
-                fis.close();
-                dos.flush();
-                dos.close();
+                // Cleanup
+                if (file.exists()) file.delete();
 
             } catch (Exception e) {
                 Log.e(TAG, "Process failed", e);
+                showToast("Bağlantı hatası: " + e.getMessage());
             } finally {
                 stopForeground(true);
                 stopSelf();
             }
         }).start();
+    }
+
+    private void showToast(final String text) {
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+            Toast.makeText(getApplicationContext(), text, Toast.LENGTH_LONG).show();
+        });
     }
 
     @Override

@@ -13,40 +13,40 @@ public class CallReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        // Debug Toast - Show every state change
         String state = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
-        Log.d(TAG, "onReceive intent: " + intent.getAction() + " state: " + state);
+        String incomingNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
         
-        if (state != null) {
-            Toast.makeText(context, "Telefon Durumu: " + state, Toast.LENGTH_SHORT).show();
-        }
+        Log.d(TAG, "onReceive: state=" + state + ", number=" + incomingNumber);
         
         if (state == null) return;
 
-        Log.d(TAG, "Call State: " + state);
+        // Show a more professional debug toast
+        Toast.makeText(context, "Çağrı Durumu: " + state, Toast.LENGTH_SHORT).show();
 
         // Check if user is staff
         SharedPreferences prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
         boolean isStaff = prefs.getBoolean("is_staff", false);
 
         if (!isStaff) {
-            Log.d(TAG, "Sync failed or not a staff member.");
+            Log.d(TAG, "Not a staff member or not synced yet.");
             return;
         }
 
+        Intent serviceIntent = new Intent(context, VoiceAssistantService.class);
+        
         if (TelephonyManager.EXTRA_STATE_RINGING.equals(state)) {
-            Toast.makeText(context, "Yapay Zeka Hazır: Görüşme bekleniyor...", Toast.LENGTH_SHORT).show();
-            // We can also start the service in a 'waiting' mode to ensure it's warmed up
-            Intent serviceIntent = new Intent(context, VoiceAssistantService.class);
+            Log.d(TAG, "State: RINGING");
+            Toast.makeText(context, "AI: Çağrı bekleniyor...", Toast.LENGTH_SHORT).show();
             serviceIntent.setAction("WAITING_FOR_CALL");
             context.startForegroundService(serviceIntent);
         } else if (TelephonyManager.EXTRA_STATE_OFFHOOK.equals(state)) {
-            Toast.makeText(context, "AI Asistan: Görüşme başladı, dinleniyor...", Toast.LENGTH_SHORT).show();
-            Intent serviceIntent = new Intent(context, VoiceAssistantService.class);
+            Log.d(TAG, "State: OFFHOOK (Görüşme Başladı)");
+            Toast.makeText(context, "AI: Görüşme kaydediliyor...", Toast.LENGTH_SHORT).show();
             serviceIntent.setAction("START_RECORDING");
             context.startForegroundService(serviceIntent);
         } else if (TelephonyManager.EXTRA_STATE_IDLE.equals(state)) {
-            Intent serviceIntent = new Intent(context, VoiceAssistantService.class);
+            Log.d(TAG, "State: IDLE (Görüşme Bitti)");
+            Toast.makeText(context, "AI: İşlem tamamlanıyor...", Toast.LENGTH_SHORT).show();
             serviceIntent.setAction("STOP_RECORDING");
             context.startForegroundService(serviceIntent);
         }

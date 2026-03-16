@@ -133,24 +133,47 @@ function App() {
         };
 
         checkAuth();
+    }, [setUser, setInitialized, isNative]);
 
+    // Native Sync & Listener Effect
+    useEffect(() => {
+        if (!isNative || !initialized || !isAuthenticated || !user) return;
+
+        const syncMobileData = async () => {
+            try {
+                const { registerPlugin } = await import('@capacitor/core');
+                const AIAssistant = registerPlugin<any>('AIAssistant');
+                
+                const token = localStorage.getItem('token');
+                const baseUrl = (api.defaults.baseURL || window.location.origin).replace(/\/$/, "");
+                const isStaff = user.role === 'staff' || user.role === 'company_admin';
+
+                await AIAssistant.syncStaffData({
+                    token: token || '',
+                    baseUrl: baseUrl,
+                    isStaff: isStaff
+                });
+                console.log('Global Mobile AI Assistant synced');
+            } catch (e) {
+                console.warn('Global Mobile sync failed:', e);
+            }
+        };
+
+        syncMobileData();
+        
         // Listen for deep links in Capacitor App
         if (isNative) {
             const listener = CapApp.addListener('appUrlOpen', async (data) => {
                 const url = data.url;
-
-                // Example URL: saloncebinde://dashboard?code=ABCD or https://www.saloncebinde.com/dashboard?code=ABCD
                 if (url.includes('code=')) {
                     try {
                         const urlObj = new URL(url);
                         const code = urlObj.searchParams.get('code');
-
                         if (code) {
-                            setInitialized(false); // Show loading spinner
+                            setInitialized(false);
                             const res = await api.post('/companies/check-code', { code });
                             if (res.data?.success && res.data?.data?.token) {
                                 localStorage.setItem('token', res.data.data.token);
-                                // Refresh user session
                                 const meRes = await api.get('/auth/me');
                                 if (meRes.data.success) {
                                     useAuthStore.getState().login(meRes.data.data, res.data.data.token);
@@ -169,7 +192,7 @@ function App() {
                 listener.then(l => l.remove());
             };
         }
-    }, [setUser, setInitialized, isNative]);
+    }, [isNative, initialized, isAuthenticated, user]);
 
     if (!initialized) {
         return (
