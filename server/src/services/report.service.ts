@@ -1,7 +1,7 @@
 import pool from '../config/database';
 
 class ReportService {
-    async getEmployeeStats(companyId: number, staffId: number, period: 'today' | 'week' | 'month' | 'year', localDate?: string) {
+    async getEmployeeStats(companyId: number, staffId: number | undefined, period: 'today' | 'week' | 'month' | 'year', localDate?: string) {
         let dateFilter = '';
         let dateFilterExp = '';
         const todayStr = localDate ? `'${localDate}'::date` : 'CURRENT_DATE';
@@ -25,38 +25,49 @@ class ReportService {
                 break;
         }
 
-        const params: any[] = [companyId];
+        const params: any[] = [companyId, staffId || null];
         let staffFilter = '';
         let staffFilterExp = '';
 
         if (staffId) {
             staffFilter = 'AND (a.staff_id = $2 OR EXISTS (SELECT 1 FROM appointment_services WHERE appointment_id = a.id AND staff_id = $2))';
             staffFilterExp = 'AND created_by = $2';
-            params.push(staffId);
         }
 
         const query = `
             SELECT 
                 COUNT(DISTINCT a.id) as total_appointments,
-                SUM(COALESCE(
-                    (SELECT SUM(price) FROM appointment_services WHERE appointment_id = a.id AND ($2::INTEGER IS NULL OR staff_id = $2)),
-                    a.original_price,
-                    a.price, 
-                    s.price, 
-                    0
-                )) as total_booked_value,
-                SUM(CASE WHEN a.status IN ('completed', 'invoiced') THEN COALESCE(
-                    (SELECT SUM(price) FROM appointment_services WHERE appointment_id = a.id AND ($2::INTEGER IS NULL OR staff_id = $2)),
-                    a.collected_price,
-                    a.price, 
-                    s.price, 
-                    0
-                ) ELSE 0 END) as actual_collected
+                SUM(
+                    COALESCE(
+                        (SELECT SUM(aps_in.price) FROM appointment_services aps_in WHERE aps_in.appointment_id = a.id AND (
+                            ($2::INTEGER IS NULL) OR 
+                            (aps_in.staff_id = $2) OR 
+                            (aps_in.staff_id IS NULL AND a.staff_id = $2)
+                        )),
+                        CASE WHEN ($2::INTEGER IS NULL OR (a.staff_id = $2 AND NOT EXISTS (SELECT 1 FROM appointment_services WHERE appointment_id = a.id))) 
+                             THEN COALESCE(a.original_price, a.price, s.price, 0) 
+                             ELSE 0 
+                        END
+                    )
+                ) as total_booked_value,
+                SUM(CASE WHEN a.status IN ('completed', 'invoiced') THEN 
+                    COALESCE(
+                        (SELECT SUM(aps_in.price) FROM appointment_services aps_in WHERE aps_in.appointment_id = a.id AND (
+                            ($2::INTEGER IS NULL) OR 
+                            (aps_in.staff_id = $2) OR 
+                            (aps_in.staff_id IS NULL AND a.staff_id = $2)
+                        )),
+                        CASE WHEN ($2::INTEGER IS NULL OR (a.staff_id = $2 AND NOT EXISTS (SELECT 1 FROM appointment_services WHERE appointment_id = a.id))) 
+                             THEN COALESCE(a.collected_price, a.price, s.price, 0) 
+                             ELSE 0 
+                        END
+                    )
+                ELSE 0 END) as actual_collected
             FROM appointments a
             LEFT JOIN services s ON a.service_id = s.id
             WHERE a.company_id = $1 
             ${staffFilter}
-            AND a.status NOT IN ('cancelled', 'pending')
+            AND a.status != 'cancelled'
             AND ${dateFilter}
         `;
 
@@ -79,25 +90,26 @@ class ReportService {
         };
     }
 
-    async getDetailedCompanyReports(companyId: number, period: 'today' | 'week' | 'month' | 'year') {
+    async getDetailedCompanyReports(companyId: number, period: 'today' | 'week' | 'month' | 'year', localDate?: string) {
         let statsFilter = '';
         let chartFilter = '';
+        const todayStr = localDate ? `'${localDate}'::date` : 'CURRENT_DATE';
 
         switch (period) {
             case 'today':
-                statsFilter = "appointment_date = CURRENT_DATE";
-                chartFilter = "appointment_date >= date_trunc('week', CURRENT_DATE)"; // Today evaluates the week for charts
+                statsFilter = `appointment_date = ${todayStr}`;
+                chartFilter = `appointment_date >= date_trunc('week', ${todayStr})`; // Today evaluates the week for charts
                 break;
             case 'week':
-                statsFilter = "appointment_date >= date_trunc('week', CURRENT_DATE)";
+                statsFilter = `appointment_date >= date_trunc('week', ${todayStr})`;
                 chartFilter = statsFilter;
                 break;
             case 'month':
-                statsFilter = "appointment_date >= date_trunc('month', CURRENT_DATE)";
+                statsFilter = `appointment_date >= date_trunc('month', ${todayStr})`;
                 chartFilter = statsFilter;
                 break;
             case 'year':
-                statsFilter = "appointment_date >= date_trunc('year', CURRENT_DATE)";
+                statsFilter = `appointment_date >= date_trunc('year', ${todayStr})`;
                 chartFilter = statsFilter;
                 break;
         }
@@ -118,16 +130,37 @@ class ReportService {
                 sa.staff_id,
                 sa.staff_name,
                 COUNT(DISTINCT a.id) as count,
-                SUM(COALESCE(aps.price, a.original_price / NULLIF((SELECT count(*) FROM appointment_services WHERE appointment_id = a.id), 0), a.price / NULLIF((SELECT count(*) FROM appointment_services WHERE appointment_id = a.id), 0), a.original_price, a.price, s.price, 0)) as total_booked_value,
-                SUM(CASE WHEN a.status IN ('completed', 'invoiced') THEN COALESCE(aps.price, a.collected_price / NULLIF((SELECT count(*) FROM appointment_services WHERE appointment_id = a.id), 0), a.price / NULLIF((SELECT count(*) FROM appointment_services WHERE appointment_id = a.id), 0), a.collected_price, a.price, s.price, 0) ELSE 0 END) as actual_collected
+                SUM(
+                    COALESCE(
+                        (SELECT SUM(aps_in.price) FROM appointment_services aps_in WHERE aps_in.appointment_id = a.id AND (
+                            (aps_in.staff_id = sa.staff_id) OR 
+                            (aps_in.staff_id IS NULL AND a.staff_id = sa.staff_id)
+                        )),
+                        CASE WHEN (a.staff_id = sa.staff_id AND NOT EXISTS (SELECT 1 FROM appointment_services WHERE appointment_id = a.id)) 
+                             THEN COALESCE(a.original_price, a.price, s.price, 0) 
+                             ELSE 0 
+                        END
+                    )
+                ) as total_booked_value,
+                SUM(CASE WHEN a.status IN ('completed', 'invoiced') THEN 
+                    COALESCE(
+                        (SELECT SUM(aps_in.price) FROM appointment_services aps_in WHERE aps_in.appointment_id = a.id AND (
+                            (aps_in.staff_id = sa.staff_id) OR 
+                            (aps_in.staff_id IS NULL AND a.staff_id = sa.staff_id)
+                        )),
+                        CASE WHEN (a.staff_id = sa.staff_id AND NOT EXISTS (SELECT 1 FROM appointment_services WHERE appointment_id = a.id)) 
+                             THEN COALESCE(a.collected_price, a.price, s.price, 0) 
+                             ELSE 0 
+                        END
+                    )
+                ELSE 0 END) as actual_collected
             FROM staff_all sa
             LEFT JOIN (
-                SELECT a.*, aps.staff_id as service_staff_id, aps.price as service_price
-                FROM appointments a
-                LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
-                WHERE a.company_id = $1 AND a.status != 'cancelled' AND ${statsFilter}
-            ) a ON sa.staff_id = a.staff_id OR sa.staff_id = a.service_staff_id
-            LEFT JOIN appointment_services aps ON a.id = aps.appointment_id AND aps.staff_id = sa.staff_id
+                SELECT DISTINCT a_in.*
+                FROM appointments a_in
+                LEFT JOIN appointment_services aps_in ON a_in.id = aps_in.appointment_id
+                WHERE a_in.company_id = $1 AND a_in.status != 'cancelled' AND ${statsFilter}
+            ) a ON sa.staff_id = a.staff_id OR EXISTS (SELECT 1 FROM appointment_services WHERE appointment_id = a.id AND staff_id = sa.staff_id)
             LEFT JOIN services s ON a.service_id = s.id
             GROUP BY sa.staff_id, sa.staff_name
             ORDER BY count DESC
@@ -179,12 +212,27 @@ class ReportService {
             SELECT 
                 d.id as department_id,
                 d.name as department_name,
-                COUNT(a.id) as count,
-                SUM(COALESCE(a.original_price, a.price, s.price, 0)) as total_booked_value,
-                SUM(CASE WHEN a.status IN ('completed', 'invoiced') THEN COALESCE(a.collected_price, a.price, s.price, 0) ELSE 0 END) as actual_collected
+                COUNT(DISTINCT a.id) as count,
+                SUM(COALESCE(
+                    (SELECT SUM(aps_in.price) FROM appointment_services aps_in WHERE aps_in.appointment_id = a.id AND EXISTS (SELECT 1 FROM users u2 WHERE u2.id = aps_in.staff_id AND u2.department_id = d.id)),
+                    CASE WHEN EXISTS (SELECT 1 FROM users u2 WHERE u2.id = a.staff_id AND u2.department_id = d.id) AND NOT EXISTS (SELECT 1 FROM appointment_services WHERE appointment_id = a.id)
+                         THEN COALESCE(a.original_price, a.price, s.price, 0)
+                         ELSE 0
+                    END
+                )) as total_booked_value,
+                SUM(CASE WHEN a.status IN ('completed', 'invoiced') THEN 
+                    COALESCE(
+                        (SELECT SUM(aps_in.price) FROM appointment_services aps_in WHERE aps_in.appointment_id = a.id AND EXISTS (SELECT 1 FROM users u2 WHERE u2.id = aps_in.staff_id AND u2.department_id = d.id)),
+                        CASE WHEN EXISTS (SELECT 1 FROM users u2 WHERE u2.id = a.staff_id AND u2.department_id = d.id) AND NOT EXISTS (SELECT 1 FROM appointment_services WHERE appointment_id = a.id)
+                             THEN COALESCE(a.collected_price, a.price, s.price, 0)
+                             ELSE 0
+                        END
+                    )
+                ELSE 0 END) as actual_collected
             FROM departments d
             LEFT JOIN users u ON u.department_id = d.id
-            LEFT JOIN appointments a ON a.staff_id = u.id AND a.company_id = $1 AND a.status != 'cancelled' AND ${statsFilter}
+            LEFT JOIN appointments a ON (a.staff_id = u.id OR EXISTS (SELECT 1 FROM appointment_services aps_in WHERE aps_in.appointment_id = a.id AND aps_in.staff_id = u.id))
+                AND a.company_id = $1 AND a.status != 'cancelled' AND ${statsFilter}
             LEFT JOIN services s ON a.service_id = s.id
             WHERE d.company_id = $1
             GROUP BY d.id, d.name

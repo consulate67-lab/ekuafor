@@ -16,12 +16,13 @@ public class CallReceiver extends BroadcastReceiver {
         String state = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
         String incomingNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
         
-        Log.d(TAG, "onReceive: state=" + state + ", number=" + incomingNumber);
-        
         if (state == null) return;
 
-        // Show a more professional debug toast
-        Toast.makeText(context, "Çağrı Durumu: " + state, Toast.LENGTH_SHORT).show();
+        // Her durumda bir bildirim ver (Sistemin çalıştığını doğrula)
+        if (TelephonyManager.EXTRA_STATE_RINGING.equals(state)) {
+             Toast.makeText(context, "📱 AI: Telefon çalıyor...", Toast.LENGTH_LONG).show();
+             Log.d(TAG, "Ringing detected");
+        }
 
         // Check if user is staff
         SharedPreferences prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
@@ -29,6 +30,7 @@ public class CallReceiver extends BroadcastReceiver {
 
         if (!isStaff) {
             Log.d(TAG, "Not a staff member or not synced yet.");
+            // Sadece çalışan değilse veya oturum senkronize değilse burada durur
             return;
         }
 

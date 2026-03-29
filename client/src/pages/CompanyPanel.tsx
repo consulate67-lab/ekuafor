@@ -775,12 +775,25 @@ export default function CompanyPanel() {
         }
     };
 
+    const getLocalDateString = () => {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     const fetchReports = async (period: string) => {
         if (!company) return;
         setLoadingReport(true);
         setReportError('');
         try {
-            const res = await api.get('/reports/company-detailed', { params: { period } });
+            const res = await api.get('/reports/company-detailed', { 
+                params: { 
+                    period, 
+                    local_date: getLocalDateString() 
+                } 
+            });
             if (res.data?.success) {
                 setReportData(res.data?.data);
             } else {

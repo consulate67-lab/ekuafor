@@ -50,7 +50,8 @@ router.get('/company-detailed', authMiddleware, async (req: Request, res: Respon
             return res.status(403).json({ success: false, error: 'Yetkisiz erişim' });
         }
 
-        const reports = await reportService.getDetailedCompanyReports(companyId, period);
+        const localDate = req.query.local_date as string;
+        const reports = await reportService.getDetailedCompanyReports(companyId, period, localDate);
 
         res.json({
             success: true,

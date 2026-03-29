@@ -28,6 +28,8 @@ import SetupStaff from './pages/SetupStaff';
 import SetPassword from './pages/SetPassword';
 import StaffPanel from './pages/StaffPanel';
 import { useAppointmentSync } from './hooks/useAppointmentSync';
+import AIAdminPanel from './pages/AIAdminPanel';
+
 
 
 
@@ -146,7 +148,14 @@ function App() {
                 
                 const token = localStorage.getItem('token');
                 const baseUrl = (api.defaults.baseURL || window.location.origin).replace(/\/$/, "");
-                const isStaff = user.role === 'staff' || user.role === 'company_admin';
+                const isStaff = user.role === 'staff' || user.role === 'company_admin' || user.role === 'super_admin';
+
+                // Request permissions to ensure CallReceiver can work
+                try {
+                    await AIAssistant.requestPermissions();
+                } catch (e) {
+                    console.warn('Permission request failed:', e);
+                }
 
                 await AIAssistant.syncStaffData({
                     token: token || '',
@@ -255,6 +264,7 @@ function App() {
                             <Route path="/services" element={<ServiceManagement />} />
                             <Route path="/appointments" element={<AppointmentManagement />} />
                             <Route path="/sms-settings" element={<SmsSettings />} />
+                            <Route path="/ai-admin" element={<AIAdminPanel />} />
                             <Route path="*" element={<Navigate to="/dashboard" replace />} />
                         </>
                     ) : (

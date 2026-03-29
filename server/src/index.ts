@@ -867,7 +867,29 @@ const runMigrations = async () => {
         await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_bank_iban ON companies(bank_iban)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_verification_code ON companies(verification_code)');
 
+        // AI Learning System Tables
+        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN DEFAULT TRUE');
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS ai_call_logs (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+                transcription TEXT,
+                extracted_info JSONB,
+                appointment_id INTEGER REFERENCES appointments(id) ON DELETE SET NULL,
+                was_auto_created BOOLEAN DEFAULT false,
+                confidence VARCHAR(10),
+                feedback VARCHAR(20) DEFAULT 'pending',
+                matched_service_name VARCHAR(255),
+                source VARCHAR(20) DEFAULT 'audio',
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_ai_call_logs_company ON ai_call_logs(company_id)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_ai_call_logs_created ON ai_call_logs(created_at DESC)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_ai_call_logs_feedback ON ai_call_logs(feedback)');
+
         console.log('✅ Auto-migrations and seeding completed.');
+
     } catch (err) {
         console.error('❌ Migration failed:', err);
     } finally {

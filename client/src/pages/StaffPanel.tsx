@@ -24,6 +24,11 @@ export default function StaffPanel() {
     const [services, setServices] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [reportStats, setReportStats] = useState({
+        total_booked_value: 0,
+        actual_collected: 0,
+        total_appointments: 0
+    });
 
     useEffect(() => {
         // Eğer zaten auth store'da staff olarak giriş yapmışsa oradan alalım
@@ -57,6 +62,7 @@ export default function StaffPanel() {
                     setStaffInfo(res.data.data.user);
                     setCompany(res.data.data.company);
                     fetchAppointments(res.data.data.company.id, res.data.data.user.id);
+                    fetchReportStats(res.data.data.user.id);
                 }
             } catch {
                 localStorage.removeItem('staff_board_code');
@@ -66,6 +72,26 @@ export default function StaffPanel() {
             }
         })();
     }, [user]);
+
+    const fetchReportStats = async (staffId: number) => {
+        try {
+            const d = new Date();
+            const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+            const res = await api.get('/reports/employee-stats', {
+                params: {
+                    period: 'today',
+                    local_date: localDate,
+                    staff_id: staffId // Added staff_id to params
+                }
+            });
+            if (res.data.success) {
+                setReportStats(res.data.data);
+            }
+        } catch (e) {
+            console.error('Report stats error', e);
+        }
+    };
 
     const fetchAppointments = async (companyId: number, staffId: number) => {
         try {
@@ -127,13 +153,11 @@ export default function StaffPanel() {
 
     const nextApp = appointments.find(a => {
         const [h, m] = a.start_time.split(':').map(Number);
-        return (h * 60 + m) >= nowMinutes;
+        return (h * 60 + m) >= nowMinutes && a.status !== 'completed' && a.status !== 'invoiced';
     });
 
-    const completedToday = appointments.filter(a => {
-        const [h, m] = a.end_time.split(':').map(Number);
-        return (h * 60 + m) <= nowMinutes;
-    }).length;
+    const completedToday = appointments.filter(a => a.status === 'completed' || a.status === 'invoiced').length;
+    const pendingToday = appointments.filter(a => a.status === 'pending' || a.status === 'approved').length;
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50">
@@ -184,6 +208,16 @@ export default function StaffPanel() {
 
             {/* Summary Cards */}
             <div className="px-6 -mt-6 relative z-20">
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div className="bg-white rounded-2xl p-4 shadow-lg shadow-slate-200/40 border border-slate-50 flex flex-col items-center justify-center">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Potansiyel Kazanç</p>
+                        <p className="text-2xl font-black text-indigo-600">₺{reportStats.total_booked_value.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-white rounded-2xl p-4 shadow-lg shadow-slate-200/40 border border-slate-50 flex flex-col items-center justify-center">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Tahsil Edilen</p>
+                        <p className="text-2xl font-black text-emerald-600">₺{reportStats.actual_collected.toLocaleString()}</p>
+                    </div>
+                </div>
                 <div className="grid grid-cols-3 gap-3">
                     <div className="bg-white rounded-2xl p-4 shadow-lg shadow-slate-200/40 text-center border border-slate-50">
                         <p className="text-3xl font-black text-slate-900">{appointments.length}</p>
@@ -194,8 +228,8 @@ export default function StaffPanel() {
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Biten</p>
                     </div>
                     <div className="bg-white rounded-2xl p-4 shadow-lg shadow-slate-200/40 text-center border border-slate-50">
-                        <p className="text-3xl font-black text-indigo-600">{appointments.length - completedToday}</p>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Kalan</p>
+                        <p className="text-3xl font-black text-amber-600">{pendingToday}</p>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Bekleyen</p>
                     </div>
                 </div>
             </div>

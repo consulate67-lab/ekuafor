@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import { Appointment, Service, Company } from '../types';
@@ -74,10 +74,183 @@ export default function AppointmentManagement() {
     });
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
 
+    // ─── AI Ses Kaydı Sistemi ────────────────────────────────────────
+    const [aiMode, setAiMode] = useState<'IDLE' | 'RECORDING' | 'PROCESSING' | 'REVIEW' | 'CREATING' | 'SUCCESS' | 'ERROR'>('IDLE');
+    const [aiRecordingTime, setAiRecordingTime] = useState(0);
+    const [aiTranscription, setAiTranscription] = useState('');
+    const [aiExtracted, setAiExtracted] = useState<any>(null);
+    const [aiError, setAiError] = useState('');
+    const [aiCreatedId, setAiCreatedId] = useState<number | null>(null);
+    const [aiEditData, setAiEditData] = useState<any>(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
+    const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
     const speak = (text: string) => {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'tr-TR';
         window.speechSynthesis.speak(utterance);
+    };
+
+    // ─── AI SES KAYIT FONKSİYONLARI ───────────────────────────────────
+
+    const resetAiState = () => {
+        setAiMode('IDLE');
+        setAiRecordingTime(0);
+        setAiTranscription('');
+        setAiExtracted(null);
+        setAiError('');
+        setAiCreatedId(null);
+        setAiEditData(null);
+        if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            try { mediaRecorderRef.current.stop(); } catch (_) {}
+        }
+        audioChunksRef.current = [];
+    };
+
+    const startAiRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                ? 'audio/webm;codecs=opus'
+                : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' 
+                : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
+                : '';
+
+            const mr = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+            mediaRecorderRef.current = mr;
+            audioChunksRef.current = [];
+
+            mr.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunksRef.current.push(e.data);
+            };
+
+            mr.onstop = async () => {
+                stream.getTracks().forEach(t => t.stop());
+                const blob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
+                if (blob.size < 1000) {
+                    setAiError('Kayıt çok kısa. Lütfen tekrar deneyin.');
+                    setAiMode('ERROR');
+                    return;
+                }
+                await processAudioWithAI(blob, mimeType || 'audio/webm');
+            };
+
+            mr.start(1000); // collect chunks every 1s
+            setAiMode('RECORDING');
+            setAiRecordingTime(0);
+
+            recordingTimerRef.current = setInterval(() => {
+                setAiRecordingTime(prev => {
+                    if (prev >= 120) { // max 2 min
+                        stopAiRecording();
+                        return prev;
+                    }
+                    return prev + 1;
+                });
+            }, 1000);
+        } catch (err: any) {
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                setAiError('Mikrofon izni reddedildi. Lütfen tarayıcı/uygulama ayarlarından mikrofon iznini etkinleştirin.');
+            } else {
+                setAiError('Mikrofon başlatılamadı: ' + err.message);
+            }
+            setAiMode('ERROR');
+        }
+    };
+
+    const stopAiRecording = () => {
+        if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); }
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            setAiMode('PROCESSING');
+            mediaRecorderRef.current.stop();
+        }
+    };
+
+    const processAudioWithAI = async (audioBlob: Blob, mimeType: string) => {
+        setAiMode('PROCESSING');
+        try {
+            const ext = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : 'webm';
+            const formData = new FormData();
+            formData.append('audio', audioBlob, `call_recording.${ext}`);
+
+            const res = await api.post('/ai/process-call-audio', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                timeout: 60000
+            });
+
+            const d = res.data.data;
+            setAiTranscription(d.transcription || '');
+            setAiExtracted(d.extractedInfo);
+
+            if (d.autoCreated && d.appointmentId) {
+                setAiCreatedId(d.appointmentId);
+                setAiMode('SUCCESS');
+                await fetchData();
+            } else {
+                // Show review screen for manual confirmation / edit
+                setAiEditData({
+                    customerName: d.extractedInfo?.customerName || '',
+                    serviceName: d.extractedInfo?.serviceName || '',
+                    date: d.extractedInfo?.date || getLocalDateString(),
+                    time: d.extractedInfo?.time || '10:00',
+                    note: d.extractedInfo?.note || '',
+                });
+                setAiMode('REVIEW');
+            }
+        } catch (err: any) {
+            const msg = err.response?.data?.error || err.message || 'Ses işlenemedi.';
+            setAiError(msg);
+            setAiMode('ERROR');
+        }
+    };
+
+    const confirmAiAppointment = async () => {
+        if (!aiEditData || !company) return;
+        setAiMode('CREATING');
+        try {
+            // Match service from loaded services list
+            const sName = (aiEditData.serviceName || '').toLowerCase().trim();
+            const matchedService = services.find(s =>
+                s.name.toLowerCase().includes(sName) || sName.includes(s.name.toLowerCase())
+            ) || services[0];
+
+            if (!matchedService) {
+                setAiError('Hizmet bulunamadı. Lütfen manuel randevu oluşturun.');
+                setAiMode('ERROR');
+                return;
+            }
+
+            const duration = matchedService.duration_minutes || 30;
+            const startTime = aiEditData.time || '10:00';
+            const [h, m] = startTime.split(':').map(Number);
+            const totalMin = h * 60 + m + duration;
+            const endTime = `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
+
+            const staffId = staff[0]?.id || staff[0]?.user_id || undefined;
+
+            await api.post('/appointments', {
+                company_id: company.id,
+                service_id: matchedService.id,
+                service_ids: [matchedService.id],
+                services: [{ id: matchedService.id, price: matchedService.price, duration_minutes: duration, staff_id: staffId }],
+                staff_id: staffId,
+                customer_name: aiEditData.customerName || 'Sesli Asistan Müşterisi',
+                appointment_date: aiEditData.date,
+                start_time: startTime,
+                end_time: endTime,
+                price: matchedService.price,
+                notes: `Müşteri: ${aiEditData.customerName || '-'} | 🤖 AI Sesli Arama | Not: ${aiEditData.note || '-'} | Transkript: ${aiTranscription.substring(0, 150)}`,
+                status: 'approved'
+            });
+
+            setAiMode('SUCCESS');
+            await fetchData();
+        } catch (err: any) {
+            setAiError(err.response?.data?.error || err.message || 'Randevu oluşturulamadı.');
+            setAiMode('ERROR');
+        }
     };
 
     const fetchData = async () => {
@@ -322,7 +495,8 @@ export default function AppointmentManagement() {
                 try {
                     setLoading(true);
                     await api.patch(`/appointments/${id}/status`, { status: 'completed' });
-                    fetchData();
+                    await fetchData();
+                    window.location.reload();
                     return;
                 } catch (err) {
                     alert('Hata oluştu');
@@ -349,7 +523,8 @@ export default function AppointmentManagement() {
                 status,
                 price: finalPrice
             });
-            fetchData();
+            await fetchData();
+            window.location.reload();
         } catch (err: any) {
             const serverError = err.response?.data?.error;
             const message = serverError ? `Sunucu Hatası: ${serverError}` : (err.message || 'Bilinmeyen hata');
@@ -537,9 +712,25 @@ export default function AppointmentManagement() {
                         Panel
                     </Link>
                     <div className="flex gap-2">
+                        {/* AI Sesli Arama Butonu */}
+                        <button
+                            onClick={() => { setAiMode('RECORDING'); startAiRecording(); }}
+                            className={`p-2.5 rounded-xl transition-all relative ${aiMode === 'RECORDING' ? 'bg-red-500 text-white shadow-lg shadow-red-200 animate-pulse' : aiMode === 'PROCESSING' ? 'bg-amber-500 text-white animate-spin' : 'bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-md shadow-purple-200 hover:shadow-lg hover:scale-105'}`}
+                            title="Sesli Arama ile Randevu (AI)"
+                        >
+                            {aiMode === 'PROCESSING' ? (
+                                <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                            ) : aiMode === 'RECORDING' ? (
+                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                            ) : (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                            )}
+                        </button>
+                        {/* Guided Voice Step Butonu */}
                         <button
                             onClick={startVoiceCommand}
-                            className={`p-2.5 rounded-xl transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-50 text-slate-400 hover:text-pink-600'}`}
+                            className={`p-2.5 rounded-xl transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-50 text-slate-400 hover:text-purple-600 hover:bg-purple-50'}`}
+                            title="Adım Adım Sesli Komut"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m8 0h-8m4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
                         </button>
@@ -554,10 +745,11 @@ export default function AppointmentManagement() {
                 <h2 className="text-xl font-black text-slate-900 tracking-tight">Randevu Yönetimi</h2>
                 {voiceTranscript && (
                     <div className="mt-2 bg-pink-50 text-pink-600 px-3 py-1.5 rounded-xl text-[10px] font-bold animate-pulse border border-pink-100 italic">
-                        " {voiceTranscript} "
+                        "{voiceTranscript}"
                     </div>
                 )}
             </div>
+
 
             <div className="px-6 py-6">
                 {/* Horizontal Date Picker */}
@@ -1313,13 +1505,14 @@ export default function AppointmentManagement() {
                                             await api.patch(`/appointments/${completionModal.app!.id}/status`, {
                                                 status: 'completed',
                                                 price: completionModal.amount,
-                                                payment_method: 'unspecified',
+                                                payment_method: 'cash',
                                                 technical_notes: completionModal.technical_notes,
                                                 used_materials: completionModal.used_materials
                                             });
                                             setCompletionModal({ open: false, app: null, amount: 0, technical_notes: '', used_materials: '' });
                                             setSelectedAppointment(null);
-                                            fetchData();
+                                            await fetchData();
+                                            window.location.reload();
                                         } catch (e) {
                                             alert('İşlem başarısız');
                                         } finally {
@@ -1343,7 +1536,8 @@ export default function AppointmentManagement() {
                                             });
                                             setCompletionModal({ open: false, app: null, amount: 0, technical_notes: '', used_materials: '' });
                                             setSelectedAppointment(null);
-                                            fetchData();
+                                            await fetchData();
+                                            window.location.reload();
                                         } catch (e) {
                                             alert('İşlem başarısız');
                                         } finally {
@@ -1479,8 +1673,259 @@ export default function AppointmentManagement() {
                     </div>
                 )
             }
+
+            {/* ═══════════════════════════════════════════════════════════════
+                AI SES ARAMASI OVERLAY - RECORDING / PROCESSING / REVIEW / SUCCESS / ERROR
+                ═══════════════════════════════════════════════════════════════ */}
+            {aiMode !== 'IDLE' && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/95 backdrop-blur-2xl animate-in fade-in duration-300">
+                    <button
+                        onClick={resetAiState}
+                        className="absolute top-8 right-8 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-all"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+
+                    {/* ── RECORDING State ── */}
+                    {aiMode === 'RECORDING' && (
+                        <div className="flex flex-col items-center gap-8 px-6 w-full max-w-sm">
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-20 scale-[1.8]"></div>
+                                <div className="absolute inset-0 bg-red-400 rounded-full animate-pulse opacity-30 scale-[1.4]"></div>
+                                <div className="relative w-28 h-28 bg-gradient-to-br from-red-500 to-rose-600 rounded-full flex items-center justify-center shadow-2xl shadow-red-500/40">
+                                    <svg className="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                    </svg>
+                                </div>
+                            </div>
+                            {/* Animated waveform bars */}
+                            <div className="flex items-center gap-1 h-12">
+                                {[...Array(12)].map((_, i) => (
+                                    <div
+                                        key={i}
+                                        className="w-1.5 bg-red-400 rounded-full"
+                                        style={{
+                                            height: `${20 + Math.sin(i * 0.8) * 20}px`,
+                                            animation: `pulse ${0.4 + i * 0.1}s ease-in-out infinite alternate`,
+                                            animationDelay: `${i * 0.07}s`
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                            <div className="text-center">
+                                <h2 className="text-3xl font-black text-white tracking-tighter mb-2">Dinliyorum...</h2>
+                                <p className="text-red-300 text-sm font-bold">
+                                    {Math.floor(aiRecordingTime / 60)}:{String(aiRecordingTime % 60).padStart(2, '0')} / 2:00
+                                </p>
+                                <p className="text-white/40 text-xs font-bold uppercase tracking-widest mt-1">
+                                    Görüşmeyi bitirince kayıt düğmesine basın
+                                </p>
+                            </div>
+                            <button
+                                onClick={stopAiRecording}
+                                className="w-full max-w-xs py-5 bg-white text-slate-900 rounded-3xl font-black text-sm uppercase tracking-widest shadow-2xl hover:scale-105 active:scale-95 transition-all"
+                            >
+                                ⏹ Kaydı Durdur & Analiz Et
+                            </button>
+                        </div>
+                    )}
+
+                    {/* ── PROCESSING State ── */}
+                    {aiMode === 'PROCESSING' && (
+                        <div className="flex flex-col items-center gap-8 px-6 text-center">
+                            <div className="relative w-28 h-28">
+                                <div className="absolute inset-0 rounded-full border-4 border-purple-500/20"></div>
+                                <div className="absolute inset-0 rounded-full border-4 border-t-purple-500 animate-spin"></div>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <span className="text-4xl">🧠</span>
+                                </div>
+                            </div>
+                            <div>
+                                <h2 className="text-3xl font-black text-white tracking-tighter mb-2">Analiz Ediliyor</h2>
+                                <p className="text-purple-300 text-sm font-bold">Yapay zeka konuşmayı işliyor...</p>
+                            </div>
+                            <div className="space-y-2 w-full max-w-xs">
+                                {['Ses transkiript ediliyor (Whisper)', 'Randevu bilgileri çıkarılıyor (GPT-4o)', 'Hizmet eşleştiriliyor'].map((step, i) => (
+                                    <div key={i} className="flex items-center gap-3 bg-white/5 px-4 py-2.5 rounded-xl">
+                                        <div className="w-4 h-4 rounded-full border-2 border-t-purple-400 animate-spin flex-shrink-0" style={{ animationDelay: `${i * 0.3}s` }}></div>
+                                        <span className="text-white/60 text-xs font-bold">{step}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── REVIEW State ── */}
+                    {aiMode === 'REVIEW' && aiEditData && (
+                        <div className="w-full max-w-sm px-4 py-6 overflow-y-auto max-h-screen">
+                            <div className="text-center mb-6">
+                                <div className="w-16 h-16 bg-amber-500/20 rounded-2xl flex items-center justify-center mx-auto mb-3 text-3xl">📋</div>
+                                <h2 className="text-2xl font-black text-white tracking-tighter">Randevu Özeti</h2>
+                                <p className="text-amber-300 text-xs font-bold uppercase tracking-widest mt-1">AI bilgileri buldu — lütfen kontrol edin</p>
+                            </div>
+
+                            {/* Transcript */}
+                            {aiTranscription && (
+                                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-5">
+                                    <p className="text-white/30 text-[9px] font-black uppercase tracking-widest mb-2">Transkript</p>
+                                    <p className="text-white/60 text-xs italic leading-relaxed line-clamp-3">{aiTranscription}</p>
+                                </div>
+                            )}
+
+                            <div className="space-y-3 mb-6">
+                                {/* Müşteri Adı */}
+                                <div className="bg-white/5 rounded-2xl p-3">
+                                    <label className="block text-white/40 text-[9px] font-black uppercase tracking-widest mb-1.5">Müşteri Adı</label>
+                                    <input
+                                        type="text"
+                                        value={aiEditData.customerName || ''}
+                                        onChange={e => setAiEditData((p: any) => ({ ...p, customerName: e.target.value }))}
+                                        placeholder="Müşteri adı..."
+                                        className="w-full bg-transparent text-white font-bold text-sm outline-none placeholder-white/20 border-b border-white/10 pb-1"
+                                    />
+                                </div>
+                                {/* Hizmet */}
+                                <div className="bg-white/5 rounded-2xl p-3">
+                                    <label className="block text-white/40 text-[9px] font-black uppercase tracking-widest mb-1.5">Hizmet</label>
+                                    <select
+                                        value={services.find(s => s.name.toLowerCase().includes((aiEditData.serviceName || '').toLowerCase()))?.id || ''}
+                                        onChange={e => {
+                                            const found = services.find(s => String(s.id) === e.target.value);
+                                            if (found) setAiEditData((p: any) => ({ ...p, serviceName: found.name }));
+                                        }}
+                                        className="w-full bg-transparent text-white font-bold text-sm outline-none border-b border-white/10 pb-1"
+                                    >
+                                        <option value="" className="bg-slate-900">— Hizmet Seçin —</option>
+                                        {services.map(s => (
+                                            <option key={s.id} value={s.id} className="bg-slate-900">{s.name} (₺{s.price})</option>
+                                        ))}
+                                    </select>
+                                    {aiExtracted?.serviceName && (
+                                        <p className="text-white/30 text-[9px] mt-1">AI tespit etti: "{aiExtracted.serviceName}"</p>
+                                    )}
+                                </div>
+                                {/* Tarih */}
+                                <div className="bg-white/5 rounded-2xl p-3">
+                                    <label className="block text-white/40 text-[9px] font-black uppercase tracking-widest mb-1.5">Tarih</label>
+                                    <input
+                                        type="date"
+                                        value={aiEditData.date || ''}
+                                        onChange={e => setAiEditData((p: any) => ({ ...p, date: e.target.value }))}
+                                        className="w-full bg-transparent text-white font-bold text-sm outline-none border-b border-white/10 pb-1"
+                                        style={{ colorScheme: 'dark' }}
+                                    />
+                                </div>
+                                {/* Saat */}
+                                <div className="bg-white/5 rounded-2xl p-3">
+                                    <label className="block text-white/40 text-[9px] font-black uppercase tracking-widest mb-1.5">Saat</label>
+                                    <input
+                                        type="time"
+                                        value={aiEditData.time || ''}
+                                        onChange={e => setAiEditData((p: any) => ({ ...p, time: e.target.value }))}
+                                        className="w-full bg-transparent text-white font-bold text-sm outline-none border-b border-white/10 pb-1"
+                                        style={{ colorScheme: 'dark' }}
+                                    />
+                                </div>
+                                {/* Not */}
+                                <div className="bg-white/5 rounded-2xl p-3">
+                                    <label className="block text-white/40 text-[9px] font-black uppercase tracking-widest mb-1.5">Not</label>
+                                    <input
+                                        type="text"
+                                        value={aiEditData.note || ''}
+                                        onChange={e => setAiEditData((p: any) => ({ ...p, note: e.target.value }))}
+                                        placeholder="Ek not..."
+                                        className="w-full bg-transparent text-white font-bold text-sm outline-none placeholder-white/20 border-b border-white/10 pb-1"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={resetAiState}
+                                    className="flex-1 py-4 bg-white/10 text-white/60 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-white/20 transition-all"
+                                >
+                                    İptal
+                                </button>
+                                <button
+                                    onClick={confirmAiAppointment}
+                                    disabled={!aiEditData.serviceName || !aiEditData.date}
+                                    className="flex-2 px-6 py-4 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-purple-500/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    ✅ Randevu Oluştur
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── CREATING State ── */}
+                    {aiMode === 'CREATING' && (
+                        <div className="flex flex-col items-center gap-6 text-center px-6">
+                            <div className="w-20 h-20 bg-violet-500/20 rounded-2xl flex items-center justify-center">
+                                <svg className="w-10 h-10 text-violet-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-black text-white tracking-tighter">Kaydediliyor...</h2>
+                                <p className="text-violet-300 text-sm font-bold mt-1">Randevu sisteme ekleniyor</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── SUCCESS State ── */}
+                    {aiMode === 'SUCCESS' && (
+                        <div className="flex flex-col items-center gap-8 text-center px-6">
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-emerald-500 rounded-full animate-ping opacity-20 scale-[1.5]"></div>
+                                <div className="w-28 h-28 bg-gradient-to-br from-emerald-400 to-green-600 rounded-full flex items-center justify-center shadow-2xl shadow-emerald-500/40">
+                                    <svg className="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                </div>
+                            </div>
+                            <div>
+                                <h2 className="text-3xl font-black text-white tracking-tighter mb-2">Randevu Oluşturuldu!</h2>
+                                <p className="text-emerald-300 text-sm font-bold">AI sesli aramadan randevu başarıyla kaydedildi.</p>
+                                {aiCreatedId && <p className="text-white/30 text-xs mt-1">Randevu ID: #{aiCreatedId}</p>}
+                            </div>
+                            <button
+                                onClick={resetAiState}
+                                className="w-full max-w-xs py-5 bg-white text-slate-900 rounded-3xl font-black text-sm uppercase tracking-widest shadow-2xl hover:scale-105 active:scale-95 transition-all"
+                            >
+                                Tamam
+                            </button>
+                        </div>
+                    )}
+
+                    {/* ── ERROR State ── */}
+                    {aiMode === 'ERROR' && (
+                        <div className="flex flex-col items-center gap-6 text-center px-6 max-w-sm">
+                            <div className="w-24 h-24 bg-red-500/20 rounded-2xl flex items-center justify-center text-5xl">⚠️</div>
+                            <div>
+                                <h2 className="text-2xl font-black text-white tracking-tighter mb-2">Hata Oluştu</h2>
+                                <p className="text-red-300 text-sm font-bold leading-relaxed">{aiError}</p>
+                            </div>
+                            <div className="flex gap-3 w-full">
+                                <button
+                                    onClick={resetAiState}
+                                    className="flex-1 py-4 bg-white/10 text-white/60 rounded-2xl font-black text-xs uppercase tracking-widest"
+                                >
+                                    Kapat
+                                </button>
+                                <button
+                                    onClick={() => { setAiMode('IDLE'); setAiError(''); startAiRecording(); }}
+                                    className="flex-1 py-4 bg-red-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest"
+                                >
+                                    Tekrar Dene
+                                </button>
+                            </div>
+                            {/* Fallback: Open manual form */}
+                            <button
+                                onClick={() => { resetAiState(); setShowAddForm(true); }}
+                                className="text-white/30 text-xs font-bold uppercase tracking-widest hover:text-white/60 transition-colors"
+                            >
+                                Manuel Randevu Oluştur
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
         </div >
     );
 }
-
-
