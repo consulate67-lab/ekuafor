@@ -193,19 +193,30 @@ public class VoiceAssistantService extends Service {
                         showToast("Görüşme analiz edildi, randevu bulunamadı.");
                     }
                     
-                    // İşlem sonucunu (Hata/Başarı) görmek için UYGULAMAYI AÇ!
+                    // İşlem sonucunu (Hata/Başarı) görmek için statik hafızaya yaz ve UYGULAMAYI AÇMAYI DENE!
+                    AIAssistantPlugin.lastAIResult = resStr;
                     Intent launchIntent = new Intent(this, MainActivity.class);
                     launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
                     launchIntent.putExtra("ai_result", resStr);
-                    startActivity(launchIntent);
+                    try {
+                        startActivity(launchIntent);
+                    } catch (Exception startErr) {
+                        Log.e(TAG, "Activity could not be started from background", startErr);
+                    }
                 } else {
                     showToast("Sunucu yanıtı boş: " + responseCode);
                     
                     // Boş yanıt bile gelse hatayı gösterebilmek için ekranı mecburen açıyoruz
+                    String errStr = "{\"success\":false,\"error\":\"HTTP " + responseCode + " - Sunucu ile bağlantı kurulamadı.\"}";
+                    AIAssistantPlugin.lastAIResult = errStr;
                     Intent launchIntent = new Intent(this, MainActivity.class);
                     launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                    launchIntent.putExtra("ai_result", "{\"success\":false,\"error\":\"HTTP " + responseCode + " - Sunucu ile bağlantı kurulamadı.\"}");
-                    startActivity(launchIntent);
+                    launchIntent.putExtra("ai_result", errStr);
+                    try {
+                        startActivity(launchIntent);
+                    } catch (Exception startErr) {
+                        Log.e(TAG, "Activity could not be started from background", startErr);
+                    }
                 }
                 
                 // Cleanup
