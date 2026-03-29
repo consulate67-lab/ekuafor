@@ -73,12 +73,9 @@ public class VoiceAssistantService extends Service {
             audioFilePath = getExternalFilesDir(null).getAbsolutePath() + "/call_" + System.currentTimeMillis() + ".m4a";
             recorder = new MediaRecorder();
             
-            // Try VOICE_COMMUNICATION first, it often works best on modern Android for calls
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                recorder.setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION);
-            } else {
-                recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-            }
+            // Yankı (echo) sorununu önlemek için varsayılan MIC kullanıyoruz. 
+            // VOICE_COMMUNICATION bazı cihazlarda hoparlörü zorla açar.
+            recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
             
             recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
             recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
@@ -86,23 +83,10 @@ public class VoiceAssistantService extends Service {
             
             recorder.prepare();
             recorder.start();
-            Log.d(TAG, "Recording started: " + audioFilePath);
+            Log.d(TAG, "Recording started with MIC: " + audioFilePath);
         } catch (Exception e) {
-            Log.e(TAG, "VOICE_COMMUNICATION failed, trying MIC", e);
-            try {
-                if (recorder != null) recorder.release();
-                recorder = new MediaRecorder();
-                recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-                recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-                recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
-                recorder.setOutputFile(audioFilePath);
-                recorder.prepare();
-                recorder.start();
-                Log.d(TAG, "Recording started with MIC");
-            } catch (Exception e2) {
-                Log.e(TAG, "MIC recording failed too", e2);
-                showToast("Ses kaydı başlatılamadı!");
-            }
+            Log.e(TAG, "Recording start failed", e);
+            showToast("Ses kaydı başlatılamadı!");
         }
     }
 
@@ -186,8 +170,13 @@ public class VoiceAssistantService extends Service {
                 int responseCode = conn.getResponseCode();
                 Log.d(TAG, "Server Responded: " + responseCode);
                 
-                if (responseCode == 200) {
-                    BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                // Başarılı (2xx) veya Hata (4xx, 5xx), ne olursa olsun yanıtı oku
+                java.io.InputStream inStream = (responseCode >= 200 && responseCode < 300) 
+                        ? conn.getInputStream() 
+                        : conn.getErrorStream();
+
+                if (inStream != null) {
+                    BufferedReader in = new BufferedReader(new InputStreamReader(inStream));
                     String line;
                     StringBuilder response = new StringBuilder();
                     while ((line = in.readLine()) != null) response.append(line);
@@ -198,17 +187,25 @@ public class VoiceAssistantService extends Service {
                     
                     if (resStr.contains("\"success\":true") && resStr.contains("\"data\"")) {
                         showToast("Randevu algılandı!");
+                    } else if (resStr.contains("\"success\":false")) {
+                        showToast("Sunucudan bir hata mesajı döndü.");
                     } else {
                         showToast("Görüşme analiz edildi, randevu bulunamadı.");
                     }
                     
-                    // Success - Open App anyway to show feedback
+                    // İşlem sonucunu (Hata/Başarı) görmek için UYGULAMAYI AÇ!
                     Intent launchIntent = new Intent(this, MainActivity.class);
                     launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
                     launchIntent.putExtra("ai_result", resStr);
                     startActivity(launchIntent);
                 } else {
-                    showToast("Sunucu hatası: " + responseCode);
+                    showToast("Sunucu yanıtı boş: " + responseCode);
+                    
+                    // Boş yanıt bile gelse hatayı gösterebilmek için ekranı mecburen açıyoruz
+                    Intent launchIntent = new Intent(this, MainActivity.class);
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                    launchIntent.putExtra("ai_result", "{\"success\":false,\"error\":\"HTTP " + responseCode + " - Sunucu ile bağlantı kurulamadı.\"}");
+                    startActivity(launchIntent);
                 }
                 
                 // Cleanup
