@@ -196,9 +196,42 @@ function App() {
                     }
                 }
             });
+            
+            // App resume (foregrounding) event
+            const stateListener = CapApp.addListener('appStateChange', async (state) => {
+                if (state.isActive) {
+                    try {
+                        const { registerPlugin } = await import('@capacitor/core');
+                        const AIAssistant = registerPlugin<any>('AIAssistant');
+                        const { result } = await AIAssistant.getLastResult();
+                        
+                        if (result) {
+                            try {
+                                const parsed = JSON.parse(result);
+                                if (parsed.success && parsed.data) {
+                                    if (parsed.data.autoCreated) {
+                                        alert('✅ Arka plan araması analiz edildi ve randevu başarıyla oluşturuldu!\n\nServis: ' + parsed.data.extractedInfo?.serviceName + ' - ' + parsed.data.extractedInfo?.time);
+                                        // Trigger a reload of appointments
+                                        window.dispatchEvent(new Event('refresh_appointments'));
+                                    } else {
+                                        alert('ℹ️ Görüşme analiz edildi, ancak net bir randevu bulunamadı veya manuel onay gerekiyor.');
+                                    }
+                                } else if (!parsed.success) {
+                                    alert('⚠️ Yapay Zeka Hata Kodu:\n\n' + (parsed.error || 'Bilinmeyen Hata'));
+                                }
+                            } catch (e) {
+                                console.error('Error parsing global AI result', e);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('StateListener AI Result Error:', e);
+                    }
+                }
+            });
 
             return () => {
                 listener.then(l => l.remove());
+                stateListener.then(l => l.remove());
             };
         }
     }, [isNative, initialized, isAuthenticated, user]);

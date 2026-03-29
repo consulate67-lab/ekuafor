@@ -5,6 +5,8 @@ import aiAssistantService from '../services/ai-assistant.service';
 import appointmentService from '../services/appointment.service';
 import { authMiddleware } from '../middleware/auth.middleware';
 import pool from '../config/database';
+import { LocalNLPEngine } from '../services/local-nlp.service';
+import { LocalSTTEngine } from '../services/local-stt.service';
 
 const router = Router();
 
@@ -181,48 +183,69 @@ async function autoCreateFromExtracted(
  * POST /api/ai/process-call-audio
  */
 router.post('/process-call-audio', authMiddleware as any, (upload.single('audio') as any), async (req: any, res: any) => {
-    const audioFile = req.file;
-    if (!audioFile) return res.status(400).json({ success: false, error: 'Ses dosyası yüklenemedi.' });
-
     try {
-        const companyId: number = req.user?.company_id;
-        let rules = '';
+        const audioFile = req.file;
+        const companyId = req.user?.company_id;
 
+        if (!audioFile) {
+            return res.status(400).json({ success: false, error: 'Ses dosyası bulunamadı.' });
+        }
+
+        let rules = '';
         if (companyId) {
             try {
                 const compRes = await pool.query('SELECT ai_rules, ai_enabled FROM companies WHERE id = $1', [companyId]);
                 const cd = compRes.rows[0];
-                // Note: If ai_enabled is explicitly FALSE, then we stop. If it's undefined (column missing), we continue.
                 if (cd && cd.ai_enabled === false) {
                     fs.unlink(audioFile.path, () => {});
                     return res.status(403).json({ success: false, error: 'Yapay Zeka bu firma için devre dışı.' });
                 }
                 rules = cd?.ai_rules || '';
             } catch (e) {
-                console.warn('[AI] Company settings check failed (maybe column missing):', (e as any).message);
+                console.warn('[AI] Company settings check failed:', (e as any).message);
             }
         }
 
-        // 1. Transcribe
+        // 1. Ücretsiz Local Ses Tanıma (ASR) Dene
         let transcription = '';
         try {
-            transcription = await aiAssistantService.transcribeAudio(audioFile.path);
-        } catch (e: any) {
-            fs.unlink(audioFile.path, () => {});
-            return res.status(422).json({ success: false, error: e.message, transcription: '' });
+            console.log('[AI] VOSK Local STT Motoru deneniyor...');
+            transcription = await LocalSTTEngine.transcribeAudio(audioFile.path);
+        } catch (localSttError: any) {
+            console.warn('[AI] Local STT Modeli bulunamadı veya hata verdi. Yedeğe (OpenAI) geçiliyor:', localSttError.message);
+            try {
+                transcription = await aiAssistantService.transcribeAudio(audioFile.path);
+            } catch (e: any) {
+                fs.unlink(audioFile.path, () => {});
+                return res.status(422).json({ success: false, error: e.message, transcription: '' });
+            }
         }
 
-        // 2. Extract with GPT-4o + few-shot from this company's history
-        const info = await aiAssistantService.extractAppointmentInfo(transcription, rules, companyId);
-        console.log('[AI] Extracted:', JSON.stringify(info));
+        if (!transcription || transcription.length < 5) {
+            fs.unlink(audioFile.path, () => {});
+            return res.status(200).json({ success: false, error: 'Görüşme çok kısaydı veya anlaşılamadı.', transcription });
+        }
 
-        // 3. Auto-create
+        console.log('[AI] Sesten Metne Çevrildi:', transcription);
+
+        // 2. Ücretsiz Local NLP ile Cümleyi Anla (%100 Bedava, GPT-4 kullanılmaz)
+        let info: any = null;
+        try {
+            info = await LocalNLPEngine.processText(companyId, transcription);
+            console.log('[AI] Kendi NLP Motorumuzun Analizi:', JSON.stringify(info));
+        } catch (nlpErr: any) {
+            console.error('[AI] Local NLP Engine Error:', nlpErr);
+            fs.unlink(audioFile.path, () => {});
+            return res.status(500).json({ success: false, error: 'Yerel NLP motorunda hata oluştu.', transcription });
+        }
+
+        // 3. Auto-create (Açık Kaynak Sistem)
         let autoCreated = false;
         let appointmentId: number | null = null;
         let matchedServiceName: string | null = null;
         let creationError: string | null = null;
 
-        if (companyId && info) {
+        if (companyId && info && info.confidence > 25) { // Eğer mantıklı bir şeyler bulduysa
             try {
                 const result = await autoCreateFromExtracted(info, companyId, transcription);
                 autoCreated = result.autoCreated;
@@ -234,7 +257,7 @@ router.post('/process-call-audio', authMiddleware as any, (upload.single('audio'
             }
         }
 
-        // 4. Save call log for learning
+        // 4. Öğrenme Makinesi için Kaydet
         if (companyId) {
             await aiAssistantService.saveCallLog({
                 companyId,
@@ -255,9 +278,9 @@ router.post('/process-call-audio', authMiddleware as any, (upload.single('audio'
         });
 
     } catch (err: any) {
-        if (audioFile) fs.unlink(audioFile.path, () => {});
+        if (req.file) fs.unlink(req.file.path, () => {});
         console.error('[AI] Call Error:', err);
-        res.status(500).json({ success: false, error: err.message || 'Ses işleme hatası.' });
+        return res.status(500).json({ success: false, error: 'Ses işlenirken sistem hatası oluştu.' });
     }
 });
 
