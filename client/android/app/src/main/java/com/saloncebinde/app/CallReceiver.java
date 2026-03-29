@@ -24,13 +24,13 @@ public class CallReceiver extends BroadcastReceiver {
              Log.d(TAG, "Ringing detected");
         }
 
-        // Check if user is staff
+        // Check if user is logged in
         SharedPreferences prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
-        boolean isStaff = prefs.getBoolean("is_staff", false);
+        String token = prefs.getString("auth_token", "");
 
-        if (!isStaff) {
-            Log.d(TAG, "Not a staff member or not synced yet.");
-            // Sadece çalışan değilse veya oturum senkronize değilse burada durur
+        if (token == null || token.isEmpty()) {
+            Log.d(TAG, "Not logged in or token missing.");
+            // Oturum yoksa veya senkronize değilse burada durur
             return;
         }
 
