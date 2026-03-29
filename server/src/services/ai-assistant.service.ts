@@ -2,6 +2,13 @@ import OpenAI from 'openai';
 import fs from 'fs';
 import pool from '../config/database';
 
+// Fix for older Node.js versions where 'File' is not global (Required for OpenAI uploads)
+if (typeof globalThis.File === 'undefined') {
+    const { File, Blob } = require('node:buffer');
+    (globalThis as any).File = File;
+    (globalThis as any).Blob = Blob;
+}
+
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || '',
 });
