@@ -10,47 +10,41 @@ import android.widget.Toast;
 
 public class CallReceiver extends BroadcastReceiver {
     private static final String TAG = "CallReceiver";
+    private static boolean listenerStarted = false;
 
     @Override
     public void onReceive(Context context, Intent intent) {
         String state = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
-        String incomingNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
-        
         if (state == null) return;
 
-        // Her durumda bir bildirim ver (Sistemin çalıştığını doğrula)
-        if (TelephonyManager.EXTRA_STATE_RINGING.equals(state)) {
-             Toast.makeText(context, "📱 AI: Telefon çalıyor...", Toast.LENGTH_LONG).show();
-             Log.d(TAG, "Ringing detected");
-        }
+        // Sadece RINGING durumunda tetikle (Android 9+ OFFHOOK/IDLE broadcast'i kısıtlıyor)
+        if (!TelephonyManager.EXTRA_STATE_RINGING.equals(state)) return;
 
-        // Check if user is logged in
+        Log.d(TAG, "RINGING algılandı!");
+        Toast.makeText(context, "📱 AI çalıyor...", Toast.LENGTH_SHORT).show();
+
+        // Oturum kontrolü
         SharedPreferences prefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
         String token = prefs.getString("auth_token", "");
-
         if (token == null || token.isEmpty()) {
-            Log.d(TAG, "Not logged in or token missing.");
-            // Oturum yoksa veya senkronize değilse burada durur
+            Log.d(TAG, "Token eksik - servis başlatılmadı");
             return;
         }
 
-        Intent serviceIntent = new Intent(context, VoiceAssistantService.class);
-        
-        if (TelephonyManager.EXTRA_STATE_RINGING.equals(state)) {
-            Log.d(TAG, "State: RINGING");
-            Toast.makeText(context, "AI: Çağrı bekleniyor...", Toast.LENGTH_SHORT).show();
-            serviceIntent.setAction("WAITING_FOR_CALL");
-            context.startForegroundService(serviceIntent);
-        } else if (TelephonyManager.EXTRA_STATE_OFFHOOK.equals(state)) {
-            Log.d(TAG, "State: OFFHOOK (Görüşme Başladı)");
-            Toast.makeText(context, "AI: Görüşme kaydediliyor...", Toast.LENGTH_SHORT).show();
-            serviceIntent.setAction("START_RECORDING");
-            context.startForegroundService(serviceIntent);
-        } else if (TelephonyManager.EXTRA_STATE_IDLE.equals(state)) {
-            Log.d(TAG, "State: IDLE (Görüşme Bitti)");
-            Toast.makeText(context, "AI: İşlem tamamlanıyor...", Toast.LENGTH_SHORT).show();
-            serviceIntent.setAction("STOP_RECORDING");
-            context.startForegroundService(serviceIntent);
+        if (listenerStarted) {
+            Log.d(TAG, "Listener zaten çalışıyor");
+            return;
         }
+
+        // PhoneStateListener'ı başlatmak için servisi çalıştır
+        Intent serviceIntent = new Intent(context, VoiceAssistantService.class);
+        serviceIntent.setAction("START_LISTENING");
+        context.startForegroundService(serviceIntent);
+        listenerStarted = true;
+
+        // Servis kapatılınca flag'i sıfırla (30 saniye sonra)
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            listenerStarted = false;
+        }, 30000);
     }
 }
