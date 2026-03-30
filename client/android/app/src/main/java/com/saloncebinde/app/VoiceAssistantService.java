@@ -10,8 +10,9 @@ import android.content.SharedPreferences;
 import android.media.MediaRecorder;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
-import android.telephony.PhoneStateListener;
+import android.os.Looper;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.widget.Toast;
@@ -28,97 +29,110 @@ import java.net.URL;
 public class VoiceAssistantService extends Service {
     private static final String TAG = "VoiceAssistantService";
     private static final String CHANNEL_ID = "VoiceAssistantChannel";
+    
     private MediaRecorder recorder = null;
     private String audioFilePath = null;
+    private Handler pollingHandler = null;
     private TelephonyManager telephonyManager = null;
-    private PhoneStateListener phoneStateListener = null;
-    private boolean isListening = false;
+    
+    // Durum takibi
+    private boolean wasOffhook = false;  // Daha önce açıldı mı?
+    private int pollCount = 0;
+    private static final int MAX_POLLS = 180; // 3 dakika (her 1 saniyede bir)
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent != null ? intent.getAction() : null;
         Log.d(TAG, "onStartCommand: " + action);
 
-        if ("WAITING_FOR_CALL".equals(action) || "START_LISTENING".equals(action)) {
-            startForegroundService("Saloon AI Hazır - Çağrı Dinleniyor...");
-            startPhoneStateListener();
-        } else if ("START_RECORDING".equals(action)) {
-            // Eski yöntem - geriye dönük uyumluluk
-            startForegroundService("Görüşme Kaydediliyor...");
-            startRecording();
-        } else if ("STOP_RECORDING".equals(action)) {
-            // Eski yöntem - geriye dönük uyumluluk
-            stopRecording();
-            uploadAndNotify();
+        if ("START_LISTENING".equals(action) || "WAITING_FOR_CALL".equals(action)) {
+            startForegroundNotification("AI Hazır - Çağrı İzleniyor...");
+            startPolling();
         }
 
-        return START_STICKY; // Sistem öldürse bile yeniden başlat
+        return START_NOT_STICKY;
     }
 
     /**
-     * Modern Android 9+ için PhoneStateListener - BroadcastReceiver yerine
-     * Bu yöntem RINGING, OFFHOOK ve IDLE'ı %100 güvenilir şekilde yakalar
+     * Her saniye TelephonyManager'ı sorgula - En güvenilir yöntem!
+     * BroadcastReceiver veya PhoneStateListener yerine direkt polling.
      */
-    private void startPhoneStateListener() {
-        if (isListening) return;
-
+    private void startPolling() {
         telephonyManager = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
         if (telephonyManager == null) {
             Log.e(TAG, "TelephonyManager alınamadı!");
+            AIAssistantPlugin.lastAIResult = "{\"success\":false,\"error\":\"TELEFON_HATASI: TelephonyManager bulunamadı.\"}";
+            stopSelf();
             return;
         }
 
-        phoneStateListener = new PhoneStateListener() {
+        pollingHandler = new Handler(Looper.getMainLooper());
+        wasOffhook = false;
+        pollCount = 0;
+        
+        Log.d(TAG, "Telefon durumu izleme başladı");
+        
+        Runnable pollRunnable = new Runnable() {
             @Override
-            public void onCallStateChanged(int state, String phoneNumber) {
-                Log.d(TAG, "PhoneStateListener - Durum: " + state);
-
-                switch (state) {
-                    case TelephonyManager.CALL_STATE_RINGING:
-                        // Telefon çalıyor
-                        showToast("🔔 AI: Telefon Çalıyor...");
-                        Log.d(TAG, "RINGING algılandı");
-                        break;
-
-                    case TelephonyManager.CALL_STATE_OFFHOOK:
-                        // Telefon açıldı - KAYDI BAŞLAT
-                        showToast("🔴 AI: Kayıt Başladı!");
-                        Log.d(TAG, "OFFHOOK - Kayıt başlıyor");
-                        startRecording();
-                        break;
-
-                    case TelephonyManager.CALL_STATE_IDLE:
-                        // Görüşme bitti - KAYDI DURDUR VE YÜKLE
-                        showToast("✅ AI: Görüşme Bitti, Analiz Başlıyor...");
-                        Log.d(TAG, "IDLE - Kayıt durduruluyor");
-                        stopPhoneStateListener();
-                        stopRecording();
-                        uploadAndNotify();
-                        break;
+            public void run() {
+                pollCount++;
+                
+                if (pollCount > MAX_POLLS) {
+                    Log.w(TAG, "Max polling süresi doldu");
+                    stopRecordingAndUpload();
+                    return;
                 }
+
+                int callState = telephonyManager.getCallState();
+                Log.d(TAG, "Poll #" + pollCount + " - Durum: " + callState);
+
+                if (callState == TelephonyManager.CALL_STATE_OFFHOOK && !wasOffhook) {
+                    // Telefon açıldı - KAYDI BAŞLAT
+                    wasOffhook = true;
+                    showToast("🔴 AI: Kayıt Başladı!");
+                    Log.d(TAG, "OFFHOOK tespit edildi - kayıt başlıyor");
+                    startRecording();
+
+                } else if (callState == TelephonyManager.CALL_STATE_IDLE && wasOffhook) {
+                    // Görüşme bitti ve daha önce açılmıştı - KAYDI DURDUR
+                    Log.d(TAG, "IDLE tespit edildi - kayıt durduruluyor");
+                    showToast("✅ AI: Görüşme Bitti!");
+                    stopRecordingAndUpload();
+                    return;
+
+                } else if (callState == TelephonyManager.CALL_STATE_IDLE && !wasOffhook && pollCount > 5) {
+                    // Telefon hiç açılmadan kapandı (cevapsız çağrı)
+                    Log.d(TAG, "Cevapsız çağrı - durdurulıyor");
+                    AIAssistantPlugin.lastAIResult = "{\"success\":false,\"error\":\"CEVAPSIZ: Görüşme açılmadı, kayıt yapılmadı.\"}";
+                    stopForeground(true);
+                    stopSelf();
+                    return;
+                }
+
+                // Tekrar kontrol et (1 saniye sonra)
+                pollingHandler.postDelayed(this, 1000);
             }
         };
-
-        telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
-        isListening = true;
-        Log.d(TAG, "PhoneStateListener kaydedildi!");
+        
+        pollingHandler.postDelayed(pollRunnable, 1000);
     }
 
-    private void stopPhoneStateListener() {
-        if (telephonyManager != null && phoneStateListener != null) {
-            telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE);
-            isListening = false;
-            Log.d(TAG, "PhoneStateListener durduruldu");
+    private void stopRecordingAndUpload() {
+        if (pollingHandler != null) {
+            pollingHandler.removeCallbacksAndMessages(null);
+            pollingHandler = null;
         }
+        stopRecording();
+        uploadAndNotify();
     }
 
-    private void startForegroundService(String text) {
+    private void startForegroundNotification(String text) {
         NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "AI Asistan", NotificationManager.IMPORTANCE_LOW);
         if (manager != null) manager.createNotificationChannel(channel);
 
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Saloon Cebinde AI")
+            .setContentTitle("Saloon AI")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.presence_audio_busy)
             .setOngoing(true)
@@ -145,15 +159,15 @@ public class VoiceAssistantService extends Service {
             Log.d(TAG, "Kayıt başladı: " + audioFilePath);
         } catch (Exception e) {
             Log.e(TAG, "Kayıt başlatılamadı", e);
-            String errMsg = "{\"success\":false,\"error\":\"MIC_HATASI: " + e.getMessage() + "\"}";
-            AIAssistantPlugin.lastAIResult = errMsg;
-            showToast("⚠️ Ses kaydı başlatılamadı: " + e.getMessage());
-            audioFilePath = null;
-            recorder = null;
-            Intent launchIntent = new Intent(this, MainActivity.class);
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            launchIntent.putExtra("ai_result", errMsg);
-            try { startActivity(launchIntent); } catch (Exception ex) { Log.e(TAG, "Launch failed", ex); }
+            String err = "{\"success\":false,\"error\":\"MIC_HATASI: " + e.getMessage() + "\"}";
+            AIAssistantPlugin.lastAIResult = err;
+            showToast("⚠️ Mikrofon hatası: " + e.getMessage());
+            Intent li = new Intent(this, MainActivity.class);
+            li.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            li.putExtra("ai_result", err);
+            try { startActivity(li); } catch (Exception ex) { Log.e(TAG, "Launch failed", ex); }
+            stopForeground(true);
+            stopSelf();
         }
     }
 
@@ -172,14 +186,10 @@ public class VoiceAssistantService extends Service {
 
     private void uploadAndNotify() {
         if (audioFilePath == null) {
-            Log.d(TAG, "audioFilePath null - kayıt hiç başlamamış");
-            String errMsg = "{\"success\":false,\"error\":\"KAYIT_YOK: Ses dosyası oluşturulamadı. Mikrofon izni var mı?\"}";
-            AIAssistantPlugin.lastAIResult = errMsg;
+            String err = "{\"success\":false,\"error\":\"KAYIT_YOK: Ses kaydı başlatılamadı.\"}";
+            AIAssistantPlugin.lastAIResult = err;
             showToast("⚠️ Ses kaydedilemedi.");
-            Intent launchIntent = new Intent(this, MainActivity.class);
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            launchIntent.putExtra("ai_result", errMsg);
-            try { startActivity(launchIntent); } catch (Exception e) { Log.e(TAG, "Launch failed", e); }
+            launchMainActivity(err);
             stopForeground(true);
             stopSelf();
             return;
@@ -188,35 +198,30 @@ public class VoiceAssistantService extends Service {
         new Thread(() -> {
             try {
                 Thread.sleep(500);
-
                 SharedPreferences prefs = getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
                 String token = prefs.getString("auth_token", "");
                 String baseUrl = prefs.getString("base_url", "https://www.saloncebinde.com");
 
                 if (token == null || token.isEmpty()) {
-                    Log.e(TAG, "Auth token eksik!");
-                    AIAssistantPlugin.lastAIResult = "{\"success\":false,\"error\":\"TOKEN_EKSIK: Uygulamaya giriş yapılmamış.\"}";
-                    showToast("Hata: Oturum bilgisi eksik.");
+                    String err = "{\"success\":false,\"error\":\"TOKEN_EKSIK: Giriş yapılmamış.\"}";
+                    AIAssistantPlugin.lastAIResult = err;
+                    showToast("Hata: Giriş bilgisi eksik.");
+                    launchMainActivity(err);
                     return;
                 }
 
                 File file = new File(audioFilePath);
                 if (!file.exists() || file.length() < 100) {
-                    Log.e(TAG, "Dosya çok küçük: " + (file.exists() ? file.length() : "Yok"));
-                    String errMsg = "{\"success\":false,\"error\":\"DOSYA_KUCUK: Ses dosyası " + (file.exists() ? file.length() + " byte" : "bulunamadı") + ". Görüşme çok kısa mıydı?\"}";
-                    AIAssistantPlugin.lastAIResult = errMsg;
-                    showToast("Görüşme çok kısa veya ses alınamadı.");
-                    Intent li = new Intent(this, MainActivity.class);
-                    li.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                    li.putExtra("ai_result", errMsg);
-                    try { startActivity(li); } catch (Exception e) { Log.e(TAG, "Launch failed", e); }
+                    String err = "{\"success\":false,\"error\":\"DOSYA_KUCUK: " + (file.exists() ? file.length() + " byte" : "Dosya yok") + "\"}";
+                    AIAssistantPlugin.lastAIResult = err;
+                    showToast("Ses dosyası çok küçük.");
+                    launchMainActivity(err);
                     return;
                 }
 
-                showToast("⏳ Görüşme analiz ediliyor...");
-
+                showToast("⏳ Analiz ediliyor...");
                 String targetUrl = baseUrl.replaceAll("/$", "") + "/api/ai/process-call-audio";
-                Log.d(TAG, "Yükleniyor (" + file.length() + " byte): " + targetUrl);
+                Log.d(TAG, "Gönderiliyor (" + file.length() + "b): " + targetUrl);
 
                 URL url = new URL(targetUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -242,54 +247,41 @@ public class VoiceAssistantService extends Service {
                 fis.close();
 
                 int responseCode = conn.getResponseCode();
-                Log.d(TAG, "Sunucu Yanıtı: " + responseCode);
+                Log.d(TAG, "HTTP: " + responseCode);
 
-                java.io.InputStream inStream = (responseCode >= 200 && responseCode < 300)
-                        ? conn.getInputStream()
-                        : conn.getErrorStream();
+                java.io.InputStream inStream = responseCode >= 200 && responseCode < 300
+                        ? conn.getInputStream() : conn.getErrorStream();
 
                 String resStr;
                 if (inStream != null) {
-                    BufferedReader in = new BufferedReader(new InputStreamReader(inStream));
+                    BufferedReader br = new BufferedReader(new InputStreamReader(inStream));
+                    StringBuilder sb = new StringBuilder();
                     String line;
-                    StringBuilder response = new StringBuilder();
-                    while ((line = in.readLine()) != null) response.append(line);
-                    in.close();
-                    resStr = response.toString();
+                    while ((line = br.readLine()) != null) sb.append(line);
+                    br.close();
+                    resStr = sb.toString();
                 } else {
-                    resStr = "{\"success\":false,\"error\":\"HTTP " + responseCode + " - Sunucu yanıtı boş\"}";
+                    resStr = "{\"success\":false,\"error\":\"HTTP_" + responseCode + "\"}";
                 }
 
-                Log.d(TAG, "AI Yanıtı: " + resStr);
+                Log.d(TAG, "Yanıt: " + resStr);
+                AIAssistantPlugin.lastAIResult = resStr;
 
                 if (resStr.contains("\"success\":true")) {
                     showToast("✅ Randevu analiz edildi!");
                 } else {
-                    showToast("⚠️ Analiz tamamlandı (sonuç için uygulamayı aç)");
+                    showToast("⚠️ Analiz tamamlandı");
                 }
 
-                // Hafızaya yaz ve uygulamayı aç
-                AIAssistantPlugin.lastAIResult = resStr;
-                Intent launchIntent = new Intent(this, MainActivity.class);
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                launchIntent.putExtra("ai_result", resStr);
-                try { startActivity(launchIntent); } catch (Exception startErr) {
-                    Log.e(TAG, "Activity açılamadı", startErr);
-                }
-
+                launchMainActivity(resStr);
                 if (file.exists()) file.delete();
 
             } catch (Exception e) {
-                Log.e(TAG, "İşlem başarısız", e);
-                String crashErr = "{\"success\":false,\"error\":\"BAGLANTI_HATASI: " + e.getMessage() + "\"}";
-                AIAssistantPlugin.lastAIResult = crashErr;
+                Log.e(TAG, "Hata", e);
+                String err = "{\"success\":false,\"error\":\"BAGLANTI: " + e.getMessage() + "\"}";
+                AIAssistantPlugin.lastAIResult = err;
                 showToast("Bağlantı hatası: " + e.getMessage());
-                Intent launchIntent = new Intent(this, MainActivity.class);
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                launchIntent.putExtra("ai_result", crashErr);
-                try { startActivity(launchIntent); } catch (Exception startErr) {
-                    Log.e(TAG, "Activity açılamadı", startErr);
-                }
+                launchMainActivity(err);
             } finally {
                 stopForeground(true);
                 stopSelf();
@@ -297,15 +289,22 @@ public class VoiceAssistantService extends Service {
         }).start();
     }
 
+    private void launchMainActivity(String result) {
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        intent.putExtra("ai_result", result);
+        try { startActivity(intent); } catch (Exception e) { Log.e(TAG, "Launch failed", e); }
+    }
+
     private void showToast(final String text) {
-        new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
+        new Handler(Looper.getMainLooper()).post(() ->
             Toast.makeText(getApplicationContext(), text, Toast.LENGTH_LONG).show()
         );
     }
 
     @Override
     public void onDestroy() {
-        stopPhoneStateListener();
+        if (pollingHandler != null) pollingHandler.removeCallbacksAndMessages(null);
         stopRecording();
         super.onDestroy();
     }
