@@ -310,7 +310,7 @@ function App() {
                             }
                         }}
                     >
-                        v1.1.2-AI | {showDebug ? 'Gizle' : 'HATA KODUNU GÖSTER (' + debugLog.length + ')'}
+                        v1.1.3-AI | {showDebug ? 'Gizle' : 'HATA KODUNU GÖSTER (' + debugLog.length + ')'}
                     </button>
                 </div>
             )}

@@ -204,7 +204,13 @@ public class VoiceAssistantService extends Service {
                 }
 
                 showToast("⏳ Yapay zeka analiz ediyor...");
-                String targetUrl = baseUrl.replaceAll("/$", "") + "/api/ai/process-call-audio";
+                String cleanBase = baseUrl.replaceAll("/$", "");
+                String targetUrl;
+                if (cleanBase.endsWith("/api")) {
+                    targetUrl = cleanBase + "/ai/process-call-audio";
+                } else {
+                    targetUrl = cleanBase + "/api/ai/process-call-audio";
+                }
                 Log.d(TAG, "POST → " + targetUrl + " (" + fileSize + "b)");
 
                 URL url = new URL(targetUrl);
