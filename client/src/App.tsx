@@ -273,23 +273,25 @@ function App() {
     }
 
     return (
-        <div className="relative min-h-screen">
-            {/* CANLI DEBUG PANEL */}
+        <div className="relative min-h-screen pb-40">
+            {/* CANLI DEBUG PANEL - BÜYÜTÜLMÜŞ VE YUKARI ALINMIŞ */}
             {isNative && (
-                <div className="fixed bottom-0 left-0 right-0 z-[9999]">
+                <div className="fixed bottom-24 left-2 right-2 z-[99999] shadow-2xl rounded-lg overflow-hidden border-2 border-green-500">
                     {showDebug && (
-                        <div ref={debugRef} className="bg-black/90 text-green-400 text-[10px] font-mono p-2 max-h-48 overflow-y-auto border-t border-green-800">
-                            <div className="flex justify-between items-center mb-1">
-                                <span className="text-yellow-400 font-bold">AI Debug Log</span>
-                                <button className="text-red-400 text-xs px-2" onClick={() => setShowDebug(false)}>x Kapat</button>
+                        <div ref={debugRef} className="bg-black/95 text-green-400 text-xs sm:text-sm font-mono p-3 h-64 overflow-y-auto">
+                            <div className="flex justify-between items-center mb-2 pb-2 border-b border-green-800 sticky top-0 bg-black/95">
+                                <span className="text-yellow-400 font-bold text-sm">🔍 NET AI HATA EKRANI</span>
+                                <button className="bg-red-900/50 text-red-200 border border-red-500 px-3 py-1 rounded text-xs" onClick={() => setShowDebug(false)}>Kapat</button>
                             </div>
-                            {debugLog.map((log, i) => (
-                                <div key={i} className="border-b border-green-900 pb-1 mb-1 break-all">{log}</div>
-                            ))}
+                            <div className="flex flex-col space-y-2">
+                                {debugLog.map((log, i) => (
+                                    <div key={i} className="border-l-2 border-green-700 pl-2 break-all">{log}</div>
+                                ))}
+                            </div>
                         </div>
                     )}
                     <button
-                        className="w-full text-[10px] bg-gray-900 text-green-400 py-1 font-mono border-t border-green-800"
+                        className="w-full bg-gray-900 hover:bg-black text-green-400 py-3 font-mono font-bold text-xs shadow-lg uppercase"
                         onClick={async () => {
                             setShowDebug(prev => !prev);
                             if (isNative) {
@@ -298,17 +300,17 @@ function App() {
                                     const AIAssistant = registerPlugin<any>('AIAssistant');
                                     const { result } = await AIAssistant.getLastResult();
                                     const ts = new Date().toLocaleTimeString('tr-TR');
-                                    const msg = result || 'BOMBOS (NULL)';
-                                    setDebugLog(prev => [`[${ts}] MANUEL: ${msg}`, ...prev.slice(0, 20)]);
+                                    const msg = result || 'YENİ HATA YOK (BOMBOS)';
+                                    setDebugLog(prev => [`[${ts}] ${msg}`, ...prev.slice(0, 29)]);
                                     setShowDebug(true);
                                 } catch (e: any) {
-                                    setDebugLog(prev => [`HATA: ${e.message}`, ...prev]);
+                                    setDebugLog(prev => [`SİSTEM_HATASI: ${e.message}`, ...prev]);
                                     setShowDebug(true);
                                 }
                             }
                         }}
                     >
-                        v1.1.1-AI | Debug ({debugLog.length} kayit) | {showDebug ? 'Gizle' : 'Goster'}
+                        v1.1.2-AI | {showDebug ? 'Gizle' : 'HATA KODUNU GÖSTER (' + debugLog.length + ')'}
                     </button>
                 </div>
             )}
