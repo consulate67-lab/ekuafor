@@ -5,6 +5,7 @@ let pipeline: any, env: any;
 let ffmpeg: any;
 let ffmpegPath: any;
 let WaveFile: any;
+let initError: any = null;
 
 try {
     // Tamamen Pure-JavaScript ONNX (Açık Kaynak/Kendi Yerel modellememiz) Kütüphaneleri
@@ -20,8 +21,9 @@ try {
     ffmpeg.setFfmpegPath(ffmpegPath);
     
     WaveFile = require('wavefile').WaveFile;
-} catch (e) {
-    console.warn('[AI Local STT] @xenova/transformers, wavefile veya FFmpeg tam kurulamadı.');
+} catch (e: any) {
+    initError = e;
+    console.warn('[AI Local STT] Başlatma Hatası:', e.message);
 }
 
 export class LocalSTTEngine {
@@ -44,7 +46,9 @@ export class LocalSTTEngine {
      * Sesi alır, FFmpeg ile 16kHz WAV formatına çevirir, Float32 Matriksine dönüştürüp Whisper ONNX Motoruna verir
      */
     static async transcribeAudio(inputAudioPath: string): Promise<string> {
-        if (!pipeline || !ffmpeg || !WaveFile) throw new Error("Kütüphaneler kurulu değil.");
+        if (!pipeline || !ffmpeg || !WaveFile) {
+            throw new Error("Kütüphaneler kurulamadı. Sebep: " + (initError ? initError.message : "Bilinmiyor"));
+        }
         await this.initialize();
 
         const tempWavFile = path.join(process.cwd(), `temp_${Date.now()}.wav`);
