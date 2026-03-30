@@ -86,21 +86,26 @@ public class VoiceAssistantService extends Service {
         try {
             audioFilePath = getExternalFilesDir(null).getAbsolutePath() + "/call_" + System.currentTimeMillis() + ".m4a";
             recorder = new MediaRecorder();
-            
-            // Yankı (echo) sorununu önlemek için varsayılan MIC kullanıyoruz. 
-            // VOICE_COMMUNICATION bazı cihazlarda hoparlörü zorla açar.
             recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-            
             recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
             recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
             recorder.setOutputFile(audioFilePath);
-            
             recorder.prepare();
             recorder.start();
-            Log.d(TAG, "Recording started with MIC: " + audioFilePath);
+            Log.d(TAG, "Recording started: " + audioFilePath);
+            showToast("🔴 AI: Kayıt Başladı!");
         } catch (Exception e) {
             Log.e(TAG, "Recording start failed", e);
-            showToast("Ses kaydı başlatılamadı!");
+            String errMsg = "{\"success\":false,\"error\":\"MIC_HATASI: " + e.getMessage() + "\"}";
+            AIAssistantPlugin.lastAIResult = errMsg;
+            showToast("⚠️ Ses kaydı başlatılamadı: " + e.getMessage());
+            audioFilePath = null;
+            recorder = null;
+            // Hata mesajını kullanıcıya göster
+            Intent launchIntent = new Intent(this, MainActivity.class);
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            launchIntent.putExtra("ai_result", errMsg);
+            try { startActivity(launchIntent); } catch (Exception ex) { Log.e(TAG, "Launch failed", ex); }
         }
     }
 

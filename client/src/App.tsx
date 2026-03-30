@@ -251,7 +251,7 @@ function App() {
         <div className="relative min-h-screen">
             {/* Forced UI refresh commit */}
             <div 
-                className="fixed bottom-1 right-2 w-auto h-auto text-[10px] z-[9999] text-gray-500 opacity-80 pointer-events-auto font-bold cursor-pointer bg-white px-2 py-1 rounded"
+                className="fixed bottom-20 right-3 text-[11px] z-[9999] text-blue-600 opacity-90 pointer-events-auto font-bold cursor-pointer bg-white border border-blue-300 px-3 py-2 rounded-lg shadow-md"
                 onClick={async () => {
                     alert("Butona tıklandı, hafıza okunuyor...");
                     if (Capacitor.isNativePlatform()) {
