@@ -249,6 +249,7 @@ function App() {
 
     return (
         <div className="relative min-h-screen">
+            {/* Forced UI refresh commit */}
             <div 
                 className="fixed bottom-1 right-2 w-auto h-auto text-[10px] z-[9999] text-gray-500 opacity-80 pointer-events-auto font-bold cursor-pointer bg-white px-2 py-1 rounded"
                 onClick={async () => {
