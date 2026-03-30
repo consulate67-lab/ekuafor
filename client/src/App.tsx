@@ -308,7 +308,7 @@ function App() {
                             }
                         }}
                     >
-                        v1.1.0-AI | Debug ({debugLog.length} kayit) | {showDebug ? 'Gizle' : 'Goster'}
+                        v1.1.1-AI | Debug ({debugLog.length} kayit) | {showDebug ? 'Gizle' : 'Goster'}
                     </button>
                 </div>
             )}

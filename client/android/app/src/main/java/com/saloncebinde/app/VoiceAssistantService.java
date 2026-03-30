@@ -133,7 +133,8 @@ public class VoiceAssistantService extends Service {
         try {
             audioFilePath = getExternalFilesDir(null).getAbsolutePath() + "/call_" + System.currentTimeMillis() + ".m4a";
             recorder = new MediaRecorder();
-            recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+            // Telefon görüşmesi sırasında MIC bloke olabilir. VOICE_COMMUNICATION daha güvenlidir:
+            recorder.setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION);
             recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
             recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
             recorder.setAudioSamplingRate(16000);
