@@ -218,8 +218,7 @@ function App() {
                                         // Trigger a reload of appointments
                                         window.dispatchEvent(new Event('refresh_appointments'));
                                     } else {
-                                        alert('ℹ️ Görüşme analiz edildi, manuel ilerleme gerekiyor.\nSebep: ' + (parsed.data.error || 'Algılanamadı.'));
-                                        // Gönderelim ki ekranda pop-up açılsın
+                                        // Sessizce özel pop-up'ı (Modal) açalım, native JS Alert çıkartmayalım
                                         window.dispatchEvent(new CustomEvent('ai_manual_approve', { 
                                             detail: { extracted: parsed.data.extracted, transcription: parsed.data.transcription } 
                                         }));
