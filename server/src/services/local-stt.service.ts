@@ -8,14 +8,7 @@ let WaveFile: any;
 let initError: any = null;
 
 try {
-    // Tamamen Pure-JavaScript ONNX (Açık Kaynak/Kendi Yerel modellememiz) Kütüphaneleri
-    const transformers = require('@xenova/transformers');
-    pipeline = transformers.pipeline;
-    env = transformers.env;
-    env.allowLocalModels = false; // HuggingFace deposundan ağırlıkları indireceğiz
-    env.useBrowserCache = false;
-    env.cacheDir = path.join(process.cwd(), '.cache'); // Railway'de /.cache hatası almamak için açıkça /app dizininde klasör göster!
-    
+    // Sadece CommonJS kütüphaneleri burada yüklenir
     ffmpeg = require('fluent-ffmpeg');
     ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
     ffmpeg.setFfmpegPath(ffmpegPath);
@@ -30,12 +23,27 @@ export class LocalSTTEngine {
     private static transcriber: any = null;
 
     static async initialize() {
-        if (!pipeline) throw new Error("Açık Kaynak STT kütüphaneleri bulunamadı.");
+        if (!pipeline) {
+            try {
+                // ESM Modülü olan xenova/transformers kütüphanesini dinamik olarak (async) yüklüyoruz:
+                const transformers = await import('@xenova/transformers');
+                pipeline = transformers.pipeline;
+                env = transformers.env;
+                
+                env.allowLocalModels = false; 
+                env.useBrowserCache = false;
+                env.cacheDir = path.join(process.cwd(), '.cache');
+            } catch (err: any) {
+                initError = err;
+                throw new Error("Transformatörler kütüphanesi yüklenemedi: " + err.message);
+            }
+        }
+
         if (!this.transcriber) {
             console.log('[AI Local STT] Açık Kaynak Whisper Modeli Yükleniyor...');
             console.log('[AI Local STT] (ÖNEMLİ: Bu işlem ilk seferde modeli bir kez 150 MB boyutunda sunucu cache belleğine indirir. Daha sonraki aramalarda milisaniyeler sürer.)');
             
-            // Xenova/whisper-tiny, Windows'ta veya Linux'ta 0 MB bağımlılık ile C++ kullanmadan çalışan harika boyutlu bir çoklu dil modelidir!
+            // Xenova/whisper-tiny
             this.transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
             console.log('[AI Local STT] Whisper-Tiny (Açık Kaynak/Çevrimdışı) Modeli Hazır!');
         }
@@ -46,9 +54,10 @@ export class LocalSTTEngine {
      * Sesi alır, FFmpeg ile 16kHz WAV formatına çevirir, Float32 Matriksine dönüştürüp Whisper ONNX Motoruna verir
      */
     static async transcribeAudio(inputAudioPath: string): Promise<string> {
-        if (!pipeline || !ffmpeg || !WaveFile) {
-            throw new Error("Kütüphaneler kurulamadı. Sebep: " + (initError ? initError.message : "Bilinmiyor"));
+        if (!ffmpeg || !WaveFile) {
+            throw new Error("FFmpeg veya WaveFile kütüphaneleri eksik. Sebep: " + (initError ? initError.message : "Bilinmiyor"));
         }
+        
         await this.initialize();
 
         const tempWavFile = path.join(process.cwd(), `temp_${Date.now()}.wav`);
