@@ -121,6 +121,7 @@ public class VoiceAssistantService extends Service {
                 if (token.isEmpty()) {
                     Log.e(TAG, "Auth token is missing!");
                     showToast("Sistem hatası: Oturum bilgisi eksik.");
+                    AIAssistantPlugin.lastAIResult = "{\"success\":false,\"error\":\"Oturum bilgisi eksik, analiz yapilamadi.\"}";
                     return;
                 }
 
@@ -128,6 +129,7 @@ public class VoiceAssistantService extends Service {
                 if (!file.exists() || file.length() < 100) { // Very small files are probably silence/errors
                     Log.e(TAG, "File empty or too small: " + (file.exists() ? file.length() : "not found"));
                     showToast("Görüşme çok kısa veya ses alınamadı.");
+                    AIAssistantPlugin.lastAIResult = "{\"success\":false,\"error\":\"Gorusme cok kisa (dosya " + (file.exists() ? file.length() : "yok") + ") oldugu icin iptal edildi.\"}";
                     return;
                 }
 

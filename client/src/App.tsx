@@ -249,8 +249,25 @@ function App() {
 
     return (
         <div className="relative min-h-screen">
-            <div className="fixed bottom-1 right-2 w-auto h-auto text-[10px] z-[9999] text-gray-500 opacity-50 pointer-events-none font-bold">
-                v1.0.5-AI
+            <div 
+                className="fixed bottom-1 right-2 w-auto h-auto text-[10px] z-[9999] text-gray-500 opacity-80 pointer-events-auto font-bold cursor-pointer bg-white px-2 py-1 rounded"
+                onClick={async () => {
+                    alert("Butona tıklandı, hafıza okunuyor...");
+                    if (Capacitor.isNativePlatform()) {
+                        try {
+                            const { registerPlugin } = await import('@capacitor/core');
+                            const AIAssistant = registerPlugin<any>('AIAssistant');
+                            const { result } = await AIAssistant.getLastResult();
+                            alert("Hafızadaki Sonuç:\n\n" + (result ? result : "BOMBOŞ (NULL)"));
+                        } catch (e: any) {
+                            alert("Plugin okuma hatası: " + e.message);
+                        }
+                    } else {
+                        alert("Burası web uygulaması (Android değil).");
+                    }
+                }}
+            >
+                v1.0.6-AI (Hafıza Oku)
             </div>
             <Router {...routerProps}>
                 <Routes>
