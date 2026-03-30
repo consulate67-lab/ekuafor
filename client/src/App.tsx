@@ -268,7 +268,7 @@ function App() {
                     }
                 }}
             >
-                v1.0.6-AI (Hafıza Oku)
+                v1.0.7-AI (Hafıza Oku)
             </div>
             <Router {...routerProps}>
                 <Routes>
