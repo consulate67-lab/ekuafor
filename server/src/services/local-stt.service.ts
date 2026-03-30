@@ -25,8 +25,12 @@ export class LocalSTTEngine {
     static async initialize() {
         if (!pipeline) {
             try {
-                // ESM Modülü olan xenova/transformers kütüphanesini dinamik olarak (async) yüklüyoruz:
-                const transformers = await import('@xenova/transformers');
+                // TSC 'module: commonjs' olduğunda import() komutunu sinsice require() komutuna çevirir.
+                // Bunu engellemek için JS motorunun V8 Import() fonksiyonunu direkt eval ile çağırıyoruz.
+                // Bu %100 her zaman CommonJS içinde bile yerel ESM import'u tetikler:
+                const importDynamic = new Function('modulePath', 'return import(modulePath)');
+                const transformers = await importDynamic('@xenova/transformers');
+                
                 pipeline = transformers.pipeline;
                 env = transformers.env;
                 
