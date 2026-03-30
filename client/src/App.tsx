@@ -249,6 +249,9 @@ function App() {
 
     return (
         <div className="relative min-h-screen">
+            <div className="fixed bottom-1 right-2 w-auto h-auto text-[10px] z-[9999] text-gray-500 opacity-50 pointer-events-none font-bold">
+                v1.0.5-AI
+            </div>
             <Router {...routerProps}>
                 <Routes>
                     {/* Public Routes */}
