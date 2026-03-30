@@ -206,19 +206,18 @@ router.post('/process-call-audio', authMiddleware as any, (upload.single('audio'
             }
         }
 
-        // 1. Ücretsiz Local Ses Tanıma (ASR) Dene
         let transcription = '';
         try {
-            console.log('[AI] VOSK Local STT Motoru deneniyor...');
+            console.log('[AI] Açık Kaynak STT Motoru deneniyor...');
             transcription = await LocalSTTEngine.transcribeAudio(audioFile.path);
         } catch (localSttError: any) {
-            console.warn('[AI] Local STT Modeli bulunamadı veya hata verdi. Yedeğe (OpenAI) geçiliyor:', localSttError.message);
-            try {
-                transcription = await aiAssistantService.transcribeAudio(audioFile.path);
-            } catch (e: any) {
-                fs.unlink(audioFile.path, () => {});
-                return res.status(422).json({ success: false, error: e.message, transcription: '' });
-            }
+            console.error('[AI] Local STT Hatası:', localSttError);
+            fs.unlink(audioFile.path, () => {});
+            return res.status(422).json({ 
+                success: false, 
+                error: 'LOCAL_STT_HATASI: ' + localSttError.message, 
+                transcription: '' 
+            });
         }
 
         if (!transcription || transcription.length < 5) {

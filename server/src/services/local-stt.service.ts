@@ -13,6 +13,7 @@ try {
     env = transformers.env;
     env.allowLocalModels = false; // HuggingFace deposundan ağırlıkları indireceğiz
     env.useBrowserCache = false;
+    env.cacheDir = path.join(process.cwd(), '.cache'); // Railway'de /.cache hatası almamak için açıkça /app dizininde klasör göster!
     
     ffmpeg = require('fluent-ffmpeg');
     ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
