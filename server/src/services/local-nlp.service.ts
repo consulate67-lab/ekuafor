@@ -23,8 +23,8 @@ export class LocalNLPEngine {
             return `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
         }
 
-        // Metinsel saatler (saat 3, 5 buçuk, akşam 6)
-        const wordHourRegex = /(sabah|öğle|akşam|saat)?\s*([1-9]|1[0-2]|1[0-9]|2[0-3])\s*(buçuk|yarım)?/i;
+        // Metinsel saatler (saat 3, 5 buçuk, akşam 18) - Regex sırası 2 hanelileri önce yakalamalı!
+        const wordHourRegex = /(sabah|öğle|akşam|saat)?\s*(2[0-3]|1[0-9]|0?[1-9])\s*(buçuk|yarım)?/i;
         const wordMatch = lowerText.match(wordHourRegex);
         
         if (wordMatch) {

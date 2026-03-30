@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { App as CapApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
@@ -39,31 +39,10 @@ function App() {
     useAppointmentSync();
 
     const isNative = Capacitor.isNativePlatform();
-
-    // Debug panel state
-    const [debugLog, setDebugLog] = useState<string[]>(['[DEBUG] Panel aktif - arama bekleniyor...']);
-    const [showDebug, setShowDebug] = useState(false);
-    const debugRef = useRef<HTMLDivElement>(null);
-
-    // Her 3 saniyede bir arka planda ne var diye bak
-    useEffect(() => {
-        if (!isNative) return;
-        const interval = setInterval(async () => {
-            try {
-                const { registerPlugin } = await import('@capacitor/core');
-                const AIAssistant = registerPlugin<any>('AIAssistant');
-                const { result } = await AIAssistant.getLastResult();
-                if (result) {
-                    const ts = new Date().toLocaleTimeString('tr-TR');
-                    setDebugLog(prev => [`[${ts}] ${result}`, ...prev.slice(0, 20)]);
-                    setShowDebug(true);
-                }
-            } catch (e: any) {
-                // Plugin okuma hatası - sessizce geç
-            }
-        }, 3000);
-        return () => clearInterval(interval);
-    }, [isNative]);
+    
+    // Global AI Modal State
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [extractedInfo, setExtractedInfo] = useState<any>(null);
 
     // Use HashRouter universally to ensure GitHub Pages, Native APKs, and PWAs all function flawlessly without 404 rewrite hacks.
     const Router: any = HashRouter;
@@ -235,14 +214,18 @@ function App() {
                                 const parsed = JSON.parse(result);
                                 if (parsed.success && parsed.data) {
                                     if (parsed.data.autoCreated) {
-                                        alert('✅ Arka plan araması analiz edildi ve randevu başarıyla oluşturuldu!\n\nServis: ' + parsed.data.extractedInfo?.serviceName + ' - ' + parsed.data.extractedInfo?.time);
+                                        alert('✅ Arka plan araması analiz edildi ve randevu başarıyla oluşturuldu!\n\nServis: ' + parsed.data.result?.matchedService?.name + ' - ' + parsed.data.result?.appDate);
                                         // Trigger a reload of appointments
                                         window.dispatchEvent(new Event('refresh_appointments'));
                                     } else {
-                                        alert('ℹ️ Görüşme analiz edildi, ancak net bir randevu bulunamadı veya manuel onay gerekiyor.');
+                                        alert('ℹ️ Görüşme analiz edildi, manuel ilerleme gerekiyor.\nSebep: ' + (parsed.data.error || 'Algılanamadı.'));
+                                        // Gönderelim ki ekranda pop-up açılsın
+                                        window.dispatchEvent(new CustomEvent('ai_manual_approve', { 
+                                            detail: { extracted: parsed.data.extracted, transcription: parsed.data.transcription } 
+                                        }));
                                     }
-                                } else if (!parsed.success) {
-                                    alert('⚠️ Yapay Zeka Hata Kodu:\n\n' + (parsed.error || 'Bilinmeyen Hata'));
+                                } else if (parsed.success === false) {
+                                    alert('⚠️ Yapay Zeka Hatası:\n\n' + (parsed.error || 'Bilinmeyen Hata'));
                                 }
                             } catch (e) {
                                 console.error('Error parsing global AI result', e);
@@ -261,6 +244,17 @@ function App() {
         }
     }, [isNative, initialized, isAuthenticated, user]);
 
+    // Uygulama açıkken "ai_manual_approve" sinyali yakalamak için hook
+    useEffect(() => {
+        const handleManualApprove = (e: any) => {
+            const data = e.detail;
+            setExtractedInfo({ ...data.extracted, transcription: data.transcription });
+            setIsModalOpen(true);
+        };
+        window.addEventListener('ai_manual_approve', handleManualApprove);
+        return () => window.removeEventListener('ai_manual_approve', handleManualApprove);
+    }, []);
+
     if (!initialized) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -274,46 +268,74 @@ function App() {
 
     return (
         <div className="relative min-h-screen pb-40">
-            {/* CANLI DEBUG PANEL - BÜYÜTÜLMÜŞ VE YUKARI ALINMIŞ */}
-            {isNative && (
-                <div className="fixed bottom-24 left-2 right-2 z-[99999] shadow-2xl rounded-lg overflow-hidden border-2 border-green-500">
-                    {showDebug && (
-                        <div ref={debugRef} className="bg-black/95 text-green-400 text-xs sm:text-sm font-mono p-3 h-64 overflow-y-auto">
-                            <div className="flex justify-between items-center mb-2 pb-2 border-b border-green-800 sticky top-0 bg-black/95">
-                                <span className="text-yellow-400 font-bold text-sm">🔍 NET AI HATA EKRANI</span>
-                                <button className="bg-red-900/50 text-red-200 border border-red-500 px-3 py-1 rounded text-xs" onClick={() => setShowDebug(false)}>Kapat</button>
+            {/* Siyah panel başarıyla temizlendi */}
+            
+            {isModalOpen && extractedInfo && (
+                <div className="fixed inset-0 z-[100000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border border-gray-100 w-full max-w-md overflow-hidden transform transition-all animate-in zoom-in-95 duration-200">
+                        <div className="bg-gradient-to-br from-pink-600 to-purple-700 p-5 shrink-0">
+                            <h3 className="text-xl font-bold font-sans text-white flex items-center gap-2">
+                                <span className="text-2xl">🤖</span> AI Analiz Sonucu
+                            </h3>
+                            <p className="text-pink-100 text-sm mt-1 opacity-90 leading-relaxed max-w-sm">
+                                Asistan eksik bilgiler yüzünden randevuyu kaydedemedi. Söylenenleri inceleyin.
+                            </p>
+                        </div>
+                        
+                        <div className="p-6 space-y-6 flex-1 min-h-0 overflow-y-auto">
+                            <div>
+                                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">🎤 Yapay Zekanın Duyduğu:</label>
+                                <p className="text-[15px] font-medium text-gray-800 bg-gray-50/80 p-4 rounded-xl border border-gray-100 leading-relaxed shadow-sm italic">
+                                    "{extractedInfo.transcription || 'Bilinmiyor'}"
+                                </p>
                             </div>
-                            <div className="flex flex-col space-y-2">
-                                {debugLog.map((log, i) => (
-                                    <div key={i} className="border-l-2 border-green-700 pl-2 break-all">{log}</div>
-                                ))}
+                            
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 p-4 rounded-2xl border border-blue-100/50 shadow-sm relative overflow-hidden group hover:from-blue-100 transition-colors">
+                                    <div className="absolute top-0 right-0 p-3 opacity-20 text-3xl transition-transform">📅</div>
+                                    <label className="block text-[10px] uppercase tracking-wider font-bold text-blue-800/70 mb-1 relative z-10">Tarih</label>
+                                    <div className="text-sm font-bold text-blue-900 relative z-10">{extractedInfo.date || '—'}</div>
+                                </div>
+                                <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 p-4 rounded-2xl border border-indigo-100/50 shadow-sm relative overflow-hidden group hover:from-indigo-100 transition-colors">
+                                    <div className="absolute top-0 right-0 p-3 opacity-20 text-3xl transition-transform">🕒</div>
+                                    <label className="block text-[10px] uppercase tracking-wider font-bold text-indigo-800/70 mb-1 relative z-10">Saat</label>
+                                    <div className="text-sm font-bold text-indigo-900 relative z-10">{extractedInfo.time || '—'}</div>
+                                </div>
+                                <div className="col-span-2 bg-gradient-to-br from-pink-50 to-rose-50 p-4 rounded-2xl border border-pink-100/50 shadow-sm relative overflow-hidden group hover:from-pink-100 transition-colors">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10 text-4xl transition-transform">✂️</div>
+                                    <label className="block text-[10px] uppercase tracking-wider font-bold text-pink-800/70 mb-1 relative z-10">Hizmet</label>
+                                    <div className="text-base font-bold text-pink-900 relative z-10">{extractedInfo.serviceName || '—'}</div>
+                                </div>
+                                <div className="col-span-2 bg-gradient-to-br from-purple-50 to-fuchsia-50 p-4 rounded-2xl border border-purple-100/50 shadow-sm relative overflow-hidden group hover:from-purple-100 transition-colors">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10 text-4xl transition-transform">👤</div>
+                                    <label className="block text-[10px] uppercase tracking-wider font-bold text-purple-800/70 mb-1 relative z-10">Müşteri/İsim</label>
+                                    <div className="text-lg font-bold text-purple-900 relative z-10">{extractedInfo.customerName || 'Misafir (Söylenmedi)'}</div>
+                                </div>
                             </div>
                         </div>
-                    )}
-                    <button
-                        className="w-full bg-gray-900 hover:bg-black text-green-400 py-3 font-mono font-bold text-xs shadow-lg uppercase"
-                        onClick={async () => {
-                            setShowDebug(prev => !prev);
-                            if (isNative) {
-                                try {
-                                    const { registerPlugin } = await import('@capacitor/core');
-                                    const AIAssistant = registerPlugin<any>('AIAssistant');
-                                    const { result } = await AIAssistant.getLastResult();
-                                    const ts = new Date().toLocaleTimeString('tr-TR');
-                                    const msg = result || 'YENİ HATA YOK (BOMBOS)';
-                                    setDebugLog(prev => [`[${ts}] ${msg}`, ...prev.slice(0, 29)]);
-                                    setShowDebug(true);
-                                } catch (e: any) {
-                                    setDebugLog(prev => [`SİSTEM_HATASI: ${e.message}`, ...prev]);
-                                    setShowDebug(true);
-                                }
-                            }
-                        }}
-                    >
-                        v1.1.3-AI | {showDebug ? 'Gizle' : 'HATA KODUNU GÖSTER (' + debugLog.length + ')'}
-                    </button>
+
+                        <div className="p-5 bg-white border-t border-gray-100 flex flex-col gap-3 shrink-0">
+                            <button
+                                onClick={() => {
+                                    setIsModalOpen(false);
+                                    window.location.hash = '#/appointments';
+                                }}
+                                className="w-full py-4 text-[15px] font-bold text-white bg-gradient-to-r from-pink-600 to-purple-600 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-pink-500/30 flex justify-center items-center gap-2"
+                            >
+                                <span>Randevu Takvimine Git</span>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                            </button>
+                            <button 
+                                onClick={() => setIsModalOpen(false)}
+                                className="w-full py-3 text-[14px] font-semibold text-gray-500 hover:text-gray-800 hover:bg-gray-50 rounded-xl transition-colors"
+                            >
+                                Kapat
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
+            
             <Router {...routerProps}>
                 <Routes>
                     {/* Public Routes */}
