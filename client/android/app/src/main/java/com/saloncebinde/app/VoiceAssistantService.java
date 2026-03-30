@@ -225,6 +225,16 @@ public class VoiceAssistantService extends Service {
             } catch (Exception e) {
                 Log.e(TAG, "Process failed", e);
                 showToast("Bağlantı hatası: " + e.getMessage());
+                String crashErr = "{\"success\":false,\"error\":\"Android Hata: " + e.getMessage() + "\"}";
+                AIAssistantPlugin.lastAIResult = crashErr;
+                Intent launchIntent = new Intent(this, MainActivity.class);
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                launchIntent.putExtra("ai_result", crashErr);
+                try {
+                    startActivity(launchIntent);
+                } catch (Exception startErr) {
+                    Log.e(TAG, "Activity could not be started", startErr);
+                }
             } finally {
                 stopForeground(true);
                 stopSelf();
