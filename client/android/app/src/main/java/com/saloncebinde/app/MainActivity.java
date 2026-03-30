@@ -8,6 +8,8 @@ import com.getcapacitor.JSObject;
 public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // AIAssistant plugin'ini ZORUNLU olarak kaydet
+        registerPlugin(AIAssistantPlugin.class);
         super.onCreate(savedInstanceState);
         handleIntent(getIntent());
     }
