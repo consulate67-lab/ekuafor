@@ -32,6 +32,7 @@ public class VoiceAssistantService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent != null ? intent.getAction() : null;
+        Log.d(TAG, "onStartCommand: " + action);
 
         if ("WAITING_FOR_CALL".equals(action)) {
             startForegroundService("Smart Assist Aktif - Çağrı Bekleniyor");
@@ -39,8 +40,21 @@ public class VoiceAssistantService extends Service {
             startForegroundService("Görüşme Kaydediliyor...");
             startRecording();
         } else if ("STOP_RECORDING".equals(action)) {
-            stopRecording();
-            uploadAndNotify();
+            if (recorder == null && audioFilePath == null) {
+                // Kayit hiç başlamadı (Android 10+ OFFHOOK atılamadı)
+                Log.e(TAG, "STOP_RECORDING geldi ama kayit hiç başlamamiş!");
+                String errMsg = "{\"success\":false,\"error\":\"KAYIT_BASLAMAMIS: Android bu telefonda OFFHOOK sinyalini tetikleyemiyor. Ses hicbir zaman kaydedilmedi.\"}";
+                AIAssistantPlugin.lastAIResult = errMsg;
+                showToast("⚠️ Ses kaydedilemedi (OFFHOOK sorunu).");
+                Intent launchIntent = new Intent(this, MainActivity.class);
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                launchIntent.putExtra("ai_result", errMsg);
+                try { startActivity(launchIntent); } catch (Exception e) { Log.e(TAG, "Launch failed", e); }
+                stopSelf();
+            } else {
+                stopRecording();
+                uploadAndNotify();
+            }
         }
 
         return START_NOT_STICKY;
