@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { App as CapApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
@@ -39,6 +39,31 @@ function App() {
     useAppointmentSync();
 
     const isNative = Capacitor.isNativePlatform();
+
+    // Debug panel state
+    const [debugLog, setDebugLog] = useState<string[]>(['[DEBUG] Panel aktif - arama bekleniyor...']);
+    const [showDebug, setShowDebug] = useState(false);
+    const debugRef = useRef<HTMLDivElement>(null);
+
+    // Her 3 saniyede bir arka planda ne var diye bak
+    useEffect(() => {
+        if (!isNative) return;
+        const interval = setInterval(async () => {
+            try {
+                const { registerPlugin } = await import('@capacitor/core');
+                const AIAssistant = registerPlugin<any>('AIAssistant');
+                const { result } = await AIAssistant.getLastResult();
+                if (result) {
+                    const ts = new Date().toLocaleTimeString('tr-TR');
+                    setDebugLog(prev => [`[${ts}] ${result}`, ...prev.slice(0, 20)]);
+                    setShowDebug(true);
+                }
+            } catch (e: any) {
+                // Plugin okuma hatası - sessizce geç
+            }
+        }, 3000);
+        return () => clearInterval(interval);
+    }, [isNative]);
 
     // Use HashRouter universally to ensure GitHub Pages, Native APKs, and PWAs all function flawlessly without 404 rewrite hacks.
     const Router: any = HashRouter;
@@ -249,27 +274,44 @@ function App() {
 
     return (
         <div className="relative min-h-screen">
-            {/* Forced UI refresh commit */}
-            <div 
-                className="fixed bottom-20 right-3 text-[11px] z-[9999] text-blue-600 opacity-90 pointer-events-auto font-bold cursor-pointer bg-white border border-blue-300 px-3 py-2 rounded-lg shadow-md"
-                onClick={async () => {
-                    alert("Butona tıklandı, hafıza okunuyor...");
-                    if (Capacitor.isNativePlatform()) {
-                        try {
-                            const { registerPlugin } = await import('@capacitor/core');
-                            const AIAssistant = registerPlugin<any>('AIAssistant');
-                            const { result } = await AIAssistant.getLastResult();
-                            alert("Hafızadaki Sonuç:\n\n" + (result ? result : "BOMBOŞ (NULL)"));
-                        } catch (e: any) {
-                            alert("Plugin okuma hatası: " + e.message);
-                        }
-                    } else {
-                        alert("Burası web uygulaması (Android değil).");
-                    }
-                }}
-            >
-                v1.0.9-AI (Hafıza Oku)
-            </div>
+            {/* CANLI DEBUG PANEL */}
+            {isNative && (
+                <div className="fixed bottom-0 left-0 right-0 z-[9999]">
+                    {showDebug && (
+                        <div ref={debugRef} className="bg-black/90 text-green-400 text-[10px] font-mono p-2 max-h-48 overflow-y-auto border-t border-green-800">
+                            <div className="flex justify-between items-center mb-1">
+                                <span className="text-yellow-400 font-bold">AI Debug Log</span>
+                                <button className="text-red-400 text-xs px-2" onClick={() => setShowDebug(false)}>x Kapat</button>
+                            </div>
+                            {debugLog.map((log, i) => (
+                                <div key={i} className="border-b border-green-900 pb-1 mb-1 break-all">{log}</div>
+                            ))}
+                        </div>
+                    )}
+                    <button
+                        className="w-full text-[10px] bg-gray-900 text-green-400 py-1 font-mono border-t border-green-800"
+                        onClick={async () => {
+                            setShowDebug(prev => !prev);
+                            if (isNative) {
+                                try {
+                                    const { registerPlugin } = await import('@capacitor/core');
+                                    const AIAssistant = registerPlugin<any>('AIAssistant');
+                                    const { result } = await AIAssistant.getLastResult();
+                                    const ts = new Date().toLocaleTimeString('tr-TR');
+                                    const msg = result || 'BOMBOS (NULL)';
+                                    setDebugLog(prev => [`[${ts}] MANUEL: ${msg}`, ...prev.slice(0, 20)]);
+                                    setShowDebug(true);
+                                } catch (e: any) {
+                                    setDebugLog(prev => [`HATA: ${e.message}`, ...prev]);
+                                    setShowDebug(true);
+                                }
+                            }
+                        }}
+                    >
+                        v1.1.0-AI | Debug ({debugLog.length} kayit) | {showDebug ? 'Gizle' : 'Goster'}
+                    </button>
+                </div>
+            )}
             <Router {...routerProps}>
                 <Routes>
                     {/* Public Routes */}
