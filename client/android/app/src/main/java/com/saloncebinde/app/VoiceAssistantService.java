@@ -133,11 +133,12 @@ public class VoiceAssistantService extends Service {
         try {
             audioFilePath = getExternalFilesDir(null).getAbsolutePath() + "/call_" + System.currentTimeMillis() + ".m4a";
             recorder = new MediaRecorder();
-            // Telefon görüşmesi sırasında MIC bloke olabilir. VOICE_COMMUNICATION daha güvenlidir:
-            recorder.setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION);
+            // TELEFON GÖRÜŞMELERİ İÇİN: VOICE_COMMUNICATION veya MIC sorun çıkarabilir.
+            // VOICE_RECOGNITION (Yapay Zeka Ses Tanıma), Android tarafında sesli asistanlar için garantili en saf/net insan sesi kaynağıdır!
+            recorder.setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION);
             recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
             recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
-            recorder.setAudioSamplingRate(16000);
+            recorder.setAudioSamplingRate(16000); // STT performansı için ideal (16kHz)
             recorder.setAudioEncodingBitRate(32000);
             recorder.setOutputFile(audioFilePath);
             recorder.prepare();
