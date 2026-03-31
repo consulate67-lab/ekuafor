@@ -3888,14 +3888,21 @@ export default function CompanyPanel() {
                                     <div className="flex gap-2">
                                         <button 
                                             onClick={() => {
-                                                const msg = prompt('Müşteriye gönderilecek push mesajı:', `Merhaba ${selectedCustomer.name}, müsaitseniz sizi bekleriz!`);
+                                                const msg = prompt('Müşteriye gönderilecek push bildirimi:', `Merhaba ${selectedCustomer.name}, müsaitseniz sizi bekleriz!`);
                                                 if (msg) {
                                                     api.post(`/appointments/company/${company.id}/send-customer-message`, {
                                                         phone: selectedCustomer.phone,
                                                         message: msg,
                                                         type: 'push'
-                                                    }).then(() => alert('Push bildirimi başarıyla gönderildi!'))
-                                                      .catch(e => alert('Hata: ' + (e.response?.data?.error || e.message)));
+                                                    }).then(() => alert('🚀 Bildirim Gönderildi!\nMesaj müşterinizin telefon ekranına düştü.'))
+                                                      .catch(e => {
+                                                          const err = e.response?.data?.error || e.message;
+                                                          if (err.includes('token')) {
+                                                              alert('⚠️ Uygulama Bulunamadı\n\nBu müşteriniz henüz "Salon Cebinde" mobil uygulamasını indirip giriş yapmamış (veya bildirimlere izin vermemiş).\n\nPush Bildirimleri tamamen ücretsizdir ancak sadece uygulaması olan müşterilere ulaşır. Bu müşteriye isterseniz SMS atabilirsiniz!');
+                                                          } else {
+                                                              alert('Hata: ' + err);
+                                                          }
+                                                      });
                                                 }
                                             }}
                                             className="h-12 px-6 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all"

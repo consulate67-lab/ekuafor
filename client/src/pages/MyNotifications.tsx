@@ -17,7 +17,14 @@ export default function MyNotifications() {
                 return;
             }
             const res = await api.get('/appointments/customers/notifications', { params: { phone } });
-            setNotifications(res.data.data || []);
+            const data = res.data.data || [];
+            setNotifications(data);
+            
+            // Kullanıcı bu sayfaya girdiğinde tüm bildirimleri "okundu" sayıp toplam sayıyı kaydediyoruz.
+            localStorage.setItem('read_notifications_count', data.length.toString());
+            
+            // Eğer varsa bildirim rozetini sildirmek için CustomEvent gönderelim.
+            window.dispatchEvent(new Event('notifications_read'));
         } catch (err) {
             console.error('Failed to fetch notifications', err);
         } finally {

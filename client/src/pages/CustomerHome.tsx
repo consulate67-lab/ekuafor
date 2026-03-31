@@ -177,6 +177,32 @@ export default function CustomerHome() {
     const [navigatingTo, setNavigatingTo] = useState<number | null>(null);
     const [callPicker, setCallPicker] = useState<{ open: boolean, company: any, staff: any[] }>({ open: false, company: null, staff: [] });
     const [fetchingStaff, setFetchingStaff] = useState(false);
+    
+    // Notification Badge Logic
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    useEffect(() => {
+        const checkNotifications = async () => {
+            const phone = user?.phone || localStorage.getItem('customer_phone');
+            if (!phone) return;
+            try {
+                const res = await api.get('/appointments/customers/notifications', { params: { phone } });
+                const total = res.data.data?.length || 0;
+                const readCount = parseInt(localStorage.getItem('read_notifications_count') || '0', 10);
+                if (total > readCount) setUnreadCount(total - readCount);
+                else setUnreadCount(0);
+            } catch (e) {}
+        };
+        
+        checkNotifications();
+        
+        // When notification page is mounted, an event clears the badge
+        const handleRead = () => setUnreadCount(0);
+        window.addEventListener('notifications_read', handleRead);
+        
+        return () => window.removeEventListener('notifications_read', handleRead);
+    }, [user?.phone, location.pathname]);
+
     const searchDebounceRef = useRef<any>(null);
     const [reviewsModal, setReviewsModal] = useState<{ open: boolean, company: any, reviews: any[], loading: boolean, sort: string }>({ 
         open: false, company: null, reviews: [], loading: false, sort: 'rating_desc' 
@@ -1050,9 +1076,16 @@ export default function CustomerHome() {
 
                     <Link
                         to="/my-notifications"
-                        className="flex-1 flex flex-col items-center justify-center h-full group active:scale-95 transition-all text-white/50 hover:text-amber-400"
+                        className={`flex-1 flex flex-col items-center justify-center h-full group active:scale-95 transition-all ${unreadCount > 0 ? 'text-amber-400' : 'text-white/50 hover:text-amber-400'} relative`}
                     >
-                        <span className="text-xl">🔔</span>
+                        <div className="relative">
+                            <span className={`text-xl inline-block origin-top ${unreadCount > 0 ? 'animate-ring drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]' : ''}`}>🔔</span>
+                            {unreadCount > 0 && (
+                                <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[9px] min-w-[16px] h-[16px] flex items-center justify-center font-black px-1 rounded-full border border-slate-900 shadow-lg text-center animate-bounce">
+                                    {unreadCount > 9 ? '9+' : unreadCount}
+                                </span>
+                            )}
+                        </div>
                         <span className="text-[8px] font-black uppercase tracking-widest mt-0.5">Bildirim</span>
                     </Link>
 
@@ -1341,6 +1374,15 @@ export default function CustomerHome() {
                     from { transform: translateY(100%); opacity: 0; }
                     to { transform: translateY(0); opacity: 1; }
                 }
+                @keyframes ring {
+                    0% { transform: rotate(0); }
+                    10% { transform: rotate(15deg); }
+                    20% { transform: rotate(-10deg); }
+                    30% { transform: rotate(5deg); }
+                    40% { transform: rotate(-5deg); }
+                    50%, 100% { transform: rotate(0); }
+                }
+                .animate-ring { animation: ring 1.5s ease-in-out infinite; }
             `}</style>
             {/* Reviews Modal - Premium Redesign */}
             {reviewsModal.open && (
