@@ -201,7 +201,7 @@ export default function CustomerHome() {
         window.addEventListener('notifications_read', handleRead);
         
         return () => window.removeEventListener('notifications_read', handleRead);
-    }, [user?.phone, location.pathname]);
+    }, [user?.phone]);
 
     const searchDebounceRef = useRef<any>(null);
     const [reviewsModal, setReviewsModal] = useState<{ open: boolean, company: any, reviews: any[], loading: boolean, sort: string }>({ 
