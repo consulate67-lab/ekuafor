@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
-import { Company, Appointment } from '../types';
+import { Company, Appointment, Expense } from '../types';
 
 export default function SalonBoard() {
     const navigate = useNavigate();
@@ -52,6 +52,22 @@ export default function SalonBoard() {
     const [completionModal, setCompletionModal] = useState<{ open: boolean; app: Appointment | null; amount: number }>({ open: false, app: null, amount: 0 });
     const [paymentApp, setPaymentApp] = useState<Appointment | null>(null);
     const [nfcState, setNfcState] = useState<'IDLE' | 'SCANNING' | 'SUCCESS' | 'ERROR'>('IDLE');
+
+    // Expense States
+    const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+    const [expenses, setExpenses] = useState<Expense[]>([]);
+    const [expenseForm, setExpenseForm] = useState({
+        description: '',
+        amount: '',
+        category: 'genel',
+        is_local: false
+    });
+    const [isSyncing, setIsSyncing] = useState(false);
+    const isLocalMode = localStorage.getItem('isLocalMode') === 'true';
+
+    const pendingSyncCount = useMemo(() => {
+        return appointments.filter(a => a.is_local || (a as any).is_updated_locally).length + expenses.filter((e: any) => e.is_local).length;
+    }, [appointments, expenses]);
 
     // Helper to generate consistent color for staff
     const getStaffColor = (name: string) => {
@@ -109,6 +125,16 @@ export default function SalonBoard() {
             setDepartments(deptRes.data.data || []);
         } catch (err) {
             console.error('Veri senkronizasyonu başarısız', err);
+        }
+    }, [selectedDate]);
+
+    const fetchExpenses = useCallback(async (date?: string) => {
+        try {
+            const dateToFetch = date || selectedDate;
+            const res = await api.get('/expenses', { params: { date: dateToFetch } });
+            setExpenses(res.data.data || []);
+        } catch (err) {
+            console.error('Masraf yükleme hatası', err);
         }
     }, [selectedDate]);
 
@@ -170,11 +196,18 @@ export default function SalonBoard() {
 
             const interval = setInterval(() => {
                 fetchData(compId);
+                if (isLocalMode) fetchExpenses();
                 setCurrentHour(new Date().getHours());
             }, 30000);
             return () => clearInterval(interval);
         }
-    }, [boardKey, fetchData]);
+    }, [boardKey, fetchData, fetchExpenses, isLocalMode]);
+
+    useEffect(() => {
+        if (boardKey && isLocalMode) {
+            fetchExpenses();
+        }
+    }, [boardKey, isLocalMode, fetchExpenses]);
 
     // In staff mode, filter staff list to only show the logged-in staff member, or filter by department
     const displayStaff = staffMode && staffInfo
@@ -418,6 +451,35 @@ export default function SalonBoard() {
         }
     };
 
+    const handleExpenseSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            setLoading(true);
+            await api.post('/expenses', {
+                description: expenseForm.description,
+                amount: Number(expenseForm.amount),
+                category: expenseForm.category,
+                date: selectedDate
+            });
+            setExpenseForm({ description: '', amount: '', category: 'genel', is_local: false });
+            fetchExpenses();
+        } catch (err) {
+            alert('Masraf eklenemedi');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDeleteExpense = async (id: number) => {
+        if (!confirm('Bu masrafı silmek istediğinize emin misiniz?')) return;
+        try {
+            await api.delete(`/expenses/${id}`);
+            fetchExpenses();
+        } catch (err) {
+            alert('Masraf silinemedi');
+        }
+    };
+
     const handleUpdateStatus = async (id: number, newStatus: string, currentPrice?: number) => {
         let msg = '';
         let finalPrice = currentPrice;
@@ -470,6 +532,84 @@ export default function SalonBoard() {
             alert(err.response?.data?.error || 'Hizmet onaylanırken hata oluştu');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleSyncDown = async () => {
+        if (!company || isLocalMode) return;
+        if (!confirm('Salon verileri çevrimdışı kullanım için bu cihaza indirilsin mi?')) return;
+
+        try {
+            setIsSyncing(true);
+            const compId = company.id;
+
+            // Fetch everything
+            const [staffRes, servRes, pkgRes, deptRes] = await Promise.all([
+                api.get(`/companies/${compId}/employees`, { headers: { 'X-No-Mock': 'true' } }),
+                api.get('/services', { params: { company_id: compId }, headers: { 'X-No-Mock': 'true' } }),
+                api.get('/packages', { params: { company_id: compId }, headers: { 'X-No-Mock': 'true' } }),
+                api.get('/departments', { params: { company_id: compId }, headers: { 'X-No-Mock': 'true' } })
+            ]);
+
+            // Save to localStorage specifically for mock-server keys
+            localStorage.setItem('saloon_companies', JSON.stringify([company]));
+            localStorage.setItem('saloon_users', JSON.stringify(staffRes.data.data || []));
+            localStorage.setItem('saloon_services', JSON.stringify(servRes.data.data || []));
+            localStorage.setItem('saloon_packages', JSON.stringify(pkgRes.data.data || []));
+            localStorage.setItem('saloon_departments', JSON.stringify(deptRes.data.data || []));
+
+            alert('✅ Veriler başarıyla indirildi. İnternet kesilirse Terminal Modu\'na geçebilirsiniz.');
+        } catch (err) {
+            console.error('Sync down failed:', err);
+            alert('❌ Veri indirme başarısız oldu.');
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    const handleSyncUp = async () => {
+        if (!isLocalMode || pendingSyncCount === 0) return;
+        if (!confirm(`${pendingSyncCount} adet yerel değişiklik buluta yüklensin mi?`)) return;
+
+        try {
+            setIsSyncing(true);
+
+            // Sync NEW Appointments
+            const localApps = appointments.filter(a => a.is_local);
+            for (const app of localApps) {
+                // Remove ID and is_local before sending to real server
+                const { id, is_local, is_updated_locally, service_name, end_time, ...cleanData } = app as any;
+                await api.post('/appointments', cleanData, { headers: { 'X-No-Mock': 'true' } });
+            }
+
+            // Sync UPDATED Appointments
+            const updatedApps = appointments.filter(a => (a as any).is_updated_locally && !a.is_local);
+            for (const app of updatedApps) {
+                const { id, is_local, is_updated_locally, ...patchData } = app as any;
+                await api.patch(`/appointments/${id}/status`, patchData, { headers: { 'X-No-Mock': 'true' } });
+            }
+
+            // Sync Expenses
+            const localExps = expenses.filter((e: any) => e.is_local);
+            for (const exp of localExps) {
+                const { id, is_local, created_at, ...cleanData } = exp as any;
+                await api.post('/expenses', cleanData, { headers: { 'X-No-Mock': 'true' } });
+            }
+
+            alert('✅ Tüm veriler başarıyla buluta yüklendi.');
+
+            if (confirm('İşlem tamamlandı. Canlı moda (Live Sync) geçilsin mi?')) {
+                localStorage.removeItem('isLocalMode');
+                window.location.reload();
+            } else {
+                window.location.reload();
+            }
+
+        } catch (err) {
+            console.error('Sync up failed:', err);
+            alert('❌ Senkronizasyon sırasında hata oluştu. Bazı veriler yüklenememiş olabilir.');
+        } finally {
+            setIsSyncing(false);
         }
     };
 
@@ -637,8 +777,10 @@ export default function SalonBoard() {
                                 {new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
                             </span>
                             <div className="flex items-center gap-1.5 mt-1">
-                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
-                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Live Sync</span>
+                                <span className={`w-1.5 h-1.5 ${isLocalMode ? 'bg-amber-500' : 'bg-emerald-500'} rounded-full animate-ping`}></span>
+                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                                    {isLocalMode ? 'Terminal Mode (Offline)' : 'Live Sync'}
+                                </span>
                             </div>
                         </div>
 
@@ -653,6 +795,47 @@ export default function SalonBoard() {
                                         <span className="text-sm">{pendingCount}</span>
                                         <span className="text-[10px] uppercase tracking-widest hidden sm:inline">Talep</span>
                                     </div>
+                                </button>
+                            )}
+
+                            {isLocalMode && (
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setIsExpenseModalOpen(true)}
+                                        className="group w-12 h-12 rounded-2xl bg-white border-2 border-slate-50 text-slate-400 hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-all duration-300 flex items-center justify-center shadow-lg shadow-slate-100/50 active:scale-90"
+                                        title="Masraf Girişi"
+                                    >
+                                        <svg className="w-5 h-5 transition-transform group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </button>
+
+                                    {pendingSyncCount > 0 && (
+                                        <button
+                                            onClick={handleSyncUp}
+                                            disabled={isSyncing}
+                                            className="group relative w-12 h-12 rounded-2xl bg-amber-500 text-white border-2 border-amber-300 hover:bg-amber-600 transition-all duration-300 flex items-center justify-center shadow-lg shadow-amber-200/50 active:scale-90 animate-pulse"
+                                            title={`${pendingSyncCount} Kaydı Buluta Yükle`}
+                                        >
+                                            <svg className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                            </svg>
+                                            <div className="absolute -top-2 -right-2 bg-slate-900 text-white text-[8px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">{pendingSyncCount}</div>
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            {!isLocalMode && (
+                                <button
+                                    onClick={handleSyncDown}
+                                    disabled={isSyncing}
+                                    className="group w-12 h-12 rounded-2xl bg-white border-2 border-indigo-50 text-indigo-400 hover:bg-indigo-600 hover:text-white transition-all duration-300 flex items-center justify-center shadow-lg shadow-indigo-100/50 active:scale-90"
+                                    title="Çevrimdışı İçin Verileri İndir"
+                                >
+                                    <svg className={`w-5 h-5 ${isSyncing ? 'animate-bounce' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
                                 </button>
                             )}
 
@@ -690,6 +873,23 @@ export default function SalonBoard() {
                                                     </select>
                                                 </div>
                                                 <div className="h-px bg-slate-100 w-full"></div>
+                                                {isLocalMode && (
+                                                    <button
+                                                        onClick={() => {
+                                                            if (confirm('Terminal modundan çıkılsın mı?')) {
+                                                                localStorage.removeItem('isLocalMode');
+                                                                localStorage.removeItem('salon_board_key');
+                                                                window.location.href = '/';
+                                                            }
+                                                        }}
+                                                        className="w-full flex items-center justify-between px-3 py-2 bg-amber-50 text-amber-600 rounded-xl text-sm font-bold hover:bg-amber-100 transition-all"
+                                                    >
+                                                        <span>Terminali Kapat</span>
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                                                        </svg>
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => {
                                                         if (confirm('Sistemden çıkış yapılsın mı?')) {
@@ -902,6 +1102,11 @@ export default function SalonBoard() {
                                                                             }`}>
                                                                             {app.status === 'approved' ? 'V' : app.status === 'pending' ? '!' : 'G'}
                                                                         </span>
+                                                                        {(app.is_local || (app as any).is_updated_locally) && (
+                                                                            <span className="px-1 py-0.5 bg-amber-500 text-white text-[6px] font-black uppercase tracking-widest rounded-full shadow-sm animate-pulse">
+                                                                                Lokal
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                     <div className="flex items-center justify-between mb-0.5">
                                                                         <p className="text-xs font-black truncate leading-none tracking-tight">{app.customer_name || 'Misafir'}</p>
@@ -1786,6 +1991,96 @@ export default function SalonBoard() {
                             >
                                 Vazgeç
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Expense Management Modal */}
+            {isExpenseModalOpen && (
+                <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-2xl rounded-[3rem] p-8 lg:p-12 shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300">
+                        <div className="flex items-center justify-between mb-8">
+                            <div>
+                                <h3 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Masraf Yönetimi</h3>
+                                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-1">Cihaz üzerine kaydedilen yerel giderler</p>
+                            </div>
+                            <button onClick={() => setIsExpenseModalOpen(false)} className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 hover:bg-slate-100 transition-colors flex items-center justify-center">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+
+                        {/* Expense Form */}
+                        <form onSubmit={handleExpenseSubmit} className="bg-slate-50 p-6 rounded-[2rem] mb-8 border border-slate-100 flex flex-wrap gap-4 items-end">
+                            <div className="flex-1 min-w-[200px]">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-3">Açıklama</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={expenseForm.description}
+                                    onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
+                                    placeholder="Örn: Kira, Elektrik, Malzeme"
+                                    className="w-full bg-white border-2 border-transparent rounded-2xl px-5 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
+                                />
+                            </div>
+                            <div className="w-32">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-3">Tutar (₺)</label>
+                                <input
+                                    type="number"
+                                    required
+                                    value={expenseForm.amount}
+                                    onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+                                    placeholder="500"
+                                    className="w-full bg-white border-2 border-transparent rounded-2xl px-5 py-3 font-bold text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="h-[52px] px-8 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black active:scale-95 transition-all"
+                            >
+                                {loading ? 'EKLENİYOR...' : 'EKLE'}
+                            </button>
+                        </form>
+
+                        {/* Expense List */}
+                        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                            <div className="space-y-3">
+                                {expenses.length === 0 ? (
+                                    <div className="py-12 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px]">Henüz Masraf Kaydı Yok</div>
+                                ) : (
+                                    expenses.map((exp) => (
+                                        <div key={exp.id} className="bg-white border border-slate-100 p-5 rounded-2xl flex items-center justify-between group hover:border-rose-100 hover:shadow-lg hover:shadow-rose-500/5 transition-all">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center text-lg">📉</div>
+                                                <div>
+                                                    <p className="font-bold text-slate-900 tracking-tight">{exp.description}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{exp.date}</p>
+                                                        {exp.is_local && (
+                                                            <span className="px-1.5 py-0.5 bg-amber-100 text-amber-600 text-[8px] font-black uppercase rounded-lg">Lokal</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-6">
+                                                <span className="text-xl font-black text-slate-900 tracking-tighter">₺{exp.amount}</span>
+                                                <button
+                                                    onClick={() => handleDeleteExpense(exp.id)}
+                                                    className="w-10 h-10 rounded-xl text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all flex items-center justify-center"
+                                                >
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{selectedDate} TOPLAM GİDER</span>
+                            <span className="text-2xl font-black text-rose-600 tracking-tighter">₺{expenses.reduce((sum, e) => sum + e.amount, 0)}</span>
                         </div>
                     </div>
                 </div>

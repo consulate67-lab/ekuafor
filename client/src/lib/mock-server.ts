@@ -6,7 +6,9 @@ const KEYS = {
     SERVICES: 'saloon_services',
     COMPANIES: 'saloon_companies',
     APPOINTMENTS: 'saloon_appointments',
-    TOKEN: 'token'
+    EXPENSES: 'saloon_expenses',
+    TOKEN: 'token',
+    LOCAL_AUTH: 'local_auth' // Terminal için yerel yetkilendirme
 };
 
 // Initial Data
@@ -127,6 +129,10 @@ const initializeDB = () => {
         localStorage.setItem(KEYS.APPOINTMENTS, JSON.stringify([]));
     }
 
+    if (!localStorage.getItem(KEYS.EXPENSES)) {
+        localStorage.setItem(KEYS.EXPENSES, JSON.stringify([]));
+    }
+
     let companies = [];
     try {
         companies = JSON.parse(localStorage.getItem(KEYS.COMPANIES) || '[]');
@@ -179,6 +185,20 @@ export const mockHandlers = {
     // Health Check - For Login Page Connectivity Test
     'GET /health': async () => {
         return { success: true, status: 'ok' };
+    },
+
+    // Terminal Local Login
+    'POST /auth/terminal-login': async (data: any) => {
+        const localAuth = JSON.parse(localStorage.getItem(KEYS.LOCAL_AUTH) || 'null');
+        if (!localAuth) {
+            // İlk kez kuruluyorsa şifreyi ayarla
+            localStorage.setItem(KEYS.LOCAL_AUTH, JSON.stringify({ password: data.password }));
+            return { success: true, data: { token: 'terminal-token' } };
+        }
+        if (localAuth.password !== data.password) {
+            throw { response: { data: { error: 'Geçersiz şifre' } } };
+        }
+        return { success: true, data: { token: 'terminal-token' } };
     },
 
     // Auth
@@ -449,6 +469,7 @@ export const mockHandlers = {
             service_name: service.name,
             // If user is guest/public, status is pending. If admin creates, approved.
             status: 'pending',
+            is_local: true,
             created_at: new Date().toISOString()
         };
 
@@ -475,9 +496,31 @@ export const mockHandlers = {
         if (index === -1) throw { response: { status: 404, data: { error: 'Randevu bulunamadı' } } };
 
         appointments[index].status = data.status;
+        appointments[index].is_updated_locally = true;
         setTable(KEYS.APPOINTMENTS, appointments);
 
         return { success: true, data: appointments[index] };
+    },
+
+    'PATCH /appointments/service/:id/status': async (apsId: number, data: any, _headers: any) => {
+        const appointments = getTable(KEYS.APPOINTMENTS);
+        let updated = false;
+
+        appointments.forEach((a: any) => {
+            const services = a.services || [];
+            const idx = services.findIndex((s: any) => s.id === apsId || s.aps_id === apsId);
+            if (idx !== -1) {
+                services[idx].status = data.status;
+                a.is_updated_locally = true;
+                updated = true;
+            }
+        });
+
+        if (updated) {
+            setTable(KEYS.APPOINTMENTS, appointments);
+            return { success: true };
+        }
+        throw { response: { status: 404, data: { error: 'Hizmet kaydı bulunamadı' } } };
     },
 
     // Companies
@@ -543,9 +586,38 @@ export const mockHandlers = {
     },
 
     'GET /companies/:id/employees': async (_id: number) => {
-        // Mock employees for now since we removed the UI management but the page might still request it initially
-        // returns empty or some mock data
-        return { success: true, data: [] };
+        const users = getTable(KEYS.USERS);
+        return { success: true, data: users.filter((u: any) => u.role === 'staff') };
+    },
+
+    // Expenses
+    'GET /expenses': async (params: any) => {
+        const expenses = getTable(KEYS.EXPENSES);
+        const date = params?.date;
+        if (date) {
+            return { success: true, data: expenses.filter((e: any) => e.date === date) };
+        }
+        return { success: true, data: expenses };
+    },
+
+    'POST /expenses': async (data: any) => {
+        const expenses = getTable(KEYS.EXPENSES);
+        const newExpense = {
+            id: Date.now(),
+            ...data,
+            is_local: true,
+            created_at: new Date().toISOString()
+        };
+        expenses.push(newExpense);
+        setTable(KEYS.EXPENSES, expenses);
+        return { success: true, data: newExpense };
+    },
+
+    'DELETE /expenses/:id': async (id: number) => {
+        const expenses = getTable(KEYS.EXPENSES);
+        const filtered = expenses.filter((e: any) => e.id !== id);
+        setTable(KEYS.EXPENSES, filtered);
+        return { success: true };
     }
 };
 
@@ -624,10 +696,20 @@ export const mockAdapter = async (config: any) => {
         else if (path.endsWith('/appointments') && method === 'get') responseData = await mockHandlers['GET /appointments'](params, headers);
         else if (path.endsWith('/appointments') && method === 'post') responseData = await mockHandlers['POST /appointments'](body, headers);
         else if (path.match(/\/appointments\/\d+\/status$/) && method === 'patch') {
-            const parts = path.split('/');
-            const id = parseInt(parts[parts.length - 2]);
+            const id = parseInt(path.split('/').slice(-2, -1)[0]);
             responseData = await mockHandlers['PATCH /appointments/:id/status'](id, body, headers);
         }
+
+        // EXPENSES
+        else if (path.endsWith('/expenses') && method === 'get') responseData = await mockHandlers['GET /expenses'](params);
+        else if (path.endsWith('/expenses') && method === 'post') responseData = await mockHandlers['POST /expenses'](body);
+        else if (path.includes('/expenses/') && method === 'delete') {
+            const id = parseInt(path.split('/').pop()!);
+            responseData = await mockHandlers['DELETE /expenses/:id'](id);
+        }
+
+        // TERMINAL AUTH
+        else if (path.includes('/auth/terminal-login') && method === 'post') responseData = await mockHandlers['POST /auth/terminal-login'](body);
 
         if (responseData !== null) {
             console.log(`[MockServer] RESPONSE: ${method.toUpperCase()} ${path}`, responseData);

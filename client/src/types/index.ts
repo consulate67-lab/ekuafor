@@ -182,4 +182,16 @@ export interface Appointment {
         staff_id?: number;
         service_staff_name?: string;
     }>;
+    is_local?: boolean;
+    is_updated_locally?: boolean;
+}
+
+export interface Expense {
+    id: number;
+    description: string;
+    amount: number;
+    category?: string;
+    date: string;
+    created_at?: string;
+    is_local?: boolean;
 }

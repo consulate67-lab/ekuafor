@@ -1,6 +1,13 @@
 import axios from 'axios';
 
+// Build-time baseUrl from environment
 let baseUrl = import.meta.env.VITE_API_URL;
+
+// Runtime override from localStorage for development/testing
+const storageBaseUrl = localStorage.getItem('VITE_API_URL');
+if (storageBaseUrl) {
+    baseUrl = storageBaseUrl;
+}
 
 // Akıllı Otomatik Bağlantı: Neredeyiz?
 const isProdDomain = window.location.hostname.includes('saloncebinde.com') || window.location.hostname.includes('github.io');
@@ -18,6 +25,7 @@ if (!baseUrl) {
         baseUrl = 'http://localhost:3000/api';
     } else {
         // Diğer durumlar (IP mobil vb.) için de üretim sunucusu güvenli tercihtir
+        // Alternatif: Yerel ağdayken telefonla PC'ye bağlanmak isteniyorsa localStorage.setItem('VITE_API_URL', 'http://192.168.x.x:3000/api') kullanılabilir.
         baseUrl = 'https://ekuafor-production-344a.up.railway.app/api';
     }
 }
@@ -35,15 +43,15 @@ console.log('-------------------------');
 // Sunucu hatalarından kurtulmak için tarayıcı içi veritabanı kullanımı.
 import { mockAdapter } from './mock-server';
 
-// Mock Sunucuyu Devreye Al (Her zaman veya sadece canlıda)
-const USE_MOCK_SERVER = false; // GERÇEK VERİTABANI AKTİF
+// Akıllı Mod Kontrolü: Eğer yerel mod aktifse veya internet yoksa mock sunucuyu kullan
+
 
 const api = axios.create({
     baseURL: baseUrl,
     headers: {
         'Content-Type': 'application/json',
     },
-    timeout: 30000, // 30 seconds timeout for Railway cold starts
+    timeout: 30000,
 });
 
 // Configure retry delay
@@ -51,7 +59,7 @@ const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Request interceptor - token ekle ve MOCK YÖNLENDİRME
 api.interceptors.request.use(
-    async (config) => {
+    (config: any) => {
         // Token ekle
         const token = localStorage.getItem('token');
         if (token && token.length > 10) { // Basic validation
@@ -64,57 +72,55 @@ api.interceptors.request.use(
         }
 
         // MOCK SERVER KONTROLÜ
-        if (USE_MOCK_SERVER) {
-            console.log('⚡ Mock Server İsteği:', config.url);
+        // evaluate for Every request to avoid stale mode
+        const currentIsLocalMode = localStorage.getItem('isLocalMode') === 'true';
+        const skipMock = config.headers?.['X-No-Mock'] === 'true' || config.headers?.['X-No-Mock'] === true;
 
-            // Sadece desteklenen rotaları mockla, diğerleri (örn dış api) geçsin
-            const mockedRoutes = ['/auth', '/services', '/users', '/companies', '/appointments', '/sms'];
-            if (mockedRoutes.some(r => config.url?.includes(r))) {
-                config.adapter = async (cfg) => {
-                    try {
-                        const response = await mockAdapter({
-                            method: cfg.method!,
-                            url: cfg.url!,
-                            data: cfg.data,
-                            headers: cfg.headers
-                        });
+        if (currentIsLocalMode && !skipMock) {
+            console.log('⚡ Yerel Mod Aktif: Mock Server İsteği:', config.url);
+            config.adapter = async (cfg: any) => {
+                try {
+                    const response = await mockAdapter({
+                        method: cfg.method!,
+                        url: cfg.url!,
+                        data: cfg.data,
+                        headers: cfg.headers
+                    });
 
+                    const axiosResponse = {
+                        data: response.data,
+                        status: response.status || 200,
+                        statusText: response.status === 200 ? 'OK' : 'Error',
+                        headers: {},
+                        config: cfg,
+                        request: {}
+                    };
 
-                        const axiosResponse = {
-                            data: response.data,
-                            status: response.status || 200,
-                            statusText: response.status === 200 ? 'OK' : 'Error',
-                            headers: {},
-                            config: cfg,
-                            request: {}
-                        };
-
-                        // Manually reject if status involves error (Axios validateStatus logic simulation)
-                        if (response.status >= 300) {
-                            return Promise.reject({
-                                message: 'Request failed with status code ' + response.status,
-                                name: 'AxiosError',
-                                code: 'ERR_BAD_REQUEST',
-                                config: cfg,
-                                request: {},
-                                response: axiosResponse
-                            });
-                        }
-
-                        return axiosResponse;
-                    } catch (err: any) {
+                    // Manually reject if status involves error (Axios validateStatus logic simulation)
+                    if (response.status >= 300) {
                         return Promise.reject({
-                            response: {
-                                data: err.response?.data || { error: 'Mock Server Error' },
-                                status: err.response?.status || 500,
-                                statusText: 'Internal Server Error',
-                                headers: {},
-                                config: cfg
-                            }
+                            message: 'Request failed with status code ' + response.status,
+                            name: 'AxiosError',
+                            code: 'ERR_BAD_REQUEST',
+                            config: cfg,
+                            request: {},
+                            response: axiosResponse
                         });
                     }
-                };
-            }
+
+                    return axiosResponse;
+                } catch (err: any) {
+                    return Promise.reject({
+                        response: {
+                            data: err.response?.data || { error: 'Mock Server Error' },
+                            status: err.response?.status || 500,
+                            statusText: 'Internal Server Error',
+                            headers: {},
+                            config: cfg
+                        }
+                    });
+                }
+            };
         }
 
         return config;

@@ -126,6 +126,25 @@ export default function Login() {
                         </button>
                     </div>
 
+                    {/* Terminal Mode Quick Access (Always visible or in tabs) */}
+                    <div className="bg-amber-500/5 px-8 pt-6">
+                        <button
+                            onClick={() => {
+                                if (confirm('Terminal (Yerel) moduna geçilsin mi? Tüm verileriniz bu cihaza kaydedilecektir.')) {
+                                    localStorage.setItem('isLocalMode', 'true');
+                                    localStorage.setItem('salon_board_key', 'terminal-mode');
+                                    localStorage.setItem('salon_board_company_id', '1');
+                                    // Mock Login
+                                    login({ id: 1, first_name: 'Terminal', last_name: 'Modu', role: 'company_admin', created_at: new Date().toISOString() } as any, 'terminal-token');
+                                    navigate('/board');
+                                }
+                            }}
+                            className="w-full py-3 bg-white border-2 border-amber-500/20 rounded-2xl text-amber-600 font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-amber-500 hover:text-white hover:border-amber-500 transition-all shadow-sm active:scale-95"
+                        >
+                            📟 Terminal Modu (İnternetsiz)
+                        </button>
+                    </div>
+
                     <div className="p-8">
                         {error && (
                             <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-r-lg animate-shake text-sm">
