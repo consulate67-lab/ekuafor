@@ -21,7 +21,9 @@ export default function Login() {
         try {
             if (loginType === 'email') {
                 const normalizedEmail = email.toLowerCase().trim();
-                const response = await api.post('/auth/login', { email: normalizedEmail, password });
+                // Ensure we are not in local mode when trying real email login
+                localStorage.removeItem('isLocalMode');
+                const response = await api.post('/auth/login', { email: normalizedEmail, password }, { headers: { 'X-No-Mock': 'true' } });
                 const { user, token, redirectKey } = response.data.data;
                 login(user, token);
 
