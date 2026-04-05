@@ -94,6 +94,55 @@ export default function Login() {
         }
     };
 
+    const handleTerminalSetup = async () => {
+        if (!boardCode) {
+            setError('Lütfen kurulum için Board Anahtarınızı girin.');
+            return;
+        }
+
+        setLoading(true);
+        setError('');
+        try {
+            // 1. Verify Key & Get Company Data
+            const res = await api.post('/companies/board-login', { board_key: boardCode.toUpperCase().trim() });
+            if (!res.data.success) throw new Error('Geçersiz anahtar.');
+
+            const companyData = res.data.data;
+            const compId = companyData.id;
+
+            // 2. Fetch EVERYTHING for offline use
+            const [staffRes, servRes, pkgRes, deptRes] = await Promise.all([
+                api.get(`/companies/${compId}/employees`, { headers: { 'X-No-Mock': 'true' } }),
+                api.get('/services', { params: { company_id: compId }, headers: { 'X-No-Mock': 'true' } }),
+                api.get('/packages', { params: { company_id: compId }, headers: { 'X-No-Mock': 'true' } }),
+                api.get('/departments', { params: { company_id: compId }, headers: { 'X-No-Mock': 'true' } })
+            ]);
+
+            // 3. Save to Local Database (localStorage)
+            localStorage.setItem('saloon_companies', JSON.stringify([companyData]));
+            localStorage.setItem('saloon_users', JSON.stringify(staffRes.data.data || []));
+            localStorage.setItem('saloon_services', JSON.stringify(servRes.data.data || []));
+            localStorage.setItem('saloon_packages', JSON.stringify(pkgRes.data.data || []));
+            localStorage.setItem('saloon_departments', JSON.stringify(deptRes.data.data || []));
+            
+            // 4. Switch to Local Mode
+            localStorage.setItem('isLocalMode', 'true');
+            localStorage.setItem('salon_board_key', 'terminal-mode');
+            localStorage.setItem('salon_board_company_id', compId.toString());
+
+            // Add a temporary terminal token for auth store
+            login({ id: 1, first_name: companyData.name || 'Terminal', last_name: 'Modu', role: 'company_admin', company_id: compId } as any, 'terminal-token');
+
+            alert('✅ TERMINAL KURULUMU BAŞARILI!\n\nFirmanızın tüm verileri tablete indirildi. Artık internet olmasa bile kullanabilirsiniz.');
+            navigate('/board');
+
+        } catch (err: any) {
+            setError(err.response?.data?.error || err.message || 'Kurulum başarısız. Lütfen internetinizi kontrol edin.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-slate-50">
             {/* Background Orbs */}
@@ -195,7 +244,19 @@ export default function Login() {
                                         required
                                         autoFocus
                                     />
-                                    <p className="text-[10px] text-gray-400 mt-2 text-center uppercase font-bold tracking-widest">Kişisel board kodunuzu girin</p>
+                                    <div className="mt-4 flex flex-col gap-3">
+                                        <p className="text-[10px] text-gray-400 text-center uppercase font-bold tracking-widest">Kişisel board kodunuzu girin</p>
+                                        
+                                        <div className="pt-4 border-t border-gray-100">
+                                            <button 
+                                                type="button"
+                                                onClick={handleTerminalSetup}
+                                                className="w-full py-3 bg-indigo-50 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] border border-indigo-100 hover:bg-indigo-100 transition-colors shadow-sm active:scale-95 transition-all"
+                                            >
+                                                📟 İnternetsiz Kullanım (Kurulum Yap)
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 

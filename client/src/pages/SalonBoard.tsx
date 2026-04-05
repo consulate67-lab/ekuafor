@@ -30,6 +30,7 @@ export default function SalonBoard() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [isPendingListModalOpen, setIsPendingListModalOpen] = useState(false);
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
     const [selectedCell, setSelectedCell] = useState<{ person: any, hour: string } | null>(null);
     const [fastForm, setFastForm] = useState({
@@ -128,6 +129,18 @@ export default function SalonBoard() {
         }
     }, [selectedDate]);
 
+    // Auto-Setup for Terminal Mode
+    useEffect(() => {
+        if (isLocalMode && boardKey === 'terminal-mode') {
+            const hasData = localStorage.getItem('saloon_users');
+            if (!hasData) {
+                if (confirm('Terminal Modu ilk kez başlatılıyor. Şirket verileri (personel, hizmetler, saatler) şimdi sunucudan indirilsin mi?')) {
+                    handleSyncDown();
+                }
+            }
+        }
+    }, [isLocalMode, boardKey]);
+
     const fetchExpenses = useCallback(async (date?: string) => {
         try {
             const dateToFetch = date || selectedDate;
@@ -156,6 +169,52 @@ export default function SalonBoard() {
             }
         } catch (err: any) {
             setError(err.response?.data?.error || 'Geçersiz anahtar');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleTerminalSetup = async () => {
+        if (!inputKey) {
+            setError('Lütfen firmanıza ait Terminal Anahtarını girin.');
+            return;
+        }
+
+        setLoading(true);
+        setError('');
+        try {
+            // 1. Verify Key & Get Company Data
+            const res = await api.post('/companies/board-login', { board_key: inputKey });
+            if (!res.data.success) throw new Error('Geçersiz anahtar.');
+
+            const companyData = res.data.data;
+            const compId = companyData.id;
+
+            // 2. Fetch EVERYTHING for offline use
+            const [staffRes, servRes, pkgRes, deptRes] = await Promise.all([
+                api.get(`/companies/${compId}/employees`, { headers: { 'X-No-Mock': 'true' } }),
+                api.get('/services', { params: { company_id: compId }, headers: { 'X-No-Mock': 'true' } }),
+                api.get('/packages', { params: { company_id: compId }, headers: { 'X-No-Mock': 'true' } }),
+                api.get('/departments', { params: { company_id: compId }, headers: { 'X-No-Mock': 'true' } })
+            ]);
+
+            // 3. Save to Local Database (localStorage)
+            localStorage.setItem('saloon_companies', JSON.stringify([companyData]));
+            localStorage.setItem('saloon_users', JSON.stringify(staffRes.data.data || []));
+            localStorage.setItem('saloon_services', JSON.stringify(servRes.data.data || []));
+            localStorage.setItem('saloon_packages', JSON.stringify(pkgRes.data.data || []));
+            localStorage.setItem('saloon_departments', JSON.stringify(deptRes.data.data || []));
+            
+            // 4. Switch to Local Mode
+            localStorage.setItem('isLocalMode', 'true');
+            localStorage.setItem('salon_board_key', 'terminal-mode');
+            localStorage.setItem('salon_board_company_id', compId.toString());
+
+            alert('✅ TERMINAL KURULUMU BAŞARILI!\n\nFirmanızın tüm verileri tablete indirildi. Artık internet olmasa bile kullanabilirsiniz.');
+            window.location.reload();
+
+        } catch (err: any) {
+            setError(err.response?.data?.error || err.message || 'Kurulum başarısız');
         } finally {
             setLoading(false);
         }
@@ -561,7 +620,20 @@ export default function SalonBoard() {
             alert('✅ Veriler başarıyla indirildi. İnternet kesilirse Terminal Modu\'na geçebilirsiniz.');
         } catch (err) {
             console.error('Sync down failed:', err);
-            alert('❌ Veri indirme başarısız oldu.');
+            
+            // Fallback for crucial services if sync fails
+            const defaultServices = [
+                { id: 999001, name: 'Saç Kesimi (Standart)', price: 200, duration_minutes: 30, company_id: company.id },
+                { id: 999002, name: 'Yıkama & Fön', price: 100, duration_minutes: 20, company_id: company.id },
+                { id: 999003, name: 'Sakal Tıraşı', price: 100, duration_minutes: 15, company_id: company.id }
+            ];
+            
+            if (!localStorage.getItem('saloon_services')) {
+                localStorage.setItem('saloon_services', JSON.stringify(defaultServices));
+                alert('⚠️ Sunucuya bağlanılamadı, varsayılan hizmetler tanımlandı.');
+            } else {
+                alert('❌ Veri indirme başarısız oldu. Lütfen internet bağlantınızı kontrol edin.');
+            }
         } finally {
             setIsSyncing(false);
         }
@@ -613,6 +685,33 @@ export default function SalonBoard() {
         }
     };
 
+    const handleAddLocalStaff = (name: string, deptId: string) => {
+        const currentStaff = JSON.parse(localStorage.getItem('saloon_users') || '[]');
+        const newId = Date.now();
+        const newStaff = {
+            id: newId,
+            first_name: name.split(' ')[0],
+            last_name: name.split(' ').slice(1).join(' ') || '',
+            role: 'staff',
+            department_id: deptId,
+            company_id: company?.id || 1,
+            photo: null
+        };
+
+        const updated = [...currentStaff, newStaff];
+        localStorage.setItem('saloon_users', JSON.stringify(updated));
+        setStaff(updated);
+        alert('✅ Yeni personel yerel hafızaya eklendi.');
+    };
+
+    const handleUpdateLocalWorkHours = (start: string, end: string) => {
+        if (!company) return;
+        const updatedCompany = { ...company, work_start_time: start, work_end_time: end };
+        localStorage.setItem('saloon_companies', JSON.stringify([updatedCompany]));
+        setCompany(updatedCompany);
+        alert('✅ Çalışma saatleri güncellendi.');
+    };
+
     if (!boardKey) {
         return (
             <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-6 bg-mesh-gradient">
@@ -637,8 +736,26 @@ export default function SalonBoard() {
                             disabled={loading}
                             className="w-full bg-amber-500 hover:bg-amber-400 text-slate-900 py-6 rounded-2xl font-black uppercase tracking-widest shadow-[0_20px_40px_-10px_rgba(245,158,11,0.3)] active:scale-95 transition-all disabled:opacity-50"
                         >
-                            {loading ? 'Bağlanıyor...' : 'Sistemi Başlat'}
+                            {loading ? 'Bağlanıyor...' : 'Çevrimiçi Başlat'}
                         </button>
+
+                        <div className="relative py-4">
+                            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
+                            <div className="relative flex justify-center text-xs uppercase"><span className="bg-[#1a2333] px-4 text-slate-500 font-bold tracking-widest">VEYA</span></div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={handleTerminalSetup}
+                            disabled={loading}
+                            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-6 rounded-2xl font-black uppercase tracking-widest shadow-[0_20px_40px_-10px_rgba(79,70,229,0.3)] active:scale-95 transition-all disabled:opacity-50 border border-white/10 flex items-center justify-center gap-3"
+                        >
+                            <span className="text-xl">📟</span>
+                            {loading ? 'KURULUYOR...' : 'TERMINAL KURULUMU YAP'}
+                        </button>
+                        <p className="text-white/30 text-[9px] font-bold uppercase tracking-[0.2em] mt-4">
+                            * Kurulum için bir kerelik internet bağlantısı gerekir.
+                        </p>
                     </form>
                 </div>
             </div>
@@ -795,6 +912,20 @@ export default function SalonBoard() {
                                         <span className="text-sm">{pendingCount}</span>
                                         <span className="text-[10px] uppercase tracking-widest hidden sm:inline">Talep</span>
                                     </div>
+                                </button>
+                            )}
+
+                            {/* Settings Gear Icon (Somun) */}
+                            {isLocalMode && (
+                                <button
+                                    onClick={() => setIsSettingsModalOpen(true)}
+                                    className="p-3 bg-white border border-slate-100 rounded-xl text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 transition-all active:scale-90"
+                                    title="Parametre ve Personel Ayarları"
+                                >
+                                    <svg className="w-6 h-6 animate-spin-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
                                 </button>
                             )}
 
@@ -1990,6 +2121,127 @@ export default function SalonBoard() {
                                 className="w-full py-4 text-slate-400 font-black text-xs uppercase tracking-widest hover:text-slate-600 transition-colors"
                             >
                                 Vazgeç
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Terminal Settings Modal (Somun) */}
+            {isSettingsModalOpen && (
+                <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-4xl rounded-[3rem] p-8 lg:p-12 shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300">
+                        <div className="flex items-center justify-between mb-10">
+                            <div className="flex items-center gap-4">
+                                <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl shadow-inner">
+                                    ⚙️
+                                </div>
+                                <div>
+                                    <h3 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Terminal Ayarları</h3>
+                                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-1">Sektörel parametreler ve yerel tanımlamalar</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsSettingsModalOpen(false)} className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 hover:bg-slate-100 transition-colors flex items-center justify-center">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar space-y-12">
+                            {/* Section 1: Working Hours */}
+                            <section>
+                                <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                    <span className="w-2 h-2 bg-amber-500 rounded-full"></span> Mesai Saatleri
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-4">Açılış Saati</label>
+                                        <input
+                                            type="time"
+                                            defaultValue={company?.work_start_time || '08:00'}
+                                            onBlur={(e) => handleUpdateLocalWorkHours(e.target.value, company?.work_end_time || '21:00')}
+                                            className="w-full bg-white border-2 border-transparent rounded-2xl px-6 py-4 font-black text-2xl text-slate-700 outline-none focus:border-amber-500 transition-all shadow-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-4">Kapanış Saati</label>
+                                        <input
+                                            type="time"
+                                            defaultValue={company?.work_end_time || '21:00'}
+                                            onBlur={(e) => handleUpdateLocalWorkHours(company?.work_start_time || '08:00', e.target.value)}
+                                            className="w-full bg-white border-2 border-transparent rounded-2xl px-6 py-4 font-black text-2xl text-slate-700 outline-none focus:border-amber-500 transition-all shadow-sm"
+                                        />
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* Section 2: Local Staff Management */}
+                            <section>
+                                <div className="flex items-center justify-between mb-6">
+                                    <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                                        <span className="w-2 h-2 bg-emerald-500 rounded-full"></span> Personel Yönetimi
+                                    </h4>
+                                    <button 
+                                        onClick={() => {
+                                            const name = prompt('Personel Adı Soyadı:');
+                                            if (name) handleAddLocalStaff(name, departments[0]?.id || '1');
+                                        }}
+                                        className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl hover:bg-indigo-600 hover:text-white transition-all uppercase tracking-widest"
+                                    >
+                                        + Yeni Personel
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {staff.map((s) => (
+                                        <div key={s.id} className="bg-white border border-slate-100 p-5 rounded-[2rem] flex items-center gap-4 hover:border-indigo-100 transition-all group">
+                                            <div 
+                                                className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black text-white shadow-lg"
+                                                style={{ backgroundColor: getStaffColor(`${s.first_name} ${s.last_name}`) }}
+                                            >
+                                                {s.first_name[0]}{s.last_name[0]}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-black text-slate-900 tracking-tight truncate">{s.first_name} {s.last_name}</p>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                    {departments.find(d => d.id === Number(s.department_id))?.name || 'Genel'}
+                                                </p>
+                                            </div>
+                                            {s.id > 1000000000 && ( // Local added staff check (using timestamp id)
+                                                <span className="text-[8px] font-black text-amber-500 bg-amber-50 px-2 py-1 rounded-lg uppercase">Yerel</span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+
+                            {/* Section 3: Services (Read-only for now) */}
+                            <section>
+                                <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                    <span className="w-2 h-2 bg-indigo-500 rounded-full"></span> Tanımlı Hizmetler
+                                </h4>
+                                <div className="space-y-3">
+                                    {services.map((ser) => (
+                                        <div key={ser.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-white transition-all">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">✂️</div>
+                                                <div>
+                                                    <p className="font-bold text-slate-900 text-sm tracking-tight">{ser.name}</p>
+                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{ser.duration_minutes} Dakika</p>
+                                                </div>
+                                            </div>
+                                            <span className="font-black text-slate-900">₺{ser.price}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+                        </div>
+
+                        <div className="mt-10 pt-8 border-t border-slate-100 text-center">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-4">Senkronizasyon Durumu</p>
+                            <button 
+                                onClick={handleSyncUp}
+                                className="px-10 py-4 bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 shadow-xl shadow-emerald-100 active:scale-95 transition-all"
+                            >
+                                Tüm Yerel Verileri Buluta Yükle
                             </button>
                         </div>
                     </div>
