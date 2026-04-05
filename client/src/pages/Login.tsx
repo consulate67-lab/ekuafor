@@ -33,12 +33,12 @@ export default function Login() {
                 }
 
                 // Role based redirect
-                if (user.role === 'company_admin') {
+                if (user.role === 'company_admin' || user.role === 'admin') {
                     navigate('/company-panel', { replace: true });
                 } else if (user.role === 'staff') {
                     navigate('/dashboard', { replace: true });
                 } else if (user.role === 'super_admin') {
-                    navigate('/dashboard', { replace: true });
+                    navigate('/main-management', { replace: true });
                 } else {
                     navigate('/app', { replace: true });
                 }

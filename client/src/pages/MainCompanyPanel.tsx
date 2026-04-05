@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuthStore } from '../store/authStore';
 import api from '../lib/api';
 
 export default function MainCompanyPanel() {
@@ -20,15 +21,17 @@ export default function MainCompanyPanel() {
     const [authCode, setAuthCode] = useState('');
     const [isAuthorized, setIsAuthorized] = useState(false);
 
+    const { user } = useAuthStore();
+    
     useEffect(() => {
         const savedAuth = localStorage.getItem('main_company_auth');
-        if (savedAuth) {
+        if (savedAuth || user?.role === 'super_admin') {
             setIsAuthorized(true);
             fetchMainCompanies();
         } else {
             setLoading(false);
         }
-    }, []);
+    }, [user]);
 
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
