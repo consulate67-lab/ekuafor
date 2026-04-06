@@ -1,7 +1,7 @@
 {
     "name": "saloncebinde-client",
     "private": true,
-    "version": "1.73.00",
+    "version": "1.73.02",
     "type": "module",
     "homepage": "https://consulate67-lab.github.io/ekuafor/",
     "scripts": {
