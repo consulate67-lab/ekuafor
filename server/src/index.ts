@@ -110,7 +110,8 @@ app.get('/health', healthHandler);
 app.get('/api/health', healthHandler);
 app.get('/ekuafor/api/health', healthHandler);
 
-// API Routes
+// API Routes (Triple mapping for safety)
+app.use('/auth', authRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/ekuafor/api/auth', authRoutes);
 

@@ -35,13 +35,15 @@ const Login = () => {
             if (loginType === 'email') {
                 const normalizedEmail = email.toLowerCase().trim();
                 localStorage.removeItem('isLocalMode');
-                const response = await api.post('/auth/login', { email: normalizedEmail, password }, { headers: { 'X-No-Mock': 'true' } });
+                const fullLoginUrl = 'https://ekuafor-production-344a.up.railway.app/api/auth/login';
+                const response = await api.post(fullLoginUrl, { email: normalizedEmail, password }, { headers: { 'X-No-Mock': 'true' } });
                 const { user: userData, token } = response.data.data;
                 login(userData, token);
             } else {
                 // Dashboard Login (Terminal)
                 localStorage.removeItem('isLocalMode');
-                const response = await api.post('/companies/board-login', { key: boardCode }, { headers: { 'X-No-Mock': 'true' } });
+                const fullTerminalLoginUrl = 'https://ekuafor-production-344a.up.railway.app/api/companies/board-login';
+                const response = await api.post(fullTerminalLoginUrl, { key: boardCode }, { headers: { 'X-No-Mock': 'true' } });
                 const { user: userData, token } = response.data.data;
                 login(userData, token);
             }
