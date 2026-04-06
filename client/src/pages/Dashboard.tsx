@@ -147,7 +147,7 @@ export default function Dashboard() {
         const fetchStats = async () => {
             if (user?.role === 'super_admin') {
                 try {
-                    const res = await api.get('/companies');
+                    const res = await api.get('/companies', { headers: { 'X-No-Mock': 'true' } });
                     const companyList = res.data.data || [];
                     setStats(prev => ({ ...prev, companyCount: companyList.length }));
                     setAllCompanies(companyList);

@@ -45,7 +45,7 @@ export default function MainCompanyPanel() {
         // 2. Admin Key veya Board Key kontrolü (her iki endpoint'i dene)
         try {
             // Önce admin_key dene
-            const res = await api.get(`/main-companies/code/${authCode.toUpperCase()}`);
+            const res = await api.get(`/main-companies/code/${authCode.toUpperCase()}`, { headers: { 'X-No-Mock': 'true' } });
             if (res.data.success && res.data.data) {
                 localStorage.setItem('main_company_auth', authCode.toUpperCase());
                 setIsAuthorized(true);
@@ -56,7 +56,7 @@ export default function MainCompanyPanel() {
 
         try {
             // Board key dene (rapor girişiyle aynı endpoint)
-            const res2 = await api.post('/main-companies/reports-login', { key: authCode.toUpperCase() });
+            const res2 = await api.post('/main-companies/reports-login', { key: authCode.toUpperCase() }, { headers: { 'X-No-Mock': 'true' } });
             if (res2.data.success && res2.data.data) {
                 localStorage.setItem('main_company_auth', authCode.toUpperCase());
                 setIsAuthorized(true);
@@ -71,7 +71,7 @@ export default function MainCompanyPanel() {
     const fetchMainCompanies = async () => {
         try {
             setLoading(true);
-            const response = await api.get('/main-companies');
+            const response = await api.get('/main-companies', { headers: { 'X-No-Mock': 'true' } });
             setMainCompanies(response.data.data || []);
         } catch (err: any) {
             setError('Veriler yüklenirken hata oluştu');
@@ -86,7 +86,7 @@ export default function MainCompanyPanel() {
             await api.post('/main-companies', {
                 ...formData,
                 admin_key: formData.admin_code
-            });
+            }, { headers: { 'X-No-Mock': 'true' } });
             setShowForm(false);
             setFormData({ name: '', description: '', address_line: '', admin_code: '', board_key: '' });
             fetchMainCompanies();
@@ -98,7 +98,7 @@ export default function MainCompanyPanel() {
     const handleDelete = async (id: number) => {
         if (!confirm('Bu üst firmayı silmek istediğinize emin misiniz? Şubeler bağımsız hale gelecektir.')) return;
         try {
-            await api.delete(`/main-companies/${id}`);
+            await api.delete(`/main-companies/${id}`, { headers: { 'X-No-Mock': 'true' } });
             fetchMainCompanies();
         } catch (err: any) {
             alert('Silme işlemi başarısız oldu');
