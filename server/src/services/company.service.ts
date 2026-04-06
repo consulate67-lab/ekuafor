@@ -344,8 +344,11 @@ class CompanyService {
             try {
                 const cached = await redis.get(cacheKey);
                 if (cached) {
-                    console.log('[Redis] Cache Hit:', cacheKey);
-                    return JSON.parse(cached);
+                    const parsed = JSON.parse(cached);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        console.log('[Redis] Cache Hit:', cacheKey);
+                        return parsed;
+                    }
                 }
             } catch (err) {
                 console.error('[Redis] Cache Read Error:', err);
