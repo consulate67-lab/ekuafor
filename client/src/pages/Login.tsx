@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, Layout, ArrowRight, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import api from '../lib/api';
 
@@ -14,7 +14,6 @@ const Login = () => {
 
     useEffect(() => {
         if (isAuthenticated && user) {
-            console.log('User role fully loaded:', user.role);
             if (user.role === 'super_admin') {
                 navigate('/main-management', { replace: true });
             } else if (user.role === 'admin' || user.role === 'company_admin') {
@@ -31,93 +30,64 @@ const Login = () => {
         setLoading(true);
 
         try {
-            const normalizedEmail = email.toLowerCase().trim();
-            const response = await api.post('/auth/login', { 
-                email: normalizedEmail, 
-                password 
+            const response = await api.post('/auth/login', {
+                email: email.toLowerCase().trim(),
+                password
             });
             const { user: userData, token } = response.data.data;
             login(userData, token);
         } catch (err: any) {
-            console.error('Login Error:', err);
-            if (err.response?.status === 401 || err.response?.status === 400) {
-                setError('Email veya şifre hatalı');
-            } else {
-                setError('Giriş yapılırken sunucu hatası oluştu. Lütfen tekrar deneyin.');
-            }
+            setError(err.response?.data?.error || 'Email veya şifre hatalı');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-white flex items-center justify-center p-4">
             <div className="max-w-md w-full">
-                <div className="text-center mb-8">
-                    <div className="inline-flex p-3 bg-indigo-600 rounded-2xl mb-4 shadow-lg shadow-indigo-200">
-                        <Layout className="w-8 h-8 text-white" />
-                    </div>
-                    <h1 className="text-3xl font-bold text-slate-900">Salon Cebinde</h1>
-                    <p className="text-slate-500 mt-2">Admin Yönetim Paneline Giriş</p>
+                <div className="text-center mb-10">
+                    <h1 className="text-4xl font-bold text-gray-900 mb-2">Salon Cebinde</h1>
+                    <p className="text-gray-600">Lütfen giriş yapın</p>
                 </div>
 
-                <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/60 p-8 border border-slate-100">
+                <div className="space-y-6">
                     {error && (
-                        <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl text-center">
+                        <div className="bg-red-50 text-red-600 p-4 rounded-lg text-center text-sm border border-red-100">
                             {error}
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="space-y-5">
+                    <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1.5 ml-1">E-posta Adresi</label>
-                            <div className="relative">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                                <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900"
-                                    placeholder="admin@example.com"
-                                    required
-                                />
-                            </div>
+                            <input
+                                type="email"
+                                placeholder="E-posta"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                required
+                            />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1.5 ml-1">Şifre</label>
-                            <div className="relative">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                                <input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900"
-                                    placeholder="••••••••"
-                                    required
-                                />
-                            </div>
+                            <input
+                                type="password"
+                                placeholder="Şifre"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                required
+                            />
                         </div>
-
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-indigo-300 transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
+                            className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
                         >
-                            {loading ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                            ) : (
-                                <>
-                                    Giriş Yap
-                                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                                </>
-                            )}
+                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Giriş Yap'}
                         </button>
                     </form>
                 </div>
-
-                <p className="text-center mt-8 text-slate-500 text-sm">
-                    © 2026 Salon Cebinde - Tüm Hakları Saklıdır.
-                </p>
             </div>
         </div>
     );
