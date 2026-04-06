@@ -795,7 +795,7 @@ export default function Dashboard() {
                                             </h1>
                                         </div>
                                         <p className="text-slate-400 text-sm font-medium leading-relaxed">
-                                            Sisteme yeni salonlar tanımlayabilir, mevcut işletmelerin bilgilerini (isim, adres, telefon) güncelleyebilir ve şube yapılarını yönetebilirsiniz.
+                                            Sisteme yeni salonlar tanımlayabilir ve her bir firmanın Board (Kurulum) kodunu buradan hızlıca yönetebilirsiniz.
                                         </p>
                                         <div className="flex flex-wrap gap-4 pt-2">
                                             <Link to="/companies/new" className="bg-indigo-500 hover:bg-indigo-600 text-white px-10 py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest transition-all shadow-2xl shadow-indigo-500/20 active:scale-95 flex items-center gap-3">
@@ -803,7 +803,7 @@ export default function Dashboard() {
                                                 YENİ FİRMA TANIMLA
                                             </Link>
                                             <Link to="/companies" className="bg-white/10 hover:bg-white/20 text-white px-10 py-5 rounded-[2rem] font-black text-xs uppercase tracking-widest transition-all border border-white/10 active:scale-95">
-                                                FİRMALARI YÖNET
+                                                TÜMÜNÜ YÖNET
                                             </Link>
                                         </div>
                                     </div>
@@ -811,7 +811,7 @@ export default function Dashboard() {
                                     <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
                                         <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/5 flex-1 lg:min-w-[150px] text-center group/item hover:bg-white/10 transition-colors">
                                             <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2 opacity-60">TOPLAM FİRMA</p>
-                                            <p className="text-5xl font-black text-white tracking-tighter group-hover/item:scale-110 transition-transform duration-500">{stats.companyCount}</p>
+                                            <p className="text-5xl font-black text-white tracking-tighter group-hover/item:scale-110 transition-transform duration-500">{stats.companyCount || allCompanies.length}</p>
                                         </div>
                                         <Link to="/main-management" className="bg-emerald-500/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-emerald-500/10 flex-1 lg:min-w-[150px] text-center group/item hover:bg-emerald-500/20 transition-all">
                                             <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-2 opacity-60">ÜST YÖNETİM</p>
@@ -820,14 +820,66 @@ export default function Dashboard() {
                                                 <span className="text-lg font-black text-white uppercase">YÖNET</span>
                                             </div>
                                         </Link>
-                                        <Link to="/sms-settings" className="bg-indigo-500/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-indigo-500/10 flex-1 lg:min-w-[150px] text-center group/item hover:bg-indigo-500/20 transition-all">
-                                            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2 opacity-60">SMS / OTP</p>
-                                            <div className="flex items-center justify-center gap-2">
-                                                <svg className="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-                                                <span className="text-lg font-black text-white uppercase">AYARLA</span>
-                                            </div>
-                                        </Link>
                                     </div>
+                                </div>
+                            </div>
+
+                            {/* FIRMA ERİŞİM ANAHTARLARI TABLOSU (Board Key Listesi) */}
+                            <div className="bg-white rounded-[3rem] p-10 shadow-2xl shadow-slate-200/50 border border-slate-100 mb-12">
+                                <div className="flex justify-between items-center mb-8">
+                                    <div>
+                                        <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Firma Giriş Anahtarları</h3>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Board Key ve Yönetici Kodları</p>
+                                    </div>
+                                    <div className="bg-indigo-50 px-6 py-2 rounded-2xl">
+                                        <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Board Sayısı: {allCompanies.length}</span>
+                                    </div>
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="border-b-2 border-slate-50">
+                                                <th className="pb-5 pl-4 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Firma Adı / Şehir</th>
+                                                <th className="pb-5 text-[11px] font-black text-indigo-500 uppercase tracking-[0.2em]">Board Key</th>
+                                                <th className="pb-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Yönetici Key</th>
+                                                <th className="pb-5 text-right pr-4 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Durum</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {allCompanies.map((c) => (
+                                                <tr key={c.id} className="hover:bg-slate-50/80 transition-all duration-300 group">
+                                                    <td className="py-6 pl-4">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-black text-slate-400 group-hover:bg-indigo-500 group-hover:text-white transition-all">
+                                                                {c.name?.[0].toUpperCase()}
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-black text-slate-900 uppercase tracking-tight">{c.name}</p>
+                                                                <p className="text-[10px] font-bold text-slate-400 uppercase">{c.city || 'Belirsiz'}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-6">
+                                                        <span className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-xl font-black text-xs tracking-widest border border-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                                                            {c.board_key || 'KOD YOK'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-6">
+                                                        <span className="text-slate-400 font-mono font-bold text-xs">
+                                                            {c.admin_key || 'KOD YOK'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-6 text-right pr-4">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                                                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Aktif</span>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
 
@@ -944,7 +996,7 @@ export default function Dashboard() {
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pb-4">
                                         <div className="bg-indigo-50/20 p-4 rounded-[2rem] border border-indigo-100/50 flex flex-col items-center text-center">
                                             <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-indigo-600 shadow-sm mb-3">
-                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2v12a2 2 0 002 2z" /></svg>
                                             </div>
                                             <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-1">Randevu</p>
                                             <p className={`text-2xl font-black text-indigo-900 ${statsLoading ? 'animate-pulse' : ''}`}>{employeeStats.total_appointments}</p>
