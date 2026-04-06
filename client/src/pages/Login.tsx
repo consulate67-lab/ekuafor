@@ -6,12 +6,12 @@ import api from '../lib/api';
 export default function Login() {
     const navigate = useNavigate();
     const { login, isAuthenticated, user } = useAuthStore();
-    const [loginType, setLoginType] = useState<'admin' | 'board'>('admin');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [boardCode, setBoardCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [showBoardLogin, setShowBoardLogin] = useState(false);
+    const [boardKey, setBoardKey] = useState('');
 
     useEffect(() => {
         if (isAuthenticated && user) {
@@ -25,7 +25,7 @@ export default function Login() {
         }
     }, [isAuthenticated, user, navigate]);
 
-    const handleAdminLogin = async (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setLoading(true);
@@ -45,75 +45,74 @@ export default function Login() {
 
     const handleBoardLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!boardCode) {
-            setError('Lütfen Board kodunu giriniz');
+        if (!boardKey) {
+            setError('Lütfen kurulum kodunu giriniz');
             return;
         }
         setError('');
         setLoading(true);
         try {
-            const response = await api.post('/companies/board-login', { key: boardCode.toUpperCase() });
+            const response = await api.post('/companies/board-login', { key: boardKey.toUpperCase() });
             const { user: userData, token } = response.data.data;
             login(userData, token);
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Geçersiz Board kodu');
+            setError(err.response?.data?.error || 'Geçersiz Kurulum Kodu');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-6 py-12 relative overflow-hidden font-sans">
-            {/* Background Effects (Aynen Orijinaldeki gibi) */}
-            <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-                <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-100 rounded-full blur-[100px] opacity-50 animate-pulse"></div>
-                <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-pink-100 rounded-full blur-[100px] opacity-40 animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="min-h-screen flex flex-col items-center justify-center bg-indigo-600 px-6 py-12 relative overflow-hidden font-sans">
+            {/* Background Texture */}
+            <div className="absolute inset-0 opacity-10">
+                <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
+                <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-200 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl"></div>
             </div>
 
-            <div className="max-w-sm w-full relative z-10">
+            <div className="max-w-md w-full relative z-10">
                 <div className="text-center mb-10">
-                    <div className="w-24 h-24 rounded-[2rem] overflow-hidden flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-indigo-200 rotate-6 hover:rotate-0 transition-transform duration-500 bg-white">
-                        <img src="/app-icon.png" alt="Logo" className="w-full h-full object-cover" />
+                    <div className="bg-white p-5 rounded-[2.5rem] w-24 h-24 flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-indigo-900/30">
+                        <img src="/app-icon.png" alt="Logo" className="w-full h-full object-contain" />
                     </div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2 uppercase">Salon Cebinde</h1>
-                    <p className="text-slate-400 font-bold text-xs uppercase tracking-[0.2em]">Yönetim Paneli Girişi</p>
+                    <h1 className="text-4xl font-black text-white tracking-tighter uppercase mb-2">Salon Cebinde</h1>
+                    <p className="text-indigo-100 font-bold text-xs uppercase tracking-[0.3em] opacity-80 italic">Orijinal Yönetim Sistemi</p>
                 </div>
 
-                <div className="bg-white/70 backdrop-blur-xl p-8 rounded-[2.5rem] shadow-2xl shadow-slate-200/60 border border-white">
+                <div className="bg-white rounded-[2.5rem] p-10 shadow-[0_20px_50px_rgba(0,0,0,0.2)]">
                     {error && (
-                        <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-red-100 flex items-center gap-3">
-                            <span className="text-lg">⚠️</span>
+                        <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-2xl text-[11px] font-black uppercase tracking-widest border border-red-100 flex items-center gap-3">
                             {error}
                         </div>
                     )}
 
-                    {loginType === 'admin' ? (
-                        <form onSubmit={handleAdminLogin} className="space-y-6">
-                            <div className="text-center mb-4">
-                                <h2 className="text-xl font-black text-slate-900 mb-1">Yönetici Girişi</h2>
-                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest leading-relaxed px-4">Panelinize erişmek için bilgilerinizi girin</p>
+                    {!showBoardLogin ? (
+                        <form onSubmit={handleLogin} className="space-y-6">
+                            <div className="text-center mb-8">
+                                <h2 className="text-2xl font-black text-slate-800">Yönetici Girişi</h2>
+                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Lütfen bilgilerinizi doğrulayın</p>
                             </div>
 
-                            <div className="group">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-4">E-posta</label>
+                            <div className="space-y-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">E-posta</label>
                                 <input
                                     type="email"
-                                    placeholder="admin@example.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full bg-slate-50 border-2 border-slate-100 p-5 rounded-2xl font-bold text-slate-900 outline-none focus:border-indigo-500 focus:bg-white transition-all tracking-wide"
+                                    className="w-full bg-slate-50 border-2 border-slate-100 p-5 rounded-2xl font-bold text-slate-900 outline-none focus:border-indigo-600 focus:bg-white transition-all"
+                                    placeholder="admin@saloon.com"
                                     required
                                 />
                             </div>
 
-                            <div className="group">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-4">Şifre</label>
+                            <div className="space-y-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Şifre</label>
                                 <input
                                     type="password"
-                                    placeholder="••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full bg-slate-50 border-2 border-slate-100 p-5 rounded-2xl font-bold text-slate-900 outline-none focus:border-indigo-500 focus:bg-white transition-all"
+                                    className="w-full bg-slate-50 border-2 border-slate-100 p-5 rounded-2xl font-bold text-slate-900 outline-none focus:border-indigo-600 focus:bg-white transition-all"
+                                    placeholder="••••••••"
                                     required
                                 />
                             </div>
@@ -121,57 +120,49 @@ export default function Login() {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full bg-slate-900 text-white p-5 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl shadow-slate-200 disabled:opacity-30 active:scale-95 transition-all"
+                                className="w-full bg-indigo-600 text-white p-5 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 active:scale-95 transition-all text-xs"
                             >
-                                {loading ? 'Giriş Yapılıyor...' : 'Giriş Yap'}
+                                {loading ? 'BAĞLANILIYOR...' : 'SİSTEME GİRİŞ YAP'}
                             </button>
                         </form>
                     ) : (
                         <form onSubmit={handleBoardLogin} className="space-y-6">
-                            <div className="text-center mb-4">
-                                <h2 className="text-xl font-black text-slate-900 mb-1">Terminal/Board</h2>
-                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest leading-relaxed px-4">Firmanıza özel board kurulum kodunu girin</p>
+                            <div className="text-center mb-8">
+                                <h2 className="text-2xl font-black text-indigo-700 uppercase tracking-tighter italic">Kurulum Girişi</h2>
+                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1 italic">Sistemi aktif etmek için Kurulum Kodunu yazın</p>
                             </div>
 
-                            <div className="group">
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-4">Giriş Anahtarı</label>
+                            <div className="space-y-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 italic">Kurulum Anahtarı (Board Key)</label>
                                 <input
                                     type="text"
+                                    value={boardKey}
+                                    onChange={(e) => setBoardKey(e.target.value.toUpperCase())}
+                                    className="w-full bg-slate-50 border-4 border-indigo-100 p-6 rounded-2xl font-black text-indigo-700 text-center text-4xl outline-none focus:border-indigo-600 focus:bg-white transition-all tracking-widest"
                                     placeholder="XXXX-123"
-                                    value={boardCode}
-                                    onChange={(e) => setBoardCode(e.target.value.toUpperCase())}
-                                    className="w-full bg-slate-50 border-2 border-slate-100 p-5 rounded-2xl font-black text-slate-900 text-center text-3xl outline-none focus:border-indigo-500 focus:bg-white transition-all tracking-[0.2em]"
                                     required
+                                    autoFocus
                                 />
                             </div>
 
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full bg-indigo-600 text-white p-5 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 disabled:opacity-30 active:scale-95 transition-all"
+                                className="w-full bg-indigo-700 text-white p-5 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 active:scale-95 transition-all text-xs italic"
                             >
-                                {loading ? 'Bağlanıyor...' : 'Sistemi Başlat'}
+                                {loading ? 'KURULUM BAŞLATILIYOR...' : 'TAHTAYA BAĞLAN'}
                             </button>
                         </form>
                     )}
                 </div>
 
-                <div className="mt-8 text-center space-y-6">
+                <div className="mt-10 text-center">
                     <button
-                        onClick={() => {
-                            setLoginType(loginType === 'admin' ? 'board' : 'admin');
-                            setError('');
-                        }}
-                        className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline"
+                        onClick={() => { setShowBoardLogin(!showBoardLogin); setError(''); }}
+                        className="text-[11px] font-black text-indigo-100 hover:text-white uppercase tracking-widest underline decoration-2 underline-offset-8 transition-colors"
                     >
-                        {loginType === 'admin' ? '✈ Kurulum Kodu ile Giriş (Board)' : '🔙 Yönetici Girişine Dön'}
+                        {!showBoardLogin ? '✈ KURULUM KODU İLE BAĞLAN (BOARD)' : '🔙 YÖNETİCİ PANELİNE DÖN'}
                     </button>
-
-                    <div className="pt-4">
-                        <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.3em] leading-relaxed">
-                            © 2026 Salon Cebinde
-                        </p>
-                    </div>
                 </div>
             </div>
         </div>
