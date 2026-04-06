@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../lib/api';
+import InventoryTab from '../components/InventoryTab';
 import { Camera, CameraResultType, CameraSource, CameraDirection } from '@capacitor/camera';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 
@@ -74,7 +75,7 @@ type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'finan
     'finance-cash-dashboard' | 'finance-cash-reports' | 'finance-cash-list' |
     'finance-contacts' | 'finance-contacts-balance' |
     'header-invoices' | 'header-cash' | 'header-contacts' |
-    'customers-list' | 'customers-marketing' | 'customers-automations' | 'crm';
+    'customers-list' | 'customers-marketing' | 'customers-automations' | 'crm' | 'inventory';
 
 interface MenuItem {
     key: TabKey;
@@ -109,6 +110,7 @@ const menuItems: MenuItem[] = [
             { key: 'finance-contacts-balance', label: 'Toplu Bakiye Raporu', icon: '⚖️' },
         ]
     },
+    { key: 'inventory', icon: '📦', label: 'Envanter & Stok' },
     {
         key: 'crm',
         icon: '👥',
@@ -1635,6 +1637,7 @@ export default function CompanyPanel() {
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Hızlı İşlemler</p>
                                 {[
                                     { icon: '📅', label: 'Müşteri Randevu QR Kodu', desc: 'Müşterilerin randevu alması için', tab: 'booking' as TabKey },
+                                    { icon: '📦', label: 'Envanter & Stok Yönetimi', desc: 'Malzeme ve sarfiyat takibi', tab: 'inventory' as TabKey },
                                     { icon: '✂️', label: (company.service_label || 'Hizmet') + ' ve Paket Yönetimi', desc: 'Fiyat ve süre tanımlamaları', tab: 'services' as TabKey },
                                     { icon: '👤', label: 'Yeni Personel Ekle', desc: 'Board kodu ile giriş yapacak', tab: 'staff' as TabKey },
                                     { icon: '🏢', label: 'Departman Yönet', desc: 'Birimlerinizi düzenleyin', tab: 'dept' as TabKey },
@@ -4200,6 +4203,14 @@ export default function CompanyPanel() {
                                     </div>
                                 </>
                             ) : null}
+                        </div>
+                    )}
+                    {/* INVENTORY TAB - Envanter ve Stok Yönetimi */}
+                    {activeTab === 'inventory' && (
+                        <div className="animate-fade-in">
+                            <InventoryTab 
+                                companyId={Number(company.id)} 
+                            />
                         </div>
                     )}
                 </div>

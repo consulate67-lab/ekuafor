@@ -8,7 +8,6 @@ import { parseVoiceCommand } from '../lib/aiParser';
 import { Device } from '@capacitor/device';
 import { useAuthStore } from '../store/authStore';
 import { 
-    Package, 
     Users, 
     TrendingUp,
     AlertTriangle,
@@ -1079,30 +1078,7 @@ export default function Dashboard() {
                         </button>
                     )}
 
-                    {/* 3. Envanter & Stok Kestirmesi - SADECE FİRMA ADMİNİ */}
-                    {user?.role === 'company_admin' && (
-                        <Link
-                            to="/inventory"
-                            className="card group hover:scale-[1.02] transition-all duration-300 border-indigo-100 bg-gradient-to-br from-white to-indigo-50/30"
-                        >
-                            <div className="flex items-center gap-5">
-                                <div className="bg-indigo-600 p-4 rounded-2xl text-white shadow-lg shadow-indigo-200 group-hover:scale-110 transition-transform duration-300">
-                                    <Package className="w-8 h-8" />
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <h3 className="text-xl font-black text-gray-900 uppercase tracking-tighter italic">Envanter & Stok</h3>
-                                        {stats.lowStockCount > 0 && (
-                                            <span className="bg-rose-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full animate-pulse">
-                                                {stats.lowStockCount} KRİTİK
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p className="text-[10px] text-indigo-600 font-black uppercase tracking-widest leading-relaxed opacity-70">Malzeme takibi ve personel zimmetleri.</p>
-                                </div>
-                            </div>
-                        </Link>
-                    )}
+
 
                     {/* 4. Çalışan Raporu */}
                     {(user?.role === 'staff' || user?.role === 'company_admin') && (
