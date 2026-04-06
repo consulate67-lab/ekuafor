@@ -7,8 +7,10 @@ import api from '../lib/api';
 const Login = () => {
     const navigate = useNavigate();
     const { login, isAuthenticated, user } = useAuthStore();
+    const [loginType, setLoginType] = useState<'admin' | 'board'>('admin');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [boardCode, setBoardCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -24,11 +26,10 @@ const Login = () => {
         }
     }, [isAuthenticated, user, navigate]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleAdminLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setLoading(true);
-
         try {
             const response = await api.post('/auth/login', {
                 email: email.toLowerCase().trim(),
@@ -37,7 +38,26 @@ const Login = () => {
             const { user: userData, token } = response.data.data;
             login(userData, token);
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Email veya şifre hatalı');
+            setError(err.response?.data?.error || 'Giriş başarısız. Lütfen kontrol edin.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBoardLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!boardCode) {
+            setError('Lütfen Board kodunu giriniz');
+            return;
+        }
+        setError('');
+        setLoading(true);
+        try {
+            const response = await api.post('/companies/board-login', { key: boardCode.toUpperCase() });
+            const { user: userData, token } = response.data.data;
+            login(userData, token);
+        } catch (err: any) {
+            setError(err.response?.data?.error || 'Geçersiz Board kodu');
         } finally {
             setLoading(false);
         }
@@ -48,7 +68,7 @@ const Login = () => {
             <div className="max-w-md w-full">
                 <div className="text-center mb-10">
                     <h1 className="text-4xl font-bold text-gray-900 mb-2">Salon Cebinde</h1>
-                    <p className="text-gray-600">Lütfen giriş yapın</p>
+                    <p className="text-gray-600">{loginType === 'admin' ? 'Yönetici Girişi' : 'Board Girişi'}</p>
                 </div>
 
                 <div className="space-y-6">
@@ -58,8 +78,8 @@ const Login = () => {
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
+                    {loginType === 'admin' ? (
+                        <form onSubmit={handleAdminLogin} className="space-y-4">
                             <input
                                 type="email"
                                 placeholder="E-posta"
@@ -68,8 +88,6 @@ const Login = () => {
                                 className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                 required
                             />
-                        </div>
-                        <div>
                             <input
                                 type="password"
                                 placeholder="Şifre"
@@ -78,15 +96,45 @@ const Login = () => {
                                 className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                 required
                             />
-                        </div>
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center"
+                            >
+                                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Giriş Yap'}
+                            </button>
+                        </form>
+                    ) : (
+                        <form onSubmit={handleBoardLogin} className="space-y-4">
+                            <input
+                                type="text"
+                                placeholder="Board Kodu (Örn: ABC-123)"
+                                value={boardCode}
+                                onChange={(e) => setBoardCode(e.target.value.toUpperCase())}
+                                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center font-mono tracking-widest"
+                                required
+                            />
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full bg-slate-800 text-white py-3 rounded-lg font-semibold hover:bg-slate-900 transition-colors flex items-center justify-center"
+                            >
+                                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Boardu Aç'}
+                            </button>
+                        </form>
+                    )}
+
+                    <div className="pt-4 border-t border-gray-100">
                         <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                            onClick={() => {
+                                setLoginType(loginType === 'admin' ? 'board' : 'admin');
+                                setError('');
+                            }}
+                            className="w-full text-indigo-600 font-medium text-sm hover:underline"
                         >
-                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Giriş Yap'}
+                            {loginType === 'admin' ? 'Board Kodu ile Giriş Yap' : 'Yönetici Girişine Dön'}
                         </button>
-                    </form>
+                    </div>
                 </div>
             </div>
         </div>
