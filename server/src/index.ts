@@ -277,6 +277,12 @@ const runMigrations = async () => {
             )
         `);
 
+        // Force add columns if they are missing (for existing tables)
+        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS admin_key VARCHAR(20) UNIQUE');
+        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS board_key VARCHAR(20) UNIQUE');
+        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_type VARCHAR(20) DEFAULT \'ASIL\'');
+        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS main_company_id INTEGER');
+
         await pool.query(`
             CREATE TABLE IF NOT EXISTS main_companies (
                 id SERIAL PRIMARY KEY,
