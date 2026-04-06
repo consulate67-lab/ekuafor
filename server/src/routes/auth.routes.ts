@@ -105,14 +105,15 @@ router.post('/login', async (req: Request, res: Response) => {
     try {
         const validatedData = loginSchema.parse(req.body);
 
-        // Kullanıcıyı bul
         const lowerEmail = validatedData.email.toLowerCase().trim();
+        console.log('[Auth] Login request for email:', lowerEmail);
         const result = await pool.query(
             'SELECT * FROM users WHERE LOWER(email) = $1',
             [lowerEmail]
         );
 
         if (result.rows.length === 0) {
+            console.warn('[Auth] User not found:', lowerEmail);
             return res.status(401).json({
                 success: false,
                 error: 'Email veya şifre hatalı'
@@ -120,12 +121,13 @@ router.post('/login', async (req: Request, res: Response) => {
         }
 
         const user = result.rows[0];
+        console.log('[Auth] User found, role:', user.role);
 
         // Şifreyi kontrol et
-        // DİKKAT: Veritabanında sütun adı 'password'
         const isPasswordValid = await bcrypt.compare(validatedData.password, user.password);
 
         if (!isPasswordValid) {
+            console.warn('[Auth] Invalid password for:', lowerEmail);
             return res.status(401).json({
                 success: false,
                 error: 'Email veya şifre hatalı'
@@ -133,6 +135,7 @@ router.post('/login', async (req: Request, res: Response) => {
         }
 
         // JWT token oluştur
+        console.log('[Auth] Password valid, generating token...');
         const token = jwt.sign(
             { userId: user.id, email: user.email, role: user.role, companyId: user.company_id },
             process.env.JWT_SECRET || 'your-secret-key',
@@ -145,12 +148,14 @@ router.post('/login', async (req: Request, res: Response) => {
         // Extra info for panel redirects
         let redirectKey = null;
         if (user.role === 'company_admin' && user.company_id) {
+            console.log('[Auth] Fetching admin_key for company:', user.company_id);
             const comp = await pool.query('SELECT admin_key FROM companies WHERE id = $1', [user.company_id]);
             redirectKey = comp.rows[0]?.admin_key;
         } else if (user.role === 'staff') {
             redirectKey = user.board_code;
         }
 
+        console.log('[Auth] Login successful for:', lowerEmail);
         res.json({
             success: true,
             data: {
@@ -159,7 +164,8 @@ router.post('/login', async (req: Request, res: Response) => {
                 redirectKey
             }
         });
-    } catch (error) {
+    } catch (error: any) {
+        console.error('[Auth Critical Error]:', error);
         res.status(500).json({
             success: false,
             error: error instanceof Error ? error.message : 'Giriş sırasında hata oluştu'
