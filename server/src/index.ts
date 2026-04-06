@@ -912,7 +912,8 @@ const server = app.listen(PORT, () => {
     console.log(`🔗 DB_URL_TEST: ${process.env.DATABASE_URL ? 'VAR' : 'YOK'}`);
     console.log('================================================');
 
-    // Run migrations in background
+    // Run migrations in background (DISABLED TO RESTORE WORKING STATE)
+    /*
     setTimeout(async () => {
         console.log('🏁 Starting background migrations...');
         try {
@@ -921,6 +922,7 @@ const server = app.listen(PORT, () => {
             console.error('🔥 Background migration failed:', e);
         }
     }, 5000);
+    */
 });
 
 // Graceful shutdown

@@ -1,6 +1,6 @@
 {
   "name": "saloncebinde-backend",
-  "version": "1.69.14",
+  "version": "1.69.22",
   "description": "Güzellik Merkezi Randevu Sistemi - Backend",
   "main": "dist/index.js",
   "scripts": {
