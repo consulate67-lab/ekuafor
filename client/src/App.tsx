@@ -29,6 +29,7 @@ import SetPassword from './pages/SetPassword';
 import StaffPanel from './pages/StaffPanel';
 import { useAppointmentSync } from './hooks/useAppointmentSync';
 import AIAdminPanel from './pages/AIAdminPanel';
+import Inventory from './pages/Inventory';
 
 
 
@@ -384,6 +385,7 @@ function App() {
                             <Route path="/appointments" element={<AppointmentManagement />} />
                             <Route path="/sms-settings" element={<SmsSettings />} />
                             <Route path="/ai-admin" element={<AIAdminPanel />} />
+                            <Route path="/inventory" element={<Inventory />} />
                             <Route path="*" element={<Navigate to="/dashboard" replace />} />
                         </>
                     ) : (

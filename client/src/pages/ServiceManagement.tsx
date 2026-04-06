@@ -12,6 +12,11 @@ export default function ServiceManagement() {
     const [error, setError] = useState('');
     const [showForm, setShowForm] = useState(false);
     const [showTemplates, setShowTemplates] = useState(false);
+    const [showMaterialModal, setShowMaterialModal] = useState(false);
+    const [selectedService, setSelectedService] = useState<Service | null>(null);
+    const [allProducts, setAllProducts] = useState<any[]>([]);
+    const [linkedMaterials, setLinkedMaterials] = useState<any[]>([]);
+    const [linkProductForm, setLinkProductForm] = useState({ product_id: '', qty: 1 });
 
     // Service Form State
     const [formData, setFormData] = useState<Partial<Service>>({
@@ -43,12 +48,14 @@ export default function ServiceManagement() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [servicesRes, packagesRes] = await Promise.all([
+            const [servicesRes, packagesRes, productsRes] = await Promise.all([
                 api.get('/services'),
-                api.get('/packages')
+                api.get('/packages'),
+                api.get('/inventory/products')
             ]);
             setServices(servicesRes.data.data);
             setPackages(packagesRes.data.data);
+            setAllProducts(productsRes.data.data || []);
         } catch (err: any) {
             console.error('Veriler yüklenirken hata:', err);
             setError('Veriler yüklenirken hata oluştu');
@@ -496,6 +503,18 @@ export default function ServiceManagement() {
                                         </div>
                                         <div className="flex gap-2">
                                             <button
+                                                onClick={async () => {
+                                                    setSelectedService(service);
+                                                    setShowMaterialModal(true);
+                                                    const res = await api.get(`/inventory/service-materials/${service.id}`);
+                                                    setLinkedMaterials(res.data.data || []);
+                                                }}
+                                                className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center hover:bg-amber-500 hover:text-white transition-all shadow-sm"
+                                                title="Malzeme Bağla"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                            </button>
+                                            <button
                                                 onClick={() => handleEditService(service)}
                                                 className="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:text-violet-600 transition-colors"
                                             >
@@ -655,6 +674,106 @@ export default function ServiceManagement() {
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Material Linkage Modal */}
+            {showMaterialModal && selectedService && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden relative animate-in zoom-in-95 duration-300">
+                        <div className="p-8 bg-amber-50 border-b border-amber-100 flex justify-between items-center">
+                            <div>
+                                <h3 className="text-xl font-black text-amber-900 uppercase tracking-tight">Malzeme Bağlantısı</h3>
+                                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mt-1">"{selectedService.name}" Hizmeti İçin</p>
+                            </div>
+                            <button onClick={() => setShowMaterialModal(false)} className="w-10 h-10 bg-white text-amber-500 rounded-full flex items-center justify-center shadow-sm">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+
+                        <div className="p-8 space-y-6">
+                            {/* Current Links */}
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Bağlı Malzemeler</label>
+                                <div className="space-y-2">
+                                    {linkedMaterials.length > 0 ? linkedMaterials.map((m, i) => (
+                                        <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                            <div>
+                                                <p className="text-xs font-black text-slate-800">{m.product_name}</p>
+                                                <p className="text-[10px] text-slate-400">{m.brand} | {m.required_quantity} {m.unit}</p>
+                                            </div>
+                                            <button 
+                                                onClick={async () => {
+                                                    // Add delete logic if needed
+                                                    setLinkedMaterials(prev => prev.filter((_, idx) => idx !== i));
+                                                    alert('Bağlantı kaldırıldı (Önizleme - Kaydet butonu eklenebilir)');
+                                                }}
+                                                className="text-red-400 hover:text-red-600 p-2"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            </button>
+                                        </div>
+                                    )) : (
+                                        <div className="text-center py-6 border-2 border-dashed border-slate-100 rounded-3xl">
+                                            <p className="text-xs font-bold text-slate-300 italic">Henüz malzeme bağlanmamış.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <hr className="border-slate-50" />
+
+                            {/* Add New Link */}
+                            <form onSubmit={async (e) => {
+                                e.preventDefault();
+                                try {
+                                    await api.post('/inventory/service-materials', {
+                                        service_id: selectedService.id,
+                                        product_id: parseInt(linkProductForm.product_id),
+                                        required_quantity: linkProductForm.qty
+                                    });
+                                    // Refresh
+                                    const res = await api.get(`/inventory/service-materials/${selectedService.id}`);
+                                    setLinkedMaterials(res.data.data || []);
+                                    setLinkProductForm({ product_id: '', qty: 1 });
+                                } catch (err) {
+                                    alert('Bağlantı eklenirken hata oluştu.');
+                                }
+                            }} className="space-y-4">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Yeni Malzeme Ekle</label>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div className="col-span-2">
+                                        <select 
+                                            required
+                                            className="w-full bg-slate-50 p-4 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-amber-500"
+                                            value={linkProductForm.product_id}
+                                            onChange={(e) => setLinkProductForm(prev => ({ ...prev, product_id: e.target.value }))}
+                                        >
+                                            <option value="">Malzeme Seçiniz...</option>
+                                            {allProducts.map(p => (
+                                                <option key={p.id} value={p.id}>{p.brand} - {p.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <input 
+                                            type="number"
+                                            required
+                                            min="0.01"
+                                            step="0.01"
+                                            className="w-full bg-slate-50 p-4 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-amber-500"
+                                            value={linkProductForm.qty}
+                                            onChange={(e) => setLinkProductForm(prev => ({ ...prev, qty: parseFloat(e.target.value) }))}
+                                            placeholder="Miktar"
+                                        />
+                                    </div>
+                                </div>
+                                <button type="submit" className="w-full py-4 bg-amber-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-amber-500/20 active:scale-95 transition-all">
+                                    BAĞLANTIYI KAYDET
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
