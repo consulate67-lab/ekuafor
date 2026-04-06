@@ -1,7 +1,7 @@
 {
     "name": "saloncebinde-client",
     "private": true,
-    "version": "1.73.02",
+    "version": "1.73.04",
     "type": "module",
     "homepage": "https://consulate67-lab.github.io/ekuafor/",
     "scripts": {
@@ -52,8 +52,5 @@
         "tailwindcss": "^3.4.1",
         "typescript": "^5.3.3",
         "vite": "^5.0.11"
-    },
-    "optionalDependencies": {
-        "@rollup/rollup-linux-x64-gnu": "4.21.0"
     }
 }
