@@ -280,6 +280,7 @@ const runMigrations = async () => {
         `);
 
         // Force add columns if they are missing (for existing tables)
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS commission_rate DECIMAL(5, 2)');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS admin_key VARCHAR(20) UNIQUE');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS board_key VARCHAR(20) UNIQUE');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_type VARCHAR(20) DEFAULT \'ASIL\'');
@@ -782,7 +783,7 @@ const runMigrations = async () => {
                     )
                     SELECT 
                         m.name, m.description, m.address_line, m.city, m.district, 
-                        m.latitude, m.longitude, m.phone, m.board_key,
+                        0, 0, '', m.admin_code,
                         'ÜST FİRMA', m.is_active, m.created_at, m.admin_code
                     FROM main_companies m
                     WHERE NOT EXISTS (

@@ -115,20 +115,28 @@ class ReportService {
         }
 
         // 1. Staff Breakdown (Uses STRICT statsFilter)
+        // Fetches staff-specific commission rate or falls back to company's default rate
         const staffQuery = `
             WITH staff_all AS (
-                SELECT u.id as staff_id, u.first_name || ' ' || u.last_name as staff_name
+                SELECT 
+                    u.id as staff_id, 
+                    u.first_name || ' ' || u.last_name as staff_name,
+                    u.commission_rate as staff_commission_rate,
+                    c.commission_rate as company_commission_rate
                 FROM users u
                 JOIN (
                     SELECT id as user_id FROM users WHERE company_id = $1
                     UNION
                     SELECT user_id FROM company_users WHERE company_id = $1
                 ) cu_all ON u.id = cu_all.user_id
+                JOIN companies c ON u.company_id = c.id
                 WHERE u.role != 'customer'
             )
             SELECT 
                 sa.staff_id,
                 sa.staff_name,
+                sa.staff_commission_rate,
+                sa.company_commission_rate,
                 COUNT(DISTINCT a.id) as count,
                 SUM(
                     COALESCE(
@@ -162,7 +170,7 @@ class ReportService {
                 WHERE a_in.company_id = $1 AND a_in.status != 'cancelled' AND ${statsFilter}
             ) a ON sa.staff_id = a.staff_id OR EXISTS (SELECT 1 FROM appointment_services WHERE appointment_id = a.id AND staff_id = sa.staff_id)
             LEFT JOIN services s ON a.service_id = s.id
-            GROUP BY sa.staff_id, sa.staff_name
+            GROUP BY sa.staff_id, sa.staff_name, sa.staff_commission_rate, sa.company_commission_rate
             ORDER BY count DESC
         `;
 
@@ -248,7 +256,17 @@ class ReportService {
         ]);
 
         return {
-            staffStats: staffRes.rows.map(r => ({ ...r, count: parseInt(r.count), total_booked_value: parseFloat(r.total_booked_value || 0), actual_collected: parseFloat(r.actual_collected || 0) })),
+            staffStats: staffRes.rows.map(r => {
+                const actualCollected = parseFloat(r.actual_collected || 0);
+                const rate = parseFloat(r.staff_commission_rate || r.company_commission_rate || 0);
+                return {
+                    ...r,
+                    count: parseInt(r.count),
+                    total_booked_value: parseFloat(r.total_booked_value || 0),
+                    actual_collected: actualCollected,
+                    actual_commission: (actualCollected * rate) / 100
+                };
+            }),
             hourlyStats: hourlyRes.rows.map(r => ({ hour: parseInt(r.hour), count: parseInt(r.count) })),
             weeklyStats: weeklyRes.rows.map(r => ({ day: r.day_name.trim(), count: parseInt(r.count), total_booked_value: parseFloat(r.total_booked_value || 0), actual_collected: parseFloat(r.actual_collected || 0) })),
             monthlyStats: monthlyRes.rows.map(r => ({ month: r.month_name.trim(), count: parseInt(r.count), total_booked_value: parseFloat(r.total_booked_value || 0), actual_collected: parseFloat(r.actual_collected || 0) })),

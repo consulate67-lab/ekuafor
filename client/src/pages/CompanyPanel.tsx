@@ -47,6 +47,7 @@ interface StaffBoard {
     phone: string;
     quantity?: number | string | null;
     unit?: string | null;
+    commission_rate?: number | string | null;
 }
 
 interface CurrentAccount {
@@ -156,7 +157,8 @@ export default function CompanyPanel() {
         unit: '',
         email: '',
         phone: '',
-        password: ''
+        password: '',
+        commission_rate: '' as string | number
     });
     const [copiedField, setCopiedField] = useState('');
     const [isCreating, setIsCreating] = useState(false);
@@ -871,6 +873,13 @@ export default function CompanyPanel() {
                 photo: staffForm.photo,
                 quantity: staffForm.quantity ? Number(staffForm.quantity) : null,
                 unit: staffForm.unit || null,
+                commission_rate: (() => {
+                    const rate = staffForm.commission_rate ? Number(staffForm.commission_rate) : null;
+                    if (rate !== null && (rate < 0 || rate > 100)) {
+                        throw new Error('Prim oranı 0 ile 100 arasında olmalıdır.');
+                    }
+                    return rate;
+                })(),
                 email: staffForm.email.trim() || undefined,
                 phone: staffForm.phone.trim() || undefined,
                 password: staffForm.password || undefined
@@ -887,7 +896,7 @@ export default function CompanyPanel() {
                 await api.post(`/companies/${company.id}/create-staff-board`, data);
             }
 
-            setStaffForm({ first_name: '', last_name: '', gender: 'erkek', department_id: '', photo: null, quantity: '', unit: '', email: '', phone: '', password: '' });
+            setStaffForm({ first_name: '', last_name: '', gender: 'erkek', department_id: '', photo: null, quantity: '', unit: '', email: '', phone: '', password: '', commission_rate: '' });
             setSelectedStaffId(null);
             setShowStaffModal(false);
             fetchData(company.id);
@@ -2571,7 +2580,7 @@ export default function CompanyPanel() {
                             <button
                                 onClick={() => {
                                     setSelectedStaffId(null);
-                                    setStaffForm({ first_name: '', last_name: '', gender: 'erkek', department_id: '', photo: null, quantity: '', unit: '', email: '', phone: '', password: '' });
+                                    setStaffForm({ first_name: '', last_name: '', gender: 'erkek', department_id: '', photo: null, quantity: '', unit: '', email: '', phone: '', password: '', commission_rate: '' });
                                     setShowStaffModal(true);
                                 }}
                                 className="w-full py-5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl font-black text-base tracking-wide shadow-xl shadow-emerald-500/20 active:scale-95 transition-all"
@@ -2602,7 +2611,8 @@ export default function CompanyPanel() {
                                                         unit: staff.unit || '',
                                                         email: staff.email || '',
                                                         phone: staff.phone || '',
-                                                        password: ''
+                                                        password: '',
+                                                        commission_rate: staff.commission_rate || ''
                                                     });
                                                     setShowStaffModal(true);
                                                 }}
@@ -2670,6 +2680,11 @@ export default function CompanyPanel() {
                                                         {staff.quantity && staff.unit && (
                                                             <span className="px-2 py-0.5 bg-violet-50 text-violet-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-violet-100 flex items-center gap-1">
                                                                 ⚖️ {staff.quantity} {staff.unit}
+                                                            </span>
+                                                        )}
+                                                        {staff.commission_rate !== null && staff.commission_rate !== undefined && (
+                                                            <span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-amber-100 flex items-center gap-1">
+                                                                💰 %{staff.commission_rate} Prim
                                                             </span>
                                                         )}
                                                     </div>
@@ -4061,7 +4076,8 @@ export default function CompanyPanel() {
                                                             </div>
                                                         </div>
                                                         <div className="text-right">
-                                                            <p className="font-black text-indigo-600">{s.actual_collected.toLocaleString('tr-TR')} ₺</p>
+                                                            <p className="font-black text-slate-900">{s.actual_collected.toLocaleString('tr-TR')} ₺</p>
+                                                            <p className="text-[10px] font-black text-emerald-600">Hak Ediş: {s.actual_commission.toLocaleString('tr-TR')} ₺</p>
                                                             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Pot: {s.total_booked_value.toLocaleString('tr-TR')} ₺</p>
                                                         </div>
                                                     </div>
@@ -4370,7 +4386,7 @@ export default function CompanyPanel() {
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Miktar</label>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">İşlem Miktarı</label>
                                         <input
                                             type="number"
                                             step="0.01"
@@ -4394,6 +4410,21 @@ export default function CompanyPanel() {
                                             <option value="adet">Adet</option>
                                             <option value="müşteri">Müşteri</option>
                                         </select>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 ml-2">Prim Oranı (%)</label>
+                                        <input
+                                            type="number"
+                                            value={staffForm.commission_rate}
+                                            onChange={e => setStaffForm(p => ({ ...p, commission_rate: e.target.value }))}
+                                            placeholder="Örn: 30"
+                                            className="w-full p-4 bg-indigo-50/50 rounded-2xl border-2 border-indigo-100 focus:border-indigo-500 text-base font-bold text-slate-900 outline-none"
+                                        />
+                                    </div>
+                                    <div className="flex items-end pb-4">
+                                        <p className="text-[9px] font-bold text-slate-400 leading-tight">Boş bırakılırsa firma varsayılanı kullanılır.</p>
                                     </div>
                                 </div>
                             </div>

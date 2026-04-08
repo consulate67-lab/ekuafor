@@ -554,7 +554,7 @@ router.post('/:id/create-staff-board', async (req: Request, res: Response) => {
         console.log('--- Staff Creation Request ---');
         console.log('Company ID:', companyId);
         console.log('Body:', req.body);
-        const { first_name, last_name, gender, department_id, photo, quantity, unit, email: providedEmail, phone, password } = req.body;
+        const { first_name, last_name, gender, department_id, photo, quantity, unit, commission_rate, email: providedEmail, phone, password } = req.body;
 
         if (!first_name || !last_name) {
             return res.status(400).json({ success: false, error: 'İsim ve soyisim gereklidir' });
@@ -574,10 +574,10 @@ router.post('/:id/create-staff-board', async (req: Request, res: Response) => {
         }
 
         const userResult = await pool.query(
-            `INSERT INTO users (email, password, role, first_name, last_name, phone, company_id, board_code, gender, department_id, photo, quantity, unit)
-             VALUES ($1, $2, 'staff', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            `INSERT INTO users (email, password, role, first_name, last_name, phone, company_id, board_code, gender, department_id, photo, quantity, unit, commission_rate)
+             VALUES ($1, $2, 'staff', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
              RETURNING *`,
-            [email, passwordHash, first_name, last_name, formatPhoneTo12Digits(phone), companyId, board_code, gender || null, department_id || null, photo || null, quantity || null, unit || null]
+            [email, passwordHash, first_name, last_name, formatPhoneTo12Digits(phone), companyId, board_code, gender || null, department_id || null, photo || null, quantity || null, unit || null, commission_rate || null]
         );
 
         // company_users bağlantısı ekle (constraint yoksa hata vermeden devam et)
@@ -610,7 +610,7 @@ router.get('/:id/staff-boards', async (req: Request, res: Response) => {
     try {
         const companyId = parseInt(req.params.id);
         const result = await pool.query(
-            `SELECT DISTINCT u.id, u.first_name, u.last_name, u.email, u.phone, u.board_code, u.gender, u.department_id, u.photo, u.quantity, u.unit, d.name as department_name
+            `SELECT DISTINCT u.id, u.first_name, u.last_name, u.email, u.phone, u.board_code, u.gender, u.department_id, u.photo, u.quantity, u.unit, u.commission_rate, d.name as department_name
              FROM users u
              LEFT JOIN departments d ON u.department_id = d.id
              LEFT JOIN company_users cu ON cu.user_id = u.id AND cu.company_id = $1
@@ -691,7 +691,7 @@ router.patch('/:id/staff/:userId/photo', async (req: Request, res: Response) => 
 router.put('/:id/staff/:userId', async (req: Request, res: Response) => {
     try {
         const { userId } = req.params;
-        const { first_name, last_name, email, phone, password, gender, department_id, quantity, unit } = req.body;
+        const { first_name, last_name, email, phone, password, gender, department_id, quantity, unit, commission_rate } = req.body;
 
         const updates: string[] = [];
         const values: any[] = [];
@@ -708,6 +708,7 @@ router.put('/:id/staff/:userId', async (req: Request, res: Response) => {
         if (department_id !== undefined) { updates.push(`department_id = $${i++}`); values.push(department_id || null); }
         if (quantity !== undefined) { updates.push(`quantity = $${i++}`); values.push(quantity || null); }
         if (unit !== undefined) { updates.push(`unit = $${i++}`); values.push(unit || null); }
+        if (commission_rate !== undefined) { updates.push(`commission_rate = $${i++}`); values.push(commission_rate || null); }
 
         if (password) {
             const passwordHash = await bcrypt.hash(password, 10);

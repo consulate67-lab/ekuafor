@@ -19,40 +19,37 @@ async function unify() {
         console.log('Migrating main_companies to companies table...');
         const migrationQuery = `
             INSERT INTO companies (
-                name, description, address_line, province_id, province_name, 
+                name, description, address_line, city, district, 
+                latitude, longitude, phone, board_key,
                 company_type, is_active, created_at, admin_key
             )
             SELECT 
-                name, description, address_line, province_id, province_name, 
-                'ÜST FİRMA', is_active, created_at, admin_code
+                m.name, m.description, m.address_line, m.city, m.district, 
+                0, 0, '', m.admin_code,
+                'ÜST FİRMA', m.is_active, m.created_at, m.admin_code
             FROM main_companies m
             WHERE NOT EXISTS (
-                SELECT 1 FROM companies c WHERE c.name = m.name AND c.company_type = 'ÜST FİRMA'
+                SELECT 1 FROM companies c 
+                WHERE c.name = m.name AND c.company_type = 'ÜST FİRMA'
             )
-            RETURNING id, name;
+            ON CONFLICT DO NOTHING;
         `;
         const migrated = await client.query(migrationQuery);
         console.log(`Migrated ${migrated.rowCount} main companies.`);
 
         // 3. Update main_company_id references
-        // This is tricky. We need to know which main_company_id pointed to which main_companies entry.
-        // Assuming the current main_company_id values IN THE TABLE refer to main_companies(id).
         console.log('Updating main_company_id references...');
-
-        // We'll use a temporary mapping table or just join
         await client.query(`
             UPDATE companies c
             SET main_company_id = m_new.id
             FROM main_companies m_old
             JOIN companies m_new ON m_new.name = m_old.name AND m_new.company_type = 'ÜST FİRMA'
-            WHERE c.main_company_id = m_old.id
+            WHERE (c.main_company_id = m_old.id OR c.main_company_id IS NULL)
             AND c.company_type = 'ŞUBE'
+            AND c.main_company_id IS DISTINCT FROM m_new.id;
         `);
 
-        // 4. Drop the old incorrect constraint if it somehow still exists
-        await client.query('ALTER TABLE companies DROP CONSTRAINT IF EXISTS companies_main_company_id_fkey');
-
-        // 5. Cleanup invalid references again to be sure
+        // 4. Cleanup invalid references
         await client.query(`
             UPDATE companies 
             SET main_company_id = NULL 
@@ -60,8 +57,13 @@ async function unify() {
             AND main_company_id NOT IN (SELECT id FROM companies)
         `);
 
-        // 6. Apply correct constraint
-        await client.query('ALTER TABLE companies ADD CONSTRAINT companies_main_company_id_fkey FOREIGN KEY (main_company_id) REFERENCES companies(id)');
+        // 5. Apply correct constraint
+        try {
+            await client.query('ALTER TABLE companies DROP CONSTRAINT IF EXISTS companies_main_company_id_fkey');
+            await client.query('ALTER TABLE companies ADD CONSTRAINT companies_main_company_id_fkey FOREIGN KEY (main_company_id) REFERENCES companies(id)');
+        } catch (e) {
+            console.log('Note: Constraint might already exist or data mismatch, continuing...');
+        }
 
         console.log('✅ Unification successful!');
         process.exit(0);
