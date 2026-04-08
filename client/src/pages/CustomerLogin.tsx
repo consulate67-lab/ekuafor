@@ -207,7 +207,7 @@ export default function CustomerLogin() {
                             onClick={() => navigate('/login')}
                             className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors"
                         >
-                            Yönetici Girişi
+                            Kullanıcı Girişi
                         </button>
                     </div>
                 </div>

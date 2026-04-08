@@ -768,21 +768,28 @@ const runMigrations = async () => {
                 END $$;
             `);
 
-            // --- DATA UNIFICATION MIGRATION (One-time) ---
-            const mainCount = await pool.query('SELECT COUNT(*) FROM main_companies');
-            const unifiedCount = await pool.query('SELECT COUNT(*) FROM companies WHERE company_type = \'ÜST FİRMA\'');
-
-            if (parseInt(mainCount.rows[0].count) > 0 && parseInt(unifiedCount.rows[0].count) === 0) {
-                console.log('📦 Migrating legacy main_companies to companies table...');
+            // --- DATA UNIFICATION MIGRATION (One-time but robust) ---
+            const mainCountResult = await pool.query('SELECT COUNT(*) FROM main_companies');
+            const mainCount = parseInt(mainCountResult.rows[0].count);
+            
+            if (mainCount > 0) {
+                console.log(`📦 Syncing ${mainCount} legacy main_companies to companies table...`);
                 await pool.query(`
                     INSERT INTO companies (
                         name, description, address_line, city, district, 
+                        latitude, longitude, phone, board_key,
                         company_type, is_active, created_at, admin_key
                     )
                     SELECT 
-                        name, description, address_line, city, district, 
-                        'ÜST FİRMA', is_active, created_at, admin_code
-                    FROM main_companies
+                        m.name, m.description, m.address_line, m.city, m.district, 
+                        m.latitude, m.longitude, m.phone, m.board_key,
+                        'ÜST FİRMA', m.is_active, m.created_at, m.admin_code
+                    FROM main_companies m
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM companies c 
+                        WHERE c.name = m.name AND c.company_type = 'ÜST FİRMA'
+                    )
+                    ON CONFLICT DO NOTHING;
                 `);
 
                 // Re-link branches using names
@@ -791,10 +798,11 @@ const runMigrations = async () => {
                     SET main_company_id = m_new.id
                     FROM main_companies m_old
                     JOIN companies m_new ON m_new.name = m_old.name AND m_new.company_type = 'ÜST FİRMA'
-                    WHERE c.main_company_id = m_old.id
+                    WHERE (c.main_company_id = m_old.id OR c.main_company_id IS NULL)
                     AND c.company_type = 'ŞUBE'
+                    AND c.main_company_id IS DISTINCT FROM m_new.id;
                 `);
-                console.log('✅ Data migration and re-linking completed.');
+                console.log('✅ Data migration and re-linking sync completed.');
             }
 
             // Cleanup invalid IDs that don't exist in companies table before adding FK

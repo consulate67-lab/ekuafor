@@ -89,7 +89,7 @@ export default function Login() {
                     {!showBoardLogin ? (
                         <form onSubmit={handleLogin} className="space-y-6">
                             <div className="text-center mb-8">
-                                <h2 className="text-2xl font-black text-slate-800">Yönetici Girişi</h2>
+                                <h2 className="text-2xl font-black text-slate-800">Kullanıcı Girişi</h2>
                                 <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Lütfen bilgilerinizi doğrulayın</p>
                             </div>
 
@@ -161,7 +161,7 @@ export default function Login() {
                         onClick={() => { setShowBoardLogin(!showBoardLogin); setError(''); }}
                         className="text-[11px] font-black text-indigo-100 hover:text-white uppercase tracking-widest underline decoration-2 underline-offset-8 transition-colors"
                     >
-                        {!showBoardLogin ? '✈ KURULUM KODU İLE BAĞLAN (BOARD)' : '🔙 YÖNETİCİ PANELİNE DÖN'}
+                        {!showBoardLogin ? '✈ KURULUM KODU İLE BAĞLAN (BOARD)' : '🔙 KULLANICI PANELİNE DÖN'}
                     </button>
                 </div>
             </div>

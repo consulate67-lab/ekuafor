@@ -32,13 +32,6 @@ L.Marker.prototype.options.icon = DefaultIcon;
 
 export default function Dashboard() {
     const { user, logout } = useAuthStore();
-    const [stats, setStats] = useState({
-        companyCount: 0,
-        activeAppointments: 0,
-        todayIncome: 0,
-        customerCount: 0,
-        lowStockCount: 0
-    });
     const [employeeStats, setEmployeeStats] = useState({
         total_appointments: 0,
         total_booked_value: 0,
@@ -158,22 +151,13 @@ export default function Dashboard() {
                 try {
                     const res = await api.get('/companies', { headers: { 'X-No-Mock': 'true' } });
                     const companyList = res.data.data || [];
-                    setStats(prev => ({ ...prev, companyCount: companyList.length }));
+                    console.log(`[SuperAdmin] Fetched ${companyList.length} companies`);
                     setAllCompanies(companyList);
                 } catch (e) {
                     console.error('Stats fetch error:', e);
                 }
             } else if (user?.role === 'company_admin' || user?.role === 'staff') {
                 try {
-                    const todayStr = getLocalDateString();
-                    // Safe fetch for appointments
-                    let statsApps: any[] = [];
-                    try {
-                        const appointmentsRes = await api.get('/appointments', { params: { start_date: todayStr } });
-                        statsApps = appointmentsRes.data?.data || [];
-                    } catch (e) {
-                        console.warn('Appointments fetch failed', e);
-                    }
 
                     // Safe fetch for services
                     let services: any[] = [];
@@ -183,35 +167,6 @@ export default function Dashboard() {
                     } catch (e) {
                         console.warn('Services fetch failed', e);
                     }
-
-                    // Active Appointments (Today's pending or approved)
-                    const activeApps = statsApps.filter(a =>
-                        a.appointment_date === todayStr &&
-                        (a.status === 'approved' || a.status === 'pending')
-                    );
-
-                    // Today's Income (Approved or completed appointments)
-                    const incomeApps = statsApps.filter(a =>
-                        a.appointment_date === todayStr &&
-                        (a.status === 'approved' || a.status === 'completed')
-                    );
-
-                    const totalIncome = incomeApps.reduce((sum, app) => {
-                        // If appointment has price override use it, else find service price
-                        if (app.price) return sum + Number(app.price);
-                        const service = services.find(s => s.id === app.service_id);
-                        return sum + (service ? Number(service.price) : 0);
-                    }, 0);
-
-                    // Customer Count (Unique customers)
-                    const uniqueCustomers = new Set(statsApps.map(a => a.customer_name || a.customer_id)).size;
-
-                    setStats(prev => ({
-                        ...prev,
-                        activeAppointments: activeApps.length,
-                        todayIncome: totalIncome,
-                        customerCount: uniqueCustomers
-                    }));
 
                     setServices(services);
 
@@ -819,7 +774,7 @@ export default function Dashboard() {
                                     <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
                                         <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/5 flex-1 lg:min-w-[150px] text-center group/item hover:bg-white/10 transition-colors">
                                             <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2 opacity-60">TOPLAM FİRMA</p>
-                                            <p className="text-5xl font-black text-white tracking-tighter group-hover/item:scale-110 transition-transform duration-500">{stats.companyCount || allCompanies.length}</p>
+                                            <p className="text-5xl font-black text-white tracking-tighter group-hover/item:scale-110 transition-transform duration-500">{allCompanies.length}</p>
                                         </div>
                                         <Link to="/main-management" className="bg-emerald-500/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-emerald-500/10 flex-1 lg:min-w-[150px] text-center group/item hover:bg-emerald-500/20 transition-all">
                                             <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-2 opacity-60">ÜST YÖNETİM</p>
