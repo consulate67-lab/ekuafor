@@ -483,17 +483,21 @@ export default function CompanyPanel() {
                         setContactsBalance(res.data.data);
                     }
                 } catch (reportErr) {
-                    // Fallback
-                    const res = await api.get('/finance/current-accounts', {
-                        params: { search: financeSearch }
-                    });
-                    if (res.data.success) {
-                        setContactsBalance(res.data.data.map((c: any) => ({
-                            ...c,
-                            carried_balance: 0,
-                            period_debit: c.balance > 0 ? c.balance : 0,
-                            period_credit: c.balance < 0 ? Math.abs(c.balance) : 0
-                        })));
+                    // Fallback - Eğer rapor endpointi hata verirse düz listeyi dene
+                    try {
+                        const res = await api.get('/finance/current-accounts', {
+                            params: financeSearch ? { search: financeSearch } : {}
+                        });
+                        if (res.data.success) {
+                            setContactsBalance(res.data.data.map((c: any) => ({
+                                ...c,
+                                carried_balance: 0,
+                                period_debit: c.balance > 0 ? c.balance : 0,
+                                period_credit: c.balance < 0 ? Math.abs(c.balance) : 0
+                            })));
+                        }
+                    } catch (innerErr) {
+                        console.error('Cari listesi çekilemedi:', innerErr);
                     }
                 }
             }
@@ -737,10 +741,13 @@ export default function CompanyPanel() {
             const res = await api.post('/finance/current-accounts', data);
             if (res.data.success) {
                 setShowCurrentAccountModal(false);
+                alert('🚀 Cari Kart başarıyla kaydedildi!');
                 fetchFinanceData();
+            } else {
+                alert('Hata: ' + (res.data.error || 'Bilinmeyen bir hata oluştu'));
             }
         } catch (err: any) {
-            alert(err.response?.data?.error || 'Cari oluşturulamadı');
+            alert(err.response?.data?.error || 'Cari oluşturulamadı. Sunucu hatası oluşmuş olabilir.');
         }
     };
 
