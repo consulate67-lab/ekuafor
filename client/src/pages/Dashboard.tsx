@@ -4,8 +4,8 @@ import { Company, Service } from '../types';
 import { parseVoiceCommand } from '../lib/aiParser';
 import { Device } from '@capacitor/device';
 import { useAuthStore } from '../store/authStore';
-import { 
-    Users, 
+import {
+    Users,
     TrendingUp,
     AlertTriangle,
     Calendar,
@@ -77,7 +77,7 @@ export default function Dashboard() {
     const [filteredCompanies, setFilteredCompanies] = useState<Company[]>([]);
     const [companiesModalTitle, setCompaniesModalTitle] = useState('');
     const [modalSearchTerm, setModalSearchTerm] = useState('');
-    
+
     // Lead Hunter States
     const [hunterCity, setHunterCity] = useState('');
     const [hunterResults, setHunterResults] = useState<any[]>([]);
@@ -227,50 +227,62 @@ export default function Dashboard() {
     const searchLeads = async () => {
         if (!hunterCity) return;
         setHunterLoading(true);
+        setHunterResults([]); // Önce eski sonuçları temizle
         try {
-            // Search for hairdressers and beauty salons in the specified city
-            const query = `hair dresser in ${hunterCity}, Turkey`;
-            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=20`, {
-                headers: { 'Accept-Language': 'tr-TR' }
+            // Sorguyu daha geniş ve profesyonel hale getirelim: Kuaför + Güzellik Salonu
+            const query = `hairdresser OR "beauty salon" in ${hunterCity}, Turkey`;
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5000`, {
+                headers: {
+                    'Accept-Language': 'tr-TR',
+                    'User-Agent': 'SaloonLeadHunter/1.0' // OSM politikası gereği User-Agent eklemek iyi olur
+                }
             });
             const data = await res.json();
-            
+
+            console.log("OSM'den Gelen Ham Veri Sayısı:", data.length);
+            if (data.length > 0) console.log("İlk Örnek Kayıt:", data[0]);
+
             // Filter out those already in our system (Check by Coordinates OR exact Name+City)
             const filtered = data.filter((item: any) => {
-                const searchName = item.display_name.split(',')[0].toLowerCase().replace(/\s+/g, ' ').trim();
+                const searchName = (item.display_name.split(',')[0] || '').toLowerCase().replace(/\s+/g, ' ').trim();
                 const searchCity = (item.address?.province || item.address?.city || hunterCity || '').toLowerCase().trim();
                 const searchLat = parseFloat(item.lat);
                 const searchLon = parseFloat(item.lon);
-                
-                return !allCompanies.some(internal => {
-                    // 1. Lokasyon Kontrolü (En güvenilir: ~50 metre fark varsa aynı yerdir)
+
+                // Eğer isim çok kısaysa (örn sadece şehir ismi gelmişse) bunu ele
+                if (searchName.length < 3) return false;
+
+                const isAlreadyRegistered = allCompanies.some(internal => {
+                    // 1. Lokasyon Kontrolü (En güvenilir: ~100 metre fark varsa aynı yerdir)
                     if (internal.latitude && internal.longitude) {
                         const dLat = Math.abs(parseFloat(String(internal.latitude)) - searchLat);
                         const dLon = Math.abs(parseFloat(String(internal.longitude)) - searchLon);
-                        if (dLat < 0.0005 && dLon < 0.0005) return true; 
+                        if (dLat < 0.001 && dLon < 0.001) return true;
                     }
-                    
-                    // 2. İsim + Şehir Kontrolü (Koordinat yoksa veya tutmuyorsa isme bak)
+
+                    // 2. İsim + Şehir Kontrolü
                     const internalName = (internal.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
                     const internalCity = (internal.city || '').toLowerCase().trim();
-                    
+
                     return internalName === searchName && internalCity === searchCity;
                 });
+
+                return !isAlreadyRegistered;
             });
 
-            console.log(`OSM'den ${data.length} sonuç geldi, filtre sonrası ${filtered.length} kaldı.`);
+            console.log("Filtreleme Sonrası Kalan:", filtered.length);
             setHunterResults(filtered);
-            
+
             if (filtered.length === 0) {
                 if (data && data.length > 0) {
-                    alert(`Bu bölgede ${data.length} işletme bulundu ancak tamamı veritabanınızda (isimiyle veya konumuyla) zaten kayıtlı görünüyor.`);
+                    alert(`Bulunan ${data.length} işletmenin tamamı veritabanıyla çakışıyor (İsim veya Konum benzerliği).`);
                 } else {
-                    alert(`${hunterCity} bölgesinde kriterlere uygun yeni bir işletme bulunamadı.`);
+                    alert(`${hunterCity} bölgesinde kriterlere uygun (Kuaför/Güzellik Salonu) açık veri bulunamadı.`);
                 }
             }
         } catch (e) {
             console.error('Lead search error:', e);
-            alert('Arama sırasında bir hata oluştu.');
+            alert('Arama sırasında teknik bir hata oluştu.');
         } finally {
             setHunterLoading(false);
         }
@@ -281,7 +293,7 @@ export default function Dashboard() {
         try {
             const name = lead.display_name.split(',')[0];
             const addr = lead.address;
-            
+
             const payload = {
                 name: name,
                 city: addr.province || addr.city || hunterCity,
@@ -737,7 +749,7 @@ export default function Dashboard() {
                             <h3 className="text-lg font-black text-red-900 uppercase tracking-tight">Veri Çekme Hatası</h3>
                             <p className="text-sm text-red-600 font-bold opacity-70">{fetchError}</p>
                         </div>
-                        <button 
+                        <button
                             onClick={() => window.location.reload()}
                             className="ml-auto px-6 py-3 bg-white text-red-600 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:shadow-md transition-all active:scale-95"
                         >
@@ -758,14 +770,14 @@ export default function Dashboard() {
                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">OpenStreetMap üzerinden bölgenizdeki salonları tarayın ve sisteme kazandırın</p>
                                 </div>
                                 <div className="flex w-full lg:w-auto gap-3">
-                                    <input 
-                                        type="text" 
-                                        placeholder="Şehir ismi girin (Örn: İstanbul)" 
+                                    <input
+                                        type="text"
+                                        placeholder="Şehir ismi girin (Örn: İstanbul)"
                                         value={hunterCity}
                                         onChange={(e) => setHunterCity(e.target.value)}
                                         className="flex-1 lg:w-64 bg-slate-50 border-none rounded-2xl px-6 py-4 text-slate-900 font-bold focus:ring-2 focus:ring-indigo-600 outline-none transition-all"
                                     />
-                                    <button 
+                                    <button
                                         onClick={searchLeads}
                                         disabled={hunterLoading || !hunterCity}
                                         className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95 disabled:opacity-50 flex items-center gap-2"
@@ -784,7 +796,7 @@ export default function Dashboard() {
                                                 <h4 className="font-black text-slate-900 uppercase tracking-tight text-sm mb-1">{lead.display_name.split(',')[0]}</h4>
                                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed line-clamp-2 mb-4">{lead.display_name}</p>
                                             </div>
-                                            <button 
+                                            <button
                                                 onClick={() => importLead(lead)}
                                                 disabled={importingId === lead.place_id}
                                                 className="w-full py-3 bg-white text-indigo-600 border border-indigo-100 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all active:scale-95 flex justify-center items-center"
@@ -816,7 +828,7 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                                 <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
-                                    <div 
+                                    <div
                                         onClick={() => {
                                             setFilteredCompanies(allCompanies);
                                             setCompaniesModalTitle('Tüm Kayıtlı Firmalar');
@@ -837,7 +849,7 @@ export default function Dashboard() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-                            <div 
+                            <div
                                 onClick={() => {
                                     const today = getLocalDateString();
                                     const filtered = allCompanies.filter((c: any) => c.created_at?.startsWith(today));
@@ -871,7 +883,7 @@ export default function Dashboard() {
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] group-hover:text-white/60">Lisansı Bitecek</p>
                                 <h3 className="text-3xl font-black text-slate-900 mt-1 group-hover:text-white">{superAdminStats?.expiring_companies?.length || 0} <span className="text-sm">Firma</span></h3>
                             </div>
-                            <div 
+                            <div
                                 onClick={() => {
                                     setFilteredCompanies(allCompanies);
                                     setCompaniesModalTitle('Şehir Bazlı Dağılım');
@@ -982,9 +994,9 @@ export default function Dashboard() {
                                     </div>
                                     <div className="px-10 pb-6">
                                         <div className="relative">
-                                            <input 
-                                                type="text" 
-                                                placeholder="Firma ismi veya şehir ara..." 
+                                            <input
+                                                type="text"
+                                                placeholder="Firma ismi veya şehir ara..."
                                                 value={modalSearchTerm}
                                                 onChange={(e) => setModalSearchTerm(e.target.value)}
                                                 className="w-full bg-slate-50 border-none rounded-2xl px-12 py-4 text-slate-900 font-bold focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
@@ -995,30 +1007,30 @@ export default function Dashboard() {
                                     <div className="p-8 max-h-[50vh] overflow-y-auto custom-scrollbar">
                                         <div className="space-y-4">
                                             {filteredCompanies
-                                                .filter(c => 
-                                                    c.name?.toLowerCase().includes(modalSearchTerm.toLowerCase()) || 
+                                                .filter(c =>
+                                                    c.name?.toLowerCase().includes(modalSearchTerm.toLowerCase()) ||
                                                     c.city?.toLowerCase().includes(modalSearchTerm.toLowerCase())
                                                 )
                                                 .length > 0 ? filteredCompanies
-                                                    .filter(c => 
-                                                        c.name?.toLowerCase().includes(modalSearchTerm.toLowerCase()) || 
+                                                    .filter(c =>
+                                                        c.name?.toLowerCase().includes(modalSearchTerm.toLowerCase()) ||
                                                         c.city?.toLowerCase().includes(modalSearchTerm.toLowerCase())
                                                     )
                                                     .map((c: any) => (
-                                                <Link key={c.id} to={`/companies/${c.id}`} className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:border-indigo-200 transition-all group">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-xl shadow-sm group-hover:text-indigo-500 transition-colors">🏢</div>
-                                                        <div>
-                                                            <p className="font-black text-slate-900 uppercase">{c.name}</p>
-                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{c.city || 'Şehir Belirtilmemiş'} | {c.address?.slice(0, 30)}...</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex flex-col items-end">
-                                                         <p className="text-[10px] font-black text-indigo-600 uppercase mb-1">{c.subscription_type || 'ÜCRETSİZ'}</p>
-                                                         <p className="text-[8px] font-bold text-slate-400 uppercase">{new Date(c.created_at).toLocaleDateString()} KAYIT</p>
-                                                    </div>
-                                                </Link>
-                                            )) : (
+                                                        <Link key={c.id} to={`/companies/${c.id}`} className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:border-indigo-200 transition-all group">
+                                                            <div className="flex items-center gap-4">
+                                                                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-xl shadow-sm group-hover:text-indigo-500 transition-colors">🏢</div>
+                                                                <div>
+                                                                    <p className="font-black text-slate-900 uppercase">{c.name}</p>
+                                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{c.city || 'Şehir Belirtilmemiş'} | {c.address?.slice(0, 30)}...</p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex flex-col items-end">
+                                                                <p className="text-[10px] font-black text-indigo-600 uppercase mb-1">{c.subscription_type || 'ÜCRETSİZ'}</p>
+                                                                <p className="text-[8px] font-bold text-slate-400 uppercase">{new Date(c.created_at).toLocaleDateString()} KAYIT</p>
+                                                            </div>
+                                                        </Link>
+                                                    )) : (
                                                 <div className="text-center py-10 opacity-40">
                                                     <p className="text-5xl mb-4">🔍</p>
                                                     <p className="font-black text-slate-900 uppercase">Filtreye uygun firma bulunamadı</p>
@@ -1281,7 +1293,7 @@ export default function Dashboard() {
                         {!customersModal.search ? (
                             <div className="flex flex-col items-center justify-center py-20 opacity-40">
                                 <div className="text-4xl mb-4">🔍</div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Arama yapmak için isim veya<br/>telefon numarası giriniz.</p>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Arama yapmak için isim veya<br />telefon numarası giriniz.</p>
                             </div>
                         ) : (
                             customersModal.history.map((h: any) => (
