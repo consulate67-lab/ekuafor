@@ -52,6 +52,9 @@ export default function Dashboard() {
     const [renewingLicense, setRenewingLicense] = useState(false);
     const [superAdminStats, setSuperAdminStats] = useState<any>(null);
     const [showExpiringModal, setShowExpiringModal] = useState(false);
+    const [showCompaniesModal, setShowCompaniesModal] = useState(false);
+    const [filteredCompanies, setFilteredCompanies] = useState<Company[]>([]);
+    const [companiesModalTitle, setCompaniesModalTitle] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // OCR States
@@ -650,7 +653,14 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                                 <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
-                                    <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/5 flex-1 lg:min-w-[150px] text-center">
+                                    <div 
+                                        onClick={() => {
+                                            setFilteredCompanies(allCompanies);
+                                            setCompaniesModalTitle('Tüm Kayıtlı Firmalar');
+                                            setShowCompaniesModal(true);
+                                        }}
+                                        className="bg-white/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/5 flex-1 lg:min-w-[150px] text-center cursor-pointer hover:bg-white/10 transition-colors"
+                                    >
                                         <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2 opacity-60">TOPLAM FİRMA</p>
                                         <p className="text-5xl font-black text-white tracking-tighter">{allCompanies.length}</p>
                                     </div>
@@ -663,7 +673,16 @@ export default function Dashboard() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-                            <div className="bg-white p-8 rounded-[3rem] shadow-xl border border-slate-100 group hover:bg-indigo-600 transition-all duration-500">
+                            <div 
+                                onClick={() => {
+                                    const today = getLocalDateString();
+                                    const filtered = allCompanies.filter((c: any) => c.created_at?.startsWith(today));
+                                    setFilteredCompanies(filtered);
+                                    setCompaniesModalTitle('Bugün Katılan Firmalar');
+                                    setShowCompaniesModal(true);
+                                }}
+                                className="bg-white p-8 rounded-[3rem] shadow-xl border border-slate-100 group hover:bg-indigo-600 transition-all duration-500 cursor-pointer"
+                            >
                                 <div className="flex justify-between items-start mb-6">
                                     <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-2xl group-hover:bg-white/20 transition-colors">🏢</div>
                                     <TrendingUp className="text-indigo-500 group-hover:text-white" />
@@ -687,7 +706,14 @@ export default function Dashboard() {
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] group-hover:text-white/60">Lisansı Bitecek</p>
                                 <h3 className="text-3xl font-black text-slate-900 mt-1 group-hover:text-white">{superAdminStats?.expiring_companies?.length || 0} <span className="text-sm">Firma</span></h3>
                             </div>
-                            <div className="bg-white p-8 rounded-[3rem] shadow-xl border border-slate-100 group hover:bg-slate-900 transition-all duration-500">
+                            <div 
+                                onClick={() => {
+                                    setFilteredCompanies(allCompanies);
+                                    setCompaniesModalTitle('Şehir Bazlı Dağılım');
+                                    setShowCompaniesModal(true);
+                                }}
+                                className="bg-white p-8 rounded-[3rem] shadow-xl border border-slate-100 group hover:bg-slate-900 transition-all duration-500 cursor-pointer"
+                            >
                                 <div className="flex justify-between items-start mb-6">
                                     <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-2xl group-hover:bg-white/20 transition-colors">📍</div>
                                     <Users className="text-slate-500 group-hover:text-white" />
@@ -747,6 +773,47 @@ export default function Dashboard() {
                                                 <p className="font-black text-slate-900 uppercase">Herhangi bir aciliyet bulunmuyor</p>
                                             </div>
                                         )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {showCompaniesModal && (
+                            <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+                                <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowCompaniesModal(false)}></div>
+                                <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95">
+                                    <div className="p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                                        <div>
+                                            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">{companiesModalTitle}</h3>
+                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Sisteme kayıtlı işletmelerin detaylı listesi</p>
+                                        </div>
+                                        <button onClick={() => setShowCompaniesModal(false)} className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 hover:text-slate-900 shadow-sm transition-colors">
+                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
+                                    </div>
+                                    <div className="p-8 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                                        <div className="space-y-4">
+                                            {filteredCompanies.length > 0 ? filteredCompanies.map((c: any) => (
+                                                <div key={c.id} className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:border-indigo-200 transition-all group">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-xl shadow-sm group-hover:text-indigo-500 transition-colors">🏢</div>
+                                                        <div>
+                                                            <p className="font-black text-slate-900 uppercase">{c.name}</p>
+                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{c.city || 'Şehir Belirtilmemiş'} | {c.address?.slice(0, 30)}...</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-col items-end">
+                                                         <p className="text-[10px] font-black text-indigo-600 uppercase mb-1">{c.subscription_type || 'ÜCRETSİZ'}</p>
+                                                         <p className="text-[8px] font-bold text-slate-400 uppercase">{new Date(c.created_at).toLocaleDateString()} KAYIT</p>
+                                                    </div>
+                                                </div>
+                                            )) : (
+                                                <div className="text-center py-10 opacity-40">
+                                                    <p className="text-5xl mb-4">🔍</p>
+                                                    <p className="font-black text-slate-900 uppercase">Filtreye uygun firma bulunamadı</p>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
