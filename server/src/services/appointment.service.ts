@@ -441,12 +441,18 @@ class AppointmentService {
                     }
                 }
             } else {
-                if (status === 'completed') {
+                const finalStatus = status === 'completed' ? 'completed' : status;
+                const paymentStatus = (finalStatus === 'completed') ? 'paid' : 'pending';
+                const finalPaymentMethod = payment_method || ((finalStatus === 'completed') ? 'cash' : null);
+
+                if (finalStatus === 'completed') {
                     result = await client.query(
-                        'UPDATE appointments SET status = $1, collected_price = COALESCE(collected_price, price), technical_notes = COALESCE($2, technical_notes), used_materials = COALESCE($3, used_materials) WHERE id = $4 RETURNING *',
-                        [status, technical_notes || null, used_materials || null, id]
+                        'UPDATE appointments SET status = $1, payment_status = $2, payment_method = COALESCE(payment_method, $3), collected_price = COALESCE(collected_price, price), technical_notes = COALESCE($4, technical_notes), used_materials = COALESCE($5, used_materials) WHERE id = $6 RETURNING *',
+                        [finalStatus, paymentStatus, finalPaymentMethod, technical_notes || null, used_materials || null, id]
                     );
-                    await client.query('UPDATE appointment_services SET status = \'completed\' WHERE appointment_id = $1', [id]);
+                    
+                    // Even if no new price is passed, sync existing prices to services marked as completed
+                    await client.query("UPDATE appointment_services SET status = 'completed', price = COALESCE(price, 0) WHERE appointment_id = $1", [id]);
                 } else {
                     result = await client.query(
                         'UPDATE appointments SET status = $1, technical_notes = COALESCE($2, technical_notes), used_materials = COALESCE($3, used_materials) WHERE id = $4 RETURNING *',

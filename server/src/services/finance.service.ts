@@ -245,9 +245,29 @@ class FinanceService {
 
             if (invoice.appointment_id) {
                 await client.query(
-                    "UPDATE appointments SET status = 'invoiced', collected_price = COALESCE(collected_price, $2) WHERE id = $1",
-                    [invoice.appointment_id, grand_total]
+                    "UPDATE appointments SET status = 'invoiced', collected_price = COALESCE(collected_price, $2), payment_method = COALESCE(payment_method, $3) WHERE id = $1",
+                    [invoice.appointment_id, grand_total, invoice.payment_method]
                 );
+                
+                // Sync to appointment_services for reports
+                const servicesRes = await client.query('SELECT id, price FROM appointment_services WHERE appointment_id = $1', [invoice.appointment_id]);
+                const services = servicesRes.rows;
+                
+                if (services.length === 1) {
+                    await client.query("UPDATE appointment_services SET price = $1, status = 'completed' WHERE id = $2", [grand_total, services[0].id]);
+                } else if (services.length > 1) {
+                    const currentSum = services.reduce((sum, s) => sum + Number(s.price || 0), 0);
+                    const finalPrice = Number(grand_total);
+                    if (currentSum > 0) {
+                        for (const s of services) {
+                            const distributed = (Number(s.price || 0) / currentSum) * finalPrice;
+                            await client.query("UPDATE appointment_services SET price = $1, status = 'completed' WHERE id = $2", [distributed, s.id]);
+                        }
+                    } else {
+                        const distributed = finalPrice / services.length;
+                        await client.query("UPDATE appointment_services SET price = $1, status = 'completed' WHERE appointment_id = $2", [distributed, invoice.appointment_id]);
+                    }
+                }
             }
 
             await client.query('COMMIT');
