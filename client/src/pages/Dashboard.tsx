@@ -241,19 +241,22 @@ export default function Dashboard() {
                 const searchCity = (item.address?.province || item.address?.city || hunterCity || '').toLowerCase().trim();
                 
                 return !allCompanies.some(internal => {
-                    const internalName = (internal.name || '').toLowerCase().trim();
-                    const internalCity = (internal.city || '').toLowerCase().trim();
-                    // Match only if both name and city are significantly similar
-                    return internalName === searchName && (internalCity === searchCity || !internalCity);
+                    if (!internal.name || !internal.city) return false; // Eksik veri varsa engelleme yapma
+                    
+                    const internalName = internal.name.toLowerCase().trim();
+                    const internalCity = internal.city.toLowerCase().trim();
+                    
+                    // Sadece hem isim hem şehir tam tutarsa "zaten var" say
+                    return internalName === searchName && internalCity === searchCity;
                 });
             });
 
             setHunterResults(filtered);
             if (filtered.length === 0) {
-                if (data.length > 0) {
-                    alert('Bu bölgedeki tüm işletmeler zaten sisteminizde kayıtlı.');
+                if (data && data.length > 0) {
+                    alert('Seçtiğiniz bu bölgedeki tüm işletmeler zaten veritabanınızda kayıtlı.');
                 } else {
-                    alert('Bu şehirde kriterlere uygun işletme bulunamadı.');
+                    alert(`${hunterCity} bölgesinde kriterlere uygun (Kuaför/Güzellik Salonu) sonuç bulunamadı. Lütfen daha büyük bir şehir örneği deneyin.`);
                 }
             }
         } catch (e) {
