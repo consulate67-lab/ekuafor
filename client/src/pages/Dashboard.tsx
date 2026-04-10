@@ -153,8 +153,7 @@ export default function Dashboard() {
                     setStatsLoading(true);
                     setFetchError(null);
                     const res = await api.get('/companies', { 
-                        params: { nocache: 'true' },
-                        headers: { 'X-No-Mock': 'true' } 
+                        params: { nocache: 'true' }
                     });
                     const companyList = res.data.data || [];
                     console.log(`[SuperAdmin] Fetched ${companyList.length} companies`);
