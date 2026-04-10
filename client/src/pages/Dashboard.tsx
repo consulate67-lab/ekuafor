@@ -235,28 +235,37 @@ export default function Dashboard() {
             });
             const data = await res.json();
             
-            // Filter out those already in our system (Check BOTH name and city for precision)
+            // Filter out those already in our system (Check by Coordinates OR exact Name+City)
             const filtered = data.filter((item: any) => {
-                const searchName = item.display_name.split(',')[0].toLowerCase().trim();
+                const searchName = item.display_name.split(',')[0].toLowerCase().replace(/\s+/g, ' ').trim();
                 const searchCity = (item.address?.province || item.address?.city || hunterCity || '').toLowerCase().trim();
+                const searchLat = parseFloat(item.lat);
+                const searchLon = parseFloat(item.lon);
                 
                 return !allCompanies.some(internal => {
-                    if (!internal.name || !internal.city) return false; // Eksik veri varsa engelleme yapma
+                    // 1. Lokasyon Kontrolü (En güvenilir: ~50 metre fark varsa aynı yerdir)
+                    if (internal.latitude && internal.longitude) {
+                        const dLat = Math.abs(parseFloat(String(internal.latitude)) - searchLat);
+                        const dLon = Math.abs(parseFloat(String(internal.longitude)) - searchLon);
+                        if (dLat < 0.0005 && dLon < 0.0005) return true; 
+                    }
                     
-                    const internalName = internal.name.toLowerCase().trim();
-                    const internalCity = internal.city.toLowerCase().trim();
+                    // 2. İsim + Şehir Kontrolü (Koordinat yoksa veya tutmuyorsa isme bak)
+                    const internalName = (internal.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+                    const internalCity = (internal.city || '').toLowerCase().trim();
                     
-                    // Sadece hem isim hem şehir tam tutarsa "zaten var" say
                     return internalName === searchName && internalCity === searchCity;
                 });
             });
 
+            console.log(`OSM'den ${data.length} sonuç geldi, filtre sonrası ${filtered.length} kaldı.`);
             setHunterResults(filtered);
+            
             if (filtered.length === 0) {
                 if (data && data.length > 0) {
-                    alert('Seçtiğiniz bu bölgedeki tüm işletmeler zaten veritabanınızda kayıtlı.');
+                    alert(`Bu bölgede ${data.length} işletme bulundu ancak tamamı veritabanınızda (isimiyle veya konumuyla) zaten kayıtlı görünüyor.`);
                 } else {
-                    alert(`${hunterCity} bölgesinde kriterlere uygun (Kuaför/Güzellik Salonu) sonuç bulunamadı. Lütfen daha büyük bir şehir örneği deneyin.`);
+                    alert(`${hunterCity} bölgesinde kriterlere uygun yeni bir işletme bulunamadı.`);
                 }
             }
         } catch (e) {
