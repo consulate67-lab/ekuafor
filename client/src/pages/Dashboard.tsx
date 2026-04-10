@@ -229,12 +229,12 @@ export default function Dashboard() {
         setHunterLoading(true);
         setHunterResults([]); // Önce eski sonuçları temizle
         try {
-            // Sorguyu daha geniş ve profesyonel hale getirelim: Kuaför + Güzellik Salonu
-            const query = `hairdresser OR "beauty salon" in ${hunterCity}, Turkey`;
-            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5000`, {
-                headers: {
+            // Nominatim için daha doğal ve sonuç odaklı Türkçe sorgu
+            const query = `kuaför güzellik salonu ${hunterCity}`;
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=tr&format=json&addressdetails=1&limit=100`, {
+                headers: { 
                     'Accept-Language': 'tr-TR',
-                    'User-Agent': 'SaloonLeadHunter/1.0' // OSM politikası gereği User-Agent eklemek iyi olur
+                    'User-Agent': 'SaloonLeadHunter/1.0'
                 }
             });
             const data = await res.json();
