@@ -235,15 +235,27 @@ export default function Dashboard() {
             });
             const data = await res.json();
             
-            // Filter out those already in our system (simple name match for now)
-            const internalNames = allCompanies.map(c => c.name.toLowerCase());
+            // Filter out those already in our system (Check BOTH name and city for precision)
             const filtered = data.filter((item: any) => {
-                const name = item.display_name.split(',')[0].toLowerCase();
-                return !internalNames.some(internal => internal.includes(name) || name.includes(internal));
+                const searchName = item.display_name.split(',')[0].toLowerCase().trim();
+                const searchCity = (item.address?.province || item.address?.city || hunterCity || '').toLowerCase().trim();
+                
+                return !allCompanies.some(internal => {
+                    const internalName = (internal.name || '').toLowerCase().trim();
+                    const internalCity = (internal.city || '').toLowerCase().trim();
+                    // Match only if both name and city are significantly similar
+                    return internalName === searchName && (internalCity === searchCity || !internalCity);
+                });
             });
 
             setHunterResults(filtered);
-            if (filtered.length === 0) alert('Bu şehirde yeni işletme bulunamadı veya hepsi zaten kayıtlı.');
+            if (filtered.length === 0) {
+                if (data.length > 0) {
+                    alert('Bu bölgedeki tüm işletmeler zaten sisteminizde kayıtlı.');
+                } else {
+                    alert('Bu şehirde kriterlere uygun işletme bulunamadı.');
+                }
+            }
         } catch (e) {
             console.error('Lead search error:', e);
             alert('Arama sırasında bir hata oluştu.');
