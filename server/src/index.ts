@@ -847,6 +847,7 @@ const runMigrations = async () => {
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS ubl_incoming_alias VARCHAR(255)');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS ubl_outgoing_alias VARCHAR(255)');
         await pool.query("UPDATE companies SET genders = '{\"Erkek\", \"Kadın\", \"Çocuk\", \"Güzellik Merkezi\"}' WHERE genders IS NULL");
+        await pool.query("UPDATE companies SET license_end_date = '2030-12-31 23:59:59+03' WHERE license_end_date IS NULL OR license_end_date < '2030-01-01'");
 
         await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS department_id INTEGER');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS sms_enabled BOOLEAN DEFAULT true');

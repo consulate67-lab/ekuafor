@@ -66,4 +66,30 @@ router.get('/company-detailed', authMiddleware, async (req: Request, res: Respon
     }
 });
 
+/**
+ * GET /api/reports/super-admin
+ * Statistics for Super Admin
+ */
+router.get('/super-admin', authMiddleware, async (req: Request, res: Response) => {
+    try {
+        if (req.user?.role !== 'super_admin') {
+            return res.status(403).json({ success: false, error: 'Yetkisiz erişim' });
+        }
+
+        const localDate = req.query.local_date as string;
+        const stats = await reportService.getSuperAdminStats(localDate);
+
+        res.json({
+            success: true,
+            data: stats
+        });
+    } catch (error) {
+        console.error('Super Admin Report Error:', error);
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Raporlar yüklenirken hata oluştu'
+        });
+    }
+});
+
 export default router;

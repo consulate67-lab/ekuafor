@@ -275,6 +275,66 @@ class ReportService {
             departmentStats: deptRes.rows.map(r => ({ ...r, count: parseInt(r.count), total_booked_value: parseFloat(r.total_booked_value || 0), actual_collected: parseFloat(r.actual_collected || 0) }))
         };
     }
+
+    async getSuperAdminStats(localDate?: string) {
+        const todayStr = localDate ? `'${localDate}'::date` : 'CURRENT_DATE';
+
+        // 1. Today's Summary
+        const summaryQuery = `
+            SELECT 
+                (SELECT COUNT(*) FROM companies WHERE created_at::date = ${todayStr}) as new_companies_today,
+                (SELECT COUNT(*) FROM appointments WHERE created_at::date = ${todayStr}) as new_appointments_today,
+                (SELECT COUNT(*) FROM users WHERE role = 'company_admin') as total_company_admins,
+                (SELECT COUNT(*) FROM companies WHERE is_active = true) as total_active_companies
+        `;
+        const summaryRes = await pool.query(summaryQuery);
+
+        // 2. License Expiry Check (Expiring in less than 30 days)
+        const expiringQuery = `
+            SELECT 
+                id, name, license_end_date,
+                EXTRACT(DAY FROM (license_end_date - CURRENT_TIMESTAMP))::INTEGER as days_left
+            FROM companies 
+            WHERE license_end_date IS NOT NULL 
+            AND license_end_date > CURRENT_TIMESTAMP
+            AND license_end_date < CURRENT_TIMESTAMP + INTERVAL '30 days'
+            ORDER BY license_end_date ASC
+        `;
+        const expiringRes = await pool.query(expiringQuery);
+
+        // 3. Last 7 Days Registration Trend
+        const trendQuery = `
+            SELECT 
+                TO_CHAR(d.day, 'DD/MM') as date,
+                COALESCE(COUNT(c.id), 0) as company_count,
+                COALESCE((SELECT COUNT(*) FROM appointments WHERE created_at::date = d.day), 0) as appointment_count
+            FROM (
+                SELECT generate_series(${todayStr} - INTERVAL '6 days', ${todayStr}, '1 day')::date as day
+            ) d
+            LEFT JOIN companies c ON c.created_at::date = d.day
+            GROUP BY d.day
+            ORDER BY d.day ASC
+        `;
+        const trendRes = await pool.query(trendQuery);
+
+        return {
+            summary: {
+                new_companies_today: parseInt(summaryRes.rows[0].new_companies_today),
+                new_appointments_today: parseInt(summaryRes.rows[0].new_appointments_today),
+                total_company_admins: parseInt(summaryRes.rows[0].total_company_admins),
+                total_active_companies: parseInt(summaryRes.rows[0].total_active_companies)
+            },
+            expiring_companies: expiringRes.rows.map(r => ({
+                ...r,
+                days_left: parseInt(r.days_left)
+            })),
+            trends: trendRes.rows.map(r => ({
+                ...r,
+                company_count: parseInt(r.company_count),
+                appointment_count: parseInt(r.appointment_count)
+            }))
+        };
+    }
 }
 
 export default new ReportService();
