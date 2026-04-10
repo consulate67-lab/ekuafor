@@ -163,7 +163,7 @@ const ft=()=>{};var ue={};/**
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */class Wt{constructor(t){this.container=t}getPlatformInfoString(){return this.container.getProviders().map(n=>{if(qt(n)){const r=n.getImmediate();return`${r.library}/${r.version}`}else return null}).filter(n=>n).join(" ")}}function qt(e){const t=e.getComponent();return(t==null?void 0:t.type)==="VERSION"}const X="@firebase/app",pe="0.14.9";/**
+ */class Wt{constructor(t){this.container=t}getPlatformInfoString(){return this.container.getProviders().map(n=>{if(qt(n)){const r=n.getImmediate();return`${r.library}/${r.version}`}else return null}).filter(n=>n).join(" ")}}function qt(e){const t=e.getComponent();return(t==null?void 0:t.type)==="VERSION"}const X="@firebase/app",pe="0.14.11";/**
  * @license
  * Copyright 2019 Google LLC
  *
@@ -283,7 +283,7 @@ const ft=()=>{};var ue={};/**
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */function Rn(e){I(new b("platform-logger",t=>new Wt(t),"PRIVATE")),I(new b("heartbeat",t=>new On(t),"PRIVATE")),m(X,pe,e),m(X,pe,"esm2020"),m("fire-js","")}Rn("");var Pn="firebase",$n="12.10.0";/**
+ */function Rn(e){I(new b("platform-logger",t=>new Wt(t),"PRIVATE")),I(new b("heartbeat",t=>new On(t),"PRIVATE")),m(X,pe,e),m(X,pe,"esm2020"),m("fire-js","")}Rn("");var Pn="firebase",$n="12.12.0";/**
  * @license
  * Copyright 2020 Google LLC
  *
@@ -298,7 +298,7 @@ const ft=()=>{};var ue={};/**
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */m(Pn,$n,"app");const xe="@firebase/installations",ne="0.6.20";/**
+ */m(Pn,$n,"app");const xe="@firebase/installations",ne="0.6.21";/**
  * @license
  * Copyright 2019 Google LLC
  *
@@ -821,7 +821,7 @@ const ft=()=>{};var ue={};/**
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */async function no(e,t){const n=t.data;if(!n.isFirebaseMessaging)return;e.onMessageHandler&&n.messageType===D.PUSH_RECEIVED&&(typeof e.onMessageHandler=="function"?e.onMessageHandler(Ae(n)):e.onMessageHandler.next(Ae(n)));const r=n.data;zr(r)&&r[vr]==="1"&&await eo(e,n.messageType,r)}const De="@firebase/messaging",ve="0.12.24";/**
+ */async function no(e,t){const n=t.data;if(!n.isFirebaseMessaging)return;e.onMessageHandler&&n.messageType===D.PUSH_RECEIVED&&(typeof e.onMessageHandler=="function"?e.onMessageHandler(Ae(n)):e.onMessageHandler.next(Ae(n)));const r=n.data;zr(r)&&r[vr]==="1"&&await eo(e,n.messageType,r)}const De="@firebase/messaging",ve="0.12.25";/**
  * @license
  * Copyright 2020 Google LLC
  *
