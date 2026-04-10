@@ -327,6 +327,7 @@ router.get('/', async (req: Request, res: Response) => {
         };
 
         const companies = await companyService.getAllCompanies(filters);
+        console.log(`[GET /api/companies] Found ${companies.length} companies with filters:`, JSON.stringify(filters));
 
         res.json({
             success: true,

@@ -204,6 +204,9 @@ const runMigrations = async () => {
     try {
         console.log('🔄 Running auto-migrations...');
         client = await pool.connect();
+        
+        const testCount = await client.query('SELECT count(*) FROM companies');
+        console.log(`[DB] Current companies count: ${testCount.rows[0].count}`);
 
         // 0. Enum Types
         await pool.query(`

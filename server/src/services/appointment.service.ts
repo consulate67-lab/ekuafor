@@ -411,12 +411,13 @@ class AppointmentService {
         try {
             await client.query('BEGIN');
             let result;
+            if (status === 'completed' || price !== undefined || payment_method !== undefined) {
                 result = await client.query(
                     'UPDATE appointments SET status = $1, price = COALESCE($2, price), payment_status = $3, payment_method = COALESCE(payment_method, $4), collected_price = COALESCE(collected_price, $2, price), technical_notes = COALESCE($5, technical_notes), used_materials = COALESCE($6, used_materials) WHERE id = $7 RETURNING *',
                     [status, price ?? null, (status === 'completed' ? 'paid' : 'pending'), payment_method || (status === 'completed' ? 'cash' : null), technical_notes || null, used_materials || null, id]
                 );
 
-                if (status === 'completed') {
+                if (status === 'completed' || status === 'paid') {
                     const finalPrice = price ?? result.rows[0].price ?? 0;
                     
                     // Sync price to appointment_services for reporting

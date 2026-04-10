@@ -864,7 +864,7 @@ export default function Dashboard() {
                                                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                                             />
-                                            {allCompanies.filter(c => c.latitude && c.longitude).map(c => (
+                                            {allCompanies.filter(c => c.latitude && c.longitude && Number(c.latitude) !== 0).map(c => (
                                                 <Marker key={c.id} position={[Number(c.latitude), Number(c.longitude)] as any}>
                                                     <Popup>
                                                         <div className="p-1">

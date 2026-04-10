@@ -346,7 +346,7 @@ class CompanyService {
                 if (cached) {
                     const parsed = JSON.parse(cached);
                     if (Array.isArray(parsed) && parsed.length > 0) {
-                        console.log('[Redis] Cache Hit:', cacheKey);
+                        console.log('[Redis] Cache Hit:', cacheKey, 'Count:', parsed.length);
                         return parsed;
                     }
                 }
@@ -354,6 +354,7 @@ class CompanyService {
                 console.error('[Redis] Cache Read Error:', err);
             }
         }
+        console.log('[DB] Fetching from DB for:', cacheKey);
         // -------------------------
 
         const values: any[] = [];
