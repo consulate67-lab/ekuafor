@@ -55,6 +55,7 @@ export default function Dashboard() {
     const [showCompaniesModal, setShowCompaniesModal] = useState(false);
     const [filteredCompanies, setFilteredCompanies] = useState<Company[]>([]);
     const [companiesModalTitle, setCompaniesModalTitle] = useState('');
+    const [modalSearchTerm, setModalSearchTerm] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // OCR States
@@ -657,6 +658,7 @@ export default function Dashboard() {
                                         onClick={() => {
                                             setFilteredCompanies(allCompanies);
                                             setCompaniesModalTitle('Tüm Kayıtlı Firmalar');
+                                            setModalSearchTerm('');
                                             setShowCompaniesModal(true);
                                         }}
                                         className="bg-white/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/5 flex-1 lg:min-w-[150px] text-center cursor-pointer hover:bg-white/10 transition-colors"
@@ -679,6 +681,7 @@ export default function Dashboard() {
                                     const filtered = allCompanies.filter((c: any) => c.created_at?.startsWith(today));
                                     setFilteredCompanies(filtered);
                                     setCompaniesModalTitle('Bugün Katılan Firmalar');
+                                    setModalSearchTerm('');
                                     setShowCompaniesModal(true);
                                 }}
                                 className="bg-white p-8 rounded-[3rem] shadow-xl border border-slate-100 group hover:bg-indigo-600 transition-all duration-500 cursor-pointer"
@@ -710,6 +713,7 @@ export default function Dashboard() {
                                 onClick={() => {
                                     setFilteredCompanies(allCompanies);
                                     setCompaniesModalTitle('Şehir Bazlı Dağılım');
+                                    setModalSearchTerm('');
                                     setShowCompaniesModal(true);
                                 }}
                                 className="bg-white p-8 rounded-[3rem] shadow-xl border border-slate-100 group hover:bg-slate-900 transition-all duration-500 cursor-pointer"
@@ -791,10 +795,32 @@ export default function Dashboard() {
                                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
                                         </button>
                                     </div>
-                                    <div className="p-8 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                                    <div className="px-10 pb-6">
+                                        <div className="relative">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Firma ismi veya şehir ara..." 
+                                                value={modalSearchTerm}
+                                                onChange={(e) => setModalSearchTerm(e.target.value)}
+                                                className="w-full bg-slate-50 border-none rounded-2xl px-12 py-4 text-slate-900 font-bold focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                            />
+                                            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                        </div>
+                                    </div>
+                                    <div className="p-8 max-h-[50vh] overflow-y-auto custom-scrollbar">
                                         <div className="space-y-4">
-                                            {filteredCompanies.length > 0 ? filteredCompanies.map((c: any) => (
-                                                <div key={c.id} className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:border-indigo-200 transition-all group">
+                                            {filteredCompanies
+                                                .filter(c => 
+                                                    c.name?.toLowerCase().includes(modalSearchTerm.toLowerCase()) || 
+                                                    c.city?.toLowerCase().includes(modalSearchTerm.toLowerCase())
+                                                )
+                                                .length > 0 ? filteredCompanies
+                                                    .filter(c => 
+                                                        c.name?.toLowerCase().includes(modalSearchTerm.toLowerCase()) || 
+                                                        c.city?.toLowerCase().includes(modalSearchTerm.toLowerCase())
+                                                    )
+                                                    .map((c: any) => (
+                                                <Link key={c.id} to={`/companies/${c.id}`} className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:border-indigo-200 transition-all group">
                                                     <div className="flex items-center gap-4">
                                                         <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-xl shadow-sm group-hover:text-indigo-500 transition-colors">🏢</div>
                                                         <div>
@@ -806,7 +832,7 @@ export default function Dashboard() {
                                                          <p className="text-[10px] font-black text-indigo-600 uppercase mb-1">{c.subscription_type || 'ÜCRETSİZ'}</p>
                                                          <p className="text-[8px] font-bold text-slate-400 uppercase">{new Date(c.created_at).toLocaleDateString()} KAYIT</p>
                                                     </div>
-                                                </div>
+                                                </Link>
                                             )) : (
                                                 <div className="text-center py-10 opacity-40">
                                                     <p className="text-5xl mb-4">🔍</p>
