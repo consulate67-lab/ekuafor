@@ -1,9 +1,9 @@
 import axios from 'axios';
 
 const isProduction = import.meta.env.PROD;
-const baseUrl = isProduction 
-  ? 'https://ekuafor-production-344a.up.railway.app/api'
-  : 'http://localhost:3000/api';
+const baseUrl = import.meta.env.VITE_API_URL || (isProduction 
+  ? 'https://ekuafor-backend.onrender.com/api' // Render veya yeni sunucu adresi
+  : 'http://localhost:3000/api');
 
 const api = axios.create({
     baseURL: baseUrl,

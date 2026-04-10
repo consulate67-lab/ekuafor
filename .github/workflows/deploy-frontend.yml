@@ -33,7 +33,7 @@ jobs:
         working-directory: client
         run: npm run build
         env:
-          VITE_API_URL: "https://ekuafor-production-344a.up.railway.app/api"
+          VITE_API_URL: "https://ekuafor-backend.onrender.com/api"
           VITE_BASE: "/ekuafor/"
 
       - name: Deploy

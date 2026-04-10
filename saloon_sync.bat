@@ -1,9 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
-title Saloon Cebinde Master Deployer (v1.0.4)
+title Saloon Cebinde Master Deployer (v1.0.5)
 
 echo ============================================================
-echo SALOON CEBINDE - MASTER BUILD & DEPLOY (v1.0.4)
+echo SALOON CEBINDE - KOMPLE GUNCELLEME BAŞLATILIYOR (v1.0.5)
+echo (Github, APK, ve Site FTP Guncellemesi - Railway Iptal Edildi)
 echo ============================================================
 echo.
 
@@ -21,13 +22,13 @@ cd ..
 :: 2. Git
 echo [2/4] Veriler Hazirlaniyor...
 git add .
-set msg=Saloon Sync Update
-set /p user_msg="Notunuz (Opsiyonel): "
+set msg=Saloon Sync: Railway baglantilari kaldirildi
+set /p user_msg="Guncelleme Notu (Opsiyonel): "
 if not "!user_msg!"=="" set msg=!user_msg!
 
 echo.
 echo [3/4] GitHub Bulutuna Yukleniyor (Push)...
-git commit -m "!msg! - v1.0.4"
+git commit -m "!msg! - v1.0.5"
 git push origin main
 if %errorlevel% neq 0 (
     echo [ERROR] Git Push Hatasi!

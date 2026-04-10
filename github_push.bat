@@ -9,7 +9,9 @@ echo [1/3] Degisiklikler hazirlaniyor (git add)...
 git add -A
 
 echo [2/3] Kaydediliyor (git commit)...
-git commit -m "feat: Personel prim sistemi (Commission Reporting) tamamlandı ve Supabase geçişi hazırlandı"
+set /p commit_msg="Guncelleme aciklamasi girin (Bos birakilirsa 'fix: railway baglantilari kaldirildi' yazilacak): "
+if "%commit_msg%"=="" set commit_msg="fix: railway baglantilari kaldirildi"
+git commit -m "%commit_msg%"
 
 echo [3/3] GitHub'a gonderiliyor (git push)...
 git push origin HEAD
