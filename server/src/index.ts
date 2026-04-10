@@ -715,8 +715,8 @@ const runMigrations = async () => {
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS license_end_date TIMESTAMP WITH TIME ZONE');
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS license_status VARCHAR(20) DEFAULT \'active\'');
 
-            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS original_price DECIMAL(10, 2)');
-            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS collected_price DECIMAL(10, 2)');
+            await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS original_price DECIMAL(10, 2)');
+            await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS collected_price DECIMAL(10, 2)');
 
             // Denormalization columns for speed
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS rating_avg DECIMAL(3, 2) DEFAULT 0');
