@@ -40,6 +40,7 @@ export default function Dashboard() {
     });
     const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'year'>('today');
     const [statsLoading, setStatsLoading] = useState(false);
+    const [fetchError, setFetchError] = useState<string | null>(null);
     const [showReports, setShowReports] = useState(false);
     const [services, setServices] = useState<Service[]>([]);
     const [isListening, setIsListening] = useState(false);
@@ -149,12 +150,20 @@ export default function Dashboard() {
         const fetchStats = async () => {
             if (user?.role === 'super_admin') {
                 try {
-                    const res = await api.get('/companies', { headers: { 'X-No-Mock': 'true' } });
+                    setStatsLoading(true);
+                    setFetchError(null);
+                    const res = await api.get('/companies', { 
+                        params: { nocache: 'true' },
+                        headers: { 'X-No-Mock': 'true' } 
+                    });
                     const companyList = res.data.data || [];
                     console.log(`[SuperAdmin] Fetched ${companyList.length} companies`);
                     setAllCompanies(companyList);
-                } catch (e) {
+                } catch (e: any) {
                     console.error('Stats fetch error:', e);
+                    setFetchError(e.response?.data?.error || e.message || 'Hata oluştu');
+                } finally {
+                    setStatsLoading(false);
                 }
             } else if (user?.role === 'company_admin' || user?.role === 'staff') {
                 try {
@@ -794,8 +803,16 @@ export default function Dashboard() {
                                         <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Firma Giriş Anahtarları</h3>
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Board Key ve Yönetici Kodları</p>
                                     </div>
-                                    <div className="bg-indigo-50 px-6 py-2 rounded-2xl">
-                                        <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Board Sayısı: {allCompanies.length}</span>
+                                    <div className="bg-indigo-50 px-6 py-2 rounded-2xl flex flex-col items-end">
+                                        <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">
+                                            {statsLoading ? 'Yükleniyor...' : `Board Sayısı: ${allCompanies.length}`}
+                                        </span>
+                                        {fetchError && (
+                                            <span className="text-[8px] text-red-500 font-bold uppercase">{fetchError}</span>
+                                        )}
+                                        {allCompanies.length === 0 && !statsLoading && !fetchError && (
+                                            <span className="text-[8px] text-amber-500 font-bold uppercase">Kayıt Bulunamadı</span>
+                                        )}
                                     </div>
                                 </div>
 

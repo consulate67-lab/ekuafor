@@ -37,7 +37,7 @@ app.use(cors({
     origin: '*', // Allow all origins for debugging
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-No-Mock', 'X-Company-Id']
 }));
 
 app.use(express.json({ limit: '10mb' }));

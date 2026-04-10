@@ -337,10 +337,11 @@ class CompanyService {
         company_type?: string;
         exclude_parent?: boolean;
         sort?: 'rating' | 'reviews' | 'newest';
+        nocache?: boolean;
     }): Promise<Company[]> {
         // --- REDIS CACHE CHECK ---
         const cacheKey = `companies:list:${JSON.stringify(filters || {})}`;
-        if (redis) {
+        if (redis && !filters?.nocache) {
             try {
                 const cached = await redis.get(cacheKey);
                 if (cached) {

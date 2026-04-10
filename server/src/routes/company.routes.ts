@@ -323,7 +323,8 @@ router.get('/', async (req: Request, res: Response) => {
             gender: req.query.gender as string | undefined,
             company_type: req.query.company_type as string | undefined,
             exclude_parent: req.query.exclude_parent === 'true' ? true : undefined,
-            sort: req.query.sort as 'rating' | 'reviews' | 'newest' | undefined
+            sort: req.query.sort as 'rating' | 'reviews' | 'newest' | undefined,
+            nocache: req.query.nocache === 'true'
         };
 
         const companies = await companyService.getAllCompanies(filters);
