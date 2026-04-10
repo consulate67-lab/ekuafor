@@ -14,6 +14,27 @@ import {
 } from 'lucide-react';
 import api from '../lib/api';
 import Tesseract from 'tesseract.js';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+// Fix for default marker icon in Leaflet
+import iconRetina from 'leaflet/dist/images/marker-icon-2x.png';
+import iconMarker from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+
+const DefaultIcon = L.icon({
+    iconRetinaUrl: iconRetina,
+    iconUrl: iconMarker,
+    shadowUrl: iconShadow,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    tooltipAnchor: [16, -28],
+    shadowSize: [41, 41]
+});
+
+L.Marker.prototype.options.icon = DefaultIcon;
 
 export default function Dashboard() {
     const { user, logout } = useAuthStore();
@@ -56,6 +77,13 @@ export default function Dashboard() {
     const [filteredCompanies, setFilteredCompanies] = useState<Company[]>([]);
     const [companiesModalTitle, setCompaniesModalTitle] = useState('');
     const [modalSearchTerm, setModalSearchTerm] = useState('');
+    
+    // Lead Hunter States
+    const [hunterCity, setHunterCity] = useState('');
+    const [hunterResults, setHunterResults] = useState<any[]>([]);
+    const [hunterLoading, setHunterLoading] = useState(false);
+    const [importingId, setImportingId] = useState<string | null>(null);
+
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // OCR States
@@ -193,6 +221,67 @@ export default function Dashboard() {
             console.error('Employee stats fetch error:', e);
         } finally {
             setStatsLoading(false);
+        }
+    };
+
+    const searchLeads = async () => {
+        if (!hunterCity) return;
+        setHunterLoading(true);
+        try {
+            // Search for hairdressers and beauty salons in the specified city
+            const query = `hair dresser in ${hunterCity}, Turkey`;
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=20`, {
+                headers: { 'Accept-Language': 'tr-TR' }
+            });
+            const data = await res.json();
+            
+            // Filter out those already in our system (simple name match for now)
+            const internalNames = allCompanies.map(c => c.name.toLowerCase());
+            const filtered = data.filter((item: any) => {
+                const name = item.display_name.split(',')[0].toLowerCase();
+                return !internalNames.some(internal => internal.includes(name) || name.includes(internal));
+            });
+
+            setHunterResults(filtered);
+            if (filtered.length === 0) alert('Bu şehirde yeni işletme bulunamadı veya hepsi zaten kayıtlı.');
+        } catch (e) {
+            console.error('Lead search error:', e);
+            alert('Arama sırasında bir hata oluştu.');
+        } finally {
+            setHunterLoading(false);
+        }
+    };
+
+    const importLead = async (lead: any) => {
+        setImportingId(lead.place_id);
+        try {
+            const name = lead.display_name.split(',')[0];
+            const addr = lead.address;
+            
+            const payload = {
+                name: name,
+                city: addr.province || addr.city || hunterCity,
+                district: addr.town || addr.district || addr.suburb || '',
+                address_line: lead.display_name,
+                latitude: parseFloat(lead.lat),
+                longitude: parseFloat(lead.lon),
+                company_type: 'ASIL',
+                is_active: true,
+                subscription_type: 'ÜCRETSİZ'
+            };
+
+            const res = await api.post('/companies', payload);
+            if (res.data.success) {
+                alert(`${name} başarıyla sisteme eklendi!`);
+                setHunterResults(prev => prev.filter(item => item.place_id !== lead.place_id));
+                // Update allCompanies list
+                const compRes = await api.get('/companies', { params: { nocache: 'true' } });
+                setAllCompanies(compRes.data.data || []);
+            }
+        } catch (e: any) {
+            alert('Ekleme hatası: ' + (e.response?.data?.error || e.message));
+        } finally {
+            setImportingId(null);
         }
     };
 
@@ -635,6 +724,55 @@ export default function Dashboard() {
 
                 {user?.role === 'super_admin' && (
                     <>
+                        <div className="bg-white rounded-[3rem] p-10 shadow-2xl border border-slate-100 mb-12">
+                            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
+                                <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="px-3 py-1 bg-indigo-500 text-white text-[9px] font-black rounded-full uppercase tracking-widest">AKILLI AVCI</span>
+                                        <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter font-serif">Potansiyel İşletme Bulucu</h3>
+                                    </div>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">OpenStreetMap üzerinden bölgenizdeki salonları tarayın ve sisteme kazandırın</p>
+                                </div>
+                                <div className="flex w-full lg:w-auto gap-3">
+                                    <input 
+                                        type="text" 
+                                        placeholder="Şehir ismi girin (Örn: İstanbul)" 
+                                        value={hunterCity}
+                                        onChange={(e) => setHunterCity(e.target.value)}
+                                        className="flex-1 lg:w-64 bg-slate-50 border-none rounded-2xl px-6 py-4 text-slate-900 font-bold focus:ring-2 focus:ring-indigo-600 outline-none transition-all"
+                                    />
+                                    <button 
+                                        onClick={searchLeads}
+                                        disabled={hunterLoading || !hunterCity}
+                                        className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                                    >
+                                        {hunterLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'TARAMAYI BAŞLAT'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {hunterResults.length > 0 && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4">
+                                    {hunterResults.map((lead) => (
+                                        <div key={lead.place_id} className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100 hover:border-indigo-200 transition-all flex flex-col justify-between group">
+                                            <div>
+                                                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-xl shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-all mb-4">🔍</div>
+                                                <h4 className="font-black text-slate-900 uppercase tracking-tight text-sm mb-1">{lead.display_name.split(',')[0]}</h4>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed line-clamp-2 mb-4">{lead.display_name}</p>
+                                            </div>
+                                            <button 
+                                                onClick={() => importLead(lead)}
+                                                disabled={importingId === lead.place_id}
+                                                className="w-full py-3 bg-white text-indigo-600 border border-indigo-100 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all active:scale-95 flex justify-center items-center"
+                                            >
+                                                {importingId === lead.place_id ? 'EKLENİYOR...' : 'SİSTEME AKTAR'}
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
                         <div className="card bg-slate-900 border-none shadow-2xl mb-12 overflow-hidden relative group">
                             <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl group-hover:bg-indigo-500/20 transition-all duration-700"></div>
                             <div className="relative z-10 flex flex-col lg:flex-row gap-10 items-center justify-between">
@@ -724,6 +862,29 @@ export default function Dashboard() {
                                 </div>
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] group-hover:text-white/60">Firma Yaygınlığı</p>
                                 <h3 className="text-3xl font-black text-slate-900 mt-1 group-hover:text-white">{Array.from(new Set(allCompanies.map(c => c.city))).length} <span className="text-sm">Şehir</span></h3>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-[3rem] p-10 shadow-2xl border border-slate-100 mb-12">
+                            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-8 font-serif">Sistem Yaygınlığı</h3>
+                            <div className="h-[400px] rounded-[2.5rem] overflow-hidden border-8 border-slate-50 shadow-inner z-0">
+                                <MapContainer center={[39.1, 35.3]} zoom={6} style={{ height: '100%', width: '100%' }}>
+                                    <TileLayer
+                                        url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                                    />
+                                    {allCompanies.filter(c => c.latitude && c.longitude).map((c: any) => (
+                                        <Marker key={c.id} position={[c.latitude, c.longitude]}>
+                                            <Popup>
+                                                <div className="p-2">
+                                                    <p className="font-black text-slate-900 uppercase text-xs mb-1">{c.name}</p>
+                                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{c.city} / {c.district}</p>
+                                                    <Link to={`/companies/${c.id}`} className="mt-2 block text-indigo-600 font-black text-[9px] uppercase tracking-widest hover:underline">Detayı Gör</Link>
+                                                </div>
+                                            </Popup>
+                                        </Marker>
+                                    ))}
+                                </MapContainer>
                             </div>
                         </div>
 
