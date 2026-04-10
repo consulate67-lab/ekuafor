@@ -683,9 +683,24 @@ export default function CompanyPanel() {
 
     const handleCreatePurchase = async (data: any) => {
         try {
-            const res = await api.post('/finance/purchase-invoices', data);
+            // Backend'in tanımadığı alanları (product_id vb.) faturadan ayıklıyoruz
+            const backendData = {
+                ...data,
+                items: data.items.map((item: any) => ({
+                    product_name: item.product_name,
+                    quantity: item.quantity,
+                    unit_price: item.unit_price,
+                    vat_rate: item.vat_rate,
+                    discount_rate: item.discount_rate,
+                    vat_amount: item.vat_amount,
+                    discount_amount: item.discount_amount,
+                    total_amount: item.total_amount
+                }))
+            };
+
+            const res = await api.post('/finance/purchase-invoices', backendData);
             if (res.data.success) {
-                // Her bir kalem için stok güncellemesi yap
+                // Fatura başarıyla kaydedildiyse stokları güncelle
                 for (const item of data.items) {
                     if (item.product_id) {
                         try {
@@ -709,10 +724,11 @@ export default function CompanyPanel() {
                     items: [{ product_name: '', quantity: 1, unit_price: 0, vat_rate: 20, discount_rate: 0 }]
                 });
                 fetchFinanceData();
-                fetchInventoryProducts(); // Stoklar güncellendiği için listeyi yenile
+                fetchInventoryProducts();
             }
         } catch (err: any) {
-            alert(err.response?.data?.error || 'Alış faturası oluşturulamadı');
+            const errorMsg = err.response?.data?.error || err.message || 'Alış faturası oluşturulamadı';
+            alert('Hata: ' + errorMsg);
         }
     };
 
