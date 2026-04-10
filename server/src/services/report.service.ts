@@ -57,10 +57,11 @@ class ReportService {
                             (aps_in.staff_id = $2) OR 
                             (aps_in.staff_id IS NULL AND a.staff_id = $2)
                         )),
-                        CASE WHEN ($2::INTEGER IS NULL OR (a.staff_id = $2 AND NOT EXISTS (SELECT 1 FROM appointment_services WHERE appointment_id = a.id))) 
+                        CASE WHEN ($2::INTEGER IS NULL OR a.staff_id = $2) 
                              THEN COALESCE(a.collected_price, a.price, s.price, 0) 
                              ELSE 0 
-                        END
+                        END,
+                        0
                     )
                 ELSE 0 END) as actual_collected
             FROM appointments a
@@ -156,10 +157,11 @@ class ReportService {
                             (aps_in.staff_id = sa.staff_id) OR 
                             (aps_in.staff_id IS NULL AND a.staff_id = sa.staff_id)
                         )),
-                        CASE WHEN (a.staff_id = sa.staff_id AND NOT EXISTS (SELECT 1 FROM appointment_services WHERE appointment_id = a.id)) 
+                        CASE WHEN (a.staff_id = sa.staff_id) 
                              THEN COALESCE(a.collected_price, a.price, s.price, 0) 
                              ELSE 0 
-                        END
+                        END,
+                        0
                     )
                 ELSE 0 END) as actual_collected
             FROM staff_all sa
