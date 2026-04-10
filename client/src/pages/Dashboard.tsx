@@ -227,62 +227,68 @@ export default function Dashboard() {
     const searchLeads = async () => {
         if (!hunterCity) return;
         setHunterLoading(true);
-        setHunterResults([]); // Önce eski sonuçları temizle
+        setHunterResults([]); 
         try {
-            // Nominatim için daha doğal ve sonuç odaklı Türkçe sorgu
-            const query = `kuaför güzellik salonu ${hunterCity}`;
-            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=tr&format=json&addressdetails=1&limit=100`, {
+            // Nominatim için parametrik arama (Daha fazla sonuç ve doğruluk sağlar)
+            const url = `https://nominatim.openstreetmap.org/search?q=hairdresser&city=${encodeURIComponent(hunterCity)}&countrycodes=tr&format=json&addressdetails=1&limit=200`;
+            
+            console.log(`[LeadHunter] Sorgu başlatılıyor: ${url}`);
+            const res = await fetch(url, {
                 headers: { 
                     'Accept-Language': 'tr-TR',
                     'User-Agent': 'SaloonLeadHunter/1.0'
                 }
             });
             const data = await res.json();
+            
+            console.log(`[LeadHunter] OSM'den ${data.length} ham sonuç geldi.`);
 
-            console.log("OSM'den Gelen Ham Veri Sayısı:", data.length);
-            if (data.length > 0) console.log("İlk Örnek Kayıt:", data[0]);
-
-            // Filter out those already in our system (Check by Coordinates OR exact Name+City)
             const filtered = data.filter((item: any) => {
                 const searchName = (item.display_name.split(',')[0] || '').toLowerCase().replace(/\s+/g, ' ').trim();
                 const searchCity = (item.address?.province || item.address?.city || hunterCity || '').toLowerCase().trim();
                 const searchLat = parseFloat(item.lat);
                 const searchLon = parseFloat(item.lon);
-
-                // Eğer isim çok kısaysa (örn sadece şehir ismi gelmişse) bunu ele
+                
                 if (searchName.length < 3) return false;
 
-                const isAlreadyRegistered = allCompanies.some(internal => {
-                    // 1. Lokasyon Kontrolü (En güvenilir: ~100 metre fark varsa aynı yerdir)
+                const match = allCompanies.find(internal => {
+                    // 1. Lokasyon Kontrolü
                     if (internal.latitude && internal.longitude) {
                         const dLat = Math.abs(parseFloat(String(internal.latitude)) - searchLat);
                         const dLon = Math.abs(parseFloat(String(internal.longitude)) - searchLon);
-                        if (dLat < 0.001 && dLon < 0.001) return true;
+                        if (dLat < 0.0008 && dLon < 0.0008) {
+                            console.log(`[Filtre] ${searchName} elendi: Konum çakışması (${internal.name})`);
+                            return true;
+                        }
                     }
-
+                    
                     // 2. İsim + Şehir Kontrolü
                     const internalName = (internal.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
                     const internalCity = (internal.city || '').toLowerCase().trim();
-
-                    return internalName === searchName && internalCity === searchCity;
+                    
+                    if (internalName === searchName && internalCity === searchCity) {
+                        console.log(`[Filtre] ${searchName} elendi: İsim ve Şehir aynı (${internal.name})`);
+                        return true;
+                    }
+                    return false;
                 });
 
-                return !isAlreadyRegistered;
+                return !match;
             });
 
-            console.log("Filtreleme Sonrası Kalan:", filtered.length);
+            console.log(`[LeadHunter] Filtreleme sonrası ${filtered.length} yeni işletme kaldı.`);
             setHunterResults(filtered);
-
+            
             if (filtered.length === 0) {
                 if (data && data.length > 0) {
-                    alert(`Bulunan ${data.length} işletmenin tamamı veritabanıyla çakışıyor (İsim veya Konum benzerliği).`);
+                    alert(`Bulunan ${data.length} işletmenin tamamı veritabanınızla çakışıyor. Detaylar için konsola (F12) bakabilirsiniz.`);
                 } else {
-                    alert(`${hunterCity} bölgesinde kriterlere uygun (Kuaför/Güzellik Salonu) açık veri bulunamadı.`);
+                    alert(`${hunterCity} bölgesinde kriterlere uygun (Kuaför) sonuç bulunamadı. Lütfen "Şehir, İlçe" şeklinde daha spesifik deneyin.`);
                 }
             }
         } catch (e) {
-            console.error('Lead search error:', e);
-            alert('Arama sırasında teknik bir hata oluştu.');
+            console.error('[LeadHunter] Hata:', e);
+            alert('Arama sırasında teknik bir hata oluştu. Lütfen bağlantınızı kontrol edin.');
         } finally {
             setHunterLoading(false);
         }
