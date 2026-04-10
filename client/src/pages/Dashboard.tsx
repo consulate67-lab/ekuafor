@@ -229,18 +229,29 @@ export default function Dashboard() {
         setHunterLoading(true);
         setHunterResults([]); 
         try {
-            // Nominatim için parametrik arama (Daha fazla sonuç ve doğruluk sağlar)
-            const url = `https://nominatim.openstreetmap.org/search?q=hairdresser&city=${encodeURIComponent(hunterCity)}&countrycodes=tr&format=json&addressdetails=1&limit=200`;
+            // Nominatim için en sağlam format: Tek bir sorgu içinde birleştirme
+            const searchTerm = `hairdresser ${hunterCity}`;
+            const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchTerm)}&countrycodes=tr&format=json&addressdetails=1&limit=100`;
             
             console.log(`[LeadHunter] Sorgu başlatılıyor: ${url}`);
             const res = await fetch(url, {
                 headers: { 
-                    'Accept-Language': 'tr-TR',
-                    'User-Agent': 'SaloonLeadHunter/1.0'
+                    'Accept-Language': 'tr-TR'
                 }
             });
+
+            if (!res.ok) {
+                throw new Error(`API Hatası: ${res.status}`);
+            }
+
             const data = await res.json();
             
+            if (!Array.isArray(data)) {
+                console.error("[LeadHunter] Beklenmedik veri formatı:", data);
+                setHunterResults([]);
+                return;
+            }
+
             console.log(`[LeadHunter] OSM'den ${data.length} ham sonuç geldi.`);
 
             const filtered = data.filter((item: any) => {
@@ -266,8 +277,8 @@ export default function Dashboard() {
                     const internalName = (internal.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
                     const internalCity = (internal.city || '').toLowerCase().trim();
                     
-                    if (internalName === searchName && internalCity === searchCity) {
-                        console.log(`[Filtre] ${searchName} elendi: İsim ve Şehir aynı (${internal.name})`);
+                    if (internalName === searchName && (internalCity === searchCity || searchName.includes(internalName))) {
+                        console.log(`[Filtre] ${searchName} elendi: İsim/Şehir benzerliği (${internal.name})`);
                         return true;
                     }
                     return false;
@@ -281,14 +292,14 @@ export default function Dashboard() {
             
             if (filtered.length === 0) {
                 if (data && data.length > 0) {
-                    alert(`Bulunan ${data.length} işletmenin tamamı veritabanınızla çakışıyor. Detaylar için konsola (F12) bakabilirsiniz.`);
+                    alert(`Bulunan ${data.length} işletmenin tamamı veritabanınızla çakışıyor.`);
                 } else {
-                    alert(`${hunterCity} bölgesinde kriterlere uygun (Kuaför) sonuç bulunamadı. Lütfen "Şehir, İlçe" şeklinde daha spesifik deneyin.`);
+                    alert(`${hunterCity} bölgesinde sonuç bulunamadı. Lütfen "İlçe, İl" şeklinde deneyin.`);
                 }
             }
         } catch (e) {
             console.error('[LeadHunter] Hata:', e);
-            alert('Arama sırasında teknik bir hata oluştu. Lütfen bağlantınızı kontrol edin.');
+            alert('Arama servisine ulaşılamadı. Lütfen tekrar deneyin.');
         } finally {
             setHunterLoading(false);
         }
