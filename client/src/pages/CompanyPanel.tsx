@@ -233,6 +233,8 @@ export default function CompanyPanel() {
     const [lastAIResult, setLastAIResult] = useState<any>(null);
     const [showAIResultModal, setShowAIResultModal] = useState(false);
     const [expandedMenus, setExpandedMenus] = useState<string[]>(['finance', 'crm']);
+    const [inventoryProducts, setInventoryProducts] = useState<any[]>([]);
+    const [purchaseSearch, setPurchaseSearch] = useState('');
 
     // Native Sync
     useEffect(() => {
@@ -369,6 +371,7 @@ export default function CompanyPanel() {
             setInputKey(key);
             if (!is_license_expired) {
                 fetchData(comp.id);
+                fetchInventoryProducts(comp.id);
                 if (comp.city) fetchDistricts(comp.city);
                 // Note: Neighborhood fetching usually needs the district ID which we get after fetchDistricts
             }
@@ -393,6 +396,19 @@ export default function CompanyPanel() {
         }
     }, []);
 
+
+    const fetchInventoryProducts = async (cid?: number) => {
+        const targetCid = cid || company?.id;
+        if (!targetCid) return;
+        try {
+            const res = await api.get('/inventory/products');
+            if (res.data.success) {
+                setInventoryProducts(res.data.data || []);
+            }
+        } catch (err) {
+            console.error('Envanter ürünleri yüklenemedi:', err);
+        }
+    };
 
     const fetchFinanceData = async (cid?: number) => {
         const targetCid = cid || company?.id;
@@ -669,8 +685,31 @@ export default function CompanyPanel() {
         try {
             const res = await api.post('/finance/purchase-invoices', data);
             if (res.data.success) {
+                // Her bir kalem için stok güncellemesi yap
+                for (const item of data.items) {
+                    if (item.product_id) {
+                        try {
+                            await api.put(`/inventory/products/${item.product_id}/stock`, {
+                                change: Number(item.quantity)
+                            });
+                        } catch (stockErr) {
+                            console.error(`Ürün (${item.product_id}) stoku güncellenemedi:`, stockErr);
+                        }
+                    }
+                }
+                
                 setShowPurchaseModal(false);
+                setPurchaseForm({
+                    supplier_name: '',
+                    invoice_no: '',
+                    current_account_id: '',
+                    invoice_date: new Date().toISOString().split('T')[0],
+                    description: '',
+                    is_closed: true,
+                    items: [{ product_name: '', quantity: 1, unit_price: 0, vat_rate: 20, discount_rate: 0 }]
+                });
                 fetchFinanceData();
+                fetchInventoryProducts(); // Stoklar güncellendiği için listeyi yenile
             }
         } catch (err: any) {
             alert(err.response?.data?.error || 'Alış faturası oluşturulamadı');
@@ -3325,20 +3364,40 @@ export default function CompanyPanel() {
                             {/* Purchases Content (LIST) */}
                             {activeTab === 'finance-purchases-list' && (
                                 <div className="space-y-6">
-                                    <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-slate-50 shadow-sm">
-                                        <h3 className="font-black text-slate-900 uppercase text-xs tracking-widest">Alış Faturaları</h3>
+                                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-50 shadow-sm">
+                                        <div className="relative group flex-1">
+                                            <input
+                                                type="text"
+                                                placeholder="Tedarikçi veya fatura no ile ara..."
+                                                value={purchaseSearch}
+                                                onChange={(e) => setPurchaseSearch(e.target.value)}
+                                                className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl px-12 py-4 text-sm font-bold focus:bg-white focus:border-indigo-100 outline-none transition-all"
+                                            />
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30 text-xl">🔍</span>
+                                        </div>
                                         <button
                                             onClick={() => setShowPurchaseModal(true)}
-                                            className="px-6 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest">+ Yeni Alış Girişi</button>
+                                            className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95"
+                                        >
+                                            + Yeni Alış Girişi
+                                        </button>
                                     </div>
                                     <div className="space-y-3">
-                                        {purchaseInvoices.length === 0 ? (
+                                        {purchaseInvoices.filter(p => 
+                                            p.supplier_name?.toLowerCase().includes(purchaseSearch.toLowerCase()) || 
+                                            p.invoice_no?.toLowerCase().includes(purchaseSearch.toLowerCase())
+                                        ).length === 0 ? (
                                             <div className="bg-white rounded-3xl p-20 text-center shadow-lg border border-slate-50">
                                                 <span className="text-4xl block mb-2">🛒</span>
-                                                <p className="text-slate-300 font-bold uppercase text-[10px]">Henüz alış faturası bulunmuyor</p>
+                                                <p className="text-slate-300 font-bold uppercase text-[10px]">
+                                                    {purchaseSearch ? 'Aradığınız kriterde fatura bulunamadı' : 'Henüz alış faturası bulunmuyor'}
+                                                </p>
                                             </div>
                                         ) : (
-                                            purchaseInvoices.map(p => (
+                                            purchaseInvoices.filter(p => 
+                                                p.supplier_name?.toLowerCase().includes(purchaseSearch.toLowerCase()) || 
+                                                p.invoice_no?.toLowerCase().includes(purchaseSearch.toLowerCase())
+                                            ).map(p => (
                                                 <div
                                                     key={p.id}
                                                     onClick={() => handleViewPurchaseDetail(p.id)}
@@ -5174,18 +5233,41 @@ export default function CompanyPanel() {
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             <div className="md:col-span-2">
-                                                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Ürün / Hizmet Tanımı</label>
-                                                <input
-                                                    type="text"
-                                                    value={item.product_name}
+                                                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Ürün / Hizmet Seçin (Envanter)</label>
+                                                <select
+                                                    value={item.product_id || ''}
                                                     onChange={e => {
+                                                        const val = e.target.value;
+                                                        const prod = inventoryProducts.find(p => p.id === parseInt(val));
                                                         const newItems = [...purchaseForm.items];
-                                                        newItems[idx].product_name = e.target.value;
+                                                        newItems[idx] = {
+                                                            ...newItems[idx],
+                                                            product_id: val ? parseInt(val) : null,
+                                                            product_name: prod ? `${prod.brand} ${prod.name}` : '',
+                                                            unit: prod ? prod.unit : 'Adet'
+                                                        };
                                                         setPurchaseForm({ ...purchaseForm, items: newItems });
                                                     }}
-                                                    className="w-full p-3 bg-slate-50 border-none rounded-xl font-bold text-sm"
-                                                    placeholder="Loreal Şampuan 500ml"
-                                                />
+                                                    className="w-full p-3 bg-slate-50 border-2 border-indigo-50 rounded-xl font-bold text-sm outline-none focus:border-indigo-500 transition-all appearance-none"
+                                                >
+                                                    <option value="">Envanter Dışı / Manuel Yaz...</option>
+                                                    {inventoryProducts.map(p => (
+                                                        <option key={p.id} value={p.id}>{p.brand} - {p.name} ({p.current_stock} {p.unit} Mevcut)</option>
+                                                    ))}
+                                                </select>
+                                                {!item.product_id && (
+                                                    <input
+                                                        type="text"
+                                                        value={item.product_name}
+                                                        onChange={e => {
+                                                            const newItems = [...purchaseForm.items];
+                                                            newItems[idx].product_name = e.target.value;
+                                                            setPurchaseForm({ ...purchaseForm, items: newItems });
+                                                        }}
+                                                        className="w-full mt-2 p-3 bg-white border-2 border-slate-100 rounded-xl font-bold text-sm outline-none focus:border-indigo-500"
+                                                        placeholder="Veya manuel bir isim yazın..."
+                                                    />
+                                                )}
                                             </div>
                                             <div>
                                                 <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Miktar</label>
