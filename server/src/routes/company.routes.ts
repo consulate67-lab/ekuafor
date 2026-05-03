@@ -596,10 +596,13 @@ router.post('/:id/create-staff-board', async (req: Request, res: Response) => {
         companyService.syncCompanyStats(companyId).catch(() => {});
 
         res.status(201).json({ success: true, data: userResult.rows[0] });
-    } catch (error) {
+    } catch (error: any) {
+        console.error('--- STAFF CREATION ERROR ---');
+        console.error('Error details:', error);
         res.status(500).json({
             success: false,
-            error: error instanceof Error ? error.message : 'Personel oluşturulurken hata oluştu'
+            error: error.message || 'Personel oluşturulurken hata oluştu',
+            details: error.detail || error.hint || null // Supabase/PG specific details
         });
     }
 });

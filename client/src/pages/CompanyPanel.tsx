@@ -1357,7 +1357,7 @@ export default function CompanyPanel() {
         setTimeout(() => setCopiedField(''), 2000);
     };
 
-    const bookingUrl = company ? `${window.location.origin}${import.meta.env.BASE_URL}book/${company.id}?ref=qr` : '';
+    const bookingUrl = company ? `${window.location.origin}/#/book/${company.id}?ref=qr` : '';
     const qrApiUrl = (data: string, size = 200) =>
         `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}&color=1e1b4b&bgcolor=ffffff`;
 
@@ -2351,7 +2351,7 @@ export default function CompanyPanel() {
                                     </div>
                                 </div>
                                 <button
-                                    onClick={() => window.open(`${window.location.origin}${import.meta.env.BASE_URL}book/${company.id}`, '_blank')}
+                                    onClick={() => window.open(`${window.location.origin}/#/book/${company.id}`, '_blank')}
                                     className="mt-6 w-full py-4 bg-white text-indigo-900 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-indigo-50 transition-all"
                                 >
                                     Müşteri Sayfasını Görüntüle

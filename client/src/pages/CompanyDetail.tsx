@@ -27,7 +27,7 @@ export default function CompanyDetail() {
 
     const handlePrint = () => {
         if (!company) return;
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(`${window.location.origin}/ekuafor/book/${company.id}?ref=qr`)}`;
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(`${window.location.origin}/#/book/${company.id}?ref=qr`)}`;
 
         const printWindow = window.open('', '_blank');
         if (!printWindow) return;
@@ -144,7 +144,7 @@ export default function CompanyDetail() {
 
                         <div className="bg-white p-6 rounded-[2rem] border-2 border-dashed border-pink-200 mb-8 shadow-xl shadow-pink-100/50 relative group">
                             <img
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`${window.location.origin}/ekuafor/book/${company.id}?ref=qr`)}`}
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`${window.location.origin}/#/book/${company.id}?ref=qr`)}`}
                                 alt="Firma QR Kodu"
                                 className="w-48 h-48 transition-transform group-hover:scale-105 duration-500"
                             />
@@ -162,7 +162,7 @@ export default function CompanyDetail() {
                                 Şık QR Standı Yazdır
                             </button>
                             <a
-                                href={`https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(`${window.location.origin}/ekuafor/book/${company.id}?ref=qr`)}`}
+                                href={`https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(`${window.location.origin}/#/book/${company.id}?ref=qr`)}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="w-full py-3 text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors text-center border-2 border-gray-100 rounded-xl"

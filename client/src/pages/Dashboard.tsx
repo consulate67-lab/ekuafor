@@ -1173,7 +1173,7 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                             </button>
-                            <a href={`https://wa.me/?text=${encodeURIComponent(`Merhaba! 👋\n\nSize özel randevu sayfamdan kolayca randevu oluşturabilirsiniz:\n${window.location.origin}/ekuafor/book/${user.company_id || 1}?staff=${user.id}`)}`} target="_blank" rel="noopener noreferrer" className="card group hover:scale-[1.02] transition-all duration-300 border-green-100">
+                            <a href={`https://wa.me/?text=${encodeURIComponent(`Merhaba! 👋\n\nSize özel randevu sayfamdan kolayca randevu oluşturabilirsiniz:\n${window.location.origin}/#/book/${user.company_id || 1}?staff=${user.id}`)}`} target="_blank" rel="noopener noreferrer" className="card group hover:scale-[1.02] transition-all duration-300 border-green-100">
                                 <div className="flex items-center gap-5">
                                     <div className="bg-green-50 p-4 rounded-2xl group-hover:bg-green-500 group-hover:text-white transition-colors duration-300">
                                         <Plus className="w-8 h-8 text-green-600 group-hover:text-white" />

@@ -238,6 +238,9 @@ const runMigrations = async () => {
                 gender VARCHAR(10),
                 department_id INTEGER,
                 photo TEXT,
+                quantity DECIMAL(10, 2),
+                unit VARCHAR(20),
+                commission_rate DECIMAL(5, 2),
                 is_active BOOLEAN DEFAULT true,
                 is_phone_verified BOOLEAN DEFAULT false,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -700,6 +703,10 @@ const runMigrations = async () => {
 
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS photo TEXT');
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS department_id INTEGER');
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(10)');
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS quantity DECIMAL(10, 2)');
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS unit VARCHAR(20)');
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS commission_rate DECIMAL(5, 2)');
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS title VARCHAR(100) DEFAULT \'Personel\'');
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_phone_verified BOOLEAN DEFAULT false');
         await pool.query('ALTER TABLE customer_devices ADD COLUMN IF NOT EXISTS push_token VARCHAR(255)');
