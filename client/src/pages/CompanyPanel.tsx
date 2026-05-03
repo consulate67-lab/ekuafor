@@ -902,13 +902,21 @@ export default function CompanyPanel() {
     };
 
     const handleAddDepartment = async () => {
-        if (!deptName.trim() || !company) return;
+        if (!company) {
+            alert('Firma bilgileri bulunamadı.');
+            return;
+        }
+        if (!deptName.trim()) {
+            alert('Lütfen departman adını giriniz.');
+            return;
+        }
         try {
             await api.post('/departments', { company_id: company.id, name: deptName.trim() });
             setDeptName('');
             setShowDeptModal(false);
             fetchData(company.id);
         } catch (err: any) {
+            console.error('Department Create Error:', err);
             alert(err.response?.data?.error || 'Departman eklenemedi');
         }
     };
@@ -924,7 +932,21 @@ export default function CompanyPanel() {
     };
 
     const handleCreateStaffBoard = async () => {
-        if (!staffForm.first_name.trim() || !staffForm.last_name.trim() || !company) return;
+        if (!company) {
+            alert('Firma bilgileri bulunamadı. Lütfen oturumu yenileyin.');
+            return;
+        }
+
+        // Validation for required fields
+        if (!staffForm.first_name.trim()) {
+            alert('Lütfen personelin adını giriniz.');
+            return;
+        }
+        if (!staffForm.last_name.trim()) {
+            alert('Lütfen personelin soyadını giriniz.');
+            return;
+        }
+
         setIsCreating(true);
         try {
             const data = {
@@ -950,8 +972,6 @@ export default function CompanyPanel() {
             if (selectedStaffId) {
                 await api.put(`/companies/${company.id}/staff/${selectedStaffId}`, data);
             } else {
-                // The user provided server-side code for logging, which cannot be directly inserted here.
-                // Assuming the intent was to add client-side logging before the API call.
                 console.log('--- Client-side Staff Creation Request ---');
                 console.log('Company ID:', company.id);
                 console.log('Body:', data);
@@ -963,8 +983,9 @@ export default function CompanyPanel() {
             setShowStaffModal(false);
             fetchData(company.id);
         } catch (err: any) {
+            console.error('Staff Action Error:', err);
             const msg = err.response?.data?.error || err.message || 'Personel işlemi gerçekleştirilemedi';
-            alert(msg);
+            alert('Hata: ' + msg);
         } finally {
             setIsCreating(false);
         }
@@ -1076,7 +1097,15 @@ export default function CompanyPanel() {
     };
 
     const handleSaveService = async () => {
-        if (!serviceForm.name.trim() || !company) return;
+        if (!company) {
+            alert('Firma bilgileri bulunamadı.');
+            return;
+        }
+        if (!serviceForm.name.trim()) {
+            alert('Lütfen hizmet adını giriniz.');
+            return;
+        }
+
         setIsSavingService(true);
         const submitData = {
             company_id: company.id,
@@ -1124,7 +1153,14 @@ export default function CompanyPanel() {
     };
 
     const handleSavePackage = async () => {
-        if (!packageForm.name.trim() || !company) return;
+        if (!company) {
+            alert('Firma bilgileri bulunamadı.');
+            return;
+        }
+        if (!packageForm.name.trim()) {
+            alert('Lütfen paket adını giriniz.');
+            return;
+        }
         if (packageForm.items.length === 0) {
             alert('Lütfen en az bir hizmet seçin');
             return;
@@ -1156,6 +1192,7 @@ export default function CompanyPanel() {
             setShowPackageModal(false);
             fetchData(company.id);
         } catch (err: any) {
+            console.error('Package Save Error:', err);
             const errorMsg = err.response?.data?.error || 'Paket kaydedilemedi';
             const details = err.response?.data?.details;
             if (details && Array.isArray(details)) {
