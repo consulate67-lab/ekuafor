@@ -283,7 +283,7 @@ const ft=()=>{};var ue={};/**
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */function Rn(e){I(new b("platform-logger",t=>new Wt(t),"PRIVATE")),I(new b("heartbeat",t=>new On(t),"PRIVATE")),m(X,pe,e),m(X,pe,"esm2020"),m("fire-js","")}Rn("");var Pn="firebase",$n="12.12.0";/**
+ */function Rn(e){I(new b("platform-logger",t=>new Wt(t),"PRIVATE")),I(new b("heartbeat",t=>new On(t),"PRIVATE")),m(X,pe,e),m(X,pe,"esm2020"),m("fire-js","")}Rn("");var Pn="firebase",$n="12.12.1";/**
  * @license
  * Copyright 2020 Google LLC
  *
