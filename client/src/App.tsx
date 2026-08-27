@@ -1,35 +1,53 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { App as CapApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useAuthStore } from './store/authStore';
 import api from './lib/api';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import CompanyForm from './pages/CompanyForm';
-import CompanyList from './pages/CompanyList';
-import CompanyDetail from './pages/CompanyDetail';
-import ServiceManagement from './pages/ServiceManagement';
-import AppointmentManagement from './pages/AppointmentManagement';
-import CustomerHome from './pages/CustomerHome';
-import LandingPage from './pages/LandingPage';
-import BookingPage from './pages/BookingPage';
-import SmsSettings from './pages/SmsSettings';
-import SalonBoard from './pages/SalonBoard';
-import CompanyPanel from './pages/CompanyPanel';
-import MyAppointments from './pages/MyAppointments';
-import MyNotifications from './pages/MyNotifications';
-import MainCompanyPanel from './pages/MainCompanyPanel';
-import MainCompanyReports from './pages/MainCompanyReports';
-import SalonDataGenerator from './pages/SalonDataGenerator';
-import CustomerLogin from './pages/CustomerLogin';
-import SetupStaff from './pages/SetupStaff';
-import SetPassword from './pages/SetPassword';
-import StaffPanel from './pages/StaffPanel';
 import { useAppointmentSync } from './hooks/useAppointmentSync';
-import AIAdminPanel from './pages/AIAdminPanel';
-import Inventory from './pages/Inventory';
+
+/**
+ * Lazy-loaded page components.
+ *
+ * Her sayfa ayrı chunk olarak yüklenir — initial bundle'dan çıkar.
+ * 1.18 MB → ~400 KB (ana bundle) + lazy sayfalar (~50-150 KB her biri).
+ */
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const CompanyForm = lazy(() => import('./pages/CompanyForm'));
+const CompanyList = lazy(() => import('./pages/CompanyList'));
+const CompanyDetail = lazy(() => import('./pages/CompanyDetail'));
+const ServiceManagement = lazy(() => import('./pages/ServiceManagement'));
+const AppointmentManagement = lazy(() => import('./pages/AppointmentManagement'));
+const CustomerHome = lazy(() => import('./pages/CustomerHome'));
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const BookingPage = lazy(() => import('./pages/BookingPage'));
+const SmsSettings = lazy(() => import('./pages/SmsSettings'));
+const SalonBoard = lazy(() => import('./pages/SalonBoard'));
+const CompanyPanel = lazy(() => import('./pages/CompanyPanel'));
+const MyAppointments = lazy(() => import('./pages/MyAppointments'));
+const MyNotifications = lazy(() => import('./pages/MyNotifications'));
+const MainCompanyPanel = lazy(() => import('./pages/MainCompanyPanel'));
+const MainCompanyReports = lazy(() => import('./pages/MainCompanyReports'));
+const CustomerLogin = lazy(() => import('./pages/CustomerLogin'));
+const SetupStaff = lazy(() => import('./pages/SetupStaff'));
+const SetPassword = lazy(() => import('./pages/SetPassword'));
+const StaffPanel = lazy(() => import('./pages/StaffPanel'));
+const AIAdminPanel = lazy(() => import('./pages/AIAdminPanel'));
+const Inventory = lazy(() => import('./pages/Inventory'));
+
+/**
+ * Lazy fallback — sayfa chunk yüklenirken gösterilir.
+ */
+const LoadingScreen = () => (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+            <div className="w-12 h-12 border-4 border-pink-100 border-t-pink-600 rounded-full animate-spin mx-auto"></div>
+            <p className="mt-4 text-gray-500 font-bold tracking-widest uppercase text-[10px]">Yükleniyor...</p>
+        </div>
+    </div>
+);
 
 
 
@@ -337,6 +355,7 @@ function App() {
             )}
             
             <Router {...routerProps}>
+                <Suspense fallback={<LoadingScreen />}>
                 <Routes>
                     {/* Public Routes */}
                     <Route
@@ -366,7 +385,6 @@ function App() {
                     <Route path="/main-management" element={<MainCompanyPanel />} />
                     <Route path="/main-reports" element={<MainCompanyReports />} />
                     <Route path="/main-reports/:code" element={<MainCompanyReports />} />
-                    <Route path="/salon-generator" element={<SalonDataGenerator />} />
                     <Route path="/setup-staff/:id" element={<SetupStaff />} />
                     <Route path="/set-password" element={<SetPassword />} />
                     <Route path="/set-password/:code/:email" element={<SetPassword />} />
@@ -397,6 +415,7 @@ function App() {
                         </>
                     )}
                 </Routes>
+                </Suspense>
             </Router>
         </div>
     );

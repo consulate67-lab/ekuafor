@@ -1,1 +1,0 @@
-src/pages/Dashboard.tsx(352,11): error TS6133: 'startVoiceCommand' is declared but its value is never read.

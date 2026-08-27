@@ -7,12 +7,16 @@ node_modules/
 .env.local
 .env.*.local
 *.env
+!.env.example
 
 # Build outputs
 dist/
 build/
 */dist/
 */build/
+*.tsbuildinfo
+.next/
+out/
 
 # Logs
 logs/
@@ -37,11 +41,36 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 
-# Temporary files
+# Temporary / cleanup
 tmp/
 temp/
 *.tmp
+.trash*/
+.trash-*/
+
+# AI tool state
+.gemini/
 
 # Firebase Service Account (security - never commit!)
 *firebase-adminsdk*.json
 firebase-key.json
+
+# Xenova/transformers local model cache
+model-tr/
+*/model-tr/
+
+# Mobile build artifacts (regenerate via npx cap sync / Android Studio / Xcode)
+*.apk
+*.aab
+*.ipa
+release/
+release_apk/
+
+# tsc error logs (legacy, regenerated on demand)
+tsc_errors.txt
+tsc_output*.txt
+build_errors.txt
+build_error.log
+errors.txt
+error.txt
+ts-error.txt

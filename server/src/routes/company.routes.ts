@@ -478,9 +478,13 @@ router.post('/board-login', async (req: Request, res: Response) => {
         }
 
         const result = await companyService.getAllCompanies(); // Simple lookup for now
-        const company = result.find(c => (c as any).board_key === board_key);
+        const company = result.find(c => {
+            const storedKey = (c as any).board_key;
+            return storedKey && storedKey.trim().toUpperCase() === board_key.trim().toUpperCase();
+        });
 
         if (!company) {
+            console.log('Hatalı Board Giriş Denemesi:', board_key); // Debug için log ekledik
             return res.status(401).json({ success: false, error: 'Geçersiz Board Key' });
         }
 
