@@ -1,4 +1,5 @@
-import pool from '../config/database';
+import { db } from '../db';
+import { sql, eq, and, or, desc, asc, ilike, gte, lte, between, SQL } from 'drizzle-orm';
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
@@ -62,19 +63,36 @@ export interface CurrentAccount {
     balance?: number;
 }
 
+/**
+ * Finance Service — Drizzle ORM.
+ *
+ * ESKİ: raw pg.query() + parametreli SQL + manual pool.connect()/BEGIN/COMMIT
+ * YENİ: db.execute(sql`...`) + db.transaction(async (tx) => {...})
+ *
+ * Pattern:
+ * - snake_case alanlar için `db.execute(sql\`...\`)` kullanılır (schema camelCase
+ *   tanımlı; routes/response alanları snake_case bekliyor)
+ * - Transaction'lar `db.transaction(async (tx) => {...})` ile sarılır
+ * - `tx` objesinin `.execute(sql\`...\`)` metodu raw SQL'i transaction içinde çalıştırır
+ * - Tablo şemasında olmayan alanlar (gib_*, xml_content, source_id, vb.) raw SQL ile yazılır
+ */
 class FinanceService {
     constructor() {
         console.log('[FinanceService] Initialized');
         // Do not auto-run migrations in constructor to avoid pool exhaustion at startup
     }
 
+    /**
+     * Schema-uyumluluk migration'ları — idempotent.
+     * Drizzle ORM kullanılır (db.execute(sql`...`)) ama ham SQL string'leri korunur.
+     * NOT: Proper migration tool zaten db/migrate.ts'de. Buradaki runMigrations artık kullanılmıyor.
+     */
     private async runMigrations() {
-        const client = await pool.connect();
         try {
             console.log('[Migration] Checking for new columns...');
 
             // 1. Companies tablosu güncellemesi
-            const companyCols = [
+            const companyCols: Array<[string, string]> = [
                 ['tax_number', 'VARCHAR(20)'],
                 ['tax_office', 'VARCHAR(100)'],
                 ['city', 'VARCHAR(50)'],
@@ -91,11 +109,11 @@ class FinanceService {
                 ['postal_code', 'VARCHAR(20)']
             ];
             for (const [col, type] of companyCols) {
-                await client.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+                await db.execute(sql.raw(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS ${col} ${type}`));
             }
 
             // 2. Invoices tablosu güncellemesi
-            const invoiceCols = [
+            const invoiceCols: Array<[string, string]> = [
                 ['customer_tax_number', 'VARCHAR(20)'],
                 ['customer_tax_office', 'VARCHAR(100)'],
                 ['customer_id', 'INTEGER REFERENCES users(id) ON DELETE SET NULL'],
@@ -113,22 +131,22 @@ class FinanceService {
                 ['current_account_id', 'INTEGER REFERENCES current_accounts(id) ON DELETE SET NULL']
             ];
             for (const [col, type] of invoiceCols) {
-                await client.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+                await db.execute(sql.raw(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS ${col} ${type}`));
             }
 
             // 3. Services tablosu güncellemesi
-            const serviceCols = [
+            const serviceCols: Array<[string, string]> = [
                 ['department_id', 'INTEGER'],
                 ['quantity', 'NUMERIC'],
                 ['unit', 'VARCHAR(30)'],
                 ['photo', 'TEXT']
             ];
             for (const [col, type] of serviceCols) {
-                await client.query(`ALTER TABLE services ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+                await db.execute(sql.raw(`ALTER TABLE services ADD COLUMN IF NOT EXISTS ${col} ${type}`));
             }
 
             // 4. Users tablosu güncellemesi
-            const userCols = [
+            const userCols: Array<[string, string]> = [
                 ['board_code', 'VARCHAR(20)'],
                 ['gender', 'VARCHAR(20)'],
                 ['department_id', 'INTEGER'],
@@ -137,11 +155,11 @@ class FinanceService {
                 ['unit', 'VARCHAR(30)']
             ];
             for (const [col, type] of userCols) {
-                await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+                await db.execute(sql.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ${col} ${type}`));
             }
 
             // 6. Cash Transactions tablosu güncellemesi
-            const cashCols = [
+            const cashCols: Array<[string, string]> = [
                 ['debit', 'NUMERIC(15,2) DEFAULT 0'],
                 ['credit', 'NUMERIC(15,2) DEFAULT 0'],
                 ['transaction_date', 'DATE DEFAULT CURRENT_DATE'],
@@ -150,21 +168,21 @@ class FinanceService {
                 ['current_account_id', 'INTEGER REFERENCES current_accounts(id) ON DELETE SET NULL']
             ];
             for (const [col, type] of cashCols) {
-                await client.query(`ALTER TABLE cash_transactions ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+                await db.execute(sql.raw(`ALTER TABLE cash_transactions ADD COLUMN IF NOT EXISTS ${col} ${type}`));
             }
 
             // 7. Purchase Invoices tablosu güncellemesi
-            const purchaseCols = [
+            const purchaseCols: Array<[string, string]> = [
                 ['subtotal', 'DECIMAL(15,2) DEFAULT 0'],
                 ['vat_total', 'DECIMAL(15,2) DEFAULT 0'],
                 ['discount_total', 'DECIMAL(15,2) DEFAULT 0'],
                 ['is_closed', 'BOOLEAN DEFAULT TRUE']
             ];
             for (const [col, type] of purchaseCols) {
-                await client.query(`ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+                await db.execute(sql.raw(`ALTER TABLE purchase_invoices ADD COLUMN IF NOT EXISTS ${col} ${type}`));
             }
 
-            await client.query(`
+            await db.execute(sql`
                 CREATE TABLE IF NOT EXISTS purchase_invoice_items (
                     id SERIAL PRIMARY KEY,
                     invoice_id INTEGER REFERENCES purchase_invoices(id) ON DELETE CASCADE,
@@ -182,8 +200,6 @@ class FinanceService {
             console.log('[Migration] Database is up to date.');
         } catch (error) {
             console.error('[Migration] Failed:', error);
-        } finally {
-            client.release();
         }
     }
 
@@ -193,12 +209,11 @@ class FinanceService {
         return date.toISOString().split('T')[0];
     }
 
-
+    /**
+     * Fatura oluştur — transactional (invoice + cash transaction + appointment sync).
+     */
     async createInvoice(invoice: Invoice) {
-        const client = await pool.connect();
-        try {
-            await client.query('BEGIN');
-
+        return await db.transaction(async (tx) => {
             const amount = Number(invoice.amount || 0);
             const vatRate = Number(invoice.vat_rate || 20);
             const discRate = Number(invoice.discount_rate || 0);
@@ -208,26 +223,26 @@ class FinanceService {
             const vat_amount = Number((subtotal * vatRate / 100).toFixed(2));
             const grand_total = Number((subtotal + vat_amount).toFixed(2));
 
-            const query = `
+            // invoices tablosunda schema'da tanımlı olmayan alanlar var (gib_*, vat_rate, vb.)
+            // Bu yüzden raw SQL ile INSERT yapıyoruz — snake_case alan adları doğrudan korunuyor.
+            const result = await tx.execute(sql`
                 INSERT INTO invoices (
                     company_id, appointment_id, customer_id, customer_name, customer_tax_number,
                     customer_tax_office, type, payment_method, amount, 
                     vat_rate, vat_amount, discount_rate, discount_amount, grand_total,
                     status, gib_status, current_account_id
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+                ) VALUES (
+                    ${invoice.company_id}, ${invoice.appointment_id ?? null}, ${invoice.customer_id ?? null}, ${invoice.customer_name},
+                    ${invoice.customer_tax_number ?? null}, ${invoice.customer_tax_office ?? null},
+                    ${invoice.type}, ${invoice.payment_method}, ${amount},
+                    ${vatRate}, ${vat_amount}, ${discRate}, ${discount_amount}, ${grand_total},
+                    'completed', 'not_sent', ${invoice.current_account_id ?? null}
+                )
                 RETURNING *
-            `;
-            const values = [
-                invoice.company_id, invoice.appointment_id, invoice.customer_id, invoice.customer_name,
-                invoice.customer_tax_number, invoice.customer_tax_office,
-                invoice.type, invoice.payment_method, amount,
-                vatRate, vat_amount, discRate, discount_amount, grand_total,
-                'completed', 'not_sent', invoice.current_account_id || null
-            ];
-            const result = await client.query(query, values);
-            const newInvoice = result.rows[0];
+            `);
+            const newInvoice = (result.rows as any[])[0];
 
-            await this.createCashTransactionInternal(client, {
+            await this.createCashTransactionInternal(tx, {
                 company_id: invoice.company_id,
                 type: 'income',
                 category: 'sales',
@@ -244,175 +259,182 @@ class FinanceService {
             });
 
             if (invoice.appointment_id) {
-                await client.query(
-                    "UPDATE appointments SET status = 'invoiced', collected_price = COALESCE(collected_price, $2), payment_method = COALESCE(payment_method, $3) WHERE id = $1",
-                    [invoice.appointment_id, grand_total, invoice.payment_method]
-                );
-                
+                await tx.execute(sql`
+                    UPDATE appointments
+                    SET status = 'invoiced',
+                        collected_price = COALESCE(collected_price, ${grand_total}),
+                        payment_method = COALESCE(payment_method, ${invoice.payment_method})
+                    WHERE id = ${invoice.appointment_id}
+                `);
+
                 // Sync to appointment_services for reports
-                const servicesRes = await client.query('SELECT id, price FROM appointment_services WHERE appointment_id = $1', [invoice.appointment_id]);
-                const services = servicesRes.rows;
-                
+                const servicesRes = await tx.execute(sql`
+                    SELECT id, price FROM appointment_services WHERE appointment_id = ${invoice.appointment_id}
+                `);
+                const services = (servicesRes.rows as any[]) || [];
+
                 if (services.length === 1) {
-                    await client.query("UPDATE appointment_services SET price = $1, status = 'completed' WHERE id = $2", [grand_total, services[0].id]);
+                    await tx.execute(sql`
+                        UPDATE appointment_services SET price = ${grand_total}, status = 'completed' WHERE id = ${services[0].id}
+                    `);
                 } else if (services.length > 1) {
                     const currentSum = services.reduce((sum, s) => sum + Number(s.price || 0), 0);
                     const finalPrice = Number(grand_total);
                     if (currentSum > 0) {
                         for (const s of services) {
                             const distributed = (Number(s.price || 0) / currentSum) * finalPrice;
-                            await client.query("UPDATE appointment_services SET price = $1, status = 'completed' WHERE id = $2", [distributed, s.id]);
+                            await tx.execute(sql`
+                                UPDATE appointment_services SET price = ${distributed}, status = 'completed' WHERE id = ${s.id}
+                            `);
                         }
                     } else {
                         const distributed = finalPrice / services.length;
-                        await client.query("UPDATE appointment_services SET price = $1, status = 'completed' WHERE appointment_id = $2", [distributed, invoice.appointment_id]);
+                        await tx.execute(sql`
+                            UPDATE appointment_services SET price = ${distributed}, status = 'completed' WHERE appointment_id = ${invoice.appointment_id}
+                        `);
                     }
                 }
             }
 
-            await client.query('COMMIT');
             return newInvoice;
-        } catch (error) {
-            await client.query('ROLLBACK');
-            throw error;
-        } finally {
-            client.release();
-        }
+        });
     }
 
-    async createCashTransactionInternal(client: any, transaction: any) {
-        const query = `
+    /**
+     * Kasa hareketi ekle (transaction içi versiyon).
+     * `executor` parametresi db veya tx olabilir; her ikisinin de .execute(sql`...`) metodu var.
+     */
+    private async createCashTransactionInternal(executor: any, transaction: any) {
+        const result = await executor.execute(sql`
             INSERT INTO cash_transactions (
-                company_id, type, category, payment_method, amount, debit, credit, description, transaction_date, due_date, source_id, source_type, current_account_id
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                company_id, type, category, payment_method, amount, debit, credit,
+                description, transaction_date, due_date, source_id, source_type, current_account_id
+            ) VALUES (
+                ${transaction.company_id}, ${transaction.type}, ${transaction.category},
+                ${transaction.payment_method}, ${transaction.amount},
+                ${transaction.debit ?? 0}, ${transaction.credit ?? 0},
+                ${transaction.description ?? null},
+                ${transaction.transaction_date ?? sql`CURRENT_DATE`},
+                ${transaction.due_date ?? null},
+                ${transaction.source_id ?? null},
+                ${transaction.source_type ?? null},
+                ${transaction.current_account_id ?? null}
+            )
             RETURNING *
-        `;
-        const values = [
-            transaction.company_id, transaction.type, transaction.category,
-            transaction.payment_method, transaction.amount,
-            transaction.debit || 0, transaction.credit || 0,
-            transaction.description,
-            transaction.transaction_date || new Date().toISOString().split('T')[0],
-            transaction.due_date,
-            transaction.source_id,
-            transaction.source_type,
-            transaction.current_account_id || null
-        ];
-        return await client.query(query, values);
+        `);
+        return result;
     }
 
+    /**
+     * Kasa hareketi ekle (standalone — kendi transaction'ı).
+     */
     async createCashTransaction(transaction: CashTransaction) {
-        const client = await pool.connect();
-        try {
-            const result = await this.createCashTransactionInternal(client, transaction);
-            return result.rows[0];
-        } finally {
-            client.release();
-        }
+        const result = await this.createCashTransactionInternal(db, transaction);
+        return (result.rows as any[])[0];
     }
 
+    /**
+     * Kasa hareketlerini listele (tarih filtresi + devir bakiyesi ile).
+     */
     async getCashTransactions(companyId: number, startDate?: string, endDate?: string, search?: string) {
-        // Calculate Opening Balance (Devir) - Balance before startDate
+        // Opening Balance (Devir) - Balance before startDate
         let openingBalance = 0;
         if (startDate) {
-            const obResult = await pool.query(
-                `SELECT COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) as balance 
-                 FROM cash_transactions 
-                 WHERE company_id = $1 AND transaction_date < $2`,
-                [companyId, startDate]
-            );
-            openingBalance = Number(obResult.rows[0].balance);
+            const obResult = await db.execute(sql`
+                SELECT COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) as balance 
+                FROM cash_transactions 
+                WHERE company_id = ${companyId} AND transaction_date < ${startDate}
+            `);
+            openingBalance = Number((obResult.rows as any[])[0]?.balance || 0);
         }
 
-        let query = 'SELECT * FROM cash_transactions WHERE company_id = $1';
-        const values: any[] = [companyId];
-        let i = 2;
-
+        // Dinamik WHERE — sql template içinde condition birleştirme
+        const conditions: SQL[] = [eq(sql`cash_transactions.company_id`, companyId)];
         if (startDate && endDate) {
-            query += ` AND transaction_date BETWEEN $${i} AND $${i + 1}`;
-            values.push(startDate, endDate);
-            i += 2;
+            conditions.push(between(sql`cash_transactions.transaction_date`, startDate, endDate));
         }
-
         if (search) {
-            query += ` AND (description ILIKE $${i} OR category ILIKE $${i} OR payment_method ILIKE $${i})`;
-            values.push(`%${search}%`);
-            i++;
+            conditions.push(or(
+                ilike(sql`cash_transactions.description`, `%${search}%`),
+                ilike(sql`cash_transactions.category`, `%${search}%`),
+                ilike(sql`cash_transactions.payment_method`, `%${search}%`)
+            )!);
         }
 
-        query += ' ORDER BY transaction_date DESC, created_at DESC';
-        const result = await pool.query(query, values);
+        const result = await db.execute(sql`
+            SELECT * FROM cash_transactions
+            WHERE ${and(...conditions)}
+            ORDER BY transaction_date DESC, created_at DESC
+        `);
+
         return {
-            transactions: result.rows,
+            transactions: result.rows as any[],
             openingBalance
         };
     }
 
+    /**
+     * Aylık kasa bakiyesi — nakit gelir-gider + kart bekleyen.
+     */
     async getMonthlyBalance(companyId: number) {
-        const query = `
+        const result = await db.execute(sql`
             SELECT 
                 SUM(CASE WHEN type = 'income' AND payment_method = 'nakit' THEN COALESCE(debit, amount) ELSE 0 END) as total_cash_income,
                 SUM(CASE WHEN type = 'expense' AND payment_method = 'nakit' THEN COALESCE(credit, amount) ELSE 0 END) as total_cash_expense,
                 SUM(CASE WHEN payment_method = 'kart' THEN COALESCE(debit, amount) ELSE 0 END) as total_card_transactions
             FROM cash_transactions 
-            WHERE company_id = $1 AND transaction_date >= date_trunc('month', CURRENT_DATE)
-        `;
-        const result = await pool.query(query, [companyId]);
-        const row = result.rows[0];
+            WHERE company_id = ${companyId} AND transaction_date >= date_trunc('month', CURRENT_DATE)
+        `);
+        const row = (result.rows as any[])[0];
         return {
             cash_balance: Number(row.total_cash_income || 0) - Number(row.total_cash_expense || 0),
             pending_card: Number(row.total_card_transactions || 0)
         };
     }
 
+    /**
+     * Alış faturası oluştur — transactional.
+     */
     async createPurchaseInvoice(data: any) {
-        const client = await pool.connect();
-        try {
-            await client.query('BEGIN');
-
+        return await db.transaction(async (tx) => {
             const subtotal = data.items?.reduce((sum: number, item: any) => sum + (Number(item.unit_price) * Number(item.quantity)), 0) || 0;
             const discount_total = data.items?.reduce((sum: number, item: any) => sum + (Number(item.discount_amount) || 0), 0) || 0;
             const vat_total = data.items?.reduce((sum: number, item: any) => sum + (Number(item.vat_amount) || 0), 0) || 0;
             const amount = subtotal - discount_total + vat_total;
+            const isClosed = data.is_closed !== false;
 
-            const query = `
-                INSERT INTO purchase_invoices (company_id, supplier_name, current_account_id, invoice_no, amount, subtotal, vat_total, discount_total, invoice_date, description, is_closed)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            const result = await tx.execute(sql`
+                INSERT INTO purchase_invoices (
+                    company_id, supplier_name, current_account_id, invoice_no, amount,
+                    subtotal, vat_total, discount_total, invoice_date, description, is_closed
+                ) VALUES (
+                    ${data.company_id}, ${data.supplier_name}, ${data.current_account_id ?? null},
+                    ${data.invoice_no}, ${amount}, ${subtotal}, ${vat_total}, ${discount_total},
+                    ${data.invoice_date ?? sql`CURRENT_DATE`}, ${data.description ?? null}, ${isClosed}
+                )
                 RETURNING *
-            `;
-            const values = [
-                data.company_id,
-                data.supplier_name,
-                data.current_account_id || null,
-                data.invoice_no,
-                amount,
-                subtotal,
-                vat_total,
-                discount_total,
-                data.invoice_date || new Date().toISOString().split('T')[0],
-                data.description,
-                data.is_closed !== false
-            ];
-            const result = await client.query(query, values);
-            const newInvoice = result.rows[0];
+            `);
+            const newInvoice = (result.rows as any[])[0];
             const invoiceId = newInvoice.id;
 
             if (data.items && Array.isArray(data.items)) {
                 for (const item of data.items) {
-                    await client.query(`
+                    await tx.execute(sql`
                         INSERT INTO purchase_invoice_items (
-                            invoice_id, product_name, quantity, unit_price, 
+                            invoice_id, product_name, quantity, unit_price,
                             vat_rate, vat_amount, discount_rate, discount_amount, total_amount
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                    `, [
-                        invoiceId, item.product_name, item.quantity, item.unit_price,
-                        item.vat_rate, item.vat_amount, item.discount_rate, item.discount_amount, item.total_amount
-                    ]);
+                        ) VALUES (
+                            ${invoiceId}, ${item.product_name}, ${item.quantity}, ${item.unit_price},
+                            ${item.vat_rate ?? null}, ${item.vat_amount ?? null},
+                            ${item.discount_rate ?? null}, ${item.discount_amount ?? null},
+                            ${item.total_amount ?? null}
+                        )
+                    `);
                 }
             }
 
-            if (data.is_closed !== false) {
-                await this.createCashTransactionInternal(client, {
+            if (isClosed) {
+                await this.createCashTransactionInternal(tx, {
                     company_id: data.company_id,
                     type: 'expense',
                     category: 'purchase',
@@ -428,91 +450,100 @@ class FinanceService {
                 });
             }
 
-            await client.query('COMMIT');
-            return result.rows[0];
-        } catch (error) {
-            await client.query('ROLLBACK');
-            throw error;
-        } finally {
-            client.release();
-        }
+            return newInvoice;
+        });
     }
 
+    /**
+     * Alış faturalarını listele (tarih + arama filtresi ile).
+     */
     async getPurchaseInvoices(companyId: number, startDate?: string, endDate?: string, search?: string) {
-        let query = 'SELECT * FROM purchase_invoices WHERE company_id = $1';
-        const values: any[] = [companyId];
-        let i = 2;
-
+        const conditions: SQL[] = [eq(sql`company_id`, companyId)];
         if (startDate && endDate) {
-            query += ` AND invoice_date BETWEEN $${i} AND $${i + 1}`;
-            values.push(startDate, endDate);
-            i += 2;
+            conditions.push(between(sql`invoice_date`, startDate, endDate));
         }
-
         if (search) {
-            query += ` AND (supplier_name ILIKE $${i} OR invoice_no ILIKE $${i} OR description ILIKE $${i})`;
-            values.push(`%${search}%`);
-            i++;
+            conditions.push(or(
+                ilike(sql`supplier_name`, `%${search}%`),
+                ilike(sql`invoice_no`, `%${search}%`),
+                ilike(sql`description`, `%${search}%`)
+            )!);
         }
 
-        query += ' ORDER BY invoice_date DESC';
-        const result = await pool.query(query, values);
-        return result.rows;
+        const result = await db.execute(sql`
+            SELECT * FROM purchase_invoices
+            WHERE ${and(...conditions)}
+            ORDER BY invoice_date DESC
+        `);
+        return result.rows as any[];
     }
 
+    /**
+     * Alış faturasını item'larıyla getir.
+     */
     async getPurchaseInvoiceById(id: number, companyId: number) {
-        const invoice = await pool.query('SELECT * FROM purchase_invoices WHERE id = $1 AND company_id = $2', [id, companyId]);
-        if (invoice.rows.length === 0) return null;
+        const invoiceRes = await db.execute(sql`
+            SELECT * FROM purchase_invoices WHERE id = ${id} AND company_id = ${companyId}
+        `);
+        const invoiceRows = invoiceRes.rows as any[];
+        if (invoiceRows.length === 0) return null;
 
-        const items = await pool.query('SELECT * FROM purchase_invoice_items WHERE invoice_id = $1', [id]);
+        const items = await db.execute(sql`
+            SELECT * FROM purchase_invoice_items WHERE invoice_id = ${id}
+        `);
 
         return {
-            ...invoice.rows[0],
-            items: items.rows
+            ...invoiceRows[0],
+            items: items.rows as any[]
         };
     }
 
+    /**
+     * Satış faturalarını listele (müşteri JOIN ile).
+     */
     async getInvoices(companyId: number, startDate?: string, endDate?: string, search?: string) {
-        let query = `
+        const conditions: SQL[] = [eq(sql`i.company_id`, companyId)];
+        if (startDate && endDate) {
+            conditions.push(between(sql`i.created_at::date`, startDate, endDate));
+        }
+        if (search) {
+            conditions.push(or(
+                ilike(sql`i.customer_name`, `%${search}%`),
+                ilike(sql`i.invoice_no`, `%${search}%`),
+                ilike(sql`u.first_name`, `%${search}%`),
+                ilike(sql`u.last_name`, `%${search}%`)
+            )!);
+        }
+
+        const result = await db.execute(sql`
             SELECT i.*, u.first_name, u.last_name, u.phone as u_phone 
             FROM invoices i
             LEFT JOIN users u ON i.customer_id = u.id
-            WHERE i.company_id = $1
-        `;
-        const values: any[] = [companyId];
-        let i = 2;
-
-        if (startDate && endDate) {
-            query += ` AND i.created_at::date BETWEEN $${i} AND $${i + 1}`;
-            values.push(startDate, endDate);
-            i += 2;
-        }
-
-        if (search) {
-            query += ` AND (i.customer_name ILIKE $${i} OR i.invoice_no ILIKE $${i} OR u.first_name ILIKE $${i} OR u.last_name ILIKE $${i})`;
-            values.push(`%${search}%`);
-            i++;
-        }
-
-        query += ' ORDER BY i.created_at DESC';
-        const result = await pool.query(query, values);
-        return result.rows;
+            WHERE ${and(...conditions)}
+            ORDER BY i.created_at DESC
+        `);
+        return result.rows as any[];
     }
 
+    /**
+     * Tek satış faturası.
+     */
     async getInvoiceById(invoiceId: number, companyId: number) {
-        const result = await pool.query(
-            'SELECT * FROM invoices WHERE id = $1 AND company_id = $2',
-            [invoiceId, companyId]
-        );
-        return result.rows[0] || null;
+        const result = await db.execute(sql`
+            SELECT * FROM invoices WHERE id = ${invoiceId} AND company_id = ${companyId}
+        `);
+        return ((result.rows as any[])[0]) || null;
     }
 
+    /**
+     * Faturayı GİB'e gönderilmek üzere hazırla (XML üret + DB'ye yaz).
+     */
     async prepareInvoice(invoiceId: number, companyId: number) {
         const invoice = await this.getInvoiceById(invoiceId, companyId);
         if (!invoice) throw new Error('Fatura bulunamadı');
 
-        const companyRes = await pool.query('SELECT * FROM companies WHERE id = $1', [companyId]);
-        const company = companyRes.rows[0];
+        const companyRes = await db.execute(sql`SELECT * FROM companies WHERE id = ${companyId}`);
+        const company = (companyRes.rows as any[])[0];
 
         const prefix = company?.invoice_prefix || 'GIB';
         const year = new Date().getFullYear();
@@ -524,12 +555,14 @@ class FinanceService {
         const xsltContent = await this.getXSLT(invoice.type);
         const ublXml = this.generateUBLTR(invoice, company, invoiceNo, gibUUID, xsltContent);
 
-        const updated = await pool.query(
-            `UPDATE invoices SET invoice_no = $1, gib_uuid = $2, gib_status = 'ready', xml_content = $3 WHERE id = $4 RETURNING *`,
-            [invoiceNo, gibUUID, ublXml, invoiceId]
-        );
+        const updated = await db.execute(sql`
+            UPDATE invoices
+            SET invoice_no = ${invoiceNo}, gib_uuid = ${gibUUID}, gib_status = 'ready', xml_content = ${ublXml}
+            WHERE id = ${invoiceId}
+            RETURNING *
+        `);
 
-        return updated.rows[0];
+        return (updated.rows as any[])[0];
     }
 
     async getXSLT(type: string): Promise<string> {
@@ -546,16 +579,19 @@ class FinanceService {
         }
     }
 
+    /**
+     * Faturayı GİB'e gönder (QNB entegrasyonu — dış API).
+     */
     async sendToGIB(invoiceId: number, companyId: number) {
         const invoice = await this.getInvoiceById(invoiceId, companyId);
         if (!invoice) throw new Error('Fatura bulunamadı');
         if (invoice.gib_status === 'success') throw new Error('Bu fatura zaten başarıyla gönderildi');
 
-        await pool.query("UPDATE invoices SET gib_status = 'pending' WHERE id = $1", [invoiceId]);
+        await db.execute(sql`UPDATE invoices SET gib_status = 'pending' WHERE id = ${invoiceId}`);
 
         try {
-            const companyResult = await pool.query('SELECT * FROM companies WHERE id = $1', [companyId]);
-            const companyInfo = companyResult.rows[0];
+            const companyResult = await db.execute(sql`SELECT * FROM companies WHERE id = ${companyId}`);
+            const companyInfo = (companyResult.rows as any[])[0];
 
             const QNB_CONFIG = {
                 username: companyInfo.qnb_username || 'USERNAME_PLACEHOLDER',
@@ -571,15 +607,14 @@ class FinanceService {
             // Simulated response for now
             await new Promise(r => setTimeout(r, 1500));
 
-            const updated = await pool.query(
-                `UPDATE invoices SET gib_status = 'success', gib_sent_at = NOW() WHERE id = $1 RETURNING *`,
-                [invoiceId]
-            );
+            const updated = await db.execute(sql`
+                UPDATE invoices SET gib_status = 'success', gib_sent_at = NOW() WHERE id = ${invoiceId} RETURNING *
+            `);
 
-            return { success: true, uuid: invoice.gib_uuid, invoice: updated.rows[0] };
+            return { success: true, uuid: invoice.gib_uuid, invoice: (updated.rows as any[])[0] };
 
         } catch (error: any) {
-            await pool.query("UPDATE invoices SET gib_status = 'failed' WHERE id = $1", [invoiceId]);
+            await db.execute(sql`UPDATE invoices SET gib_status = 'failed' WHERE id = ${invoiceId}`);
             throw new Error(`QNB Entegrasyon Hatası: ${error.message}`);
         }
     }
@@ -713,13 +748,18 @@ class FinanceService {
 </Invoice>`;
     }
 
+    /**
+     * Fatura HTML önizleme (client-side XSLT transform).
+     */
     async getInvoiceHTML(invoiceId: number, companyId: number): Promise<string> {
-        const invoiceRes = await pool.query('SELECT * FROM invoices WHERE id = $1 AND company_id = $2', [invoiceId, companyId]);
-        const inv = invoiceRes.rows[0];
+        const invoiceRes = await db.execute(sql`
+            SELECT * FROM invoices WHERE id = ${invoiceId} AND company_id = ${companyId}
+        `);
+        const inv = (invoiceRes.rows as any[])[0];
         if (!inv) throw new Error('Fatura bulunamadı');
 
-        const companyRes = await pool.query('SELECT * FROM companies WHERE id = $1', [companyId]);
-        const comp = companyRes.rows[0];
+        const companyRes = await db.execute(sql`SELECT * FROM companies WHERE id = ${companyId}`);
+        const comp = (companyRes.rows as any[])[0];
 
         // XML Content exists? If not, prepare it temporarily
         let xmlContent = inv.xml_content;
@@ -807,117 +847,132 @@ class FinanceService {
 </html>`;
     }
 
+    /**
+     * Satış faturasını sil (transactional).
+     */
     async deleteInvoice(invoiceId: number, companyId: number) {
-        const client = await pool.connect();
-        try {
-            await client.query('BEGIN');
-
-            const invoiceRes = await client.query('SELECT * FROM invoices WHERE id = $1 AND company_id = $2', [invoiceId, companyId]);
-            if (invoiceRes.rows.length === 0) throw new Error('Fatura bulunamadı');
-            const inv = invoiceRes.rows[0];
+        return await db.transaction(async (tx) => {
+            const invoiceRes = await tx.execute(sql`
+                SELECT * FROM invoices WHERE id = ${invoiceId} AND company_id = ${companyId}
+            `);
+            const invoiceRows = invoiceRes.rows as any[];
+            if (invoiceRows.length === 0) throw new Error('Fatura bulunamadı');
+            const inv = invoiceRows[0];
 
             // Revert appointment status
             if (inv.appointment_id) {
-                await client.query("UPDATE appointments SET status = 'completed' WHERE id = $1", [inv.appointment_id]);
+                await tx.execute(sql`UPDATE appointments SET status = 'completed' WHERE id = ${inv.appointment_id}`);
             }
 
             // Remove associated cash transactions
-            await client.query(
-                "DELETE FROM cash_transactions WHERE company_id = $1 AND source_id = $2 AND source_type = 'sales_invoice'",
-                [companyId, invoiceId]
-            );
+            await tx.execute(sql`
+                DELETE FROM cash_transactions
+                WHERE company_id = ${companyId} AND source_id = ${invoiceId} AND source_type = 'sales_invoice'
+            `);
 
-            await client.query('DELETE FROM invoices WHERE id = $1', [invoiceId]);
+            await tx.execute(sql`DELETE FROM invoices WHERE id = ${invoiceId}`);
 
-            await client.query('COMMIT');
             return true;
-        } catch (error) {
-            await client.query('ROLLBACK');
-            throw error;
-        } finally {
-            client.release();
-        }
+        });
     }
 
+    /**
+     * Alış faturasını sil (transactional).
+     */
     async deletePurchaseInvoice(id: number, companyId: number) {
-        const client = await pool.connect();
-        try {
-            await client.query('BEGIN');
-
-            const res = await client.query('SELECT * FROM purchase_invoices WHERE id = $1 AND company_id = $2', [id, companyId]);
-            if (res.rows.length === 0) throw new Error('Alış faturası bulunamadı');
-            const p = res.rows[0];
+        return await db.transaction(async (tx) => {
+            const res = await tx.execute(sql`
+                SELECT * FROM purchase_invoices WHERE id = ${id} AND company_id = ${companyId}
+            `);
+            const rows = res.rows as any[];
+            if (rows.length === 0) throw new Error('Alış faturası bulunamadı');
+            const p = rows[0];
 
             // Remove matching cash transaction if it was closed
             if (p.is_closed) {
-                await client.query(
-                    "DELETE FROM cash_transactions WHERE company_id = $1 AND source_id = $2 AND source_type = 'purchase_invoice'",
-                    [companyId, id]
-                );
+                await tx.execute(sql`
+                    DELETE FROM cash_transactions
+                    WHERE company_id = ${companyId} AND source_id = ${id} AND source_type = 'purchase_invoice'
+                `);
             }
 
-            await client.query('DELETE FROM purchase_invoices WHERE id = $1', [id]);
+            await tx.execute(sql`DELETE FROM purchase_invoices WHERE id = ${id}`);
 
-            await client.query('COMMIT');
             return true;
-        } catch (error) {
-            await client.query('ROLLBACK');
-            throw error;
-        } finally {
-            client.release();
-        }
+        });
     }
 
+    /**
+     * Kasa hareketini sil.
+     */
     async deleteCashTransaction(id: number, companyId: number) {
-        const result = await pool.query('DELETE FROM cash_transactions WHERE id = $1 AND company_id = $2', [id, companyId]);
+        const result = await db.execute(sql`
+            DELETE FROM cash_transactions WHERE id = ${id} AND company_id = ${companyId}
+        `);
         if (result.rowCount === 0) throw new Error('İşlem bulunamadı');
         return true;
     }
 
     // Current Accounts (Cari Kartlar)
+    /**
+     * Cari hesap (müşteri/tedarikçi) oluştur.
+     */
     async createCurrentAccount(data: CurrentAccount) {
-        const query = `
+        const result = await db.execute(sql`
             INSERT INTO current_accounts (
                 company_id, code, name, title, tax_office, tax_number, type,
                 phone, email, website, address_line, city, district, country
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            ) VALUES (
+                ${data.company_id}, ${data.code ?? null}, ${data.name}, ${data.title ?? null},
+                ${data.tax_office ?? null}, ${data.tax_number ?? null},
+                ${data.type ?? 'ALL'},
+                ${data.phone ?? null}, ${data.email ?? null}, ${data.website ?? null},
+                ${data.address_line ?? null}, ${data.city ?? null}, ${data.district ?? null},
+                ${data.country ?? 'Türkiye'}
+            )
             RETURNING *
-        `;
-        const values = [
-            data.company_id, data.code, data.name, data.title, data.tax_office, data.tax_number, data.type || 'ALL',
-            data.phone, data.email, data.website, data.address_line, data.city, data.district, data.country || 'Türkiye'
-        ];
-        const result = await pool.query(query, values);
-        return result.rows[0];
+        `);
+        return (result.rows as any[])[0];
     }
 
+    /**
+     * Cari hesap güncelle (partial update — dinamik SET listesi).
+     */
     async updateCurrentAccount(id: number, companyId: number, data: Partial<CurrentAccount>) {
-        const fields: string[] = [];
-        const values: any[] = [];
-        let i = 1;
+        const excludedFields = ['id', 'company_id', 'created_at', 'updated_at', 'balance'];
+        const entries = Object.entries(data).filter(([key, value]) =>
+            !excludedFields.includes(key) && value !== undefined
+        );
 
-        const excludedFields = ['id', 'company_id', 'created_at', 'updated_at'];
-        Object.entries(data).forEach(([key, value]) => {
-            if (!excludedFields.includes(key) && value !== undefined) {
-                fields.push(`${key} = $${i}`);
-                values.push(value);
-                i++;
-            }
-        });
+        if (entries.length === 0) {
+            // No fields to update — just return current row
+            return await this.getCurrentAccountById(id, companyId);
+        }
 
-        values.push(id, companyId);
-        const query = `
-            UPDATE current_accounts 
-            SET ${fields.join(', ')}, updated_at = NOW()
-            WHERE id = $${i} AND company_id = $${i + 1}
+        // Dinamik SET listesi — sütun adları whitelist'ten geliyor (user input değil),
+        // sql.raw ile sütun adı güvenli şekilde enjekte edilir, value parameterised
+        const setParts: SQL[] = entries.map(([key, value]) =>
+            sql`${sql.raw(key)} = ${value as any}`
+        );
+
+        const result = await db.execute(sql`
+            UPDATE current_accounts
+            SET ${sql.join(setParts, sql`, `)}, updated_at = NOW()
+            WHERE id = ${id} AND company_id = ${companyId}
             RETURNING *
-        `;
-        const result = await pool.query(query, values);
-        return result.rows[0];
+        `);
+        return (result.rows as any[])[0];
     }
 
+    /**
+     * Cari hesapları listele (bakiye hesabı ile — correlated subqueries).
+     */
     async getCurrentAccounts(companyId: number, search?: string) {
-        let query = `
+        const searchFilter = search
+            ? sql`AND (ca.name ILIKE ${'%' + search + '%'} OR ca.code ILIKE ${'%' + search + '%'} OR ca.tax_number ILIKE ${'%' + search + '%'} OR ca.title ILIKE ${'%' + search + '%'})`
+            : sql``;
+
+        const result = await db.execute(sql`
             SELECT ca.*,
                 (
                     COALESCE((SELECT SUM(grand_total) FROM invoices WHERE current_account_id = ca.id), 0) -
@@ -926,31 +981,36 @@ class FinanceService {
                     COALESCE((SELECT SUM(debit) FROM cash_transactions WHERE current_account_id = ca.id), 0)
                 ) as balance
             FROM current_accounts ca
-            WHERE ca.company_id = $1 AND ca.is_active = true
-        `;
-        const values: any[] = [companyId];
-
-        if (search) {
-            query += ' AND (name ILIKE $2 OR code ILIKE $2 OR tax_number ILIKE $2 OR title ILIKE $2)';
-            values.push(`%${search}%`);
-        }
-
-        query += ' ORDER BY name ASC';
-        const result = await pool.query(query, values);
-        return result.rows;
+            WHERE ca.company_id = ${companyId} AND ca.is_active = true
+            ${searchFilter}
+            ORDER BY ca.name ASC
+        `);
+        return result.rows as any[];
     }
 
+    /**
+     * Tek cari hesap.
+     */
     async getCurrentAccountById(id: number, companyId: number) {
-        const result = await pool.query('SELECT * FROM current_accounts WHERE id = $1 AND company_id = $2', [id, companyId]);
-        return result.rows[0] || null;
+        const result = await db.execute(sql`
+            SELECT * FROM current_accounts WHERE id = ${id} AND company_id = ${companyId}
+        `);
+        return ((result.rows as any[])[0]) || null;
     }
 
+    /**
+     * Cari hesap soft delete.
+     */
     async deleteCurrentAccount(id: number, companyId: number) {
-        // Soft delete
-        const result = await pool.query('UPDATE current_accounts SET is_active = false WHERE id = $1 AND company_id = $2', [id, companyId]);
+        const result = await db.execute(sql`
+            UPDATE current_accounts SET is_active = false WHERE id = ${id} AND company_id = ${companyId}
+        `);
         return result.rowCount ? result.rowCount > 0 : false;
     }
 
+    /**
+     * VKN/TCKN üzerinden e-fatura mükellefi sorgula (external API).
+     */
     async checkEInvoiceUser(vkn: string, companyId: number) {
         try {
             // Canlı API üzerinden sorgulama (Public lookup service)
