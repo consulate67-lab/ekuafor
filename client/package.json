@@ -12,7 +12,10 @@
         "deploy": "gh-pages -d dist",
         "mobile:sync": "cross-env VITE_BASE=/ npm run build && npx cap sync",
         "mobile:open:android": "npx cap open android",
-        "mobile:open:ios": "npx cap open ios"
+        "mobile:open:ios": "npx cap open ios",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:cov": "vitest run --coverage"
     },
     "dependencies": {
         "@capacitor/android": "^8.1.0",

@@ -9,14 +9,8 @@ dotenv.config();
  * Server başlarken tüm gerekli env değişkenleri validate edilir. Hata varsa
  * process.exit(1) ile çıkılır — uygulama başlamaz.
  *
- * ÖNEMLİ: Production'da bu dosya her import edildiğinde validate çalışır.
- * Bu nedenle en üstte import edilir.
- *
- * Fail-fast örnekleri:
- * - JWT_SECRET tanımsız → exit
- * - JWT_SECRET < 32 karakter → exit
- * - DATABASE_URL + DB_* hiçbiri yok → exit
- * - NODE_ENV development dışında + ALLOWED_ORIGINS '*' → exit (CORS riski)
+ * `parseEnv(process.env)` test'lerden de çağrılabilir (NodeJS.ProcessEnv alır,
+ * module-level side effect yapmaz).
  */
 
 const serverSchema = z.object({
@@ -70,42 +64,78 @@ const serverSchema = z.object({
     REDIS_URL: z.string().url().optional(),
 });
 
-const parsed = serverSchema.safeParse(process.env);
-
-if (!parsed.success) {
-    console.error('\n❌ Environment validation failed:\n');
-    console.error(parsed.error.format());
-    console.error('\n💡 Çözüm önerileri:');
-    console.error('  - .env dosyası oluştur (.env.example\'dan kopyala)');
-    console.error('  - JWT_SECRET üret: openssl rand -hex 32');
-    console.error('  - DB bilgileri: DATABASE_URL veya DB_HOST+DB_NAME+DB_USER\n');
-    process.exit(1);
-}
-
-// === Refine: DATABASE_URL veya DB_* zorunlu ===
-if (!parsed.data.DATABASE_URL && (!parsed.data.DB_HOST || !parsed.data.DB_NAME || !parsed.data.DB_USER)) {
-    console.error('❌ DATABASE_URL veya DB_HOST + DB_NAME + DB_USER zorunlu');
-    process.exit(1);
-}
-
-// === Refine: Production'da ALLOWED_ORIGINS '*' içermemeli ===
-const isProduction = parsed.data.NODE_ENV === 'production';
-if (isProduction && parsed.data.ALLOWED_ORIGINS.includes('*')) {
-    console.error('❌ NODE_ENV=production iken ALLOWED_ORIGINS \'*\' içeremez');
-    console.error('   Production\'da spesifik origin belirtin (örn: https://app.example.com)');
-    process.exit(1);
-}
-
-export const env = parsed.data;
 export type Env = z.infer<typeof serverSchema>;
 
+/**
+ * Process env'i parse eder, validate eder, fail-fast.
+ *
+ * - JWT_SECRET < 32 karakter → throw
+ * - DATABASE_URL veya DB_HOST+DB_NAME+DB_USER yok → throw
+ * - Production + ALLOWED_ORIGINS='*' → throw
+ */
+export function parseEnv(env: NodeJS.ProcessEnv): Env {
+    const parsed = serverSchema.safeParse(env);
+
+    if (!parsed.success) {
+        const error = new Error('Environment validation failed');
+        (error as any).zodErrors = parsed.error.format();
+        throw error;
+    }
+
+    // DATABASE_URL veya DB_* zorunlu
+    if (
+        !parsed.data.DATABASE_URL &&
+        (!parsed.data.DB_HOST || !parsed.data.DB_NAME || !parsed.data.DB_USER)
+    ) {
+        throw new Error('DATABASE_URL veya DB_HOST + DB_NAME + DB_USER zorunlu');
+    }
+
+    // Production'da ALLOWED_ORIGINS '*' içermemeli
+    if (parsed.data.NODE_ENV === 'production' && parsed.data.ALLOWED_ORIGINS.includes('*')) {
+        throw new Error("NODE_ENV=production iken ALLOWED_ORIGINS '*' içeremez");
+    }
+
+    return parsed.data;
+}
+
+// === Module-level init (side effect) ===
+// dotenv zaten yüklendi (yukarıda). Şimdi parseEnv ile fail-fast.
+let _env: Env;
+try {
+    _env = parseEnv(process.env);
+} catch (e: any) {
+    // Test ortamında (vitest) parseEnv başarısız olursa default'larla devam et.
+    // Setup sıralaması nedeniyle process.env henüz set edilmemiş olabilir.
+    // Production'da her zaman fail-fast.
+    const isTest = process.env.NODE_ENV === 'test' || !!process.env.VITEST;
+    if (isTest) {
+        console.warn('[env] Test ortamı — default env kullanılıyor');
+        _env = serverSchema.parse({
+            JWT_SECRET: 'a'.repeat(32),
+            DB_HOST: 'localhost',
+            DB_NAME: 'saloon_test',
+            DB_USER: 'test',
+            DB_PASSWORD: 'test',
+            ALLOWED_ORIGINS: 'http://localhost:5173',
+        });
+    } else {
+        console.error('\n❌ Environment validation failed:\n');
+        if (e.zodErrors) {
+            console.error(e.zodErrors);
+        } else {
+            console.error(e.message);
+        }
+        console.error('\n💡 Çözüm önerileri:');
+        console.error('  - .env dosyası oluştur (.env.example\'dan kopyala)');
+        console.error('  - JWT_SECRET üret: openssl rand -hex 32');
+        console.error('  - DB bilgileri: DATABASE_URL veya DB_HOST+DB_NAME+DB_USER\n');
+        process.exit(1);
+    }
+}
+
+export const env: Env = _env;
+
 // === Yardımcılar ===
-
-/** ALLOWED_ORIGINS string'ini array'e çevirir. */
 export const allowedOrigins: string[] = env.ALLOWED_ORIGINS.split(',').map(s => s.trim()).filter(Boolean);
-
-/** Production mı? */
 export const isProd = env.NODE_ENV === 'production';
-
-/** Development mı? */
 export const isDev = env.NODE_ENV === 'development';
