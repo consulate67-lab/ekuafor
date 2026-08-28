@@ -1,15 +1,80 @@
 services:
+  # === Backend (Node.js + Express + TypeScript) ===
   - type: web
     name: ekuafor-backend
     env: node
     plan: free
+    region: oregon
     rootDir: server
     buildCommand: npm install && npm run build
-    startCommand: npm run db:migrate && npx tsx scripts/seed-admin.ts && npm start
+    # server/src/server.ts startup'ta runMigrations() çağırır (idempotent SQL).
+    # Aşama 2.3 sonrası: drizzle-kit push/migrate burada otomatik çağrılacak.
+    startCommand: npm start
+    healthCheckPath: /api/ping
+    autoDeploy: true
     envVars:
+      # === Server core ===
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: 3000
+
+      # === Güvenlik ===
       - key: JWT_SECRET
-        generateValue: true
+        generateValue: true   # Render ilk deploy'da otomatik üretir (64 char hex)
+      - key: ALLOWED_ORIGINS
+        sync: false           # Dashboard'dan manuel set (virgülle ayrılmış origin listesi)
+                              # Örn: https://consulate67-lab.github.io,capacitor://localhost
+
+      # === Database (Supabase) ===
       - key: DATABASE_URL
-        value: postgresql://postgres.xljwypebyqpcmdqtrhwx:C97gcEqtkm4IW5o6@aws-1-eu-central-2.pooler.supabase.com:5432/postgres
+        sync: false           # Dashboard'dan set — Supabase pooler connection string
+                              # Örn: postgresql://postgres.xxxx:pass@aws-1-eu-central-2.pooler.supabase.com:5432/postgres
+
+      # === Türkiye API ===
+      - key: TURKIYE_API_BASE_URL
+        value: https://turkiyeapi.dev/api/v1
+
+      # === Base URL (iyzico callback'leri için) ===
+      - key: BASE_URL
+        sync: false           # Örn: https://ekuafor-backend.onrender.com
+
+      # === Google Maps (opsiyonel) ===
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+
+      # === OpenAI (opsiyonel — AI asistan) ===
+      - key: OPENAI_API_KEY
+        sync: false
+
+      # === SMTP (opsiyonel — e-posta) ===
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+
+      # === Firebase (opsiyonel — push notification) ===
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false           # Service account JSON içeriği (tek satır string)
+
+      # === Sentry (opsiyonel — error monitoring) ===
+      - key: SENTRY_DSN
+        sync: false
+
+      # === Redis (opsiyonel — cache) ===
+      - key: REDIS_URL
+        sync: false
+
+# === Notlar ===
+# 1. JWT_SECRET generateValue: true → Render Dashboard → Environment → otomatik set edilir
+# 2. sync: false olan tüm env'ler Dashboard'dan manuel eklenir
+# 3. Aşama 3 ile CORS, rate limit, env validation, pino logging aktif — prod-ready
+# 4. db/migrate.ts idempotent — server her başlangıçta schema kontrolü yapar
+# 5. Aşama 2.3 sonrası Drizzle migrate tek kaynak olacak
+# 6. Health check /api/ping — Render restart loop'unu önler

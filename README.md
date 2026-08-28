@@ -42,22 +42,60 @@ Bu aşamada projenin mobil dönüşümü (Capacitor), personel profil fotoğrafl
 
 ## 🚀 Deployment
 
+### Backend (Render)
+- `render.yaml` declarative konfigürasyon
+- Otomatik deploy: main branch push (autoDeploy: true)
+- Build: `npm install && npm run build` → `server/dist/`
+- Start: `npm start` (server background'da `runMigrations()` çağırır, idempotent SQL)
+- Health check: `/api/ping` (Render restart loop koruması)
+- Region: `oregon` (free plan)
+
+#### Gerekli Environment Variables (Render Dashboard → Environment)
+- `DATABASE_URL` — Supabase pooler connection string (sync: false)
+- `ALLOWED_ORIGINS` — virgülle ayrılmış: `https://consulate67-lab.github.io,capacitor://localhost,app://.` (sync: false)
+- `BASE_URL` — `https://ekuafor-backend.onrender.com` (sync: false, iyzico callback'leri için)
+- `JWT_SECRET` — **otomatik** (Render ilk deploy'da 64-char hex üretir)
+- Opsiyonel: `SMTP_*`, `FIREBASE_SERVICE_ACCOUNT_JSON`, `OPENAI_API_KEY`, `GOOGLE_MAPS_API_KEY`, `SENTRY_DSN`, `REDIS_URL`
+
+#### Güvenlik (Aşama 3)
+- `origin: '*'` CORS kaldırıldı → `ALLOWED_ORIGINS` whitelist
+- Rate limit: 200 req / 15 dk global, 10 req / 15 dk auth endpoint'leri
+- Pino structured logging (dev: pretty, prod: JSON)
+- zod fail-fast env validation (`JWT_SECRET` < 32 char → server başlamaz)
+
 ### Frontend (GitHub Pages)
-Frontend otomatik olarak GitHub Pages üzerinden yayınlanmaktadır. 
-[https://consulate67-lab.github.io/ekuafor/](https://consulate67-lab.github.io/ekuafor/)
+- `.github/workflows/deploy-frontend.yml` → main branch push'ta
+- GitHub Actions env: `VITE_API_URL=https://ekuafor-backend.onrender.com/api`
+- `VITE_BASE=/ekuafor/` (GitHub Pages alt dizini)
+- URL: [https://consulate67-lab.github.io/ekuafor/](https://consulate67-lab.github.io/ekuafor/)
+- Bundle: 1.18 MB → 64.78 KB initial (Aşama 1.3 — code split + lazy routes)
+- 36 chunk, her sayfa `React.lazy()` ile yüklenir
 
-### 🤖 Android Uygulaması (APK)
-Her push işleminde GitHub Actions üzerinden otomatik APK oluşturulur:
-1. Depodaki **Actions** sekmesine gidin.
-2. **Build Android APK** akışına tıklayın.
-3. En son başarılı build'in altındaki **Artifacts** kısmından `saloon-app-debug` dosyasını indirebilirsiniz.
+### Mobile (Capacitor → Android APK)
+- `.github/workflows/build-apk.yml` → main branch push'ta + manual trigger
+- Capacitor sync → `gradlew assembleDebug`
+- Artifacts: `saloon-app-debug` (APK indirilebilir)
+- GitHub Release otomatik: tag `latest`
+- iOS: skeleton var (`client/ios/`), build yapılandırılmadı
 
-### Backend (Railway / Render)
-Backend'i canlıya almak için:
-1. GitHub deponuzu [Railway](https://railway.app/) veya [Render](https://render.com/)'a bağlayın.
-2. **Root Directory** olarak `server` klasörünü seçin.
-3. Gerekli **Environment Variables** (DB_HOST, JWT_SECRET vb.) değerlerini girin.
-4. Veritabanı için **Supabase** veya **Railway PostgreSQL** kullanmanızı öneririz.
+### Database (Supabase PostgreSQL)
+- Pooler connection: `postgresql://postgres.[ref]:[password]@aws-[region].pooler.supabase.com:5432/postgres`
+- SSL zorunlu (pg driver'da `rejectUnauthorized: false` — pooler için)
+- **Schema uygulama** (ilk kurulum veya sıfırdan):
+  ```bash
+  # Lokal'den
+  psql $DATABASE_URL < server/drizzle/0000_init.sql
+  # Veya Supabase Dashboard → SQL Editor → aynı SQL'i yapıştır
+  ```
+- **Migration stratejisi**: Şu an `db/migrate.ts` idempotent SQL ile çalışıyor. Aşama 2.3 sonrası Drizzle migrate (`drizzle/0000_*.sql`) tek kaynak olacak
+- Backup: Supabase Dashboard → Database → Backups (Pro plan: daily, Free: manual)
+
+### CI/CD
+| Workflow | Tetikleyici | İş |
+|----------|-------------|-----|
+| `.github/workflows/server-ci.yml` | PR/push main (`server/**`) | Postgres service + Drizzle push + lint + test + build |
+| `.github/workflows/deploy-frontend.yml` | push main (`client/**`) | Vite build + GitHub Pages deploy |
+| `.github/workflows/build-apk.yml` | push main + manual | Capacitor sync + Android APK + GitHub Release |
 
 ## 🚀 Teknoloji Stack
 
