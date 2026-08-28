@@ -54,7 +54,11 @@
   "devDependencies": {
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^6.4.23",
+    "@types/supertest": "^6.0.3",
+    "@vitest/coverage-v8": "^2.1.9",
     "drizzle-kit": "^0.28.1",
-    "pino-pretty": "^11.3.0"
+    "pino-pretty": "^11.3.0",
+    "supertest": "^7.2.2",
+    "vitest": "^2.1.9"
   }
 }
