@@ -1,4 +1,6 @@
-import pool from '../config/database';
+import { db } from '../db';
+import { otpCodes } from '../db/schema';
+import { and, eq, gt, desc, sql } from 'drizzle-orm';
 import smsService from './sms.service';
 
 class OtpService {
@@ -26,16 +28,17 @@ class OtpService {
 
         try {
             // Önceki kullanılmamış kodları iptal et
-            await pool.query(
-                'UPDATE otp_codes SET is_used = true WHERE phone = $1 AND is_used = false',
-                [formattedPhone]
-            );
+            await db
+                .update(otpCodes)
+                .set({ isUsed: true })
+                .where(and(eq(otpCodes.phone, formattedPhone), eq(otpCodes.isUsed, false)));
 
             // Yeni kodu kaydet
-            await pool.query(
-                'INSERT INTO otp_codes (phone, code, expires_at) VALUES ($1, $2, $3)',
-                [formattedPhone, code, expiresAt]
-            );
+            await db.insert(otpCodes).values({
+                phone: formattedPhone,
+                code,
+                expiresAt,
+            });
 
             // SMS gönder
             const message = `Doğrulama kodunuz: ${code}. Salon Cebinde uygulamasına giriş yapmak için kullanabilirsiniz.`;
@@ -85,19 +88,26 @@ class OtpService {
         }
 
         try {
-            const result = await pool.query(
-                `SELECT * FROM otp_codes 
-                 WHERE phone = $1 AND code = $2 AND is_used = false AND expires_at > CURRENT_TIMESTAMP
-                 ORDER BY created_at DESC LIMIT 1`,
-                [formattedPhone, code]
-            );
+            const result = await db
+                .select({ id: otpCodes.id })
+                .from(otpCodes)
+                .where(
+                    and(
+                        eq(otpCodes.phone, formattedPhone),
+                        eq(otpCodes.code, code),
+                        eq(otpCodes.isUsed, false),
+                        gt(otpCodes.expiresAt, sql`CURRENT_TIMESTAMP`)
+                    )
+                )
+                .orderBy(desc(otpCodes.createdAt))
+                .limit(1);
 
-            if (result.rows.length > 0) {
+            if (result.length > 0) {
                 // Kodu kullanıldı olarak işaretle
-                await pool.query(
-                    'UPDATE otp_codes SET is_used = true WHERE id = $1',
-                    [result.rows[0].id]
-                );
+                await db
+                    .update(otpCodes)
+                    .set({ isUsed: true })
+                    .where(eq(otpCodes.id, result[0].id));
                 return true;
             }
 

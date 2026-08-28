@@ -1,4 +1,6 @@
-import pool from '../config/database';
+import { db } from '../db';
+import { services, departments } from '../db/schema';
+import { and, eq, asc } from 'drizzle-orm';
 import redis from '../config/redis';
 
 export interface Service {
@@ -13,6 +15,7 @@ export interface Service {
     quantity?: number | null;
     unit?: string | null;
     photo?: string | null;
+    department_name?: string | null;
 }
 
 class ServiceService {
@@ -29,74 +32,90 @@ class ServiceService {
         }
     }
 
+    /**
+     * Drizzle row → Service interface dönüşümü (camelCase → snake_case).
+     * Schema'da olmayan alanlar (quantity/unit/photo) DB'de tutulmuyor;
+     * public API'yi korumak için interface'de opsiyonel bırakıldı.
+     */
+    private mapRow(row: any): Service {
+        return {
+            id: row.id,
+            company_id: row.companyId,
+            name: row.name,
+            description: row.description,
+            duration_minutes: row.durationMinutes,
+            price: typeof row.price === 'string' ? parseFloat(row.price) : row.price,
+            is_active: row.isActive,
+            department_id: row.departmentId,
+            department_name: row.departmentName ?? null,
+        };
+    }
+
     async createService(service: Service): Promise<Service> {
-        const query = `
-      INSERT INTO services (company_id, name, description, duration_minutes, price, department_id, quantity, unit, photo)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING *
-    `;
-        const values = [
-            service.company_id,
-            service.name,
-            service.description,
-            service.duration_minutes,
-            service.price,
-            service.department_id || null,
-            service.quantity || null,
-            service.unit || null,
-            service.photo || null
-        ];
-        const result = await pool.query(query, values);
+        const [created] = await db
+            .insert(services)
+            .values({
+                companyId: service.company_id,
+                name: service.name,
+                description: service.description ?? null,
+                durationMinutes: service.duration_minutes,
+                price: String(service.price),
+                departmentId: service.department_id ?? null,
+            })
+            .returning();
         await this.clearCompanyCache();
-        return result.rows[0];
+        return this.mapRow(created);
     }
 
     async getServicesByCompany(companyId: number): Promise<Service[]> {
-        const result = await pool.query(
-            `SELECT s.*, d.name as department_name 
-             FROM services s 
-             LEFT JOIN departments d ON s.department_id = d.id
-             WHERE s.company_id = $1 AND s.is_active = true 
-             ORDER BY s.name`,
-            [companyId]
-        );
-        return result.rows;
+        const rows = await db
+            .select({
+                id: services.id,
+                companyId: services.companyId,
+                name: services.name,
+                description: services.description,
+                durationMinutes: services.durationMinutes,
+                price: services.price,
+                isActive: services.isActive,
+                departmentId: services.departmentId,
+                departmentName: departments.name,
+            })
+            .from(services)
+            .leftJoin(departments, eq(services.departmentId, departments.id))
+            .where(and(eq(services.companyId, companyId), eq(services.isActive, true)))
+            .orderBy(asc(services.name));
+        return rows.map(r => this.mapRow(r));
     }
 
     async updateService(id: number, service: Partial<Service>): Promise<Service | null> {
-        const fields: string[] = [];
-        const values: any[] = [];
-        let paramIndex = 1;
+        const updates: Record<string, any> = {};
+        if (service.name !== undefined) updates.name = service.name;
+        if (service.description !== undefined) updates.description = service.description;
+        if (service.duration_minutes !== undefined) updates.durationMinutes = service.duration_minutes;
+        if (service.price !== undefined) updates.price = String(service.price);
+        if (service.is_active !== undefined) updates.isActive = service.is_active;
+        if (service.department_id !== undefined) updates.departmentId = service.department_id;
 
-        Object.entries(service).forEach(([key, value]) => {
-            if (value !== undefined && key !== 'id' && key !== 'company_id') {
-                fields.push(`${key} = $${paramIndex}`);
-                values.push(value);
-                paramIndex++;
-            }
-        });
+        if (Object.keys(updates).length === 0) return null;
 
-        if (fields.length === 0) return null;
+        const [updated] = await db
+            .update(services)
+            .set(updates)
+            .where(eq(services.id, id))
+            .returning();
 
-        values.push(id);
-        const query = `
-      UPDATE services 
-      SET ${fields.join(', ')} 
-      WHERE id = $${paramIndex} 
-      RETURNING *
-    `;
-        const result = await pool.query(query, values);
-        if (result.rows[0]) await this.clearCompanyCache();
-        return result.rows[0] || null;
+        if (updated) await this.clearCompanyCache();
+        return updated ? this.mapRow(updated) : null;
     }
 
     async deleteService(id: number): Promise<boolean> {
-        const result = await pool.query(
-            'UPDATE services SET is_active = false WHERE id = $1',
-            [id]
-        );
-        if ((result.rowCount ?? 0) > 0) await this.clearCompanyCache();
-        return (result.rowCount ?? 0) > 0;
+        const result = await db
+            .update(services)
+            .set({ isActive: false })
+            .where(eq(services.id, id))
+            .returning({ id: services.id });
+        if (result.length > 0) await this.clearCompanyCache();
+        return result.length > 0;
     }
 }
 

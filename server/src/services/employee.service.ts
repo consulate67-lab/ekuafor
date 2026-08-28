@@ -1,86 +1,121 @@
-import pool from '../config/database';
+import { db } from '../db';
+import { companyUsers, users, departments } from '../db/schema';
+import { eq, or, and, ne, asc, sql } from 'drizzle-orm';
 
 export interface Employee {
     id?: number;
-    company_id: number;
-    user_id: number;
+    companyId: number;
+    userId: number;
     role: 'owner' | 'manager' | 'staff';
-    is_active: boolean;
-    created_at?: string;
-    // Join ile gelecek alanlar
-    first_name?: string;
-    last_name?: string;
+    isActive: boolean;
+    createdAt?: string;
+    // Join alanları
+    firstName?: string;
+    lastName?: string;
     email?: string;
     phone?: string;
-    department_id?: number | null;
-    department_name?: string | null;
+    departmentId?: number | null;
+    departmentName?: string | null;
 }
 
+/**
+ * Çalışan (Employee) servisi — Drizzle ORM.
+ *
+ * ESKİ: raw pg.query() + parametreli SQL
+ * YENİ: Drizzle query builder + type-safe schema
+ *
+ * Pattern: pg.query() → db.select() / db.insert() / db.update()
+ * - WHERE clause'lar `eq()`, `and()`, `or()`, `ne()` ile yazılır
+ * - JOIN'ler `.leftJoin(table, on)` ile yazılır
+ * - RETURNING clause `.returning()` ile
+ */
 class EmployeeService {
     /**
-     * Firmaya çalışan ekle
+     * Firmaya çalışan ekle.
      */
     async addEmployee(companyId: number, userId: number, role: 'owner' | 'manager' | 'staff' = 'staff'): Promise<Employee> {
-        const result = await pool.query(
-            `INSERT INTO company_users (company_id, user_id, role) 
-       VALUES ($1, $2, $3) 
-       RETURNING *`,
-            [companyId, userId, role]
-        );
-        return result.rows[0];
+        const [employee] = await db
+            .insert(companyUsers)
+            .values({ companyId, userId, role })
+            .returning();
+        return employee as Employee;
     }
 
     /**
-     * Firmanın tüm çalışanlarını listele
+     * Firmanın tüm çalışanlarını listele (users.company_id + company_users JOIN).
      */
     async getEmployeesByCompany(companyId: number): Promise<Employee[]> {
-        // Gelişmiş Yöntem: Hem users.company_id hem de company_users tablosuna bak.
-        const query = `
-            SELECT DISTINCT
-                u.id as user_id,
-                u.company_id,
-                u.first_name,
-                u.last_name,
-                u.email,
-                u.phone,
-                u.role,
-                u.photo,
-                u.department_id,
-                u.quantity,
-                u.unit,
-                d.name as department_name,
-                COALESCE(u.is_active, true) as is_active
-            FROM users u
-            LEFT JOIN departments d ON u.department_id = d.id
-            LEFT JOIN company_users cu ON cu.user_id = u.id AND cu.company_id = $1
-            WHERE (u.company_id = $1 OR cu.company_id = $1) 
-            AND u.role NOT IN ('company_admin', 'super_admin', 'customer')
-            ORDER BY u.first_name ASC
-        `;
-        const result = await pool.query(query, [companyId]);
-        return result.rows;
+        return (await db
+            .select({
+                userId: users.id,
+                companyId: users.companyId,
+                firstName: users.firstName,
+                lastName: users.lastName,
+                email: users.email,
+                phone: users.phone,
+                role: users.role,
+                photo: users.photo,
+                departmentId: users.departmentId,
+                quantity: users.quantity,
+                unit: users.unit,
+                departmentName: departments.name,
+                isActive: sql<boolean>`COALESCE(${users.isActive}, true)`,
+            })
+            .from(users)
+            .leftJoin(departments, eq(users.departmentId, departments.id))
+            .leftJoin(
+                companyUsers,
+                and(
+                    eq(companyUsers.userId, users.id),
+                    eq(companyUsers.companyId, companyId)
+                )
+            )
+            .where(
+                and(
+                    or(
+                        eq(users.companyId, companyId),
+                        eq(companyUsers.companyId, companyId)
+                    ),
+                    ne(users.role, 'company_admin'),
+                    ne(users.role, 'super_admin'),
+                    ne(users.role, 'customer')
+                )
+            )
+            .orderBy(asc(users.firstName))) as Employee[];
     }
 
     /**
-     * Çalışanı firmadan çıkar (Pasife çek)
+     * Çalışanı firmadan çıkar (soft delete — isActive=false).
      */
     async removeEmployee(companyId: number, employeeId: number): Promise<boolean> {
-        const result = await pool.query(
-            'UPDATE company_users SET is_active = false WHERE company_id = $1 AND id = $2',
-            [companyId, employeeId]
-        );
-        return result.rowCount ? result.rowCount > 0 : false;
+        const result = await db
+            .update(companyUsers)
+            .set({ isActive: false })
+            .where(
+                and(
+                    eq(companyUsers.companyId, companyId),
+                    eq(companyUsers.id, employeeId)
+                )
+            )
+            .returning({ id: companyUsers.id });
+        return result.length > 0;
     }
 
     /**
-     * Çalışan rolünü güncelle
+     * Çalışan rolünü güncelle.
      */
     async updateEmployeeRole(companyId: number, employeeId: number, role: string): Promise<Employee | null> {
-        const result = await pool.query(
-            'UPDATE company_users SET role = $1 WHERE company_id = $2 AND id = $3 RETURNING *',
-            [role, companyId, employeeId]
-        );
-        return result.rows[0] || null;
+        const [employee] = await db
+            .update(companyUsers)
+            .set({ role })
+            .where(
+                and(
+                    eq(companyUsers.companyId, companyId),
+                    eq(companyUsers.id, employeeId)
+                )
+            )
+            .returning();
+        return (employee as Employee) || null;
     }
 }
 
