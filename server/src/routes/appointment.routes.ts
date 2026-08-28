@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { env } from '../config/env';
 import jwt from 'jsonwebtoken';
 import appointmentService from '../services/appointment.service';
 import { authMiddleware } from '../middleware/auth.middleware';
@@ -142,7 +143,7 @@ router.post('/', async (req: Request, res: Response) => {
         if (req.headers.authorization) {
             try {
                 const token = req.headers.authorization.split(' ')[1];
-                const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
+                const decoded = jwt.verify(token, env.JWT_SECRET) as any;
                 if (!companyId && decoded.companyId) companyId = decoded.companyId;
                 if (companyId && (decoded.companyId == companyId || decoded.role === 'super_admin')) status = req.body.status || 'approved';
                 const roleResult = await pool.query('SELECT role FROM company_users WHERE company_id=$1 AND user_id=$2', [companyId, decoded.userId]);

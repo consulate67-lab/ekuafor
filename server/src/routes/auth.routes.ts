@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { env } from '../config/env';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../config/database';
@@ -70,7 +71,7 @@ router.post('/register', async (req: Request, res: Response) => {
         // JWT token oluştur
         const token = jwt.sign(
             { userId: user.id, email: user.email, role: user.role, companyId: user.company_id },
-            process.env.JWT_SECRET || 'your-secret-key',
+            env.JWT_SECRET,
             { expiresIn: '7d' }
         );
 
@@ -138,7 +139,7 @@ router.post('/login', async (req: Request, res: Response) => {
         console.log('[Auth] Password valid, generating token...');
         const token = jwt.sign(
             { userId: user.id, email: user.email, role: user.role, companyId: user.company_id },
-            process.env.JWT_SECRET || 'your-secret-key',
+            env.JWT_SECRET,
             { expiresIn: '7d' }
         );
 
@@ -251,7 +252,7 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
         // JWT token oluştur
         const token = jwt.sign(
             { userId: user.id, email: user.email, role: user.role, companyId: user.company_id },
-            process.env.JWT_SECRET || 'your-secret-key',
+            env.JWT_SECRET,
             { expiresIn: '30d' } // Mobilde daha uzun süre
         );
 
@@ -284,7 +285,7 @@ router.get('/me', async (req: Request, res: Response) => {
             });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
+        const decoded = jwt.verify(token, env.JWT_SECRET) as any;
 
         const result = await pool.query(
             'SELECT id, email, first_name, last_name, phone, role, company_id, photo, created_at FROM users WHERE id = $1',
@@ -318,7 +319,7 @@ router.all('/update-company', async (req: Request, res: Response) => {
         const token = req.headers.authorization?.replace('Bearer ', '');
         if (!token) return res.status(401).json({ success: false, error: 'Token bulunamadı' });
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
+        const decoded = jwt.verify(token, env.JWT_SECRET) as any;
         const { company_id } = req.body;
 
         if (!company_id) {
@@ -340,7 +341,7 @@ router.all('/update-company', async (req: Request, res: Response) => {
         // Generate new token with updated companyId
         const newToken = jwt.sign(
             { userId: user.id, email: user.email, role: user.role, companyId: user.company_id },
-            process.env.JWT_SECRET || 'your-secret-key',
+            env.JWT_SECRET,
             { expiresIn: '7d' }
         );
 
@@ -405,7 +406,7 @@ router.post('/set-password', async (req: Request, res: Response) => {
         // Generate token
         const token = jwt.sign(
             { userId: user.id, email: user.email, role: user.role, companyId: user.company_id },
-            process.env.JWT_SECRET || 'your-secret-key',
+            env.JWT_SECRET,
             { expiresIn: '30d' }
         );
 

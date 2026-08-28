@@ -1,11 +1,9 @@
-import dotenv from 'dotenv';
 import { createApp } from './app';
 import { runMigrations } from './db/migrate';
 import pool from './config/database';
+import { env } from './config/env';
+import { logger } from './utils/logger';
 
-dotenv.config();
-
-const PORT = parseInt(process.env.PORT || '3000', 10);
 const app = createApp();
 
 /**
@@ -13,48 +11,48 @@ const app = createApp();
  * Migration'lar background'da çalışır — server yine de dinlemeye başlar.
  */
 export const startServer = () => {
-    const server = app.listen(PORT, () => {
-        console.log('================================================');
-        console.log(`🚀 SERVIS CALISIYOR! PORT: ${PORT}`);
-        console.log(`🌍 NODE_ENV: ${process.env.NODE_ENV}`);
-        console.log(`🔗 DB_URL_TEST: ${process.env.DATABASE_URL ? 'VAR' : 'YOK'}`);
-        console.log('================================================');
+    const server = app.listen(env.PORT, () => {
+        logger.info(
+            {
+                port: env.PORT,
+                env: env.NODE_ENV,
+                db: env.DATABASE_URL ? 'DATABASE_URL' : `${env.DB_HOST}:${env.DB_PORT}/${env.DB_NAME}`,
+            },
+            `🚀 Server running on port ${env.PORT}`
+        );
 
         // Background migrations
         (async () => {
-            console.log('🏁 Starting background migrations...');
+            logger.info('🏁 Starting background migrations...');
             try {
                 await runMigrations();
-                console.log('✅ Background migrations finished successfully.');
-            } catch (e) {
-                console.error('🔥 Background migration failed:', e);
+                logger.info('✅ Background migrations finished successfully');
+            } catch (e: any) {
+                logger.error({ err: e }, '🔥 Background migration failed');
             }
         })();
     });
 
     // Graceful shutdown
-    const shutdown = async () => {
-        console.log('Shutting down server...');
+    const shutdown = async (signal: string) => {
+        logger.info({ signal }, 'Shutting down server...');
         server.close(async () => {
-            console.log('HTTP server closed.');
+            logger.info('HTTP server closed');
             await pool.end();
-            console.log('Database pool closed.');
+            logger.info('Database pool closed');
             process.exit(0);
         });
     };
 
-    process.on('SIGTERM', shutdown);
-    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
 
     process.on('uncaughtException', (err) => {
-        console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
-        console.error(err.name, err.message);
-        console.error(err.stack);
+        logger.fatal({ err }, 'UNCAUGHT EXCEPTION');
     });
 
     process.on('unhandledRejection', (err: any) => {
-        console.error('UNHANDLED REJECTION! 💥');
-        console.error(err.name, err.message);
+        logger.fatal({ err }, 'UNHANDLED REJECTION');
     });
 
     return server;

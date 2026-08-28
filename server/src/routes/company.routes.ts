@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { env } from '../config/env';
 import jwt from 'jsonwebtoken';
 import { formatPhoneTo12Digits } from '../utils/phone';
 import bcrypt from 'bcryptjs';
@@ -528,7 +529,7 @@ router.post('/admin-login', async (req: Request, res: Response) => {
                 role: 'company_admin',
                 companyId: company.id
             },
-            process.env.JWT_SECRET || 'your-secret-key',
+            env.JWT_SECRET,
             { expiresIn: '7d' }
         );
 
@@ -826,7 +827,7 @@ router.post('/check-code', async (req: Request, res: Response) => {
             // JWT token oluştur - firma admini olarak giriş yapsın
             const token = jwt.sign(
                 { userId: comp.id, email: `admin_${comp.id}@saloncebinde.local`, role: 'company_admin', companyId: comp.id },
-                process.env.JWT_SECRET || 'your-secret-key',
+                env.JWT_SECRET,
                 { expiresIn: '30d' }
             );
 
@@ -859,7 +860,7 @@ router.post('/check-code', async (req: Request, res: Response) => {
             // JWT token oluştur - personel dashboard'a erişsin
             const token = jwt.sign(
                 { userId: sr.id, email: `${sr.board_code}@staff.local`, role: 'staff', companyId: sr.company_id },
-                process.env.JWT_SECRET || 'your-secret-key',
+                env.JWT_SECRET,
                 { expiresIn: '7d' }
             );
 
