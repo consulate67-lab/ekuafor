@@ -32,8 +32,7 @@ export interface Appointment {
 /**
  * AppointmentService — Drizzle ORM.
  *
- * ESKİ: raw pg pool.query() + pool.connect() ile manuel BEGIN/COMMIT/ROLLBACK
- * YENİ: db.execute(sql\`...\`)` raw template + db.transaction() helper.
+ * db.execute(sql\`...\`)` raw template + db.transaction() helper.
  *
  * - Karmaşık JOIN + json_agg(FILTER WHERE ...) → raw SQL (Drizzle query builder'da
  *   bu özellikler native değil).
