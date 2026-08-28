@@ -1,6 +1,8 @@
 import OpenAI from 'openai';
 import fs from 'fs';
-import pool from '../config/database';
+import { db } from '../db';
+import { aiCallLogs } from '../db/schema';
+import { and, eq, desc, inArray, isNotNull } from 'drizzle-orm';
 
 // Fix for older Node.js versions where 'File' is not global (Required for OpenAI uploads)
 if (typeof globalThis.File === 'undefined') {
@@ -57,22 +59,29 @@ class AIAssistantService {
      */
     async fetchFewShotExamples(companyId: number): Promise<string> {
         try {
-            const res = await pool.query(`
-                SELECT transcription, extracted_info, matched_service_name
-                FROM ai_call_logs
-                WHERE company_id = $1
-                  AND feedback IN ('correct', 'pending')
-                  AND was_auto_created = true
-                  AND transcription IS NOT NULL
-                  AND extracted_info IS NOT NULL
-                ORDER BY created_at DESC
-                LIMIT 5
-            `, [companyId]);
+            const res = await db
+                .select({
+                    transcription: aiCallLogs.transcription,
+                    extracted_info: aiCallLogs.extractedInfo,
+                    matched_service_name: aiCallLogs.matchedServiceName,
+                })
+                .from(aiCallLogs)
+                .where(
+                    and(
+                        eq(aiCallLogs.companyId, companyId),
+                        inArray(aiCallLogs.feedback, ['correct', 'pending']),
+                        eq(aiCallLogs.wasAutoCreated, true),
+                        isNotNull(aiCallLogs.transcription),
+                        isNotNull(aiCallLogs.extractedInfo)
+                    )
+                )
+                .orderBy(desc(aiCallLogs.createdAt))
+                .limit(5);
 
-            if (!res.rows.length) return '';
+            if (!res.length) return '';
 
-            const examples = res.rows.map((row, i) => {
-                const info = row.extracted_info;
+            const examples = res.map((row: any, i: number) => {
+                const info = row.extracted_info as any;
                 return `Örnek ${i + 1}:
 Konuşma: "${(row.transcription || '').substring(0, 200)}"
 Çıkarılan: Müşteri="${info?.customerName || 'Misafir'}", Hizmet="${info?.serviceName || row.matched_service_name || '-'}", Tarih="${info?.date || '-'}", Saat="${info?.time || '-'}"`;
@@ -210,21 +219,16 @@ JSON formatında döndür:
         source?: string;
     }): Promise<void> {
         try {
-            await pool.query(`
-                INSERT INTO ai_call_logs 
-                    (company_id, transcription, extracted_info, appointment_id, was_auto_created, 
-                     confidence, matched_service_name, source)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            `, [
-                params.companyId,
-                params.transcription,
-                JSON.stringify(params.extractedInfo),
-                params.appointmentId || null,
-                params.wasAutoCreated,
-                params.extractedInfo?.confidence || 'medium',
-                params.matchedServiceName || null,
-                params.source || 'audio'
-            ]);
+            await db.insert(aiCallLogs).values({
+                companyId: params.companyId,
+                transcription: params.transcription,
+                extractedInfo: params.extractedInfo as any,
+                appointmentId: params.appointmentId || null,
+                wasAutoCreated: params.wasAutoCreated,
+                confidence: params.extractedInfo?.confidence || 'medium',
+                matchedServiceName: params.matchedServiceName || null,
+                source: params.source || 'audio',
+            });
         } catch (err) {
             console.warn('[AI] Could not save call log:', (err as any).message);
         }

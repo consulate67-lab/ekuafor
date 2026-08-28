@@ -1,4 +1,6 @@
-import pool from '../config/database';
+import { db } from '../db';
+import { services } from '../db/schema';
+import { eq } from 'drizzle-orm';
 
 export interface LocalParsedResult {
     customerName: string | null;
@@ -150,10 +152,18 @@ export class LocalNLPEngine {
      * Ana Fonksiyon: GPT-4 yerine kendi sunucumuzda tamamen ücretsiz çalışan Doğal Dil Anlama (NLP) motoru
      */
     public static async processText(companyId: number, transcript: string): Promise<LocalParsedResult> {
-        let services = [];
+        let companyServices: { id: number; name: string; price: string; duration_minutes: number }[] = [];
         try {
-            const srvRes = await pool.query('SELECT id, name, price, duration_minutes FROM services WHERE company_id = $1', [companyId]);
-            services = srvRes.rows;
+            const rows = await db
+                .select({
+                    id: services.id,
+                    name: services.name,
+                    price: services.price,
+                    duration_minutes: services.durationMinutes,
+                })
+                .from(services)
+                .where(eq(services.companyId, companyId));
+            companyServices = rows as { id: number; name: string; price: string; duration_minutes: number }[];
         } catch (e) {
             console.warn('[LocalNLP] Hizmetler çekilemedi', e);
         }
@@ -189,7 +199,7 @@ export class LocalNLPEngine {
         }
 
         // 3. Hizmet Çıkar
-        const extService = this.findService(transcript, services);
+        const extService = this.findService(transcript, companyServices as any[]);
 
         // 4. İsim Çıkar
         const extName = this.extractName(transcript);
