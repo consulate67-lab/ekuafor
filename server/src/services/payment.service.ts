@@ -1,4 +1,6 @@
-import pool from '../config/database';
+import { db } from '../db';
+import { appointments, companies, payments, users } from '../db/schema';
+import { eq, sql } from 'drizzle-orm';
 import appointmentService from './appointment.service';
 import smsService from './sms.service';
 import companyService from './company.service';
@@ -6,6 +8,15 @@ import iyzicoService from './iyzico.service';
 
 /**
  * Payment Service for managing transactions and Iyzico integration.
+ *
+ * Drizzle ORM notları:
+ * - Schema'da tanımlı alanlar/tablolar için type-safe query builder kullanılır
+ *   (appointments.paymentStatus, users, payments, companies.isActive, vs.)
+ * - Schema'da henüz tanımlı olmayan alanlar (iyzico_token, original_price,
+ *   collected_price, iyzico_commission_rate, sub_merchant_key, license_end_date)
+ *   ve license_payments tablosu için `db.execute(sql\`...\`)` Drizzle raw SQL
+ *   kullanılır. Bu sayede tek bir `db` instance üzerinden çalışılır ve
+ *   `pool` import'una gerek kalmaz.
  */
 class PaymentService {
     /**
@@ -24,11 +35,12 @@ class PaymentService {
         // 2. Here we would normally call Iyzico API
         const mockToken = `iyzi-mock-${Math.random().toString(36).substring(7)}`;
 
-        // Update appointment with token
-        await pool.query(
-            'UPDATE appointments SET iyzico_token = $1 WHERE id = $2',
-            [mockToken, appointmentId]
-        );
+        // Update appointment with token (iyzico_token schema'da yok → raw SQL)
+        await db.execute(sql`
+            UPDATE appointments
+            SET iyzico_token = ${mockToken}
+            WHERE id = ${appointmentId}
+        `);
 
         return {
             token: mockToken,
@@ -43,25 +55,28 @@ class PaymentService {
     async processCallback(token: string) {
         console.log(`[PaymentService] Processing callback for token: ${token}`);
 
-        // 1. Find appointment by token
-        const result = await pool.query(
-            'SELECT * FROM appointments WHERE iyzico_token = $1',
-            [token]
-        );
+        // 1. Find appointment by token (iyzico_token schema'da yok → raw SQL)
+        const appointmentRes = await db.execute(sql`
+            SELECT * FROM appointments WHERE iyzico_token = ${token}
+        `);
+        const appointmentRows = (appointmentRes as any).rows ?? [];
+        if (appointmentRows.length === 0) throw new Error('Token ile eşleşen randevu bulunamadı');
+        const appointment = appointmentRows[0];
 
-        if (result.rows.length === 0) throw new Error('Token ile eşleşen randevu bulunamadı');
-        const appointment = result.rows[0];
-
-        // Simulated success
-        await pool.query(
-            "UPDATE appointments SET payment_status = 'paid', updated_at = NOW() WHERE id = $1",
-            [appointment.id]
-        );
+        // Simulated success — paymentStatus ve updatedAt schema'da var
+        await db
+            .update(appointments)
+            .set({ paymentStatus: 'paid', updatedAt: new Date() })
+            .where(eq(appointments.id, appointment.id));
 
         // 3. Notify Staff
         try {
-            const staffResult = await pool.query('SELECT phone, first_name FROM users WHERE id = $1', [appointment.staff_id]);
-            const staff = staffResult.rows[0];
+            const staffRows = await db
+                .select({ phone: users.phone })
+                .from(users)
+                .where(eq(users.id, appointment.staff_id))
+                .limit(1);
+            const staff = staffRows[0];
 
             if (staff && staff.phone) {
                 const message = `Bilgi: ${appointment.customer_name} isimli müşterinin ₺${appointment.price} tutarındaki ödemesi alınmıştır.`;
@@ -76,23 +91,24 @@ class PaymentService {
 
     async initializeCepPos(appointmentId: number, companyId: number, staffId: number, amount: number) {
         try {
-            const query = `
-                SELECT a.*, 
-                       c.name as company_name, 
+            // iyzico_commission_rate ve sub_merchant_key schema'da yok → raw SQL
+            const apptRes = await db.execute(sql`
+                SELECT a.*,
+                       c.name as company_name,
                        c.commission_rate as platform_rate,
                        c.iyzico_commission_rate,
                        c.sub_merchant_key
-                FROM appointments a 
-                JOIN companies c ON a.company_id = c.id 
-                WHERE a.id = $1
-            `;
-            const result = await pool.query(query, [appointmentId]);
+                FROM appointments a
+                JOIN companies c ON a.company_id = c.id
+                WHERE a.id = ${appointmentId}
+            `);
+            const apptRows = (apptRes as any).rows ?? [];
 
-            if (result.rows.length === 0) {
+            if (apptRows.length === 0) {
                 throw new Error('Appointment not found');
             }
 
-            const appointment = result.rows[0];
+            const appointment = apptRows[0];
             const platformRate = parseFloat(appointment.platform_rate || '0');
             let totalIyzicoRate = parseFloat(appointment.iyzico_commission_rate || '0');
             if (totalIyzicoRate <= 0) totalIyzicoRate = 1;
@@ -104,25 +120,30 @@ class PaymentService {
             const subMerchantKey = appointment.sub_merchant_key;
             const mockToken = `ceppos_${Math.random().toString(36).substring(7)}`;
 
-            await pool.query(
-                `UPDATE appointments 
-                 SET iyzico_token = $1, 
-                     payment_status = $2, 
-                     payment_method = $3,
-                     original_price = $4,
-                     price = $5,
-                     collected_price = $6,
-                     updated_at = NOW() 
-                 WHERE id = $7`,
-                [mockToken, 'pending', 'card_ceppos', appointment.price, amount, totalToCollect, appointmentId]
-            );
+            // iyzico_token, original_price, collected_price schema'da yok → raw SQL
+            await db.execute(sql`
+                UPDATE appointments
+                SET iyzico_token = ${mockToken},
+                    payment_status = ${'pending'},
+                    payment_method = ${'card_ceppos'},
+                    original_price = ${appointment.price},
+                    price = ${amount},
+                    collected_price = ${totalToCollect},
+                    updated_at = NOW()
+                WHERE id = ${appointmentId}
+            `);
 
-            await pool.query(
-                `INSERT INTO payments (
-                    appointment_id, company_id, amount, commission_amount, net_amount, payment_method, payment_status, transaction_id
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                [appointmentId, companyId, totalToCollect, platformCommission + iyzicoCommission, amount, 'card_ceppos', 'pending', mockToken]
-            );
+            // payments tablosu schema'da tam tanımlı → Drizzle insert
+            await db.insert(payments).values({
+                appointmentId,
+                companyId,
+                amount: totalToCollect as any,
+                commissionAmount: (platformCommission + iyzicoCommission) as any,
+                netAmount: amount as any,
+                paymentMethod: 'card_ceppos',
+                paymentStatus: 'pending',
+                transactionId: mockToken
+            });
 
             return {
                 success: true,
@@ -143,8 +164,8 @@ class PaymentService {
     }
 
     async initializeLicenseRenewal(companyId: number, months: number = 12) {
-        // Migration check
-        await pool.query(`
+        // license_payments tablosu schema'da yok → raw SQL (idempotent migration)
+        await db.execute(sql`
             CREATE TABLE IF NOT EXISTS license_payments (
                 id SERIAL PRIMARY KEY,
                 company_id INTEGER NOT NULL REFERENCES companies(id),
@@ -180,10 +201,11 @@ class PaymentService {
             ]
         });
 
-        await pool.query(
-            'INSERT INTO license_payments (company_id, token, amount, months, status) VALUES ($1, $2, $3, $4, $5)',
-            [companyId, result.token, price, months, 'pending']
-        );
+        // license_payments → raw SQL
+        await db.execute(sql`
+            INSERT INTO license_payments (company_id, token, amount, months, status)
+            VALUES (${companyId}, ${result.token}, ${price}, ${months}, ${'pending'})
+        `);
 
         return result;
     }
@@ -192,23 +214,29 @@ class PaymentService {
         const result = await iyzicoService.getCheckoutFormResult(token);
 
         if (result.status === 'success') {
-            const payRes = await pool.query(
-                'UPDATE license_payments SET status = $1, updated_at = NOW() WHERE token = $2 RETURNING *',
-                ['success', token]
-            );
+            // license_payments → raw SQL (RETURNING dahil)
+            const payRes = await db.execute(sql`
+                UPDATE license_payments
+                SET status = ${'success'}, updated_at = NOW()
+                WHERE token = ${token}
+                RETURNING *
+            `);
+            const payRows = (payRes as any).rows ?? [];
 
-            if (payRes.rows.length > 0) {
-                const { company_id, months } = payRes.rows[0];
+            if (payRows.length > 0) {
+                const { company_id, months } = payRows[0];
 
                 const company = await companyService.getCompanyById(company_id);
                 const currentEnd = (company as any)?.license_end_date ? new Date((company as any).license_end_date) : new Date();
                 const newEnd = new Date(Math.max(currentEnd.getTime(), new Date().getTime()));
                 newEnd.setMonth(newEnd.getMonth() + months);
 
-                await pool.query(
-                    'UPDATE companies SET license_end_date = $1, is_active = true WHERE id = $2',
-                    [newEnd, company_id]
-                );
+                // license_end_date schema'da yok → raw SQL
+                await db.execute(sql`
+                    UPDATE companies
+                    SET license_end_date = ${newEnd as any}, is_active = true
+                    WHERE id = ${company_id}
+                `);
 
                 return { success: true, message: 'Lisans başarıyla yenilendi' };
             }

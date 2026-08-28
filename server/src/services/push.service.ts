@@ -1,6 +1,8 @@
 // Force redeploy - Triggering sync for Firebase credentials
 import * as admin from 'firebase-admin';
-import pool from '../config/database';
+import { db } from '../db';
+import { customerDevices, pushLogs } from '../db/schema';
+import { and, desc, eq, isNotNull } from 'drizzle-orm';
 
 try {
     if (!admin.apps.length) {
@@ -107,10 +109,13 @@ class PushService {
                 const pathExists = !!process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
                 console.warn(`[PushService] Firebase STILL NOT initialized after lazy attempt. ENV JSON: ${envExists}, PATH: ${pathExists}`);
 
-                await pool.query(
-                    'INSERT INTO push_logs (phone_number, title, body, status, error_message) VALUES ($1, $2, $3, $4, $5)',
-                    [phone || null, title, body, 'simulated', `Firebase not initialized (v2 JSON:${envExists})`]
-                );
+                await db.insert(pushLogs).values({
+                    phoneNumber: phone || null,
+                    title,
+                    body,
+                    status: 'simulated',
+                    errorMessage: `Firebase not initialized (v2 JSON:${envExists})`
+                });
                 return true;
             }
 
@@ -129,19 +134,24 @@ class PushService {
             const response = await admin.messaging().send(message);
             console.log(`[PushService] Notification sent:`, response);
 
-            await pool.query(
-                'INSERT INTO push_logs (phone_number, title, body, status) VALUES ($1, $2, $3, $4)',
-                [phone || null, title, body, 'sent']
-            );
+            await db.insert(pushLogs).values({
+                phoneNumber: phone || null,
+                title,
+                body,
+                status: 'sent'
+            });
 
             return true;
         } catch (error: any) {
             console.error('[PushService] Push Sending Error:', error.message);
 
-            await pool.query(
-                'INSERT INTO push_logs (phone_number, title, body, status, error_message) VALUES ($1, $2, $3, $4, $5)',
-                [phone || null, title, body, 'failed', error.message]
-            );
+            await db.insert(pushLogs).values({
+                phoneNumber: phone || null,
+                title,
+                body,
+                status: 'failed',
+                errorMessage: error.message
+            });
 
             return false;
         }
@@ -164,13 +174,19 @@ class PushService {
 
             console.log(`[PushService] Searching token for: ${phone} (Normalized: ${normalizedPhone})`);
 
-            const result = await pool.query(
-                `SELECT push_token FROM customer_devices 
-                 WHERE customer_phone = $1 AND push_token IS NOT NULL 
-                 ORDER BY last_sync DESC LIMIT 1`,
-                [normalizedPhone]
-            );
-            return result.rows[0]?.push_token || null;
+            const rows = await db
+                .select({ pushToken: customerDevices.pushToken })
+                .from(customerDevices)
+                .where(
+                    and(
+                        eq(customerDevices.customerPhone, normalizedPhone),
+                        isNotNull(customerDevices.pushToken)
+                    )
+                )
+                .orderBy(desc(customerDevices.lastSync))
+                .limit(1);
+
+            return rows[0]?.pushToken || null;
         } catch (error) {
             console.error('[PushService] Error fetching push token:', error);
             return null;

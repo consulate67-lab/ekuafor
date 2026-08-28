@@ -1,5 +1,7 @@
 import cron from 'node-cron';
-import pool from '../config/database';
+import { db } from '../db';
+import { companies } from '../db/schema';
+import { and, eq, isNotNull, ne } from 'drizzle-orm';
 import reportService from './report.service';
 import mailService from './mail.service';
 import automationService from './automation.service';
@@ -19,16 +21,30 @@ class CronService {
     private async generateAndSendDailyReports() {
         try {
             // Get all companies with emails
-            const companiesRes = await pool.query('SELECT id, name, email FROM companies WHERE is_active = true AND email IS NOT NULL AND email != \'\'');
+            const companyRows = await db
+                .select({
+                    id: companies.id,
+                    name: companies.name,
+                    email: companies.email
+                })
+                .from(companies)
+                .where(
+                    and(
+                        eq(companies.isActive, true),
+                        isNotNull(companies.email),
+                        ne(companies.email, '')
+                    )
+                );
 
-            for (const company of companiesRes.rows) {
+            for (const company of companyRows) {
                 try {
                     const reports = await reportService.getDetailedCompanyReports(company.id, 'today');
 
                     // Basic HTML generation
                     const html = this.formatReportHtml(company.name, reports);
 
-                    await mailService.sendReportEmail(company.email, company.name, html);
+                    // email null/empty sorguda filtrelendi (isNotNull + ne '')
+                    await mailService.sendReportEmail(company.email!, company.name, html);
                 } catch (err) {
                     console.error(`Failed to send report for ${company.name}:`, err);
                 }
