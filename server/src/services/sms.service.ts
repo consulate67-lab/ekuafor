@@ -1,5 +1,7 @@
 import axios from 'axios';
-import pool from '../config/database';
+import { db } from '../db';
+import { smsSettings, smsLogs } from '../db/schema';
+import { and, eq, isNull, like, ne, sql, desc, asc } from 'drizzle-orm';
 
 export interface SmsSettings {
     id?: number;
@@ -21,6 +23,18 @@ export interface SmsLog {
     created_at?: Date;
 }
 
+/**
+ * SMS Servisi — Drizzle ORM.
+ *
+ * ESKİ: raw pg.query() + parametreli SQL
+ * YENİ: Drizzle query builder + type-safe schema
+ *
+ * Notlar:
+ * - `sms_settings` ve `sms_logs` tabloları Drizzle schema'da mevcut → query builder
+ * - `companies.sms_enabled` kolonu henüz Drizzle schema'da yok → `db.execute(sql\`\`)`
+ *   ile raw SQL escape (migrate.ts'de ALTER ile eklenen legacy kolon).
+ * - Public API snake_case alan beklediği için select() içinde açık alias veriliyor.
+ */
 class SmsService {
     /**
      * Turkce karakterleri ASCII karsiliklarina cevirir
@@ -42,30 +56,54 @@ class SmsService {
         try {
             // Handle 0 as null (system-wide settings)
             const cid = (companyId === 0 || !companyId) ? null : companyId;
-            const query = cid
-                ? 'SELECT * FROM sms_settings WHERE company_id = $1 LIMIT 1'
-                : 'SELECT * FROM sms_settings WHERE company_id IS NULL LIMIT 1';
-            const values = cid ? [cid] : [];
-            let result = await pool.query(query, values);
 
-            if (!result.rows[0] && !cid) {
-                // If checking for NULL (global) and it is not found, fallback to ANY valid settings with an API key
-                const fallbackQuery = `
-                    SELECT * FROM sms_settings
-                    WHERE api_key IS NOT NULL 
-                      AND api_key != '' 
-                      AND api_key LIKE '%:%'
+            // Snake-case alias'lar ile select — public API'yi korumak için
+            const baseSelect = {
+                id: smsSettings.id,
+                company_id: smsSettings.companyId,
+                provider: smsSettings.provider,
+                api_url: smsSettings.apiUrl,
+                api_key: smsSettings.apiKey,
+                sender_id: smsSettings.senderId,
+                is_active: smsSettings.isActive,
+            };
+
+            let rows: any[];
+            if (cid) {
+                rows = await db
+                    .select(baseSelect)
+                    .from(smsSettings)
+                    .where(eq(smsSettings.companyId, cid))
+                    .limit(1);
+            } else {
+                rows = await db
+                    .select(baseSelect)
+                    .from(smsSettings)
+                    .where(isNull(smsSettings.companyId))
+                    .limit(1);
+            }
+
+            if (!rows[0] && !cid) {
+                // If checking for NULL (global) and it is not found, fallback to ANY valid settings with an API key.
+                // LIKE pattern + çoklu WHERE olduğu için raw SQL daha okunur.
+                const result = await db.execute(sql`
+                    SELECT id, company_id, provider, api_url, api_key, sender_id, is_active
+                    FROM sms_settings
+                    WHERE api_key IS NOT NULL
+                      AND api_key != ''
+                      AND api_key LIKE ${'%:%'}
                       AND is_active = true
                     ORDER BY id ASC
                     LIMIT 1
-                `;
-                result = await pool.query(fallbackQuery);
-                if (result.rows[0]) {
-                    console.log(`[SMS] Using Company ID: ${result.rows[0].company_id} as global fallback.`);
+                `);
+                const fallbackRows = (result as any).rows as any[];
+                if (fallbackRows[0]) {
+                    console.log(`[SMS] Using Company ID: ${fallbackRows[0].company_id} as global fallback.`);
+                    return fallbackRows[0] as SmsSettings;
                 }
             }
 
-            return result.rows[0] || null;
+            return (rows[0] as SmsSettings) || null;
         } catch (error) {
             console.error('Error fetching SMS settings:', error);
             return null;
@@ -81,8 +119,9 @@ class SmsService {
 
         // Extra safety check: verify if company exists in target DB
         if (cid) {
-            const checkRes = await pool.query('SELECT id FROM companies WHERE id = $1', [cid]);
-            if (checkRes.rows.length === 0) {
+            const checkRes = await db.execute(sql`SELECT id FROM companies WHERE id = ${cid}`);
+            const checkRows = (checkRes as any).rows as any[];
+            if (checkRows.length === 0) {
                 console.warn(`Company ID ${cid} not found, falling back to system-wide (null) settings.`);
                 cid = null;
             }
@@ -90,53 +129,58 @@ class SmsService {
 
         const existing = await this.getSettings(cid);
 
+        // Snake-case alias'lar ile returning — public API'yi korumak için
+        const returningClause = {
+            id: smsSettings.id,
+            company_id: smsSettings.companyId,
+            provider: smsSettings.provider,
+            api_url: smsSettings.apiUrl,
+            api_key: smsSettings.apiKey,
+            sender_id: smsSettings.senderId,
+            is_active: smsSettings.isActive,
+        };
+
         if (existing) {
-            const query = `
-                UPDATE sms_settings 
-                SET provider = $1, api_url = $2, api_key = $3, is_active = $4, sender_id = $5, updated_at = CURRENT_TIMESTAMP
-                WHERE ${cid ? 'company_id = $6' : 'company_id IS NULL'}
-                RETURNING *
-            `;
-            const values = [
-                settings.provider,
-                settings.api_url,
-                settings.api_key,
-                settings.is_active,
-                settings.sender_id,
-                ...(cid ? [cid] : [])
-            ];
-            const result = await pool.query(query, values);
-            
-            // Sync with company table: if SMS is activated here, enable it for the company too
+            const updated = await db
+                .update(smsSettings)
+                .set({
+                    provider: settings.provider,
+                    apiUrl: settings.api_url,
+                    apiKey: settings.api_key,
+                    isActive: settings.is_active,
+                    senderId: settings.sender_id,
+                    updatedAt: new Date(),
+                })
+                .where(cid ? eq(smsSettings.companyId, cid) : isNull(smsSettings.companyId))
+                .returning(returningClause);
+
+            // Sync with company table: if SMS is activated here, enable it for the company too.
+            // `sms_enabled` kolonu Drizzle schema'da yok → raw SQL escape.
             if (settings.is_active && cid) {
-                await pool.query('UPDATE companies SET sms_enabled = true WHERE id = $1', [cid]);
+                await db.execute(sql`UPDATE companies SET sms_enabled = true WHERE id = ${cid}`);
                 console.log(`[SMS Service] Sync: Enabled sms_enabled for company ${cid} (on update)`);
             }
 
-            return result.rows[0];
+            return updated[0] as SmsSettings;
         } else {
-            const query = `
-                INSERT INTO sms_settings (company_id, provider, api_url, api_key, is_active, sender_id)
-                VALUES ($1, $2, $3, $4, $5, $6)
-                RETURNING *
-            `;
-            const values = [
-                cid,
-                settings.provider,
-                settings.api_url,
-                settings.api_key,
-                settings.is_active,
-                settings.sender_id
-            ];
-            const result = await pool.query(query, values);
+            const inserted = await db
+                .insert(smsSettings)
+                .values({
+                    companyId: cid as any,
+                    provider: settings.provider,
+                    apiUrl: settings.api_url,
+                    apiKey: settings.api_key,
+                    isActive: settings.is_active,
+                    senderId: settings.sender_id,
+                })
+                .returning(returningClause);
 
-            // Sync with company table: if SMS is activated here, enable it for the company too
             if (settings.is_active && cid) {
-                await pool.query('UPDATE companies SET sms_enabled = true WHERE id = $1', [cid]);
+                await db.execute(sql`UPDATE companies SET sms_enabled = true WHERE id = ${cid}`);
                 console.log(`[SMS Service] Sync: Enabled sms_enabled for company ${cid} (on insert)`);
             }
 
-            return result.rows[0];
+            return inserted[0] as SmsSettings;
         }
     }
 
@@ -145,10 +189,12 @@ class SmsService {
      */
     async sendSms(companyId: number | null, phoneNumber: string, message: string): Promise<boolean> {
         // 1. Şirket bazlı kontrol: Şirketin genel SMS izni var mı?
+        // `companies.sms_enabled` kolonu Drizzle schema'da yok → raw SQL escape.
         if (companyId !== null) {
             try {
-                const compRes = await pool.query('SELECT sms_enabled FROM companies WHERE id = $1', [companyId]);
-                const isSmsEnabledForCompany = compRes.rows[0]?.sms_enabled;
+                const compRes = await db.execute(sql`SELECT sms_enabled FROM companies WHERE id = ${companyId}`);
+                const compRows = (compRes as any).rows as any[];
+                const isSmsEnabledForCompany = compRows[0]?.sms_enabled;
 
                 if (isSmsEnabledForCompany === false) {
                     console.log(`[SMS] Company ${companyId} has explicitly disabled SMS (sms_enabled=false). Skipping.`);
@@ -276,7 +322,7 @@ class SmsService {
                     }
                 } else {
                     // Option 2: Parametric POST (Default & Highly Recommended)
-                    // Note: Netgsm documentation (2022) states that GET is deprecated 
+                    // Note: Netgsm documentation (2022) states that GET is deprecated
                     // and requests must be sent via POST with form parameters.
                     const postUrl = targetApiUrl || 'https://api.netgsm.com.tr/sms/send/get/';
                     console.log(`[SMS] Sending via Netgsm Parametric POST to: ${postUrl}`);
@@ -298,7 +344,7 @@ class SmsService {
                         console.log(`[SMS] Using manual GET construction for Netgsm...`);
                         // Manual construction to ensure no double encoding or + issues
                         const finalUrl = `${postUrl}${postUrl.includes('?') ? '&' : '?'}usercode=${usercode}&password=${encodeURIComponent(password)}&gsmno=${phone10}&message=${encodeURIComponent(cleanMessage)}&msgheader=${encodeURIComponent(senderId)}&dil=TR&type=1:n`;
-                        
+
                         response = await axios.get(finalUrl, { timeout: 10000 });
                     } else {
                         response = await axios.post(postUrl, params, {
@@ -354,17 +400,13 @@ class SmsService {
      */
     private async logSms(log: SmsLog): Promise<void> {
         try {
-            const query = `
-                INSERT INTO sms_logs (company_id, phone_number, message, status, error_message)
-                VALUES ($1, $2, $3, $4, $5)
-            `;
-            await pool.query(query, [
-                log.company_id,
-                log.phone_number,
-                log.message,
-                log.status,
-                log.error_message
-            ]);
+            await db.insert(smsLogs).values({
+                companyId: log.company_id as any,
+                phoneNumber: log.phone_number,
+                message: log.message,
+                status: log.status,
+                errorMessage: log.error_message,
+            });
         } catch (err) {
             console.error('Error logging SMS:', err);
         }
@@ -376,12 +418,24 @@ class SmsService {
     async getLogs(companyId: number | null): Promise<SmsLog[]> {
         try {
             const cid = (companyId === 0 || !companyId) ? null : companyId;
-            const query = cid
-                ? 'SELECT * FROM sms_logs WHERE company_id = $1 ORDER BY created_at DESC LIMIT 100'
-                : 'SELECT * FROM sms_logs WHERE company_id IS NULL ORDER BY created_at DESC LIMIT 100';
-            const values = cid ? [cid] : [];
-            const result = await pool.query(query, values);
-            return result.rows;
+
+            // Snake-case alias'lar ile select — public API'yi korumak için
+            const rows = await db
+                .select({
+                    id: smsLogs.id,
+                    company_id: smsLogs.companyId,
+                    phone_number: smsLogs.phoneNumber,
+                    message: smsLogs.message,
+                    status: smsLogs.status,
+                    error_message: smsLogs.errorMessage,
+                    created_at: smsLogs.createdAt,
+                })
+                .from(smsLogs)
+                .where(cid ? eq(smsLogs.companyId, cid) : isNull(smsLogs.companyId))
+                .orderBy(desc(smsLogs.createdAt))
+                .limit(100);
+
+            return rows as SmsLog[];
         } catch (error) {
             console.error('Error fetching SMS logs:', error);
             return [];
