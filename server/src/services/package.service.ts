@@ -1,4 +1,6 @@
-import pool from '../config/database';
+import { db } from '../db';
+import { packages, packageServices, services, users, departments } from '../db/schema';
+import { eq, and, sql, asc } from 'drizzle-orm';
 
 export interface Package {
     id?: number | null;
@@ -23,55 +25,58 @@ export interface PackageServiceItem {
 
 class PackageService {
     async createPackage(pkg: Package, items: PackageServiceItem[]): Promise<Package> {
-        const client = await pool.connect();
-        try {
-            await client.query('BEGIN');
-
-            const query = `
-                INSERT INTO packages (company_id, name, description, duration_minutes, price, staff_id, department_id, is_active)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, true)
-                RETURNING *
-            `;
-            const values = [
-                pkg.company_id,
-                pkg.name,
-                pkg.description,
-                pkg.duration_minutes,
-                pkg.price,
-                pkg.staff_id || null,
-                pkg.department_id || null
-            ];
-            const result = await client.query(query, values);
-            const newPackage = result.rows[0];
+        return await db.transaction(async (tx) => {
+            const [newPackage] = await tx
+                .insert(packages)
+                .values({
+                    companyId: pkg.company_id,
+                    name: pkg.name,
+                    description: pkg.description,
+                    durationMinutes: pkg.duration_minutes,
+                    price: pkg.price as any,
+                    staffId: pkg.staff_id || null,
+                    departmentId: pkg.department_id || null,
+                    isActive: true
+                })
+                .returning({
+                    id: packages.id,
+                    company_id: packages.companyId,
+                    name: packages.name,
+                    description: packages.description,
+                    duration_minutes: packages.durationMinutes,
+                    price: packages.price,
+                    staff_id: packages.staffId,
+                    department_id: packages.departmentId,
+                    is_active: packages.isActive
+                });
 
             if (items && items.length > 0) {
-                for (let i = 0; i < items.length; i++) {
-                    await client.query(
-                        'INSERT INTO package_services (package_id, service_id, staff_id, department_id, order_index) VALUES ($1, $2, $3, $4, $5)',
-                        [newPackage.id, items[i].service_id, items[i].staff_id || null, items[i].department_id || null, i]
-                    );
-                }
+                await tx.insert(packageServices).values(
+                    items.map((item, i) => ({
+                        packageId: newPackage.id,
+                        serviceId: item.service_id,
+                        staffId: item.staff_id || null,
+                        departmentId: item.department_id || null,
+                        orderIndex: String(i)
+                    }))
+                );
             }
 
-            await client.query('COMMIT');
-            return newPackage;
-        } catch (error) {
-            await client.query('ROLLBACK');
-            throw error;
-        } finally {
-            client.release();
-        }
+            return newPackage as unknown as Package;
+        });
     }
 
     async getPackagesByCompany(companyId: number): Promise<Package[]> {
-        const query = `
-            SELECT p.*, 
+        // json_agg içeren karmaşık JOIN + aggregation — raw SQL template ile çözüldü.
+        // Drizzle query builder'da json_agg doğrudan desteği yok.
+        const result = await db.execute(sql`
+            SELECT p.*,
                    u.first_name as staff_first_name, u.last_name as staff_last_name,
                    d.name as department_name,
                    json_agg(json_build_object(
-                       'id', s.id, 
-                       'name', s.name, 
-                       'duration_minutes', s.duration_minutes, 
+                       'id', s.id,
+                       'name', s.name,
+                       'duration_minutes', s.duration_minutes,
                        'price', s.price,
                        'staff_id', ps.staff_id,
                        'staff_name', su.first_name || ' ' || su.last_name,
@@ -83,78 +88,64 @@ class PackageService {
             LEFT JOIN users su ON ps.staff_id = su.id
             LEFT JOIN users u ON p.staff_id = u.id
             LEFT JOIN departments d ON p.department_id = d.id
-            WHERE p.company_id = $1 AND p.is_active = true
+            WHERE p.company_id = ${companyId} AND p.is_active = true
             GROUP BY p.id, u.id, d.id, u.first_name, u.last_name, d.name
             ORDER BY p.name
-        `;
-        const result = await pool.query(query, [companyId]);
-        return result.rows;
+        `);
+        const rows = (result as any).rows ?? result;
+        return Array.isArray(rows) ? (rows as unknown as Package[]) : [];
     }
 
     async updatePackage(id: number, pkg: Partial<Package>, items?: PackageServiceItem[]): Promise<Package | null> {
-        const client = await pool.connect();
-        try {
-            await client.query('BEGIN');
+        await db.transaction(async (tx) => {
+            const { services: _services, ...pkgData } = pkg;
 
-            const fields: string[] = [];
-            const values: any[] = [];
-            let paramIndex = 1;
+            const setObj: Record<string, any> = {};
+            if (pkgData.name !== undefined) setObj.name = pkgData.name;
+            if (pkgData.description !== undefined) setObj.description = pkgData.description;
+            if (pkgData.duration_minutes !== undefined) setObj.durationMinutes = pkgData.duration_minutes;
+            if (pkgData.price !== undefined) setObj.price = pkgData.price;
+            if (pkgData.staff_id !== undefined) setObj.staffId = pkgData.staff_id;
+            if (pkgData.department_id !== undefined) setObj.departmentId = pkgData.department_id;
+            if (pkgData.is_active !== undefined) setObj.isActive = pkgData.is_active;
 
-            const { services, ...pkgData } = pkg;
-
-            Object.entries(pkgData).forEach(([key, value]) => {
-                if (value !== undefined && key !== 'id' && key !== 'company_id') {
-                    fields.push(`${key} = $${paramIndex}`);
-                    values.push(value);
-                    paramIndex++;
-                }
-            });
-
-            if (fields.length > 0) {
-                values.push(id);
-                const query = `
-                    UPDATE packages 
-                    SET ${fields.join(', ')} 
-                    WHERE id = $${paramIndex} 
-                    RETURNING *
-                `;
-                await client.query(query, values);
+            if (Object.keys(setObj).length > 0) {
+                await tx.update(packages).set(setObj).where(eq(packages.id, id));
             }
 
             if (items) {
                 // Remove old services
-                await client.query('DELETE FROM package_services WHERE package_id = $1', [id]);
+                await tx.delete(packageServices).where(eq(packageServices.packageId, id));
                 // Add new services
-                for (let i = 0; i < items.length; i++) {
-                    await client.query(
-                        'INSERT INTO package_services (package_id, service_id, staff_id, department_id, order_index) VALUES ($1, $2, $3, $4, $5)',
-                        [id, items[i].service_id, items[i].staff_id || null, items[i].department_id || null, i]
+                if (items.length > 0) {
+                    await tx.insert(packageServices).values(
+                        items.map((item, i) => ({
+                            packageId: id,
+                            serviceId: item.service_id,
+                            staffId: item.staff_id || null,
+                            departmentId: item.department_id || null,
+                            orderIndex: String(i)
+                        }))
                     );
                 }
             }
+        });
 
-            await client.query('COMMIT');
-
-            // Fetch updated package with services
-            const updated = await this.getPackageById(id);
-            return updated;
-        } catch (error) {
-            await client.query('ROLLBACK');
-            throw error;
-        } finally {
-            client.release();
-        }
+        // Fetch updated package with services
+        const updated = await this.getPackageById(id);
+        return updated;
     }
 
     async getPackageById(id: number): Promise<Package | null> {
-        const query = `
-            SELECT p.*, 
+        // json_agg içeren karmaşık JOIN + aggregation — raw SQL template ile çözüldü.
+        const result = await db.execute(sql`
+            SELECT p.*,
                    u.first_name as staff_first_name, u.last_name as staff_last_name,
                    d.name as department_name,
                    json_agg(json_build_object(
-                       'id', s.id, 
-                       'name', s.name, 
-                       'duration_minutes', s.duration_minutes, 
+                       'id', s.id,
+                       'name', s.name,
+                       'duration_minutes', s.duration_minutes,
                        'price', s.price,
                        'staff_id', ps.staff_id,
                        'staff_name', su.first_name || ' ' || su.last_name,
@@ -166,19 +157,20 @@ class PackageService {
             LEFT JOIN users su ON ps.staff_id = su.id
             LEFT JOIN users u ON p.staff_id = u.id
             LEFT JOIN departments d ON p.department_id = d.id
-            WHERE p.id = $1
+            WHERE p.id = ${id}
             GROUP BY p.id, u.id, d.id, u.first_name, u.last_name, d.name
-        `;
-        const result = await pool.query(query, [id]);
-        return result.rows[0] || null;
+        `);
+        const rows = (result as any).rows ?? result;
+        return Array.isArray(rows) ? ((rows[0] as unknown as Package) || null) : null;
     }
 
     async deletePackage(id: number): Promise<boolean> {
-        const result = await pool.query(
-            'UPDATE packages SET is_active = false WHERE id = $1',
-            [id]
-        );
-        return (result.rowCount ?? 0) > 0;
+        const result = await db
+            .update(packages)
+            .set({ isActive: false })
+            .where(eq(packages.id, id))
+            .returning({ id: packages.id });
+        return result.length > 0;
     }
 }
 

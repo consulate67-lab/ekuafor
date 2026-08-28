@@ -1,4 +1,5 @@
-import pool from '../config/database';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 import pushService from './push.service';
 import smsService from './sms.service';
 import mailService from './mail.service';
@@ -8,8 +9,11 @@ class AutomationService {
         console.log('🤖 [AutomationService] Starting automation rule check...');
         try {
             // Get all active rules
-            const rulesRes = await pool.query('SELECT * FROM automation_rules WHERE is_active = true');
-            const rules = rulesRes.rows;
+            // automation_rules tablosu Drizzle schema'sında henüz tanımlı değil,
+            // bu yüzden raw SQL template kullanılıyor (Drizzle db.execute).
+            const rulesRes = await db.execute(sql`SELECT * FROM automation_rules WHERE is_active = true`);
+            const rows = (rulesRes as any).rows ?? rulesRes;
+            const rules: any[] = Array.isArray(rows) ? rows : [];
 
             if (rules.length === 0) {
                 console.log('[AutomationService] No active automation rules found.');
@@ -34,12 +38,14 @@ class AutomationService {
             }
 
             // Replace ${company_id} in the script with the actual company_id
-            let sql = String(rule.sql_script).replace(/\$\{company_id\}/g, String(rule.company_id || 0));
-            
+            let sqlScript = String(rule.sql_script).replace(/\$\{company_id\}/g, String(rule.company_id || 0));
+
             // Execute the custom query
             // The query MUST return at least 'phone' (and ideally 'name', 'email')
-            const result = await pool.query(sql);
-            const targets = result.rows;
+            // Dinamik SQL — sql\`${sqlScript}\` template injection yöntemiyle çalıştırılır.
+            const result = await db.execute(sql.raw(sqlScript));
+            const targetRows = (result as any).rows ?? result;
+            const targets: any[] = Array.isArray(targetRows) ? targetRows : [];
 
             console.log(`[AutomationService] Rule "${rule.name}" matched ${targets.length} customers.`);
 
@@ -57,7 +63,7 @@ class AutomationService {
                 // Personalize message
                 let message = rule.message_template || `Merhaba {name}, size özel bir kampanyamız var!`;
                 message = message.replace(/\{name\}/g, name);
-                
+
                 try {
                     switch (String(rule.action_type).toLowerCase()) {
                         case 'push':
