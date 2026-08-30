@@ -104,3 +104,25 @@ export const departments = pgTable('departments', {
     name: varchar('name', { length: 100 }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
 });
+
+/**
+ * KVKK veri sahibi talepleri tablosu
+ * - delete: veri silme talebi
+ * - correct: veri düzeltme talebi
+ * - info: bilgi alma talebi
+ * Status: pending | processed | rejected
+ */
+export const kvkkRequests = pgTable('kvkk_requests', {
+    id: serial('id').primaryKey(),
+    requestType: varchar('request_type', { length: 20 }).notNull(), // 'delete' | 'correct' | 'info'
+    requesterName: varchar('requester_name', { length: 200 }).notNull(),
+    requesterEmail: varchar('requester_email', { length: 255 }).notNull(),
+    requesterPhone: varchar('requester_phone', { length: 20 }),
+    companyId: integer('company_id').references((): any => companies.id, { onDelete: 'set null' }),
+    companyName: varchar('company_name', { length: 255 }),
+    reason: text('reason'),
+    status: varchar('status', { length: 20 }).notNull().default('pending'),
+    adminNote: text('admin_note'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    processedAt: timestamp('processed_at', { withTimezone: true })
+});

@@ -821,6 +821,27 @@ export const runMigrations = async () => {
         await pool.query('CREATE INDEX IF NOT EXISTS idx_ai_call_logs_created ON ai_call_logs(created_at DESC)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_ai_call_logs_feedback ON ai_call_logs(feedback)');
 
+        // 8. KVKK veri sahibi talepleri tablosu (Aşama 5.4)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS kvkk_requests (
+                id SERIAL PRIMARY KEY,
+                request_type VARCHAR(20) NOT NULL,
+                requester_name VARCHAR(200) NOT NULL,
+                requester_email VARCHAR(255) NOT NULL,
+                requester_phone VARCHAR(20),
+                company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+                company_name VARCHAR(255),
+                reason TEXT,
+                status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                admin_note TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                processed_at TIMESTAMP WITH TIME ZONE
+            )
+        `);
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_kvkk_status ON kvkk_requests(status)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_kvkk_email ON kvkk_requests(requester_email)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_kvkk_created ON kvkk_requests(created_at DESC)');
+
         console.log('✅ Auto-migrations and seeding completed.');
 
     } catch (err) {
@@ -829,4 +850,4 @@ export const runMigrations = async () => {
         if (client) client.release();
     }
 };
-
+

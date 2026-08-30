@@ -21,6 +21,7 @@ import aiRoutes from './ai.routes';
 import inventoryRoutes from './inventory.routes';
 import setupRoutes from './setup.routes';
 import adminRoutes from './admin.routes';
+import kvkkRoutes from './kvkk.routes';
 
 const commonPing = (req: Request, res: Response) => res.json({
     status: 'pong',
@@ -95,6 +96,7 @@ export const mountRoutes = (app: Express) => {
     app.use('/api/setup', setupRoutes);
     app.use('/api/ai', aiRoutes);
     app.use('/api/admin', adminRoutes);
+    app.use('/api/kvkk', kvkkRoutes);
 
     // 404 Catch-all
     app.all('*', (req: Request, res: Response) => {
