@@ -14,9 +14,9 @@ import { db, pool } from '../db';
 import { companies } from '../db/schema/core';
 import { sql } from 'drizzle-orm';
 
-// Overpass ana sunucu (overpass-api.de) Render free plan IP'sini blokluyor (ENETUNREACH).
-// Kumi Systems bazen 500 dönüyor (yoğun). osm.ch İsviçre'de, rate limit yüksek, stabil.
-const OVERPASS = 'https://overpass.osm.ch/api/interpreter';
+// Overpass ana sunucu (overpass-api.de) Render IP'sini blokluyor.
+// kumi.systems 500, osm.ch 0 döndü. openstreetmap.fr (Fransa) deneniyor.
+const OVERPASS = 'https://overpass.openstreetmap.fr/api/interpreter';
 
 export interface ImportOpts {
   limit: number;       // 0 = sınırsız (TÜM İstanbul)
