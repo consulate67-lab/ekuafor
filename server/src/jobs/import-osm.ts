@@ -160,8 +160,17 @@ export async function runOsmImport(opts: ImportOpts): Promise<ImportResult> {
     result.durationMs = Date.now() - t0;
     result.ok = true;
   } catch (e: any) {
-    result.errors.push(e.message || String(e));
+    // Detaylı hata yakalama — Render dashboard logs'ta görünür
+    const detail = {
+      message: e.message || String(e),
+      name: e.name,
+      cause: e.cause ? { code: e.cause.code, message: e.cause.message, syscall: e.cause.syscall } : undefined,
+      code: e.code,
+      stack: e.stack?.split('\n').slice(0, 5).join('\n'),
+    };
+    result.errors.push(JSON.stringify(detail));
     result.durationMs = Date.now() - t0;
+    // Logger.error eklenecek (admin route pino log'lar)
   }
   return result;
 }

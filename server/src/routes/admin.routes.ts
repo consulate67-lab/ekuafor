@@ -118,10 +118,14 @@ router.post('/import-osm', async (req: Request, res: Response) => {
   // === Küçük job: sync çalıştır, sonucu dön ===
   logger.info({ limit, city, dryRun, triggeredBy }, '[admin/import-osm] Sync başladı');
   const result = await runOsmImport({ limit, city, dryRun });
-  logger.info(
-    { fetched: result.fetched, inserted: result.inserted, durationMs: result.durationMs, ok: result.ok },
-    '[admin/import-osm] Sync bitti'
-  );
+  if (!result.ok) {
+    logger.error({ errors: result.errors, durationMs: result.durationMs }, '[admin/import-osm] Sync HATA');
+  } else {
+    logger.info(
+      { fetched: result.fetched, inserted: result.inserted, durationMs: result.durationMs },
+      '[admin/import-osm] Sync bitti'
+    );
+  }
   res.json({ success: result.ok, ...result });
 });
 
