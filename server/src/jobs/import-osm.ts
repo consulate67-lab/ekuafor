@@ -14,7 +14,9 @@ import { db, pool } from '../db';
 import { companies } from '../db/schema/core';
 import { sql } from 'drizzle-orm';
 
-const OVERPASS = 'https://overpass-api.de/api/interpreter';
+// Overpass ana sunucu (overpass-api.de) Render free plan IP'sini blokluyor (ENETUNREACH).
+// Kumi Systems (Almanya, Overpass API ruhani kardeş instance) shared cloud IP'lere izin veriyor.
+const OVERPASS = 'https://overpass.kumi.systems/api/interpreter';
 
 export interface ImportOpts {
   limit: number;       // 0 = sınırsız (TÜM İstanbul)
