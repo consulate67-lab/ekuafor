@@ -10,6 +10,50 @@ const router = Router();
 router.use(authMiddleware, roleCheck(['super_admin']));
 
 /**
+ * DEBUG: /api/admin/test-network
+ * Render → dış internet outbound bağlantı testi.
+ * Birden fazla kaynağa paralel fetch yapar, sonuçları döner.
+ * Production'da tutmak zararsız (admin-only), debug kolaylığı için.
+ */
+router.get('/test-network', async (req: Request, res: Response) => {
+  const tests = [
+    { name: 'overpass-api.de', url: 'https://overpass-api.de/api/status' },
+    { name: 'api.openstreetmap.org', url: 'https://api.openstreetmap.org/api/0.6/capabilities' },
+    { name: 'httpbin.org', url: 'https://httpbin.org/get' },
+    { name: 'example.com', url: 'https://example.com/' },
+    { name: 'cloudflare.com', url: 'https://www.cloudflare.com/cdn-cgi/trace' },
+  ];
+  const dns = await import('node:dns');
+  const results: any[] = [];
+  for (const t of tests) {
+    const start = Date.now();
+    let lookup: any = null;
+    try {
+      lookup = await new Promise<any>((resolve, reject) => {
+        dns.lookup(new URL(t.url).hostname, { all: true }, (err, addrs) => {
+          if (err) reject(err); else resolve(addrs);
+        });
+      });
+    } catch (e: any) {
+      lookup = { error: e.message };
+    }
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
+    let fetchResult: any = {};
+    try {
+      const r = await fetch(t.url, { signal: ctrl.signal, headers: { 'User-Agent': 'SalonCebinde-Debug/1.0' } });
+      fetchResult = { ok: r.ok, status: r.status, bytes: (await r.text()).length };
+    } catch (e: any) {
+      fetchResult = { error: e.message, cause: e.cause?.code };
+    } finally {
+      clearTimeout(tid);
+    }
+    results.push({ name: t.name, url: t.url, dns: lookup, fetch: fetchResult, durationMs: Date.now() - start });
+  }
+  res.json({ success: true, results });
+});
+
+/**
  * In-memory job tracker. Production'da kaybolabilir (process restart),
  * ama sadece debug amaçlı. Persistent job queue gerekmiyor.
  */
