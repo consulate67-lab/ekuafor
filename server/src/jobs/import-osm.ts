@@ -25,10 +25,11 @@ const OVERPASS_MIRRORS = [
 ];
 
 export interface ImportOpts {
-  limit: number;       // 0 = sınırsız (TÜM İstanbul)
+  limit: number;       // 0 = sınırsız (TÜM bbox / grid)
   city?: string;       // default: İstanbul
   dryRun?: boolean;    // true = DB'ye yazma, sadece say
   adminEmail?: string; // default: sarpyilmaz@saloon.com
+  grid?: string;       // 'istanbul' = 4 parçalı grid, undefined = tek bbox
 }
 
 export interface ImportResult {
@@ -36,10 +37,13 @@ export interface ImportResult {
   city: string;
   limit: number;
   dryRun: boolean;
+  grid: string | null;
+  parts: number;       // kaç parça sorgu atıldı
   fetched: number;
   inserted: number;
   durationMs: number;
   errors: string[];
+  perPart?: { part: number; bbox: [number, number, number, number]; fetched: number; error?: string }[];
   sample?: { name: string; boardCode: string; phone: string | null };
 }
 
@@ -52,23 +56,36 @@ interface OSMElement {
   tags?: Record<string, string>;
 }
 
-// İl → [south, west, north, east] bbox mapping.
-// area[name="..."] bazı mirror'larda çözümlenmiyor, bbox daha güvenilir.
-// Türkiye illeri (yaklaşık merkez bbox'ları, OSM Overpass'ta çalışır)
+// İl → [south, west, north, east] bbox mapping (tek parça).
 const CITY_BBOX: Record<string, [number, number, number, number]> = {
   'İstanbul': [40.8, 28.0, 41.6, 29.7],
   'Ankara':   [39.5, 32.5, 40.3, 33.5],
   'İzmir':    [38.1, 26.7, 38.7, 27.5],
 };
-// Default: İstanbul (en çok POI)
+// Default: İstanbul
 const DEFAULT_BBOX: [number, number, number, number] = [40.8, 28.0, 41.6, 29.7];
 
-function buildQuery(city: string, limit: number): string {
+// İstanbul grid: 2x2 = 4 parça. Tam bbox 40.8-41.6N × 28.0-29.7E
+// Paralel çağrı riskli (rate limit), sıralı çağırıyoruz.
+const CITY_GRID: Record<string, [number, number, number, number][]> = {
+  'istanbul': [
+    [41.2, 28.0, 41.6, 28.85],  // NW: Avrupa kuzey
+    [41.2, 28.85, 41.6, 29.7],  // NE: Anadolu kuzey
+    [40.8, 28.0, 41.2, 28.85],  // SW: Avrupa güney
+    [40.8, 28.85, 41.2, 29.7],  // SE: Anadolu güney
+  ],
+};
+
+function buildQueryForBbox(bbox: [number, number, number, number], limit: number): string {
   const limitStr = limit > 0 ? `out ${limit}` : 'out';
-  const bbox = CITY_BBOX[city] || DEFAULT_BBOX;
   const [s, w, n, e] = bbox;
-  // Türkiye'de yaygın OSM tag'leri: shop=hairdresser, shop=beauty, amenity=beauty_salon
-  return `[out:json][timeout:180];(node["shop"="hairdresser"](${s},${w},${n},${e});node["shop"="beauty"](${s},${w},${n},${e});node["amenity"="beauty_salon"](${s},${w},${n},${e});way["shop"="hairdresser"](${s},${w},${n},${e});way["shop"="beauty"](${s},${w},${n},${e});way["amenity"="beauty_salon"](${s},${w},${n},${e}););${limitStr} center;`;
+  // Türkiye'de yaygın OSM tag'leri: shop=hairdresser (en yaygın), shop=beauty, amenity=beauty_salon
+  return `[out:json][timeout:120];(node["shop"="hairdresser"](${s},${w},${n},${e});node["shop"="beauty"](${s},${w},${n},${e});node["amenity"="beauty_salon"](${s},${w},${n},${e});way["shop"="hairdresser"](${s},${w},${n},${e});way["shop"="beauty"](${s},${w},${n},${e});way["amenity"="beauty_salon"](${s},${w},${n},${e}););${limitStr} center;`;
+}
+
+function buildQuery(city: string, limit: number): string {
+  const bbox = CITY_BBOX[city] || DEFAULT_BBOX;
+  return buildQueryForBbox(bbox, limit);
 }
 
 function mapToCompany(e: OSMElement, city: string, adminId: number) {
@@ -111,14 +128,13 @@ async function getAdminId(email: string): Promise<number> {
   return rows[0].id;
 }
 
-async function fetchOSM(city: string, limit: number): Promise<OSMElement[]> {
+async function fetchOSM(queryStr: string, errorsRef?: string[]): Promise<OSMElement[]> {
   // Render free plan IPv6 outbound desteklemiyor → ENETUNREACH.
   // Supabase direct connection IPv6-only olduğu için varsayılan ipv6first kalır,
   // ama Overpass çağrısı için IPv4 zorla (DB bağlantısı zaten kurulu, etkilenmez).
   const prevOrder = (dns as any).getDefaultResultOrder?.() || null;
   dns.setDefaultResultOrder('ipv4first');
-  const errors: string[] = [];
-  const queryStr = buildQuery(city, limit);
+  const errors = errorsRef || [];
   const PER_MIRROR_TIMEOUT_MS = 25000; // 25s per mirror, max 4×25=100s
   try {
     for (const mirror of OVERPASS_MIRRORS) {
@@ -167,22 +183,82 @@ export async function runOsmImport(opts: ImportOpts): Promise<ImportResult> {
   const limit = opts.limit ?? 5;
   const dryRun = opts.dryRun ?? false;
   const adminEmail = opts.adminEmail || 'sarpyilmaz@saloon.com';
+  const grid = opts.grid?.toLowerCase() || null;
   const result: ImportResult = {
     ok: false,
     city,
     limit,
     dryRun,
+    grid,
+    parts: 0,
     fetched: 0,
     inserted: 0,
     durationMs: 0,
     errors: [],
+    perPart: [],
   };
   const t0 = Date.now();
 
   try {
     const adminId = await getAdminId(adminEmail);
-    const elems = await fetchOSM(city, limit);
+
+    // Grid modu: birden fazla bbox parçasını sırayla çağır, sonuçları birleştir
+    if (grid && CITY_GRID[grid]) {
+      const bboxes = CITY_GRID[grid];
+      result.parts = bboxes.length;
+      // Her parça için limit uygula (parça başına max)
+      const perPartLimit = limit > 0 ? Math.ceil(limit / bboxes.length) : 0;
+      const allElems: OSMElement[] = [];
+      const seenIds = new Set<number>();
+      for (let i = 0; i < bboxes.length; i++) {
+        const bbox = bboxes[i];
+        const queryStr = buildQueryForBbox(bbox, perPartLimit);
+        try {
+          const elems = await fetchOSM(queryStr, result.errors);
+          // Aynı OSM node/way birden fazla parçada olabilir, dedup
+          let added = 0;
+          for (const e of elems) {
+            if (!seenIds.has(e.id)) {
+              seenIds.add(e.id);
+              allElems.push(e);
+              added++;
+            }
+          }
+          result.perPart!.push({ part: i + 1, bbox, fetched: added });
+        } catch (e: any) {
+          result.perPart!.push({ part: i + 1, bbox, fetched: 0, error: e.message?.slice(0, 200) || String(e).slice(0, 200) });
+        }
+      }
+      result.fetched = allElems.length;
+      if (!allElems.length) {
+        result.durationMs = Date.now() - t0;
+        result.ok = true;
+        return result;
+      }
+      // Apply final limit (e.g., test mode limit=20)
+      const finalElems = limit > 0 ? allElems.slice(0, limit) : allElems;
+      const records = finalElems.map(e => mapToCompany(e, city, adminId));
+      if (records.length) {
+        result.sample = { name: records[0].name, boardCode: records[0].boardCode, phone: records[0].phone };
+      }
+      if (!dryRun) {
+        for (let i = 0; i < records.length; i += 500) {
+          const batch = records.slice(i, i + 500);
+          const r = await db.insert(companies).values(batch).returning({ id: companies.id });
+          result.inserted += r.length;
+        }
+      } else {
+        result.inserted = records.length;
+      }
+      result.durationMs = Date.now() - t0;
+      result.ok = true;
+      return result;
+    }
+
+    // Tek bbox modu (eski davranış)
+    const elems = await fetchOSM(buildQuery(city, limit), result.errors);
     result.fetched = elems.length;
+    result.parts = 1;
     if (!elems.length) {
       result.durationMs = Date.now() - t0;
       result.ok = true;
@@ -214,7 +290,6 @@ export async function runOsmImport(opts: ImportOpts): Promise<ImportResult> {
     };
     result.errors.push(JSON.stringify(detail));
     result.durationMs = Date.now() - t0;
-    // Logger.error eklenecek (admin route pino log'lar)
   }
   return result;
 }
