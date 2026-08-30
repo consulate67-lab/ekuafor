@@ -17,11 +17,12 @@ router.use(authMiddleware, roleCheck(['super_admin']));
  */
 router.get('/test-network', async (req: Request, res: Response) => {
   const tests = [
-    { name: 'overpass-api.de', url: 'https://overpass-api.de/api/status' },
-    { name: 'api.openstreetmap.org', url: 'https://api.openstreetmap.org/api/0.6/capabilities' },
+    { name: 'overpass-api.de (ana, bloklu)', url: 'https://overpass-api.de/api/status' },
+    { name: 'overpass.kumi.systems', url: 'https://overpass.kumi.systems/api/status' },
+    { name: 'overpass.osm.ch', url: 'https://overpass.osm.ch/api/status' },
+    { name: 'overpass.openstreetmap.fr', url: 'https://overpass.openstreetmap.fr/api/status' },
     { name: 'httpbin.org', url: 'https://httpbin.org/get' },
     { name: 'example.com', url: 'https://example.com/' },
-    { name: 'cloudflare.com', url: 'https://www.cloudflare.com/cdn-cgi/trace' },
   ];
   const dns = await import('node:dns');
   const results: any[] = [];

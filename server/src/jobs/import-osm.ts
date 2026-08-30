@@ -15,8 +15,8 @@ import { companies } from '../db/schema/core';
 import { sql } from 'drizzle-orm';
 
 // Overpass ana sunucu (overpass-api.de) Render free plan IP'sini blokluyor (ENETUNREACH).
-// Kumi Systems (Almanya, Overpass API ruhani kardeş instance) shared cloud IP'lere izin veriyor.
-const OVERPASS = 'https://overpass.kumi.systems/api/interpreter';
+// Kumi Systems bazen 500 dönüyor (yoğun). osm.ch İsviçre'de, rate limit yüksek, stabil.
+const OVERPASS = 'https://overpass.osm.ch/api/interpreter';
 
 export interface ImportOpts {
   limit: number;       // 0 = sınırsız (TÜM İstanbul)
@@ -112,7 +112,7 @@ async function fetchOSM(city: string, limit: number): Promise<OSMElement[]> {
     });
     if (!res.ok) {
       const t = await res.text();
-      throw new Error(`Overpass HTTP ${res.status}: ${t.slice(0, 200)}`);
+      throw new Error(`Overpass HTTP ${res.status}: ${t.slice(0, 500)}`);
     }
     const data: any = await res.json();
     return ((data.elements || []) as OSMElement[]).filter(e => e.lat || e.center?.lat);
