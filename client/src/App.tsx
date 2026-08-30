@@ -36,6 +36,7 @@ const SetPassword = lazy(() => import('./pages/SetPassword'));
 const StaffPanel = lazy(() => import('./pages/StaffPanel'));
 const AIAdminPanel = lazy(() => import('./pages/AIAdminPanel'));
 const Inventory = lazy(() => import('./pages/Inventory'));
+const KvkkPage = lazy(() => import('./pages/KvkkPage'));
 
 /**
  * Lazy fallback — sayfa chunk yüklenirken gösterilir.
@@ -380,6 +381,7 @@ function App() {
                     <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
                     <Route path="/customer-login" element={<CustomerLogin />} />
                     <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />} />
+                    <Route path="/kvkk" element={<KvkkPage />} />
                     <Route path="/board" element={<SalonBoard />} />
                     <Route path="/company-panel" element={<CompanyPanel />} />
                     <Route path="/main-management" element={<MainCompanyPanel />} />
