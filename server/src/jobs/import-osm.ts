@@ -52,10 +52,23 @@ interface OSMElement {
   tags?: Record<string, string>;
 }
 
+// İl → [south, west, north, east] bbox mapping.
+// area[name="..."] bazı mirror'larda çözümlenmiyor, bbox daha güvenilir.
+// Türkiye illeri (yaklaşık merkez bbox'ları, OSM Overpass'ta çalışır)
+const CITY_BBOX: Record<string, [number, number, number, number]> = {
+  'İstanbul': [40.8, 28.0, 41.6, 29.7],
+  'Ankara':   [39.5, 32.5, 40.3, 33.5],
+  'İzmir':    [38.1, 26.7, 38.7, 27.5],
+};
+// Default: İstanbul (en çok POI)
+const DEFAULT_BBOX: [number, number, number, number] = [40.8, 28.0, 41.6, 29.7];
+
 function buildQuery(city: string, limit: number): string {
   const limitStr = limit > 0 ? `out ${limit}` : 'out';
+  const bbox = CITY_BBOX[city] || DEFAULT_BBOX;
+  const [s, w, n, e] = bbox;
   // Türkiye'de yaygın OSM tag'leri: shop=hairdresser, shop=beauty, amenity=beauty_salon
-  return `[out:json][timeout:180];area["name"="${city}"];(node["shop"="hairdresser"](area);node["shop"="beauty"](area);node["amenity"="beauty_salon"](area);way["shop"="hairdresser"](area);way["shop"="beauty"](area);way["amenity"="beauty_salon"](area););${limitStr} center;`;
+  return `[out:json][timeout:180];(node["shop"="hairdresser"](${s},${w},${n},${e});node["shop"="beauty"](${s},${w},${n},${e});node["amenity"="beauty_salon"](${s},${w},${n},${e});way["shop"="hairdresser"](${s},${w},${n},${e});way["shop"="beauty"](${s},${w},${n},${e});way["amenity"="beauty_salon"](${s},${w},${n},${e}););${limitStr} center;`;
 }
 
 function mapToCompany(e: OSMElement, city: string, adminId: number) {
@@ -99,16 +112,18 @@ async function getAdminId(email: string): Promise<number> {
 }
 
 async function fetchOSM(city: string, limit: number): Promise<OSMElement[]> {
-  const controller = new AbortController();
-  const tid = setTimeout(() => controller.abort(), 180000);
   // Render free plan IPv6 outbound desteklemiyor → ENETUNREACH.
   // Supabase direct connection IPv6-only olduğu için varsayılan ipv6first kalır,
   // ama Overpass çağrısı için IPv4 zorla (DB bağlantısı zaten kurulu, etkilenmez).
   const prevOrder = (dns as any).getDefaultResultOrder?.() || null;
   dns.setDefaultResultOrder('ipv4first');
+  const errors: string[] = [];
+  const queryStr = buildQuery(city, limit);
+  const PER_MIRROR_TIMEOUT_MS = 25000; // 25s per mirror, max 4×25=100s
   try {
-    const errors: string[] = [];
     for (const mirror of OVERPASS_MIRRORS) {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), PER_MIRROR_TIMEOUT_MS);
       try {
         const res = await fetch(mirror, {
           method: 'POST',
@@ -116,8 +131,8 @@ async function fetchOSM(city: string, limit: number): Promise<OSMElement[]> {
             'Content-Type': 'application/x-www-form-urlencoded',
             'User-Agent': 'SalonCebinde-OSM-Importer/1.0 (selim@saloncebinde.com)',
           },
-          body: 'data=' + encodeURIComponent(buildQuery(city, limit)),
-          signal: controller.signal,
+          body: 'data=' + encodeURIComponent(queryStr),
+          signal: ctrl.signal,
         });
         if (!res.ok) {
           const t = await res.text();
@@ -129,15 +144,16 @@ async function fetchOSM(city: string, limit: number): Promise<OSMElement[]> {
         if (elems.length > 0) {
           return elems; // başarılı mirror
         }
-        errors.push(`${mirror}: 0 element (area/tag eşleşmedi)`);
+        errors.push(`${mirror}: 0 element`);
       } catch (e: any) {
         errors.push(`${mirror}: ${e.message} (cause: ${e.cause?.code || '-'})`);
         continue;
+      } finally {
+        clearTimeout(tid);
       }
     }
     throw new Error(`Tüm Overpass mirror'lar başarısız: ${errors.join(' | ')}`);
   } finally {
-    clearTimeout(tid);
     if (prevOrder) dns.setDefaultResultOrder(prevOrder);
   }
 }
