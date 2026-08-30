@@ -898,40 +898,6 @@ export default function Dashboard() {
                         </div>
 
                         <div className="bg-white rounded-[3rem] p-10 shadow-2xl border border-slate-100 mb-12">
-                            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-8 font-serif">İl Bazında Firma Dağılımı</h3>
-                            {(() => {
-                                const cityCounts: Record<string, number> = {};
-                                allCompanies.forEach(c => {
-                                    const city = (c.city || 'Bilinmiyor').trim();
-                                    if (!city) return;
-                                    cityCounts[city] = (cityCounts[city] || 0) + 1;
-                                });
-                                const sorted = Object.entries(cityCounts).sort((a, b) => b[1] - a[1]);
-                                const max = Math.max(1, ...sorted.map(([, n]) => n));
-                                return (
-                                    <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
-                                        {sorted.map(([city, n]) => (
-                                            <div key={city} className="flex items-center gap-3">
-                                                <div className="w-32 shrink-0 text-sm font-bold text-slate-700 truncate">{city}</div>
-                                                <div className="flex-1 bg-slate-100 rounded-full h-7 relative overflow-hidden">
-                                                    <div
-                                                        className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-end px-3 transition-all"
-                                                        style={{ width: `${Math.max(8, (n / max) * 100)}%` }}
-                                                    >
-                                                        <span className="text-[10px] font-black text-white uppercase tracking-widest">{n} firma</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {sorted.length === 0 && (
-                                            <div className="text-sm text-slate-400 italic py-8 text-center">Henüz firma kaydı yok.</div>
-                                        )}
-                                    </div>
-                                );
-                            })()}
-                        </div>
-
-                        <div className="bg-white rounded-[3rem] p-10 shadow-2xl border border-slate-100 mb-12">
                             <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-8">Son 7 Günlük Aktivite Analizi</h3>
                             <div className="grid grid-cols-7 gap-4">
                                 {superAdminStats?.trends?.map((t: any) => (
