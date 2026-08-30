@@ -14,9 +14,15 @@ import { db, pool } from '../db';
 import { companies } from '../db/schema/core';
 import { sql } from 'drizzle-orm';
 
-// Overpass ana sunucu (overpass-api.de) Render IP'sini blokluyor.
-// kumi.systems 500, osm.ch 0 döndü. openstreetmap.fr (Fransa) deneniyor.
-const OVERPASS = 'https://overpass.openstreetmap.fr/api/interpreter';
+// Overpass mirror listesi (fallback zinciri).
+// Render free plan IP'si bazı mirror'lar tarafından bloklanıyor / transient hata dönüyor.
+// Bu yüzden 4 mirror'ı sırayla deniyoruz, hangisi veri döndürürse onu kullanıyoruz.
+const OVERPASS_MIRRORS = [
+  'https://overpass-api.de/api/interpreter',       // ana, bazen bloklu
+  'https://overpass.kumi.systems/api/interpreter', // Almanya, bazen 500
+  'https://overpass.osm.ch/api/interpreter',       // İsviçre
+  'https://overpass.openstreetmap.fr/api/interpreter', // Fransa, bazen 504
+];
 
 export interface ImportOpts {
   limit: number;       // 0 = sınırsız (TÜM İstanbul)
@@ -101,21 +107,35 @@ async function fetchOSM(city: string, limit: number): Promise<OSMElement[]> {
   const prevOrder = (dns as any).getDefaultResultOrder?.() || null;
   dns.setDefaultResultOrder('ipv4first');
   try {
-    const res = await fetch(OVERPASS, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'SalonCebinde-OSM-Importer/1.0 (selim@saloncebinde.com)',
-      },
-      body: 'data=' + encodeURIComponent(buildQuery(city, limit)),
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      const t = await res.text();
-      throw new Error(`Overpass HTTP ${res.status}: ${t.slice(0, 500)}`);
+    const errors: string[] = [];
+    for (const mirror of OVERPASS_MIRRORS) {
+      try {
+        const res = await fetch(mirror, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'SalonCebinde-OSM-Importer/1.0 (selim@saloncebinde.com)',
+          },
+          body: 'data=' + encodeURIComponent(buildQuery(city, limit)),
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          const t = await res.text();
+          errors.push(`${mirror}: HTTP ${res.status} (${t.slice(0, 100)})`);
+          continue;
+        }
+        const data: any = await res.json();
+        const elems = ((data.elements || []) as OSMElement[]).filter(e => e.lat || e.center?.lat);
+        if (elems.length > 0) {
+          return elems; // başarılı mirror
+        }
+        errors.push(`${mirror}: 0 element (area/tag eşleşmedi)`);
+      } catch (e: any) {
+        errors.push(`${mirror}: ${e.message} (cause: ${e.cause?.code || '-'})`);
+        continue;
+      }
     }
-    const data: any = await res.json();
-    return ((data.elements || []) as OSMElement[]).filter(e => e.lat || e.center?.lat);
+    throw new Error(`Tüm Overpass mirror'lar başarısız: ${errors.join(' | ')}`);
   } finally {
     clearTimeout(tid);
     if (prevOrder) dns.setDefaultResultOrder(prevOrder);
