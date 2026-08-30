@@ -93,6 +93,11 @@ async function getAdminId(email: string): Promise<number> {
 async function fetchOSM(city: string, limit: number): Promise<OSMElement[]> {
   const controller = new AbortController();
   const tid = setTimeout(() => controller.abort(), 180000);
+  // Render free plan IPv6 outbound desteklemiyor → ENETUNREACH.
+  // Supabase direct connection IPv6-only olduğu için varsayılan ipv6first kalır,
+  // ama Overpass çağrısı için IPv4 zorla (DB bağlantısı zaten kurulu, etkilenmez).
+  const prevOrder = (dns as any).getDefaultResultOrder?.() || null;
+  dns.setDefaultResultOrder('ipv4first');
   try {
     const res = await fetch(OVERPASS, {
       method: 'POST',
@@ -111,6 +116,7 @@ async function fetchOSM(city: string, limit: number): Promise<OSMElement[]> {
     return ((data.elements || []) as OSMElement[]).filter(e => e.lat || e.center?.lat);
   } finally {
     clearTimeout(tid);
+    if (prevOrder) dns.setDefaultResultOrder(prevOrder);
   }
 }
 
