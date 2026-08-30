@@ -74,3 +74,9 @@ build_error.log
 errors.txt
 error.txt
 ts-error.txt
+
+# CLI shim scripts (tsx ile çalışır, tsc derlemez)
+server/scripts/**/*.js
+server/scripts/**/*.js.map
+server/scripts/**/*.d.ts
+server/scripts/**/*.d.ts.map
