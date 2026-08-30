@@ -50,6 +50,11 @@ router.post('/register', async (req: Request, res: Response) => {
         // Şifreyi hashle
         const passwordHash = await bcrypt.hash(validatedData.password, 10);
 
+        // GÜVENLİK: Public register sadece 'customer' rolü oluşturabilir.
+        // Client 'super_admin' / 'company_admin' gönderirse YOK SAYILIR.
+        // Admin/company_admin kayıtları için ayrı bir admin-only endpoint gerekir.
+        const role = 'customer';
+
         // Kullanıcıyı oluştur
         const result = await pool.query(
             `INSERT INTO users (email, password, first_name, last_name, phone, role, company_id)
@@ -61,7 +66,7 @@ router.post('/register', async (req: Request, res: Response) => {
                 validatedData.first_name,
                 validatedData.last_name,
                 validatedData.phone ? formatPhoneTo12Digits(validatedData.phone) : null,
-                validatedData.role,
+                role, // herkese açık register sadece customer
                 validatedData.company_id || null
             ]
         );
