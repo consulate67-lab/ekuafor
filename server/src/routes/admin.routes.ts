@@ -3,11 +3,43 @@ import { authMiddleware, roleCheck } from '../middleware/auth.middleware';
 import { runOsmImport, ImportResult } from '../jobs/import-osm';
 import { logger } from '../utils/logger';
 import { randomUUID } from 'node:crypto';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
 
 const router = Router();
 
 // === Admin-only guard: auth + super_admin ===
 router.use(authMiddleware, roleCheck(['super_admin']));
+
+/**
+ * GET /api/admin/stats
+ * DB özet: toplam firma, OSM'den gelen (description LIKE '%OSM ID%'),
+ * son 24 saatte eklenen, KVKK talepleri.
+ */
+router.get('/stats', async (req: Request, res: Response) => {
+    try {
+        const total = await db.execute(sql`SELECT count(*)::int AS n FROM companies`);
+        const osmTotal = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE description LIKE '%OSM ID%'`);
+        const last24h = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE created_at > NOW() - INTERVAL '24 hours'`);
+        const byCity = await db.execute(sql`SELECT city, count(*)::int AS n FROM companies WHERE city IS NOT NULL GROUP BY city ORDER BY n DESC LIMIT 20`);
+        const kvkkPending = await db.execute(sql`SELECT count(*)::int AS n FROM kvkk_requests WHERE status = 'pending'`);
+        const osmJobs = Array.from(jobs.values()).slice(-10).reverse();
+        res.json({
+            success: true,
+            companies: {
+                total: (total as any).rows?.[0]?.n ?? 0,
+                fromOSM: (osmTotal as any).rows?.[0]?.n ?? 0,
+                last24h: (last24h as any).rows?.[0]?.n ?? 0,
+                byCity: (byCity as any).rows || [],
+            },
+            kvkk: { pending: (kvkkPending as any).rows?.[0]?.n ?? 0 },
+            osmJobs,
+        });
+    } catch (e: any) {
+        logger.error({ err: e.message }, '[admin/stats] hata');
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
 
 /**
  * DEBUG: /api/admin/test-network
