@@ -193,9 +193,11 @@ router.post('/deep-clean-cities', async (req: Request, res: Response) => {
         const removeUnmatched = Boolean(req.body?.removeUnmatched ?? req.query?.removeUnmatched ?? true);
         const triggeredBy = req.user?.email || 'unknown';
 
-        // İl + ilçe map'i — her anahtar normalize edilmiş (Türkçe ı → latin i) tek versiyon
+        // İl + ilçe map'i — her anahtar normalize edilmiş (latin i → Türkçe ı) tek versiyon
         // cleaned.normalize edilir, Map'te aynı normalize key aranır
-        const trNormalize = (s: string): string => s.toLowerCase().replace(/ı/g, 'i');
+        // NOT: split/join ile güvenli dönüşüm (regex /i/g Node 20+'da Unicode 'ı' karakterini
+        // yakalamıyor olabilir, split/join kesin çalışır)
+        const trNormalize = (s: string): string => s.toLowerCase().split('i').join('ı');
         const cityMap = new Map<string, string>();
         const addNorm = (k: string, proper: string) => {
             cityMap.set(trNormalize(k.trim()), proper);
@@ -237,8 +239,8 @@ router.post('/deep-clean-cities', async (req: Request, res: Response) => {
                 cleaned = cleaned.split('/')[0].trim();
             }
 
-            // 3. Map'te eşleşme (Türkçe ı → latin i normalize)
-            const lower = cleaned.toLowerCase().replace(/ı/g, 'i');
+            // 3. Map'te eşleşme (latin i → Türkçe ı normalize)
+            const lower = cleaned.toLowerCase().split('i').join('ı');
             const proper = cityMap.get(lower);
             if (proper) {
                 if (proper !== cleaned) {
