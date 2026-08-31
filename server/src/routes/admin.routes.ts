@@ -129,11 +129,14 @@ router.post('/normalize-cities', async (req: Request, res: Response) => {
 
         // ALL_CITY_BBOX + CITY_BBOX'taki 84 il'i (büyük/küçük) proper case'e çevir
         // city_match → proper_name map
+        // Türkçe locale: 'aydin' → 'Aydın', 'sirnak' → 'Şırnak', 'istanbul' → 'İstanbul' doğru
         const cityMap = new Map<string, string>();
         for (const [k, _] of Object.entries(ALL_CITY_BBOX || {})) {
-            // Proper case: ilk harf büyük, geri kalan küçük (Türkçe locale)
-            const proper = k.charAt(0).toLocaleUpperCase('tr-TR') + k.slice(1).toLocaleLowerCase('tr-TR');
-            cityMap.set(k.toLocaleLowerCase('tr-TR'), proper);
+            // Önce tüm anahtarı Türkçe locale ile küçült (i→ı, İ→i)
+            const lower = k.trim().toLocaleLowerCase('tr-TR');
+            // Proper case: ilk harfi büyüt (Türkçe), geri kalan zaten küçük
+            const proper = lower.charAt(0).toLocaleUpperCase('tr-TR') + lower.slice(1);
+            cityMap.set(lower, proper);
         }
         // CITY_BBOX'taki büyük harfli olanlar (İstanbul, Ankara, İzmir)
         for (const k of Object.keys({} as any)) { /* type-only */ }
@@ -154,6 +157,7 @@ router.post('/normalize-cities', async (req: Request, res: Response) => {
         const sampleChanges: { from: string; to: string; count: number }[] = [];
         for (const row of beforeRows) {
             const orig = String(row.city || '');
+            // Önce Türkçe locale ile küçült (Türkçe I/İ/ı/i doğru dönüşümü)
             const lower = orig.trim().toLocaleLowerCase('tr-TR');
             const proper = cityMap.get(lower);
             if (proper && proper !== orig) {
@@ -196,7 +200,9 @@ router.post('/normalize-cities', async (req: Request, res: Response) => {
         let otherUpdated = 0;
         for (const row of otherRows) {
             const orig = String(row.city || '');
-            const proper = orig.trim().charAt(0).toLocaleUpperCase('tr-TR') + orig.trim().slice(1).toLocaleLowerCase('tr-TR');
+            // Türkçe locale ile proper case
+            const lower = orig.trim().toLocaleLowerCase('tr-TR');
+            const proper = lower.charAt(0).toLocaleUpperCase('tr-TR') + lower.slice(1);
             if (proper !== orig) {
                 const r: any = await db.execute(sql`UPDATE companies SET city = ${proper} WHERE city = ${orig}`);
                 const n = r?.rowCount ?? 0;
