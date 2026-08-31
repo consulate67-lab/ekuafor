@@ -114,6 +114,110 @@ interface ImportJob {
 const jobs = new Map<string, ImportJob>();
 
 /**
+ * POST /api/admin/cleanup-companies
+ * İstenmeyen işletmeleri sil:
+ *  - kebap / et lokantası / restoran / aşçı / pastane
+ *  - düğün salonu / davet / organizasyon / toplantı
+ *  - isimsiz (name NULL, empty, 'İsimsiz İşletme')
+ *
+ * Body: { dryRun?: boolean, kebap?: boolean, dugun?: boolean, isimsiz?: boolean }
+ *   - kebap=true (default): kebap/restoran sil
+ *   - dugun=true (default): düğün salonu sil
+ *   - isimsiz=true (default): isimsiz firmaları sil
+ *   - dryRun=true: sadece rapor, silmez
+ *
+ * KVKK: kullanıcı talebi, loglanır.
+ */
+router.post('/cleanup-companies', async (req: Request, res: Response) => {
+    try {
+        const dryRun = Boolean(req.body?.dryRun ?? req.query?.dryRun ?? true);
+        const kebap = Boolean(req.body?.kebap ?? req.query?.kebap ?? true);
+        const dugun = Boolean(req.body?.dugun ?? req.query?.dugun ?? true);
+        const isimsiz = Boolean(req.body?.isimsiz ?? req.query?.isimsiz ?? true);
+        const triggeredBy = req.user?.email || 'unknown';
+
+        // WHERE koşullarını oluştur
+        const conditions: any[] = [];
+        if (kebap) {
+            conditions.push(sql`(name ILIKE '%kebap%' OR name ILIKE '%et lokanta%' OR name ILIKE '%restoran%' OR name ILIKE '%aşçı%' OR name ILIKE '%pastane%' OR name ILIKE '%pide%' OR name ILIKE '%lahmacun%' OR name ILIKE '%kumpir%')`);
+        }
+        if (dugun) {
+            conditions.push(sql`(name ILIKE '%düğün salonu%' OR name ILIKE '%düğün%' OR name ILIKE '%salonu%' OR name ILIKE '%davet%' OR name ILIKE '%organizasyon%' OR name ILIKE '%toplantı%' OR name ILIKE '%kır düğünü%' OR name ILIKE '%balo%')`);
+        }
+        if (isimsiz) {
+            conditions.push(sql`(name IS NULL OR TRIM(name) = '' OR name = 'İsimsiz İşletme')`);
+        }
+
+        if (conditions.length === 0) {
+            return res.status(400).json({ success: false, error: 'En az bir kategori seçilmeli (kebap/dugun/isimsiz)' });
+        }
+
+        const whereSql = sql.join(conditions, sql` OR `);
+        const whereClause = sql`WHERE ${whereSql}`;
+
+        // Önce sayımı al (kategori bazlı)
+        const counts: Record<string, number> = {};
+        if (kebap) {
+            const r: any = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE (name ILIKE '%kebap%' OR name ILIKE '%et lokanta%' OR name ILIKE '%restoran%' OR name ILIKE '%aşçı%' OR name ILIKE '%pastane%' OR name ILIKE '%pide%' OR name ILIKE '%lahmacun%' OR name ILIKE '%kumpir%')`);
+            counts.kebap = (r as any).rows?.[0]?.n ?? 0;
+        }
+        if (dugun) {
+            const r: any = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE (name ILIKE '%düğün salonu%' OR name ILIKE '%düğün%' OR name ILIKE '%salonu%' OR name ILIKE '%davet%' OR name ILIKE '%organizasyon%' OR name ILIKE '%toplantı%' OR name ILIKE '%kır düğünü%' OR name ILIKE '%balo%')`);
+            counts.dugun = (r as any).rows?.[0]?.n ?? 0;
+        }
+        if (isimsiz) {
+            const r: any = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE (name IS NULL OR TRIM(name) = '' OR name = 'İsimsiz İşletme')`);
+            counts.isimsiz = (r as any).rows?.[0]?.n ?? 0;
+        }
+
+        // Örnekleri al (her kategoriden 5)
+        const samples: Record<string, any[]> = {};
+        if (kebap) {
+            const r: any = await db.execute(sql`SELECT id, name, city FROM companies WHERE (name ILIKE '%kebap%' OR name ILIKE '%et lokanta%' OR name ILIKE '%restoran%' OR name ILIKE '%aşçı%' OR name ILIKE '%pastane%' OR name ILIKE '%pide%' OR name ILIKE '%lahmacun%' OR name ILIKE '%kumpir%') LIMIT 5`);
+            samples.kebap = (r as any).rows || [];
+        }
+        if (dugun) {
+            const r: any = await db.execute(sql`SELECT id, name, city FROM companies WHERE (name ILIKE '%düğün salonu%' OR name ILIKE '%düğün%' OR name ILIKE '%salonu%' OR name ILIKE '%davet%' OR name ILIKE '%organizasyon%' OR name ILIKE '%toplantı%' OR name ILIKE '%kır düğünü%' OR name ILIKE '%balo%') LIMIT 5`);
+            samples.dugun = (r as any).rows || [];
+        }
+        if (isimsiz) {
+            const r: any = await db.execute(sql`SELECT id, name, city FROM companies WHERE (name IS NULL OR TRIM(name) = '' OR name = 'İsimsiz İşletme') LIMIT 5`);
+            samples.isimsiz = (r as any).rows || [];
+        }
+        const totalToDelete = Object.values(counts).reduce((s, n) => s + Number(n), 0);
+
+        if (dryRun) {
+            return res.json({
+                success: true,
+                dryRun: true,
+                counts,
+                totalToDelete,
+                samples,
+                message: `Dry run: ${totalToDelete} firma silinecek. Silmek için dryRun:false gönderin.`,
+            });
+        }
+
+        // Asıl silme
+        const r: any = await db.execute(sql`DELETE FROM companies ${whereClause}`);
+        const deleted = r?.rowCount ?? 0;
+        logger.info(
+            { deleted, counts, triggeredBy },
+            '[admin/cleanup-companies] firmalar silindi'
+        );
+
+        res.json({
+            success: true,
+            deleted,
+            counts,
+            message: `${deleted} firma silindi.`,
+        });
+    } catch (e: any) {
+        logger.error({ err: e.message, stack: e.stack?.slice(0, 500) }, '[admin/cleanup-companies] hata');
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+/**
  * GET /api/admin/users?role=super_admin
  * User'ları listele (admin debug için). super_admin'leri bulmak için.
  */
