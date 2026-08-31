@@ -316,13 +316,18 @@ export async function runOsmImport(opts: ImportOpts): Promise<ImportResult> {
         '[import-osm] all-cities master başladı'
       );
 
-      const allElems: OSMElement[] = [];
       const seenIds = new Set<number>();
+      // Mevcut done'ların POI'lerini de seenIds'e ekle (duplicate önleme)
+      // Not: Bu sadece bu master run'ı boyunca çalışır; restart'ta seenIds sıfırlanır.
+      // Duplicate'ler osmId bazında DB insert'inde PK çakışması olarak görünür,
+      // ama boardCode random olduğu için aynı POI iki kez insert edilebilir.
+      // TODO (ileride): OSM id'yi companies tablosuna ekle, ON CONFLICT yap.
 
       for (let i = 0; i < remaining.length; i++) {
         const { key: cityName, bbox } = remaining[i];
         const queryStr = buildQueryForBbox(bbox, 0);
         let cityFetched = 0;
+        let cityInserted = 0;
         try {
           // Persistent progress: running
           await db.insert(osmImportProgress).values({
@@ -333,23 +338,45 @@ export async function runOsmImport(opts: ImportOpts): Promise<ImportResult> {
           });
 
           const elems = await fetchOSM(queryStr, result.errors);
+          const cityElems: OSMElement[] = [];
           for (const e of elems) {
             if (!seenIds.has(e.id)) {
               seenIds.add(e.id);
               (e as any)._city = cityName;
-              allElems.push(e);
+              cityElems.push(e);
               cityFetched++;
             }
           }
           result.perPart!.push({ part: i + 1, bbox, fetched: cityFetched });
 
-          // Persistent progress: done
+          // Her il bittiğinde insert (restart'tan etkilenmez)
+          if (cityElems.length && !dryRun) {
+            const records = cityElems.map((e: any) => mapToCompany(e, e._city || city, adminId));
+            if (!result.sample && records.length) {
+              result.sample = { name: records[0].name, boardCode: records[0].boardCode, phone: records[0].phone };
+            }
+            for (let bi = 0; bi < records.length; bi += 500) {
+              const batch = records.slice(bi, bi + 500);
+              const r = await db.insert(companies).values(batch).returning({ id: companies.id });
+              cityInserted += r.length;
+            }
+            result.inserted += cityInserted;
+          } else if (cityElems.length) {
+            result.inserted += cityElems.length; // dryRun simulate
+          }
+          result.fetched += cityFetched;
+
+          // Persistent progress: done (anında insert edilmiş POI sayısı ile)
           await db.insert(osmImportProgress).values({
-            city: cityName, status: 'done', fetched: cityFetched, inserted: 0, finishedAt: new Date(),
+            city: cityName, status: 'done', fetched: cityFetched, inserted: cityInserted, finishedAt: new Date(),
           }).onConflictDoUpdate({
             target: osmImportProgress.city,
-            set: { status: 'done', fetched: cityFetched, finishedAt: new Date() },
+            set: { status: 'done', fetched: cityFetched, inserted: cityInserted, finishedAt: new Date() },
           });
+          logger.info(
+            { city: cityName, fetched: cityFetched, inserted: cityInserted, progress: `${i + 1}/${remaining.length}` },
+            '[import-osm] il tamamlandı'
+          );
         } catch (e: any) {
           const errMsg = (e.message || String(e)).slice(0, 500);
           result.perPart!.push({ part: i + 1, bbox, fetched: 0, error: errMsg });
@@ -360,25 +387,10 @@ export async function runOsmImport(opts: ImportOpts): Promise<ImportResult> {
             target: osmImportProgress.city,
             set: { status: 'error', errorMessage: errMsg, finishedAt: new Date() },
           });
+          logger.warn({ city: cityName, err: errMsg }, '[import-osm] il hata');
         }
       }
-      result.fetched = allElems.length;
       result.durationMs = Date.now() - t0;
-      if (allElems.length) {
-        const records = allElems.map((e: any) => mapToCompany(e, e._city || city, adminId));
-        result.sample = { name: records[0].name, boardCode: records[0].boardCode, phone: records[0].phone };
-        if (!dryRun) {
-          for (let i = 0; i < records.length; i += 500) {
-            const batch = records.slice(i, i + 500);
-            const r = await db.insert(companies).values(batch).returning({ id: companies.id });
-            result.inserted += r.length;
-          }
-        } else {
-          result.inserted = records.length;
-        }
-        // done il sayısı + inserted güncelle (tüm done iller toplamı)
-        await db.execute(sql`UPDATE osm_import_progress SET inserted = ${result.inserted} WHERE status = 'done'`);
-      }
       result.ok = true;
       logger.info(
         { fetched: result.fetched, inserted: result.inserted, durationMs: result.durationMs, skipped: result.skipped },
