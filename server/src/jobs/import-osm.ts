@@ -71,7 +71,7 @@ const DEFAULT_BBOX: [number, number, number, number] = [40.8, 28.0, 41.6, 29.7];
 
 // İstanbul grid: 2x2 = 4 parça. Tam bbox 40.8-41.6N × 28.0-29.7E
 // Paralel çağrı riskli (rate limit), sıralı çağırıyoruz.
-const CITY_GRID: Record<string, [number, number, number, number][]> = {
+export const CITY_GRID: Record<string, [number, number, number, number][]> = {
   'istanbul': [
     [41.2, 28.0, 41.6, 28.85],  // NW: Avrupa kuzey
     [41.2, 28.85, 41.6, 29.7],  // NE: Anadolu kuzey
@@ -83,7 +83,10 @@ const CITY_GRID: Record<string, [number, number, number, number][]> = {
 // Türkiye 81 il — her il için tek parça bbox (yaklaşık merkez ±0.3° enlem, ±0.4° boylam).
 // OSM admin boundary detaylı değil ama şehir merkezi POI'leri için yeterli.
 // grid='all' modunda 81 il sırayla çağrılır.
-const ALL_CITY_BBOX: Record<string, [number, number, number, number]> = {
+// ÖNEMLİ: Anahtarlar tamamen küçük harfli (Türkçe karakterler dahil) — 'istanbul' değil 'İstanbul'.
+// DB'de osm_import_progress.city ile birebir eşleşmeli (case-sensitive UNIQUE).
+// Büyük harfle yazılan iller (İstanbul, Ankara, İzmir) CITY_BBOX'ta kalır (tekil import için).
+export const ALL_CITY_BBOX: Record<string, [number, number, number, number]> = {
   'adana':          [36.7,  34.9, 37.3,  35.7],
   'adiyaman':       [37.4,  37.9, 38.1,  38.6],
   'afyonkarahisar': [38.4,  30.1, 39.0,  31.0],

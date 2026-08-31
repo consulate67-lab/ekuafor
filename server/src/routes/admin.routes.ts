@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware, roleCheck } from '../middleware/auth.middleware';
-import { runOsmImport, ImportResult } from '../jobs/import-osm';
+import { runOsmImport, ImportResult, ALL_CITY_BBOX } from '../jobs/import-osm';
 import { logger } from '../utils/logger';
 import { randomUUID } from 'node:crypto';
 import { db } from '../db';
@@ -110,6 +110,124 @@ interface ImportJob {
   error?: string;
 }
 const jobs = new Map<string, ImportJob>();
+
+/**
+ * POST /api/admin/normalize-cities
+ * Companies tablosundaki city alanını Türkçe-uyumlu Title Case'e çevirir.
+ * OSM'den gelen "ankara", eski verilerdeki "Ankara", "ANKARA" gibi
+ * case-sensitive duplicate'leri tekilleştirir.
+ *
+ * ALL_CITY_BBOX'taki 81 il için LOWER karşılaştırma ile doğru Türkçe isme çevirir.
+ * Body: { dryRun?: boolean, onlyAffected?: boolean }
+ *   - dryRun=true: UPDATE yapmaz, sadece kaç satır etkileneceğini raporlar
+ *   - onlyAffected=true: Sadece değişecek satırları UPDATE yapar
+ */
+router.post('/normalize-cities', async (req: Request, res: Response) => {
+    try {
+        const dryRun = Boolean(req.body?.dryRun ?? req.query?.dryRun ?? false);
+        const triggeredBy = req.user?.email || 'unknown';
+
+        // ALL_CITY_BBOX + CITY_BBOX'taki 84 il'i (büyük/küçük) proper case'e çevir
+        // city_match → proper_name map
+        const cityMap = new Map<string, string>();
+        for (const [k, _] of Object.entries(ALL_CITY_BBOX || {})) {
+            // Proper case: ilk harf büyük, geri kalan küçük (Türkçe locale)
+            const proper = k.charAt(0).toLocaleUpperCase('tr-TR') + k.slice(1).toLocaleLowerCase('tr-TR');
+            cityMap.set(k.toLocaleLowerCase('tr-TR'), proper);
+        }
+        // CITY_BBOX'taki büyük harfli olanlar (İstanbul, Ankara, İzmir)
+        for (const k of Object.keys({} as any)) { /* type-only */ }
+        // ALL_CITY_BBOX zaten tüm 81 ili kapsıyor, ek gerek yok
+
+        if (cityMap.size === 0) {
+            return res.status(500).json({ success: false, error: 'City map boş, ALL_CITY_BBOX import edilemedi' });
+        }
+
+        // Şu an DB'deki unique city string'lerini çek (lowercase)
+        const beforeRes = await db.execute(sql`SELECT city, count(*)::int AS n FROM companies WHERE city IS NOT NULL GROUP BY city ORDER BY city`);
+        const beforeRows = (beforeRes as any).rows || [];
+        const beforeCount = beforeRows.length;
+        const totalCompanies = beforeRows.reduce((s: number, r: any) => s + Number(r.n || 0), 0);
+
+        // Her unique city string için case-insensitive match yap
+        let toUpdate = 0;
+        const sampleChanges: { from: string; to: string; count: number }[] = [];
+        for (const row of beforeRows) {
+            const orig = String(row.city || '');
+            const lower = orig.trim().toLocaleLowerCase('tr-TR');
+            const proper = cityMap.get(lower);
+            if (proper && proper !== orig) {
+                toUpdate += Number(row.n);
+                if (sampleChanges.length < 20) sampleChanges.push({ from: orig, to: proper, count: Number(row.n) });
+            }
+        }
+
+        if (dryRun) {
+            return res.json({
+                success: true,
+                dryRun: true,
+                uniqueCities: beforeCount,
+                totalCompanies,
+                toUpdate,
+                uniqueAfter: cityMap.size,
+                sampleChanges,
+                message: `Dry run: ${toUpdate} firma güncellenecek.`,
+            });
+        }
+
+        // Gerçek UPDATE: her unique case için ayrı UPDATE (race condition yok, hızlı)
+        let updated = 0;
+        const updateLog: string[] = [];
+        for (const [from, to] of cityMap.entries()) {
+            // from = lowercase anahtar (ALL_CITY_BBOX'tan)
+            // Aynı lowercase'e sahip TÜM varyasyonları (Ankara, ankara, ANKARA) to'ya çevir
+            const r: any = await db.execute(sql`UPDATE companies SET city = ${to} WHERE LOWER(city) = ${from} AND city IS NOT NULL`);
+            const n = r?.rowCount ?? r?.affectedRows ?? 0;
+            if (n > 0) {
+                updated += Number(n);
+                updateLog.push(`${from} → ${to}: ${n} satır`);
+            }
+        }
+
+        // Sonra kalan (Türkiye'de olmayan) şehirleri Title Case'e çevir
+        // Örn: "buca" → "Buca" (ilçe olabilir)
+        const otherRes = await db.execute(sql`SELECT city, count(*)::int AS n FROM companies WHERE city IS NOT NULL GROUP BY city`);
+        const otherRows = (otherRes as any).rows || [];
+        let otherUpdated = 0;
+        for (const row of otherRows) {
+            const orig = String(row.city || '');
+            const proper = orig.trim().charAt(0).toLocaleUpperCase('tr-TR') + orig.trim().slice(1).toLocaleLowerCase('tr-TR');
+            if (proper !== orig) {
+                const r: any = await db.execute(sql`UPDATE companies SET city = ${proper} WHERE city = ${orig}`);
+                const n = r?.rowCount ?? 0;
+                if (n > 0) {
+                    otherUpdated += Number(n);
+                    updateLog.push(`${orig} → ${proper} (ilçe): ${n} satır`);
+                }
+            }
+        }
+
+        const afterRes = await db.execute(sql`SELECT count(DISTINCT city)::int AS n FROM companies WHERE city IS NOT NULL`);
+        const afterUnique = (afterRes as any).rows?.[0]?.n ?? 0;
+
+        logger.info(
+            { updated, otherUpdated, total: updated + otherUpdated, beforeCount, afterUnique, triggeredBy, updateLog: updateLog.slice(0, 30) },
+            '[admin/normalize-cities] city normalize tamamlandı'
+        );
+
+        res.json({
+            success: true,
+            uniqueCities: { before: beforeCount, after: afterUnique },
+            totalUpdated: updated + otherUpdated,
+            from81Il: updated,
+            fromIlce: otherUpdated,
+            sampleChanges: updateLog.slice(0, 30),
+        });
+    } catch (e: any) {
+        logger.error({ err: e.message, stack: e.stack?.slice(0, 500) }, '[admin/normalize-cities] hata');
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
 
 /**
  * GET /api/admin/import-status
