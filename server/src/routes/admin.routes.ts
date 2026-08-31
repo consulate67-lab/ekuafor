@@ -112,6 +112,20 @@ interface ImportJob {
 const jobs = new Map<string, ImportJob>();
 
 /**
+ * GET /api/admin/users?role=super_admin
+ * User'ları listele (admin debug için). super_admin'leri bulmak için.
+ */
+router.get('/users', async (req: Request, res: Response) => {
+    try {
+        const role = String(req.query.role || '');
+        const r: any = await db.execute(sql`SELECT id, email, role, first_name, last_name, created_at FROM users ${role ? sql`WHERE role = ${role}` : sql``} ORDER BY id DESC LIMIT 50`);
+        res.json({ success: true, count: (r as any).rows?.length || 0, users: (r as any).rows || [] });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+/**
  * POST /api/admin/normalize-cities
  * Companies tablosundaki city alanını Türkçe-uyumlu Title Case'e çevirir.
  * OSM'den gelen "ankara", eski verilerdeki "Ankara", "ANKARA" gibi
