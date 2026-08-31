@@ -190,7 +190,8 @@ router.get('/debug-city-map', async (req: Request, res: Response) => {
 router.post('/deep-clean-cities', async (req: Request, res: Response) => {
     try {
         const dryRun = Boolean(req.body?.dryRun ?? req.query?.dryRun ?? true);
-        const removeUnmatched = Boolean(req.body?.removeUnmatched ?? req.query?.removeUnmatched ?? true);
+        // GÜVENLİK: default false. Eşleşmeyen verileri silmek istiyorsanız açıkça true gönderin.
+        const removeUnmatched = Boolean(req.body?.removeUnmatched ?? req.query?.removeUnmatched ?? false);
         const triggeredBy = req.user?.email || 'unknown';
 
         // İl + ilçe map'i — her anahtar normalize edilmiş (latin i → Türkçe ı) tek versiyon
@@ -223,6 +224,9 @@ router.post('/deep-clean-cities', async (req: Request, res: Response) => {
         const toDelete: { city: string; count: number; reason: string }[] = [];
         const willStay: { city: string; count: number }[] = [];
 
+        // Yabancı ülke / anlamsız pattern'ler (silinecekler listesi)
+        const FOREIGN_OR_JUNK = /^(Didymoteicho|Zakho|Վ|Ա|ز|duzce|Edenlere|Köyiçi|Bostanlı|Yeşiltepe|20\/b|20\/B|Sağlık|sağlık|Büyükkarıştıran|buyukkaristiran)$/i;
+
         for (const row of beforeRows) {
             const orig = String(row.city || '');
             const count = Number(row.n);
@@ -233,13 +237,28 @@ router.post('/deep-clean-cities', async (req: Request, res: Response) => {
                 continue;
             }
 
-            // 2. Slash temizleme
+            // 2. Yabancı ülke / anlamsız → sil
+            if (FOREIGN_OR_JUNK.test(orig.trim())) {
+                toDelete.push({ city: orig, count, reason: 'yabancı/anlamsız' });
+                continue;
+            }
+
+            // 3. "X mahallesi" / "X köyü" / "X köy" → sil
+            if (/\s*(mahallesi|mahallesı|mah|köyü|köy)\s*$/i.test(orig.trim())) {
+                toDelete.push({ city: orig, count, reason: 'mahalle/köy suffix' });
+                continue;
+            }
+
+            // 4. Slash temizleme (Altındağ/ankara → Altındağ)
             let cleaned = orig;
             if (cleaned.includes('/')) {
                 cleaned = cleaned.split('/')[0].trim();
             }
 
-            // 3. Map'te eşleşme (latin i → Türkçe ı normalize)
+            // 5. "X merkez" suffix temizleme (Kütahya merkez → Kütahya)
+            cleaned = cleaned.replace(/\s+merkez\s*$/i, '').trim();
+
+            // 6. Map'te eşleşme (latin i → Türkçe ı normalize)
             const lower = cleaned.toLowerCase().split('i').join('ı');
             const proper = cityMap.get(lower);
             if (proper) {
@@ -697,6 +716,229 @@ router.post('/import-osm', async (req: Request, res: Response) => {
     );
   }
   res.json({ success: result.ok, ...result });
+});
+
+/**
+ * Selim'in 24-entry kirli city listesi için karar tablosu.
+ * Her satır: mevcut kirli değer → yapılacak işlem.
+ *
+ *  - action='update' + to: city alanını `to` değerine güncelle
+ *  - action='delete': o city'e sahip firmaları sil
+ *
+ * Adres fallback: action='update' olanlar için, firmaların address alanına
+ * bakıp 81 ilden hangisi geçiyorsa onu kullan (override). Geçmiyorsa hard-coded
+ * `to` kullanılır.
+ */
+const DIRTY_CITY_RULES: { from: string; action: 'update' | 'delete'; to?: string; reason: string }[] = [
+    { from: '20/b',                       action: 'delete', reason: 'anlamsız (adres/numara)' },
+    { from: 'Altındağ/ankara',            action: 'update', to: 'Ankara',     reason: 'Altındağ → Ankara ilçesi' },
+    { from: 'Bağlar/diyarbakır',          action: 'update', to: 'Diyarbakır',  reason: 'Bağlar → Diyarbakır ilçesi' },
+    { from: 'Bostanlı mahallesi',         action: 'delete', reason: 'mahalle + konum belirsiz' },
+    { from: 'Büyükkarıştıran',            action: 'update', to: 'Kırklareli',  reason: 'Büyükkarıştıran → Kırklareli ili beldesi' },
+    { from: 'Çankaya/ankara',             action: 'update', to: 'Ankara',      reason: 'Çankaya → Ankara ilçesi' },
+    { from: 'Dereli/giresun',             action: 'update', to: 'Giresun',     reason: 'Dereli → Giresun ilçesi' },
+    { from: 'Didymoteicho',               action: 'delete', reason: 'Yunanistan şehri' },
+    { from: 'Edenlere mahallesi',         action: 'delete', reason: 'anlamsız mahalle adı' },
+    { from: 'Karatay/konya',              action: 'update', to: 'Konya',       reason: 'Karatay → Konya ilçesi' },
+    { from: 'Kayapınar/diyarbakır',       action: 'update', to: 'Diyarbakır',  reason: 'Kayapınar → Diyarbakır ilçesi' },
+    { from: 'Köyiçi mahallesi',           action: 'delete', reason: 'anlamsız mahalle adı' },
+    { from: 'Kütahya merkez',             action: 'update', to: 'Kütahya',     reason: '"merkez" suffix temizleme' },
+    { from: 'Mamak/ankara',               action: 'update', to: 'Ankara',      reason: 'Mamak → Ankara ilçesi' },
+    { from: 'Odunpazarı / eskişehir',     action: 'update', to: 'Eskişehir',   reason: 'Odunpazarı → Eskişehir ilçesi' },
+    { from: 'Şarköy',                     action: 'update', to: 'Tekirdağ',    reason: 'Şarköy → Tekirdağ ilçesi' },
+    { from: 'Sağlık',                     action: 'delete', reason: 'anlamsız (tek kelime, ili belirsiz)' },
+    { from: 'Şişli',                      action: 'update', to: 'İstanbul',    reason: 'Şişli → İstanbul ilçesi' },
+    { from: 'Sur/diyarbakır',             action: 'update', to: 'Diyarbakır',  reason: 'Sur → Diyarbakır ilçesi' },
+    { from: 'Tire/izmir',                 action: 'update', to: 'İzmir',       reason: 'Tire → İzmir ilçesi' },
+    { from: 'Yalova merkez',              action: 'update', to: 'Yalova',      reason: '"merkez" suffix temizleme' },
+    { from: 'Yeşiltepe mahallesi',        action: 'delete', reason: 'konum belirsiz (Erzurum/Karaman/Ankara vb.)' },
+];
+
+/**
+ * 81 il proper name map — adres fallback için.
+ * Her anahtar lowercase + latin-i, değer Türkçe karakterli proper case.
+ */
+const IL_MAP_LOWER: Map<string, string> = (() => {
+    const m = new Map<string, string>();
+    const normalize = (s: string) => s.toLowerCase().split('i').join('ı');
+    for (const [k, proper] of Object.entries(TURKIYE_ILLERI)) {
+        m.set(normalize(k), proper);
+    }
+    return m;
+})();
+
+/**
+ * Adres string'inden 81 il proper name'ini bul.
+ * Bulursa proper name (Türkçe karakterli) döner, bulamazsa null.
+ * Case-insensitive, Türkçe karakter duyarsız.
+ */
+function findIlInAddress(address: string | null | undefined, name: string | null | undefined): string | null {
+    const normalize = (s: string) => s.toLowerCase().split('i').join('ı');
+    const haystack = normalize(`${address || ''} ${name || ''}`);
+    // Önce tam eşleşme (kelime sınırı ile) — kısa isimler için yanlış pozitif önlenir
+    for (const [lower, proper] of IL_MAP_LOWER.entries()) {
+        // "ankara" gibi tek kelime → kelime sınırı ile ara
+        // "afyonkarahisar" gibi uzun → kelime sınırı olmadan da olur
+        const pattern = new RegExp(`(^|[^a-zçğıöşü0-9])${lower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-zçğıöşü0-9]|$)`, 'i');
+        if (pattern.test(haystack)) return proper;
+    }
+    return null;
+}
+
+/**
+ * GET /api/admin/inspect-dirty-cities
+ * Selim'in 24-entry listesi için DB detayları:
+ *  - Her kural için kaç firma etkilenir
+ *  - Sample firmaların id/name/address bilgisi
+ *  - Adres fallback uygulanmış önerilen karar
+ *
+ * Production: sadece rapor, hiçbir şey değiştirmez.
+ */
+router.get('/inspect-dirty-cities', async (req: Request, res: Response) => {
+    try {
+        const reports: any[] = [];
+        for (const rule of DIRTY_CITY_RULES) {
+            const cnt: any = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE city = ${rule.from}`);
+            const count = Number((cnt as any).rows?.[0]?.n ?? 0);
+            const samplesRes: any = await db.execute(
+                sql`SELECT id, name, address, city FROM companies WHERE city = ${rule.from} ORDER BY id LIMIT 5`
+            );
+            const samples = (samplesRes as any).rows || [];
+
+            // Adres fallback analizi
+            const addressOverrides: { id: number; name: string; address: string; proposedCity: string }[] = [];
+            if (rule.action === 'update' && rule.to) {
+                for (const s of samples) {
+                    const detected = findIlInAddress(s.address, s.name);
+                    if (detected && detected !== rule.to) {
+                        addressOverrides.push({
+                            id: s.id,
+                            name: s.name,
+                            address: s.address,
+                            proposedCity: detected,
+                        });
+                    }
+                }
+            }
+
+            reports.push({
+                from: rule.from,
+                action: rule.action,
+                to: rule.to || null,
+                reason: rule.reason,
+                count,
+                samples,
+                addressOverrideCount: addressOverrides.length,
+                addressOverrideSamples: addressOverrides,
+            });
+        }
+        const totalCount = reports.reduce((s, r) => s + r.count, 0);
+        res.json({
+            success: true,
+            totalCount,
+            totalRules: DIRTY_CITY_RULES.length,
+            reports,
+        });
+    } catch (e: any) {
+        logger.error({ err: e.message, stack: e.stack?.slice(0, 500) }, '[admin/inspect-dirty-cities] hata');
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+/**
+ * POST /api/admin/fix-dirty-cities
+ * DIRTY_CITY_RULES'taki kararları uygular.
+ *  - dryRun=true (default): sadece rapor, hiçbir şey değiştirmez
+ *  - dryRun=false: UPDATE ve DELETE işlemlerini gerçekleştirir
+ *
+ * Adres fallback: action='update' olan her kural için, firmaların address/name
+ * alanına bakılır. 81 ilden biri geçiyorsa hard-coded `to` yerine o kullanılır.
+ * Bu sayede "Altındağ/ankara" → "Ankara" gibi net kuralların yanında
+ * belirsiz durumlarda adres doğru kararı verir.
+ */
+router.post('/fix-dirty-cities', async (req: Request, res: Response) => {
+    try {
+        const dryRun = Boolean(req.body?.dryRun ?? true);
+        const triggeredBy = req.user?.email || 'unknown';
+
+        const updates: { from: string; to: string; reason: string; matched: number; updated: number; viaAddress: number }[] = [];
+        const deletes: { from: string; reason: string; matched: number; deleted: number }[] = [];
+
+        for (const rule of DIRTY_CITY_RULES) {
+            if (rule.action === 'update' && rule.to) {
+                // Tüm eşleşen firmaları çek
+                const rowsRes: any = await db.execute(
+                    sql`SELECT id, name, address, city FROM companies WHERE city = ${rule.from}`
+                );
+                const rows: { id: number; name: string; address: string; city: string }[] = (rowsRes as any).rows || [];
+                const matched = rows.length;
+                let updated = 0;
+                let viaAddress = 0;
+
+                for (const row of rows) {
+                    // Adres fallback: hard-coded `to` yerine address'ten bulunan il
+                    const detected = findIlInAddress(row.address, row.name);
+                    const targetCity = detected || rule.to;
+                    if (!dryRun) {
+                        const r: any = await db.execute(
+                            sql`UPDATE companies SET city = ${targetCity} WHERE id = ${row.id}`
+                        );
+                        if (Number(r?.rowCount ?? 0) > 0) updated++;
+                    }
+                    if (detected && detected !== rule.to) viaAddress++;
+                }
+
+                if (!dryRun) updated = matched; // dryRun=false ise tüm matched güncellendi
+                updates.push({
+                    from: rule.from,
+                    to: rule.to,
+                    reason: rule.reason,
+                    matched,
+                    updated: dryRun ? 0 : updated,
+                    viaAddress,
+                });
+            } else if (rule.action === 'delete') {
+                const cnt: any = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE city = ${rule.from}`);
+                const matched = Number((cnt as any).rows?.[0]?.n ?? 0);
+                let deleted = 0;
+                if (!dryRun) {
+                    const r: any = await db.execute(sql`DELETE FROM companies WHERE city = ${rule.from}`);
+                    deleted = Number(r?.rowCount ?? 0);
+                }
+                deletes.push({ from: rule.from, reason: rule.reason, matched, deleted });
+            }
+        }
+
+        if (!dryRun) {
+            logger.info(
+                {
+                    triggeredBy,
+                    dryRun: false,
+                    updates: updates.length,
+                    deletes: deletes.length,
+                    totalUpdated: updates.reduce((s, r) => s + r.updated, 0),
+                    totalDeleted: deletes.reduce((s, r) => s + r.deleted, 0),
+                    addressOverrides: updates.reduce((s, r) => s + r.viaAddress, 0),
+                },
+                '[admin/fix-dirty-cities] 24-entry listesi uygulandı'
+            );
+        }
+
+        res.json({
+            success: true,
+            dryRun,
+            totalRules: DIRTY_CITY_RULES.length,
+            totalMatched: updates.reduce((s, r) => s + r.matched, 0) + deletes.reduce((s, r) => s + r.matched, 0),
+            totalUpdated: updates.reduce((s, r) => s + r.updated, 0),
+            totalDeleted: deletes.reduce((s, r) => s + r.deleted, 0),
+            addressOverrides: updates.reduce((s, r) => s + r.viaAddress, 0),
+            updates,
+            deletes,
+        });
+    } catch (e: any) {
+        logger.error({ err: e.message, stack: e.stack?.slice(0, 500) }, '[admin/fix-dirty-cities] hata');
+        res.status(500).json({ success: false, error: e.message });
+    }
 });
 
 export default router;
