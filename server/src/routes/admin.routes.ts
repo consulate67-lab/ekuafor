@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware, roleCheck } from '../middleware/auth.middleware';
 import { runOsmImport, ImportResult, ALL_CITY_BBOX } from '../jobs/import-osm';
+import { TURKIYE_ILLERI } from '../data/turkiye-illeri';
 import { logger } from '../utils/logger';
 import { randomUUID } from 'node:crypto';
 import { db } from '../db';
@@ -143,14 +144,18 @@ router.post('/normalize-cities', async (req: Request, res: Response) => {
 
         // ALL_CITY_BBOX + CITY_BBOX'taki 84 il'i (büyük/küçük) proper case'e çevir
         // city_match → proper_name map
-        // Türkçe locale: 'aydin' → 'Aydın', 'sirnak' → 'Şırnak', 'istanbul' → 'İstanbul' doğru
+        // ÖNEMLİ: Node toLocaleLowerCase('tr-TR') her sürümde tutarlı i→ı dönüşümü yapmıyor,
+        // o yüzden 81 il için explicit TURKIYE_ILLERI map'i kullanıyoruz.
         const cityMap = new Map<string, string>();
-        for (const [k, _] of Object.entries(ALL_CITY_BBOX || {})) {
-            // Önce tüm anahtarı Türkçe locale ile küçült (i→ı, İ→i)
+        for (const [k, proper] of Object.entries(TURKIYE_ILLERI)) {
+            // Önce tüm anahtarı küçült (i/ı farkı için)
             const lower = k.trim().toLocaleLowerCase('tr-TR');
-            // Proper case: ilk harfi büyüt (Türkçe), geri kalan zaten küçük
-            const proper = lower.charAt(0).toLocaleUpperCase('tr-TR') + lower.slice(1);
             cityMap.set(lower, proper);
+        }
+        // CITY_BBOX'taki büyük harfli varyantlar (İstanbul, Ankara, İzmir) — zaten proper case
+        for (const k of ['İstanbul', 'Ankara', 'İzmir']) {
+            const lower = k.toLocaleLowerCase('tr-TR');
+            if (!cityMap.has(lower)) cityMap.set(lower, k);
         }
         // CITY_BBOX'taki büyük harfli olanlar (İstanbul, Ankara, İzmir)
         for (const k of Object.keys({} as any)) { /* type-only */ }
