@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { authMiddleware, roleCheck } from '../middleware/auth.middleware';
 import { runOsmImport, ImportResult, ALL_CITY_BBOX } from '../jobs/import-osm';
 import { TURKIYE_ILLERI } from '../data/turkiye-illeri';
+import { TURKIYE_ILCELERI } from '../data/turkiye-ilceler';
 import { logger } from '../utils/logger';
 import { randomUUID } from 'node:crypto';
 import { db } from '../db';
@@ -145,14 +146,18 @@ router.post('/normalize-cities', async (req: Request, res: Response) => {
         // ALL_CITY_BBOX + CITY_BBOX'taki 84 il'i (büyük/küçük) proper case'e çevir
         // city_match → proper_name map
         // ÖNEMLİ: Node toLocaleLowerCase('tr-TR') her sürümde tutarlı i→ı dönüşümü yapmıyor,
-        // o yüzden 81 il için explicit TURKIYE_ILLERI map'i kullanıyoruz.
+        // o yüzden 81 il + 50+ ilçe için explicit map kullanıyoruz.
         const cityMap = new Map<string, string>();
         for (const [k, proper] of Object.entries(TURKIYE_ILLERI)) {
             // Önce tüm anahtarı küçült (i/ı farkı için)
             const lower = k.trim().toLocaleLowerCase('tr-TR');
             cityMap.set(lower, proper);
         }
-        // CITY_BBOX'taki büyük harfli varyantlar (İstanbul, Ankara, İzmir) — zaten proper case
+        for (const [k, proper] of Object.entries(TURKIYE_ILCELERI)) {
+            const lower = k.trim().toLocaleLowerCase('tr-TR');
+            if (!cityMap.has(lower)) cityMap.set(lower, proper);
+        }
+        // CITY_BOX'taki büyük harfli varyantlar (İstanbul, Ankara, İzmir) — zaten proper case
         for (const k of ['İstanbul', 'Ankara', 'İzmir']) {
             const lower = k.toLocaleLowerCase('tr-TR');
             if (!cityMap.has(lower)) cityMap.set(lower, k);
@@ -172,16 +177,18 @@ router.post('/normalize-cities', async (req: Request, res: Response) => {
         const totalCompanies = beforeRows.reduce((s: number, r: any) => s + Number(r.n || 0), 0);
 
         // Her unique city string için case-insensitive match yap
+        // Slash'lı veri varsa ("Altındağ/ankara") sadece ilk kısmı al
         let toUpdate = 0;
         const sampleChanges: { from: string; to: string; count: number }[] = [];
         for (const row of beforeRows) {
             const orig = String(row.city || '');
-            // Önce Türkçe locale ile küçült (Türkçe I/İ/ı/i doğru dönüşümü)
-            const lower = orig.trim().toLocaleLowerCase('tr-TR');
+            // Slash temizleme: "X/Y" → "X" (ilçe/il formatı OSM'den gelen kirli veri)
+            const cleaned = orig.includes('/') ? orig.split('/')[0].trim() : orig;
+            const lower = cleaned.trim().toLocaleLowerCase('tr-TR');
             const proper = cityMap.get(lower);
-            if (proper && proper !== orig) {
+            if (proper && proper !== cleaned) {
                 toUpdate += Number(row.n);
-                if (sampleChanges.length < 20) sampleChanges.push({ from: orig, to: proper, count: Number(row.n) });
+                if (sampleChanges.length < 30) sampleChanges.push({ from: orig, to: proper, count: Number(row.n) });
             }
         }
 
@@ -202,13 +209,14 @@ router.post('/normalize-cities', async (req: Request, res: Response) => {
         let updated = 0;
         const updateLog: string[] = [];
         for (const [from, to] of cityMap.entries()) {
-            // from = lowercase anahtar (ALL_CITY_BBOX'tan)
+            // from = lowercase anahtar (Türkiye illeri/ilçeleri map'inden)
             // Aynı lowercase'e sahip TÜM varyasyonları (Ankara, ankara, ANKARA) to'ya çevir
-            const r: any = await db.execute(sql`UPDATE companies SET city = ${to} WHERE LOWER(city) = ${from} AND city IS NOT NULL`);
+            // Slash'lı varyantları da yakala: "X/il" → "X"
+            const r: any = await db.execute(sql`UPDATE companies SET city = ${to} WHERE (LOWER(city) = ${from} OR LOWER(SPLIT_PART(city, '/', 1)) = ${from}) AND city IS NOT NULL`);
             const n = r?.rowCount ?? r?.affectedRows ?? 0;
             if (n > 0) {
                 updated += Number(n);
-                updateLog.push(`${from} → ${to}: ${n} satır`);
+                if (updateLog.length < 30) updateLog.push(`${from} → ${to}: ${n} satır`);
             }
         }
 
