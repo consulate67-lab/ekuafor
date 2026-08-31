@@ -105,7 +105,7 @@ interface ImportJob {
   startedAt: string;
   finishedAt?: string;
   status: 'running' | 'done' | 'error';
-  opts: { limit: number; city?: string; dryRun?: boolean; grid?: string };
+  opts: { limit: number; city?: string; dryRun?: boolean; grid?: string; mode?: 'standard' | 'extended' };
   result?: ImportResult;
   error?: string;
 }
@@ -148,6 +148,8 @@ router.post('/import-osm', async (req: Request, res: Response) => {
   const city = String(req.body?.city ?? req.query?.city ?? 'İstanbul');
   const dryRun = Boolean(req.body?.dryRun ?? req.query?.dryRun ?? false);
   const grid = (req.body?.grid ?? req.query?.grid) ? String(req.body?.grid ?? req.query?.grid) : undefined;
+  const modeRaw = (req.body?.mode ?? req.query?.mode ?? 'standard') as string;
+  const mode = modeRaw === 'extended' ? 'extended' : 'standard';
   const triggeredBy = req.user?.email || 'unknown';
 
   if (Number.isNaN(limit) || limit < 0) {
@@ -164,16 +166,16 @@ router.post('/import-osm', async (req: Request, res: Response) => {
       id: jobId,
       startedAt: new Date().toISOString(),
       status: 'running',
-      opts: { limit, city, dryRun, grid },
+      opts: { limit, city, dryRun, grid, mode },
     };
     jobs.set(jobId, job);
     logger.info(
-      { jobId, limit, city, dryRun, grid, triggeredBy },
+      { jobId, limit, city, dryRun, grid, mode, triggeredBy },
       '[admin/import-osm] Fire-and-forget başladı'
     );
 
     // Response'u HEMEN dön, arka planda çalıştır
-    runOsmImport({ limit, city, dryRun, grid })
+    runOsmImport({ limit, city, dryRun, grid, mode })
       .then(result => {
         job.finishedAt = new Date().toISOString();
         job.status = result.ok ? 'done' : 'error';
@@ -205,8 +207,8 @@ router.post('/import-osm', async (req: Request, res: Response) => {
   }
 
   // === Küçük job: sync çalıştır, sonucu dön ===
-  logger.info({ limit, city, dryRun, grid, triggeredBy }, '[admin/import-osm] Sync başladı');
-  const result = await runOsmImport({ limit, city, dryRun, grid });
+  logger.info({ limit, city, dryRun, grid, mode, triggeredBy }, '[admin/import-osm] Sync başladı');
+  const result = await runOsmImport({ limit, city, dryRun, grid, mode });
   if (!result.ok) {
     logger.error({ errors: result.errors, durationMs: result.durationMs }, '[admin/import-osm] Sync HATA');
   } else {

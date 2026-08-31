@@ -31,6 +31,7 @@ export interface ImportOpts {
   dryRun?: boolean;    // true = DB'ye yazma, sadece say
   adminEmail?: string; // default: sarpyilmaz@saloon.com
   grid?: string;       // 'istanbul' = 4 parçalı grid, undefined = tek bbox
+  mode?: 'standard' | 'extended'; // extended: ek tag'ler + name regex
 }
 
 export interface ImportResult {
@@ -39,6 +40,7 @@ export interface ImportResult {
   limit: number;
   dryRun: boolean;
   grid: string | null;
+  mode: 'standard' | 'extended';
   parts: number;       // kaç parça sorgu atıldı
   skipped: number;     // persistent queue'da atlanan il sayısı
   fetched: number;
@@ -165,11 +167,16 @@ const ALL_CITY_BBOX: Record<string, [number, number, number, number]> = {
   'duzce':          [40.5,  30.7, 41.2,  31.5],
 };
 
-function buildQueryForBbox(bbox: [number, number, number, number], limit: number): string {
+function buildQueryForBbox(bbox: [number, number, number, number], limit: number, mode: 'standard' | 'extended' = 'standard'): string {
   const limitStr = limit > 0 ? `out ${limit}` : 'out';
   const [s, w, n, e] = bbox;
-  // Türkiye'de yaygın OSM tag'leri: shop=hairdresser (en yaygın), shop=beauty, amenity=beauty_salon
-  return `[out:json][timeout:120];(node["shop"="hairdresser"](${s},${w},${n},${e});node["shop"="beauty"](${s},${w},${n},${e});node["amenity"="beauty_salon"](${s},${w},${n},${e});way["shop"="hairdresser"](${s},${w},${n},${e});way["shop"="beauty"](${s},${w},${n},${e});way["amenity"="beauty_salon"](${s},${w},${n},${e}););${limitStr} center;`;
+  if (mode === 'standard') {
+    // Türkiye'de yaygın OSM tag'leri: shop=hairdresser (en yaygın), shop=beauty, amenity=beauty_salon
+    return `[out:json][timeout:120];(node["shop"="hairdresser"](${s},${w},${n},${e});node["shop"="beauty"](${s},${w},${n},${e});node["amenity"="beauty_salon"](${s},${w},${n},${e});way["shop"="hairdresser"](${s},${w},${n},${e});way["shop"="beauty"](${s},${w},${n},${e});way["amenity"="beauty_salon"](${s},${w},${n},${e}););${limitStr} center;`;
+  }
+  // EXTENDED: standard tag'ler + craft=hairdresser + name regex (Kuaför/Salon/Güzellik/Beauty/Parfümeri)
+  // Not: name~regex case-insensitive bayrağı (i) ile Türkçe karakterler aranır
+  return `[out:json][timeout:120];(node["shop"="hairdresser"](${s},${w},${n},${e});node["shop"="beauty"](${s},${w},${n},${e});node["amenity"="beauty_salon"](${s},${w},${n},${e});node["craft"="hairdresser"](${s},${w},${n},${e});node["name"~"Kuaför|Salon|Güzellik|Beauty|Parfümeri|Kuafor",i](${s},${w},${n},${e});way["shop"="hairdresser"](${s},${w},${n},${e});way["shop"="beauty"](${s},${w},${n},${e});way["amenity"="beauty_salon"](${s},${w},${n},${e});way["craft"="hairdresser"](${s},${w},${n},${e});way["name"~"Kuaför|Salon|Güzellik|Beauty|Parfümeri|Kuafor",i](${s},${w},${n},${e}););${limitStr} center;`;
 }
 
 function buildQuery(city: string, limit: number): string {
@@ -273,12 +280,14 @@ export async function runOsmImport(opts: ImportOpts): Promise<ImportResult> {
   const dryRun = opts.dryRun ?? false;
   const adminEmail = opts.adminEmail || 'sarpyilmaz@saloon.com';
   const grid = opts.grid?.toLowerCase() || null;
+  const mode = opts.mode || 'standard';
   const result: ImportResult = {
     ok: false,
     city,
     limit,
     dryRun,
     grid,
+    mode,
     parts: 0,
     skipped: 0,
     fetched: 0,
@@ -300,9 +309,10 @@ export async function runOsmImport(opts: ImportOpts): Promise<ImportResult> {
       const bboxes = Object.values(ALL_CITY_BBOX);
 
       // Skip zaten 'done' olanları (server restart sonrası devam)
+      // mode'a göre: standard pass'te standard done'ları, extended pass'te extended done'ları atla
       const doneRows = await db.select({ city: osmImportProgress.city })
         .from(osmImportProgress)
-        .where(eq(osmImportProgress.status, 'done'));
+        .where(sql`status = 'done' AND mode = ${mode}`);
       const doneSet = new Set(doneRows.map(r => r.city));
       const remaining: { key: string; bbox: [number, number, number, number] }[] = [];
       cityKeys.forEach((k, i) => {
@@ -325,15 +335,15 @@ export async function runOsmImport(opts: ImportOpts): Promise<ImportResult> {
 
       for (let i = 0; i < remaining.length; i++) {
         const { key: cityName, bbox } = remaining[i];
-        const queryStr = buildQueryForBbox(bbox, 0);
+        const queryStr = buildQueryForBbox(bbox, 0, mode);
         let cityFetched = 0;
         let cityInserted = 0;
         try {
           // Persistent progress: running
           await db.insert(osmImportProgress).values({
-            city: cityName, status: 'running', startedAt: new Date(),
+            city: cityName, mode, status: 'running', startedAt: new Date(),
           }).onConflictDoUpdate({
-            target: osmImportProgress.city,
+            target: [osmImportProgress.city, osmImportProgress.mode],
             set: { status: 'running', startedAt: new Date() },
           });
 
@@ -368,13 +378,13 @@ export async function runOsmImport(opts: ImportOpts): Promise<ImportResult> {
 
           // Persistent progress: done (anında insert edilmiş POI sayısı ile)
           await db.insert(osmImportProgress).values({
-            city: cityName, status: 'done', fetched: cityFetched, inserted: cityInserted, finishedAt: new Date(),
+            city: cityName, mode, status: 'done', fetched: cityFetched, inserted: cityInserted, finishedAt: new Date(),
           }).onConflictDoUpdate({
-            target: osmImportProgress.city,
+            target: [osmImportProgress.city, osmImportProgress.mode],
             set: { status: 'done', fetched: cityFetched, inserted: cityInserted, finishedAt: new Date() },
           });
           logger.info(
-            { city: cityName, fetched: cityFetched, inserted: cityInserted, progress: `${i + 1}/${remaining.length}` },
+            { city: cityName, mode, fetched: cityFetched, inserted: cityInserted, progress: `${i + 1}/${remaining.length}` },
             '[import-osm] il tamamlandı'
           );
         } catch (e: any) {
@@ -382,12 +392,12 @@ export async function runOsmImport(opts: ImportOpts): Promise<ImportResult> {
           result.perPart!.push({ part: i + 1, bbox, fetched: 0, error: errMsg });
           // Persistent progress: error (retry için)
           await db.insert(osmImportProgress).values({
-            city: cityName, status: 'error', errorMessage: errMsg, finishedAt: new Date(),
+            city: cityName, mode, status: 'error', errorMessage: errMsg, finishedAt: new Date(),
           }).onConflictDoUpdate({
-            target: osmImportProgress.city,
+            target: [osmImportProgress.city, osmImportProgress.mode],
             set: { status: 'error', errorMessage: errMsg, finishedAt: new Date() },
           });
-          logger.warn({ city: cityName, err: errMsg }, '[import-osm] il hata');
+          logger.warn({ city: cityName, mode, err: errMsg }, '[import-osm] il hata');
         }
       }
       result.durationMs = Date.now() - t0;

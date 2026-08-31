@@ -112,7 +112,8 @@ export const departments = pgTable('departments', {
  */
 export const osmImportProgress = pgTable('osm_import_progress', {
     id: serial('id').primaryKey(),
-    city: varchar('city', { length: 100 }).notNull().unique(),
+    city: varchar('city', { length: 100 }).notNull(),
+    mode: varchar('mode', { length: 20 }).notNull().default('standard'),
     status: varchar('status', { length: 20 }).notNull().default('pending'),
     fetched: integer('fetched').notNull().default(0),
     inserted: integer('inserted').notNull().default(0),

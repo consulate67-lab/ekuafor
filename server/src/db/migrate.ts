@@ -825,16 +825,30 @@ export const runMigrations = async () => {
         await pool.query(`
             CREATE TABLE IF NOT EXISTS osm_import_progress (
                 id SERIAL PRIMARY KEY,
-                city VARCHAR(100) UNIQUE NOT NULL,
+                city VARCHAR(100) NOT NULL,
+                mode VARCHAR(20) NOT NULL DEFAULT 'standard',
                 status VARCHAR(20) NOT NULL DEFAULT 'pending',
                 fetched INTEGER NOT NULL DEFAULT 0,
                 inserted INTEGER NOT NULL DEFAULT 0,
                 started_at TIMESTAMP WITH TIME ZONE,
                 finished_at TIMESTAMP WITH TIME ZONE,
-                error_message TEXT
+                error_message TEXT,
+                UNIQUE(city, mode)
             )
         `);
         await pool.query('CREATE INDEX IF NOT EXISTS idx_osm_progress_status ON osm_import_progress(status)');
+        // Eski tabloda UNIQUE(city) kaldıysa, mode kolonu ekleyip UNIQUE(city, mode) yap
+        await pool.query(`ALTER TABLE osm_import_progress ADD COLUMN IF NOT EXISTS mode VARCHAR(20) NOT NULL DEFAULT 'standard'`);
+        await pool.query(`DO $$ BEGIN
+            IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'osm_import_progress_city_key') THEN
+                ALTER TABLE osm_import_progress DROP CONSTRAINT osm_import_progress_city_key;
+            END IF;
+        END $$`);
+        await pool.query(`DO $$ BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'osm_import_progress_city_mode_key') THEN
+                ALTER TABLE osm_import_progress ADD CONSTRAINT osm_import_progress_city_mode_key UNIQUE (city, mode);
+            END IF;
+        END $$`);
 
         // 8. KVKK veri sahibi talepleri tablosu (Aşama 5.4)
         await pool.query(`
