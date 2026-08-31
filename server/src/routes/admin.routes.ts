@@ -200,9 +200,9 @@ router.post('/deep-clean-cities', async (req: Request, res: Response) => {
         const addBoth = (k: string, proper: string) => {
             const lower = k.trim().toLowerCase();
             cityMap.set(lower, proper);
-            // Türkçe ı ↔ latin i her iki versiyonu
-            cityMap.set(lower.replace(/ı/g, 'i'), proper);
-            cityMap.set(lower.replace(/i/g, 'ı'), proper);
+            // split/join ile güvenli replace (regex edge case'leri önler)
+            cityMap.set(lower.split('ı').join('i'), proper);
+            cityMap.set(lower.split('i').join('ı'), proper);
         };
         for (const [k, proper] of Object.entries(TURKIYE_ILLERI)) {
             addBoth(k, proper);
