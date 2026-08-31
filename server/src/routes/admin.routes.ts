@@ -22,7 +22,7 @@ router.get('/stats', async (req: Request, res: Response) => {
         const total = await db.execute(sql`SELECT count(*)::int AS n FROM companies`);
         const osmTotal = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE description LIKE '%OSM ID%'`);
         const last24h = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE created_at > NOW() - INTERVAL '24 hours'`);
-        const byCity = await db.execute(sql`SELECT city, count(*)::int AS n FROM companies WHERE city IS NOT NULL GROUP BY city ORDER BY n DESC LIMIT 20`);
+        const byCity = await db.execute(sql`SELECT city, count(*)::int AS n FROM companies WHERE city IS NOT NULL GROUP BY city ORDER BY n DESC LIMIT 100`);
         const kvkkPending = await db.execute(sql`SELECT count(*)::int AS n FROM kvkk_requests WHERE status = 'pending'`);
         const osmProgress = await db.execute(sql`SELECT status, count(*)::int AS n FROM osm_import_progress GROUP BY status`);
         const osmJobs = Array.from(jobs.values()).slice(-10).reverse();
