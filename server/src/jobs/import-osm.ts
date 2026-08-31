@@ -11,8 +11,9 @@ if (process.env.DNS_ORDER_IPV6_FIRST !== 'false') {
 }
 
 import { db, pool } from '../db';
-import { companies } from '../db/schema/core';
-import { sql } from 'drizzle-orm';
+import { companies, osmImportProgress } from '../db/schema/core';
+import { sql, eq } from 'drizzle-orm';
+import { logger } from '../utils/logger';
 
 // Overpass mirror listesi (fallback zinciri).
 // Render free plan IP'si bazı mirror'lar tarafından bloklanıyor / transient hata dönüyor.
@@ -39,6 +40,7 @@ export interface ImportResult {
   dryRun: boolean;
   grid: string | null;
   parts: number;       // kaç parça sorgu atıldı
+  skipped: number;     // persistent queue'da atlanan il sayısı
   fetched: number;
   inserted: number;
   durationMs: number;
@@ -278,6 +280,7 @@ export async function runOsmImport(opts: ImportOpts): Promise<ImportResult> {
     dryRun,
     grid,
     parts: 0,
+    skipped: 0,
     fetched: 0,
     inserted: 0,
     durationMs: 0,
@@ -290,31 +293,73 @@ export async function runOsmImport(opts: ImportOpts): Promise<ImportResult> {
     const adminId = await getAdminId(adminEmail);
 
     // 'all' grid modu: Türkiye'nin 81 ilini sırayla çağır (Aşama 5.3)
-    // Her il tek parça bbox, büyük job olduğu için fire-and-forget beklenir
+    // Her il tek parça bbox, büyük job olduğu için fire-and-forget beklenir.
+    // Persistent progress: server restart olursa done olanlar atlanır (Aşama 5.5).
     if (grid === 'all') {
-      const bboxes = Object.entries(ALL_CITY_BBOX).map(([k, b]) => b);
-      result.parts = bboxes.length;
+      const cityKeys = Object.keys(ALL_CITY_BBOX);
+      const bboxes = Object.values(ALL_CITY_BBOX);
+
+      // Skip zaten 'done' olanları (server restart sonrası devam)
+      const doneRows = await db.select({ city: osmImportProgress.city })
+        .from(osmImportProgress)
+        .where(eq(osmImportProgress.status, 'done'));
+      const doneSet = new Set(doneRows.map(r => r.city));
+      const remaining: { key: string; bbox: [number, number, number, number] }[] = [];
+      cityKeys.forEach((k, i) => {
+        if (!doneSet.has(k)) remaining.push({ key: k, bbox: bboxes[i] });
+      });
+      result.parts = remaining.length;
+      result.skipped = doneSet.size;
+
+      logger.info(
+        { total: cityKeys.length, remaining: remaining.length, skipped: doneSet.size },
+        '[import-osm] all-cities master başladı'
+      );
+
       const allElems: OSMElement[] = [];
       const seenIds = new Set<number>();
-      for (let i = 0; i < bboxes.length; i++) {
-        const cityName = Object.keys(ALL_CITY_BBOX)[i];
-        const bbox = bboxes[i];
+
+      for (let i = 0; i < remaining.length; i++) {
+        const { key: cityName, bbox } = remaining[i];
         const queryStr = buildQueryForBbox(bbox, 0);
+        let cityFetched = 0;
         try {
+          // Persistent progress: running
+          await db.insert(osmImportProgress).values({
+            city: cityName, status: 'running', startedAt: new Date(),
+          }).onConflictDoUpdate({
+            target: osmImportProgress.city,
+            set: { status: 'running', startedAt: new Date() },
+          });
+
           const elems = await fetchOSM(queryStr, result.errors);
-          let added = 0;
           for (const e of elems) {
             if (!seenIds.has(e.id)) {
               seenIds.add(e.id);
-              // city tag'ini OSM'in verdiği ile override et
               (e as any)._city = cityName;
               allElems.push(e);
-              added++;
+              cityFetched++;
             }
           }
-          result.perPart!.push({ part: i + 1, bbox, fetched: added });
+          result.perPart!.push({ part: i + 1, bbox, fetched: cityFetched });
+
+          // Persistent progress: done
+          await db.insert(osmImportProgress).values({
+            city: cityName, status: 'done', fetched: cityFetched, inserted: 0, finishedAt: new Date(),
+          }).onConflictDoUpdate({
+            target: osmImportProgress.city,
+            set: { status: 'done', fetched: cityFetched, finishedAt: new Date() },
+          });
         } catch (e: any) {
-          result.perPart!.push({ part: i + 1, bbox, fetched: 0, error: e.message?.slice(0, 200) || String(e).slice(0, 200) });
+          const errMsg = (e.message || String(e)).slice(0, 500);
+          result.perPart!.push({ part: i + 1, bbox, fetched: 0, error: errMsg });
+          // Persistent progress: error (retry için)
+          await db.insert(osmImportProgress).values({
+            city: cityName, status: 'error', errorMessage: errMsg, finishedAt: new Date(),
+          }).onConflictDoUpdate({
+            target: osmImportProgress.city,
+            set: { status: 'error', errorMessage: errMsg, finishedAt: new Date() },
+          });
         }
       }
       result.fetched = allElems.length;
@@ -331,8 +376,14 @@ export async function runOsmImport(opts: ImportOpts): Promise<ImportResult> {
         } else {
           result.inserted = records.length;
         }
+        // done il sayısı + inserted güncelle (tüm done iller toplamı)
+        await db.execute(sql`UPDATE osm_import_progress SET inserted = ${result.inserted} WHERE status = 'done'`);
       }
       result.ok = true;
+      logger.info(
+        { fetched: result.fetched, inserted: result.inserted, durationMs: result.durationMs, skipped: result.skipped },
+        '[import-osm] all-cities master bitti'
+      );
       return result;
     }
 

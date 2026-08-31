@@ -821,6 +821,21 @@ export const runMigrations = async () => {
         await pool.query('CREATE INDEX IF NOT EXISTS idx_ai_call_logs_created ON ai_call_logs(created_at DESC)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_ai_call_logs_feedback ON ai_call_logs(feedback)');
 
+        // 9. OSM import progress tablosu (Aşama 5.5 - persistent job queue)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS osm_import_progress (
+                id SERIAL PRIMARY KEY,
+                city VARCHAR(100) UNIQUE NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                fetched INTEGER NOT NULL DEFAULT 0,
+                inserted INTEGER NOT NULL DEFAULT 0,
+                started_at TIMESTAMP WITH TIME ZONE,
+                finished_at TIMESTAMP WITH TIME ZONE,
+                error_message TEXT
+            )
+        `);
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_osm_progress_status ON osm_import_progress(status)');
+
         // 8. KVKK veri sahibi talepleri tablosu (Aşama 5.4)
         await pool.query(`
             CREATE TABLE IF NOT EXISTS kvkk_requests (

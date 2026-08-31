@@ -106,6 +106,22 @@ export const departments = pgTable('departments', {
 });
 
 /**
+ * OSM import progress tablosu (Aşama 5.5 - persistent job queue)
+ * Her il için bir satır: pending -> running -> done | error
+ * Server restart olursa done olanlar atlanır, kalanlar işlenir
+ */
+export const osmImportProgress = pgTable('osm_import_progress', {
+    id: serial('id').primaryKey(),
+    city: varchar('city', { length: 100 }).notNull().unique(),
+    status: varchar('status', { length: 20 }).notNull().default('pending'),
+    fetched: integer('fetched').notNull().default(0),
+    inserted: integer('inserted').notNull().default(0),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    errorMessage: text('error_message'),
+});
+
+/**
  * KVKK veri sahibi talepleri tablosu
  * - delete: veri silme talebi
  * - correct: veri düzeltme talebi

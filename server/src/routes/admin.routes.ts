@@ -23,7 +23,11 @@ router.get('/stats', async (req: Request, res: Response) => {
         const last24h = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE created_at > NOW() - INTERVAL '24 hours'`);
         const byCity = await db.execute(sql`SELECT city, count(*)::int AS n FROM companies WHERE city IS NOT NULL GROUP BY city ORDER BY n DESC LIMIT 20`);
         const kvkkPending = await db.execute(sql`SELECT count(*)::int AS n FROM kvkk_requests WHERE status = 'pending'`);
+        const osmProgress = await db.execute(sql`SELECT status, count(*)::int AS n FROM osm_import_progress GROUP BY status`);
         const osmJobs = Array.from(jobs.values()).slice(-10).reverse();
+        const progress = (osmProgress as any).rows || [];
+        const progressMap: Record<string, number> = {};
+        progress.forEach((r: any) => { progressMap[r.status] = r.n; });
         res.json({
             success: true,
             companies: {
@@ -34,6 +38,12 @@ router.get('/stats', async (req: Request, res: Response) => {
             },
             kvkk: { pending: (kvkkPending as any).rows?.[0]?.n ?? 0 },
             osmJobs,
+            osmProgress: {
+                done: progressMap.done || 0,
+                error: progressMap.error || 0,
+                pending: progressMap.pending || 0,
+                running: progressMap.running || 0,
+            },
         });
     } catch (e: any) {
         logger.error({ err: e.message }, '[admin/stats] hata');
