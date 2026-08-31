@@ -114,6 +114,38 @@ interface ImportJob {
 const jobs = new Map<string, ImportJob>();
 
 /**
+ * GET /api/admin/debug-city-map?city=Balıkesir
+ * Map debug: belirli bir city için map.get sonucu + map.size + örnek keys
+ */
+router.get('/debug-city-map', async (req: Request, res: Response) => {
+    try {
+        const cityMap = new Map<string, string>();
+        for (const [k, proper] of Object.entries(TURKIYE_ILLERI)) {
+            const lower = k.trim().toLowerCase();
+            cityMap.set(lower, proper);
+        }
+        for (const [k, proper] of Object.entries(TURKIYE_ILCELERI)) {
+            const lower = k.trim().toLowerCase();
+            if (!cityMap.has(lower)) cityMap.set(lower, proper);
+        }
+        const queryCity = String(req.query.city || '');
+        const lower = queryCity.toLowerCase();
+        const matched = cityMap.get(lower);
+        const sample = Array.from(cityMap.entries()).filter(([k]) => k.includes('bal')).slice(0, 10);
+        res.json({
+            success: true,
+            mapSize: cityMap.size,
+            query: { city: queryCity, lower, matched: matched || null },
+            balSample: sample,
+            istanbulCheck: cityMap.get('istanbul'),
+            balikesirCheck: cityMap.get('balikesir'),
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+/**
  * POST /api/admin/deep-clean-cities
  * Companies tablosundaki city alanını derin temizler:
  *  1. Slash'lı veri → "/" öncesi kısım (Altındağ/ankara → Altındağ)
