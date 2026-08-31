@@ -893,7 +893,13 @@ export default function Dashboard() {
                                     <Users className="text-slate-500 group-hover:text-white" />
                                 </div>
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] group-hover:text-white/60">Firma Yaygınlığı</p>
-                                <h3 className="text-3xl font-black text-slate-900 mt-1 group-hover:text-white">{Array.from(new Set(allCompanies.map(c => c.city))).length} <span className="text-sm">Şehir</span></h3>
+                                <h3 className="text-3xl font-black text-slate-900 mt-1 group-hover:text-white">
+                                    {(() => {
+                                        // Case-insensitive unique şehir sayısı (Türkçe ı/İ, küçük/büyük harf normalize)
+                                        const norm = (s: string | undefined | null) => (s || '').trim().toLocaleLowerCase('tr-TR');
+                                        return Array.from(new Set(allCompanies.map(c => norm(c.city)).filter(Boolean))).length;
+                                    })()} <span className="text-sm">Şehir</span>
+                                </h3>
                             </div>
                         </div>
 
