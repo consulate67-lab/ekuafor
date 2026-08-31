@@ -225,6 +225,13 @@ router.post('/deep-clean-cities', async (req: Request, res: Response) => {
 
         if (dryRun) {
             // Sadece rapor
+            // İlk 5 satırın debug bilgisini ekle (lower, proper, action)
+            const debugSamples = beforeRows.slice(0, 5).map((row: any) => {
+                const orig = String(row.city || '');
+                const lower = orig.toLowerCase();
+                const proper = cityMap.get(lower);
+                return { orig, lower, proper: proper || null, action: proper ? (proper !== orig ? 'update' : 'stay') : 'delete' };
+            });
             return res.json({
                 success: true,
                 dryRun: true,
@@ -234,6 +241,8 @@ router.post('/deep-clean-cities', async (req: Request, res: Response) => {
                 toDeleteSamples: toDelete.slice(0, 20),
                 toUpdateSamples: toUpdate.slice(0, 20),
                 willStay: willStay.length,
+                mapSize: cityMap.size,
+                debugSamples,
             });
         }
 
