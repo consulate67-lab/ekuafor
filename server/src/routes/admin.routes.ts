@@ -117,6 +117,38 @@ const jobs = new Map<string, ImportJob>();
  * GET /api/admin/debug-city-map?city=Balıkesir
  * Map debug: belirli bir city için map.get sonucu + map.size + örnek keys
  */
+router.get('/debug-city-test', async (req: Request, res: Response) => {
+    try {
+        const orig = String(req.query.orig || '');
+        const cityMap = new Map<string, string>();
+        const addBoth = (k: string, proper: string) => {
+            const lower = k.trim().toLowerCase();
+            cityMap.set(lower, proper);
+            cityMap.set(lower.replace(/ı/g, 'i'), proper);
+            cityMap.set(lower.replace(/i/g, 'ı'), proper);
+        };
+        for (const [k, proper] of Object.entries(TURKIYE_ILLERI)) addBoth(k, proper);
+        for (const [k, proper] of Object.entries(TURKIYE_ILCELERI)) {
+            if (!cityMap.has(k.trim().toLowerCase())) addBoth(k, proper);
+        }
+        for (const k of ['İstanbul', 'Ankara', 'İzmir']) addBoth(k, k);
+
+        const cleaned = orig.includes('/') ? orig.split('/')[0].trim() : orig;
+        const lower = cleaned.toLowerCase();
+        const proper1 = cityMap.get(lower);
+        const proper2 = cityMap.get(lower.replace(/ı/g, 'i'));
+        const alttindagKey = cityMap.get('altındağ');
+        const alttindagLatin = cityMap.get('altindag');
+        res.json({
+            orig, cleaned, lower, lowerI: lower.replace(/ı/g, 'i'),
+            proper1, proper2,
+            alttindagKey, alttindagLatin,
+            alttindagHasKey: cityMap.has('altındağ'),
+            alttindagLatinHasKey: cityMap.has('altindag'),
+        });
+    } catch (e: any) { res.status(500).json({ success: false, error: e.message }); }
+});
+
 router.get('/debug-city-map', async (req: Request, res: Response) => {
     try {
         const cityMap = new Map<string, string>();
