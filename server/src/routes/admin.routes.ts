@@ -114,6 +114,152 @@ interface ImportJob {
 const jobs = new Map<string, ImportJob>();
 
 /**
+ * POST /api/admin/deep-clean-cities
+ * Companies tablosundaki city alanını derin temizler:
+ *  1. Slash'lı veri → "/" öncesi kısım (Altındağ/ankara → Altındağ)
+ *  2. Boş/null/'İsimsiz İşletme' → sil
+ *  3. Map'te (iller + ilçeler) eşleşen → proper case'e güncelle
+ *  4. Map'te eşleşmeyen (Türkiye'de olmayan, mahalle, köy, yabancı ülke) → sil (removeUnmatched=true)
+ *
+ * Body: { dryRun?: boolean, removeUnmatched?: boolean }
+ */
+router.post('/deep-clean-cities', async (req: Request, res: Response) => {
+    try {
+        const dryRun = Boolean(req.body?.dryRun ?? req.query?.dryRun ?? true);
+        const removeUnmatched = Boolean(req.body?.removeUnmatched ?? req.query?.removeUnmatched ?? true);
+        const triggeredBy = req.user?.email || 'unknown';
+
+        // İl + ilçe map'i
+        const cityMap = new Map<string, string>();
+        for (const [k, proper] of Object.entries(TURKIYE_ILLERI)) {
+            const lower = k.trim().toLocaleLowerCase('tr-TR');
+            cityMap.set(lower, proper);
+        }
+        for (const [k, proper] of Object.entries(TURKIYE_ILCELERI)) {
+            const lower = k.trim().toLocaleLowerCase('tr-TR');
+            if (!cityMap.has(lower)) cityMap.set(lower, proper);
+        }
+        // Büyük harfli varyantlar
+        for (const k of ['İstanbul', 'Ankara', 'İzmir']) {
+            const lower = k.toLocaleLowerCase('tr-TR');
+            if (!cityMap.has(lower)) cityMap.set(lower, k);
+        }
+
+        // Tüm unique city'leri çek
+        const beforeRes = await db.execute(sql`SELECT city, count(*)::int AS n FROM companies WHERE city IS NOT NULL GROUP BY city ORDER BY city`);
+        const beforeRows = (beforeRes as any).rows || [];
+
+        // Plan: her unique city için ne yapılacağını belirle
+        const toUpdate: { from: string; to: string; count: number }[] = [];
+        const toDelete: { city: string; count: number; reason: string }[] = [];
+        const willStay: { city: string; count: number }[] = [];
+
+        for (const row of beforeRows) {
+            const orig = String(row.city || '');
+            const count = Number(row.n);
+
+            // 1. Boş / null / placeholder kontrol
+            if (!orig.trim() || orig.trim() === 'İsimsiz İşletme') {
+                toDelete.push({ city: orig, count, reason: 'boş/placeholder' });
+                continue;
+            }
+
+            // 2. Slash temizleme
+            let cleaned = orig;
+            if (cleaned.includes('/')) {
+                cleaned = cleaned.split('/')[0].trim();
+            }
+
+            // 3. Map'te eşleşme (lowercase)
+            const lower = cleaned.toLocaleLowerCase('tr-TR');
+            const proper = cityMap.get(lower);
+            if (proper) {
+                if (proper !== cleaned) {
+                    toUpdate.push({ from: orig, to: proper, count });
+                } else {
+                    willStay.push({ city: orig, count });
+                }
+            } else {
+                // Eşleşmedi
+                if (removeUnmatched) {
+                    toDelete.push({ city: orig, count, reason: 'Türkiye\'de eşleşmedi' });
+                } else {
+                    willStay.push({ city: orig, count });
+                }
+            }
+        }
+
+        if (dryRun) {
+            // Sadece rapor
+            return res.json({
+                success: true,
+                dryRun: true,
+                total: beforeRows.length,
+                toUpdate: toUpdate.length,
+                toDelete: toDelete.length,
+                toDeleteSamples: toDelete.slice(0, 20),
+                toUpdateSamples: toUpdate.slice(0, 20),
+                willStay: willStay.length,
+            });
+        }
+
+        // Asıl işlem: önce UPDATE, sonra DELETE
+        let updatedCount = 0;
+        for (const upd of toUpdate) {
+            const r: any = await db.execute(sql`UPDATE companies SET city = ${upd.to} WHERE (LOWER(city) = LOWER(${upd.from}) OR LOWER(SPLIT_PART(city, '/', 1)) = LOWER(${upd.to})) AND city IS NOT NULL`);
+            updatedCount += Number(r?.rowCount ?? 0);
+        }
+
+        let deletedCount = 0;
+        const deleteLog: string[] = [];
+        for (const del of toDelete) {
+            const r: any = await db.execute(sql`DELETE FROM companies WHERE city = ${del.city}`);
+            const n = Number(r?.rowCount ?? 0);
+            deletedCount += n;
+            if (deleteLog.length < 30) deleteLog.push(`${del.city} (${del.reason}): ${n} satır`);
+        }
+
+        // Sonra: Türkiye'de olmayan isimleri de temizle
+        const remainingRes = await db.execute(sql`SELECT city, count(*)::int AS n FROM companies WHERE city IS NOT NULL GROUP BY city`);
+        const remainingRows = (remainingRes as any).rows || [];
+        const stillUnmatched: { city: string; count: number }[] = [];
+        for (const row of remainingRows) {
+            const orig = String(row.city || '');
+            const count = Number(row.n);
+            if (!orig.trim() || orig.trim() === 'İsimsiz İşletme') {
+                stillUnmatched.push({ city: orig, count });
+                continue;
+            }
+            const cleaned = orig.includes('/') ? orig.split('/')[0].trim() : orig;
+            const lower = cleaned.toLocaleLowerCase('tr-TR');
+            if (!cityMap.has(lower)) {
+                stillUnmatched.push({ city: orig, count });
+            }
+        }
+
+        logger.info(
+            { updatedCount, deletedCount, toUpdate: toUpdate.length, toDelete: toDelete.length, stillUnmatched: stillUnmatched.length, triggeredBy },
+            '[admin/deep-clean-cities] city derin temizleme'
+        );
+
+        res.json({
+            success: true,
+            updatedCount,
+            deletedCount,
+            toUpdate: toUpdate.length,
+            toDelete: toDelete.length,
+            deleteLog,
+            stillUnmatched,
+        });
+    } catch (e: any) {
+        logger.error({ err: e.message, stack: e.stack?.slice(0, 500) }, '[admin/deep-clean-cities] hata');
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+/**
+
+/**
  * POST /api/admin/cleanup-companies
  * İstenmeyen işletmeleri sil:
  *  - kebap / et lokantası / restoran / aşçı / pastane
