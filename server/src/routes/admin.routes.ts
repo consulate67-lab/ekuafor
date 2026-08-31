@@ -142,7 +142,7 @@ router.post('/cleanup-companies', async (req: Request, res: Response) => {
             conditions.push(sql`(name ILIKE '%kebap%' OR name ILIKE '%et lokanta%' OR name ILIKE '%restoran%' OR name ILIKE '%aşçı%' OR name ILIKE '%pastane%' OR name ILIKE '%pide%' OR name ILIKE '%lahmacun%' OR name ILIKE '%kumpir%')`);
         }
         if (dugun) {
-            conditions.push(sql`(name ILIKE '%düğün salonu%' OR name ILIKE '%düğün%' OR name ILIKE '%salonu%' OR name ILIKE '%davet%' OR name ILIKE '%organizasyon%' OR name ILIKE '%toplantı%' OR name ILIKE '%kır düğünü%' OR name ILIKE '%balo%')`);
+            conditions.push(sql`(name ILIKE '%düğün%' OR name ILIKE '%davet%' OR name ILIKE '%organizasyon%' OR name ILIKE '%toplantı%' OR name ILIKE '%kır düğünü%' OR name ILIKE '%balo%' OR name ILIKE '%nişan%' OR name ILIKE '%sünnet%')`);
         }
         if (isimsiz) {
             conditions.push(sql`(name IS NULL OR TRIM(name) = '' OR name = 'İsimsiz İşletme')`);
@@ -162,7 +162,7 @@ router.post('/cleanup-companies', async (req: Request, res: Response) => {
             counts.kebap = (r as any).rows?.[0]?.n ?? 0;
         }
         if (dugun) {
-            const r: any = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE (name ILIKE '%düğün salonu%' OR name ILIKE '%düğün%' OR name ILIKE '%salonu%' OR name ILIKE '%davet%' OR name ILIKE '%organizasyon%' OR name ILIKE '%toplantı%' OR name ILIKE '%kır düğünü%' OR name ILIKE '%balo%')`);
+            const r: any = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE (name ILIKE '%düğün%' OR name ILIKE '%davet%' OR name ILIKE '%organizasyon%' OR name ILIKE '%toplantı%' OR name ILIKE '%kır düğünü%' OR name ILIKE '%balo%' OR name ILIKE '%nişan%' OR name ILIKE '%sünnet%')`);
             counts.dugun = (r as any).rows?.[0]?.n ?? 0;
         }
         if (isimsiz) {
@@ -177,7 +177,7 @@ router.post('/cleanup-companies', async (req: Request, res: Response) => {
             samples.kebap = (r as any).rows || [];
         }
         if (dugun) {
-            const r: any = await db.execute(sql`SELECT id, name, city FROM companies WHERE (name ILIKE '%düğün salonu%' OR name ILIKE '%düğün%' OR name ILIKE '%salonu%' OR name ILIKE '%davet%' OR name ILIKE '%organizasyon%' OR name ILIKE '%toplantı%' OR name ILIKE '%kır düğünü%' OR name ILIKE '%balo%') LIMIT 5`);
+            const r: any = await db.execute(sql`SELECT id, name, city FROM companies WHERE (name ILIKE '%düğün%' OR name ILIKE '%davet%' OR name ILIKE '%organizasyon%' OR name ILIKE '%toplantı%' OR name ILIKE '%kır düğünü%' OR name ILIKE '%balo%' OR name ILIKE '%nişan%' OR name ILIKE '%sünnet%') LIMIT 5`);
             samples.dugun = (r as any).rows || [];
         }
         if (isimsiz) {
