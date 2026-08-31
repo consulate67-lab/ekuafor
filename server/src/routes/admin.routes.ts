@@ -161,22 +161,26 @@ router.post('/deep-clean-cities', async (req: Request, res: Response) => {
         const removeUnmatched = Boolean(req.body?.removeUnmatched ?? req.query?.removeUnmatched ?? true);
         const triggeredBy = req.user?.email || 'unknown';
 
-        // İl + ilçe map'i (latin i ile, JS default toLowerCase ile eşleşir)
+        // İl + ilçe map'i (her anahtar için hem Türkçe ı hem latin i versiyonu)
+        // cleaned.toLowerCase() Node 20+'da 'ı' (U+0131) korur, 'I' → 'i' (latin) yapar
+        // Bu yüzden map'te iki versiyon olmalı
         const cityMap = new Map<string, string>();
-        for (const [k, proper] of Object.entries(TURKIYE_ILLERI)) {
-            // .toLowerCase() (default, latin i) — Node'un tr-TR locale'i I→ı dönüşümü
-            // yaptığı için karışıklık olabiliyor, default daha güvenli
+        const addBoth = (k: string, proper: string) => {
             const lower = k.trim().toLowerCase();
             cityMap.set(lower, proper);
+            // Türkçe ı ↔ latin i her iki versiyonu
+            cityMap.set(lower.replace(/ı/g, 'i'), proper);
+            cityMap.set(lower.replace(/i/g, 'ı'), proper);
+        };
+        for (const [k, proper] of Object.entries(TURKIYE_ILLERI)) {
+            addBoth(k, proper);
         }
         for (const [k, proper] of Object.entries(TURKIYE_ILCELERI)) {
-            const lower = k.trim().toLowerCase();
-            if (!cityMap.has(lower)) cityMap.set(lower, proper);
+            if (!cityMap.has(k.trim().toLowerCase())) addBoth(k, proper);
         }
         // Büyük harfli varyantlar (İstanbul, Ankara, İzmir) — zaten proper case
         for (const k of ['İstanbul', 'Ankara', 'İzmir']) {
-            const lower = k.toLowerCase();
-            if (!cityMap.has(lower)) cityMap.set(lower, k);
+            addBoth(k, k);
         }
 
         // Tüm unique city'leri çek
@@ -204,9 +208,10 @@ router.post('/deep-clean-cities', async (req: Request, res: Response) => {
                 cleaned = cleaned.split('/')[0].trim();
             }
 
-            // 3. Map'te eşleşme (default lowercase, latin i)
+            // 3. Map'te eşleşme (her iki ı/i versiyonu dene)
             const lower = cleaned.toLowerCase();
-            const proper = cityMap.get(lower);
+            let proper = cityMap.get(lower);
+            if (!proper) proper = cityMap.get(lower.replace(/ı/g, 'i'));
             if (proper) {
                 if (proper !== cleaned) {
                     toUpdate.push({ from: orig, to: proper, count });
