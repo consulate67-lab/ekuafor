@@ -129,19 +129,21 @@ router.post('/deep-clean-cities', async (req: Request, res: Response) => {
         const removeUnmatched = Boolean(req.body?.removeUnmatched ?? req.query?.removeUnmatched ?? true);
         const triggeredBy = req.user?.email || 'unknown';
 
-        // İl + ilçe map'i
+        // İl + ilçe map'i (latin i ile, JS default toLowerCase ile eşleşir)
         const cityMap = new Map<string, string>();
         for (const [k, proper] of Object.entries(TURKIYE_ILLERI)) {
-            const lower = k.trim().toLocaleLowerCase('tr-TR');
+            // .toLowerCase() (default, latin i) — Node'un tr-TR locale'i I→ı dönüşümü
+            // yaptığı için karışıklık olabiliyor, default daha güvenli
+            const lower = k.trim().toLowerCase();
             cityMap.set(lower, proper);
         }
         for (const [k, proper] of Object.entries(TURKIYE_ILCELERI)) {
-            const lower = k.trim().toLocaleLowerCase('tr-TR');
+            const lower = k.trim().toLowerCase();
             if (!cityMap.has(lower)) cityMap.set(lower, proper);
         }
-        // Büyük harfli varyantlar
+        // Büyük harfli varyantlar (İstanbul, Ankara, İzmir) — zaten proper case
         for (const k of ['İstanbul', 'Ankara', 'İzmir']) {
-            const lower = k.toLocaleLowerCase('tr-TR');
+            const lower = k.toLowerCase();
             if (!cityMap.has(lower)) cityMap.set(lower, k);
         }
 
@@ -170,8 +172,8 @@ router.post('/deep-clean-cities', async (req: Request, res: Response) => {
                 cleaned = cleaned.split('/')[0].trim();
             }
 
-            // 3. Map'te eşleşme (lowercase)
-            const lower = cleaned.toLocaleLowerCase('tr-TR');
+            // 3. Map'te eşleşme (default lowercase, latin i)
+            const lower = cleaned.toLowerCase();
             const proper = cityMap.get(lower);
             if (proper) {
                 if (proper !== cleaned) {
