@@ -804,17 +804,18 @@ router.get('/inspect-dirty-cities', async (req: Request, res: Response) => {
                 const cnt: any = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE city = ${rule.from}`);
                 const count = Number((cnt as any).rows?.[0]?.n ?? 0);
                 const samplesRes: any = await db.execute(
-                    sql`SELECT id, name, address, city FROM companies WHERE city = ${rule.from} ORDER BY id LIMIT 5`
+                    sql`SELECT id, name, address_line, district, neighborhood, city FROM companies WHERE city = ${rule.from} ORDER BY id LIMIT 5`
                 );
                 const samples = (samplesRes as any).rows || [];
 
-                // Adres fallback analizi
+                // Adres fallback analizi (address_line + district + neighborhood birleşik aranır)
                 const addressOverrides: { id: number; name: string; address: string; proposedCity: string }[] = [];
                 if (rule.action === 'update' && rule.to) {
                     for (const s of samples) {
+                        const fullAddress = `${s.address_line || ''} ${s.district || ''} ${s.neighborhood || ''}`;
                         let detected: string | null = null;
                         try {
-                            detected = findIlInAddress(s.address, s.name);
+                            detected = findIlInAddress(fullAddress, s.name);
                         } catch (e: any) {
                             logger.error({ ruleFrom: rule.from, sampleId: s.id, err: e.message }, '[inspect] findIlInAddress hata');
                         }
@@ -822,7 +823,7 @@ router.get('/inspect-dirty-cities', async (req: Request, res: Response) => {
                             addressOverrides.push({
                                 id: s.id,
                                 name: s.name,
-                                address: s.address,
+                                address: fullAddress.trim(),
                                 proposedCity: detected,
                             });
                         }
@@ -886,16 +887,17 @@ router.post('/fix-dirty-cities', async (req: Request, res: Response) => {
             if (rule.action === 'update' && rule.to) {
                 // Tüm eşleşen firmaları çek
                 const rowsRes: any = await db.execute(
-                    sql`SELECT id, name, address, city FROM companies WHERE city = ${rule.from}`
+                    sql`SELECT id, name, address_line, district, neighborhood, city FROM companies WHERE city = ${rule.from}`
                 );
-                const rows: { id: number; name: string; address: string; city: string }[] = (rowsRes as any).rows || [];
+                const rows: { id: number; name: string; address_line: string; district: string; neighborhood: string; city: string }[] = (rowsRes as any).rows || [];
                 const matched = rows.length;
                 let updated = 0;
                 let viaAddress = 0;
 
                 for (const row of rows) {
-                    // Adres fallback: hard-coded `to` yerine address'ten bulunan il
-                    const detected = findIlInAddress(row.address, row.name);
+                    // Adres fallback: hard-coded `to` yerine address_line+district+neighborhood'ten bulunan il
+                    const fullAddress = `${row.address_line || ''} ${row.district || ''} ${row.neighborhood || ''}`;
+                    const detected = findIlInAddress(fullAddress, row.name);
                     const targetCity = detected || rule.to;
                     if (!dryRun) {
                         const r: any = await db.execute(
