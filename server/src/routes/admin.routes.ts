@@ -770,17 +770,19 @@ const IL_MAP_LOWER: Map<string, string> = (() => {
 /**
  * Adres string'inden 81 il proper name'ini bul.
  * Bulursa proper name (Türkçe karakterli) döner, bulamazsa null.
- * Case-insensitive, Türkçe karakter duyarsız.
+ *
+ * NOT: Hem haystack hem il isimleri normalize edilir (i → ı, lowercase).
+ * Basit substring match: ` ${haystack} `.includes(` ${lower} `).
+ * - Kısa isimlerde yanlış pozitif riski yok (boşluk sınırı)
+ * - "Afyonkarahisar" içinde "ankara" yanlış eşleşmesi önlenir
+ * - Performans: 81 includes() çağrısı, regex compile yok
  */
 function findIlInAddress(address: string | null | undefined, name: string | null | undefined): string | null {
     const normalize = (s: string) => s.toLowerCase().split('i').join('ı');
-    const haystack = normalize(`${address || ''} ${name || ''}`);
-    // Önce tam eşleşme (kelime sınırı ile) — kısa isimler için yanlış pozitif önlenir
+    // Boşluk-padded haystack: kelime sınırı kontrolü için
+    const haystack = ` ${normalize(`${address || ''} ${name || ''}`)} `;
     for (const [lower, proper] of IL_MAP_LOWER.entries()) {
-        // "ankara" gibi tek kelime → kelime sınırı ile ara
-        // "afyonkarahisar" gibi uzun → kelime sınırı olmadan da olur
-        const pattern = new RegExp(`(^|[^a-zçğıöşü0-9])${lower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-zçğıöşü0-9]|$)`, 'i');
-        if (pattern.test(haystack)) return proper;
+        if (haystack.includes(` ${lower} `)) return proper;
     }
     return null;
 }
@@ -798,39 +800,55 @@ router.get('/inspect-dirty-cities', async (req: Request, res: Response) => {
     try {
         const reports: any[] = [];
         for (const rule of DIRTY_CITY_RULES) {
-            const cnt: any = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE city = ${rule.from}`);
-            const count = Number((cnt as any).rows?.[0]?.n ?? 0);
-            const samplesRes: any = await db.execute(
-                sql`SELECT id, name, address, city FROM companies WHERE city = ${rule.from} ORDER BY id LIMIT 5`
-            );
-            const samples = (samplesRes as any).rows || [];
+            try {
+                const cnt: any = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE city = ${rule.from}`);
+                const count = Number((cnt as any).rows?.[0]?.n ?? 0);
+                const samplesRes: any = await db.execute(
+                    sql`SELECT id, name, address, city FROM companies WHERE city = ${rule.from} ORDER BY id LIMIT 5`
+                );
+                const samples = (samplesRes as any).rows || [];
 
-            // Adres fallback analizi
-            const addressOverrides: { id: number; name: string; address: string; proposedCity: string }[] = [];
-            if (rule.action === 'update' && rule.to) {
-                for (const s of samples) {
-                    const detected = findIlInAddress(s.address, s.name);
-                    if (detected && detected !== rule.to) {
-                        addressOverrides.push({
-                            id: s.id,
-                            name: s.name,
-                            address: s.address,
-                            proposedCity: detected,
-                        });
+                // Adres fallback analizi
+                const addressOverrides: { id: number; name: string; address: string; proposedCity: string }[] = [];
+                if (rule.action === 'update' && rule.to) {
+                    for (const s of samples) {
+                        let detected: string | null = null;
+                        try {
+                            detected = findIlInAddress(s.address, s.name);
+                        } catch (e: any) {
+                            logger.error({ ruleFrom: rule.from, sampleId: s.id, err: e.message }, '[inspect] findIlInAddress hata');
+                        }
+                        if (detected && detected !== rule.to) {
+                            addressOverrides.push({
+                                id: s.id,
+                                name: s.name,
+                                address: s.address,
+                                proposedCity: detected,
+                            });
+                        }
                     }
                 }
-            }
 
-            reports.push({
-                from: rule.from,
-                action: rule.action,
-                to: rule.to || null,
-                reason: rule.reason,
-                count,
-                samples,
-                addressOverrideCount: addressOverrides.length,
-                addressOverrideSamples: addressOverrides,
-            });
+                reports.push({
+                    from: rule.from,
+                    action: rule.action,
+                    to: rule.to || null,
+                    reason: rule.reason,
+                    count,
+                    samples,
+                    addressOverrideCount: addressOverrides.length,
+                    addressOverrideSamples: addressOverrides,
+                });
+            } catch (e: any) {
+                logger.error({ ruleFrom: rule.from, err: e.message, stack: e.stack?.slice(0, 500) }, '[inspect] rule hata');
+                reports.push({
+                    from: rule.from,
+                    action: rule.action,
+                    to: rule.to || null,
+                    reason: rule.reason,
+                    error: e.message,
+                });
+            }
         }
         const totalCount = reports.reduce((s, r) => s + r.count, 0);
         res.json({
