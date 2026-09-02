@@ -33,12 +33,7 @@ export default defineConfig({
                         '@capacitor/app',
                         '@capacitor/camera',
                         '@capacitor/device',
-                        '@capacitor/geolocation',
-                        '@capacitor/push-notifications'
-                    ],
-                    'firebase-vendor': [
-                        'firebase/app',
-                        'firebase/messaging'
+                        '@capacitor/geolocation'
                     ],
                     'maps-vendor': [
                         'leaflet',
