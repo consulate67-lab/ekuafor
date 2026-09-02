@@ -9,9 +9,9 @@
 // Her anahtar Türkçe karakterli proper case. findIlInAddress'te kullanılırken
 // normalize (i→ı, lowercase) ile aranır.
 
-import * as data from './turkiye-il-ilce-data.json';
+import { IL_ILCE_DATA } from './turkiye-il-ilce-data';
 
-export const IL_ILCE_MAP: Record<string, string[]> = data as any;
+export const IL_ILCE_MAP: Record<string, string[]> = IL_ILCE_DATA;
 
 export const ILCE_TO_IL: Record<string, string> = (() => {
     const m: Record<string, string> = {};
