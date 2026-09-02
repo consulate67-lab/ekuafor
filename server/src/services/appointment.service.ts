@@ -1,5 +1,6 @@
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
+import pool from '../config/database';
 import { appointments, appointmentServices } from '../db/schema/appointments';
 import { services } from '../db/schema/services';
 import smsService from './sms.service';
@@ -200,34 +201,47 @@ class AppointmentService {
         // Bu commit HALA debug amacli. SQL'i hem logla hem response'a koy ki
         // bir sonraki commit'te kesin fix yapabilelim.
         return await db.transaction(async (tx) => {
-            // Ham SQL INSERT: 14 kolon (schema ile uyumlu, original_price yok)
-            // Parametre binding Drizzle'in sql template'i uzerinden
-            const insertRes = await tx.execute(sql`
-                INSERT INTO appointments (
+            // NOT 02.09.2026 23:55: Drizzle 0.36 tx.execute(sql\`...raw SQL\`) 42601 syntax
+            // error at or near ')' donduruyor — template parser tx context'inde parantez
+            // yanlis parse ediyor. EN GUvenLi yol: Drizzle'i bypass edip raw pg pool.query
+            // kullanmak. pool.query parameterized query yapar ($1, $2, ...) ve Drizzle
+            // template parser'indan etkilenmez.
+            //
+            // Drizzle 0.36 tx context'inde raw SQL INSERT sorunlu, dolayisiyla
+            // INSERT'leri transaction disina cikarip sequential yapiyoruz. Bu, transaction
+            // guvenligini biraz bozar ama syntax hatasi onlenir.
+            //
+            // Not: Drizzle 0.40+'ta sql.array() ve tx.insert() duzgun calisiyor,
+            // upgrade ile bu workarounds'a gerek kalmaz. Biz 0.36 kullaniyoruz (0.45 uyumsuz).
+
+            // 1) INSERT appointments (14 kolon, schema uyumlu)
+            const insertRes = await pool.query(
+                `INSERT INTO appointments (
                     company_id, customer_id, service_id, staff_id,
                     appointment_date, start_time, end_time, status, notes, price,
                     customer_phone, customer_name, device_id, package_id
-                ) VALUES (
-                    ${appointment.company_id},
-                    ${appointment.customer_id || null},
-                    ${primaryServiceId},
-                    ${mainStaffId},
-                    ${appointment.appointment_date},
-                    ${appointment.start_time},
-                    ${appointment.end_time},
-                    ${appointment.status || 'pending'},
-                    ${appointment.notes || null},
-                    ${appointment.price || null},
-                    ${appointment.customer_phone || null},
-                    ${appointment.customer_name || null},
-                    ${appointment.device_id || null},
-                    ${appointment.package_id || null}
-                )
-                RETURNING *
-            `);
-            const newAppointment = (insertRes as any).rows[0];
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                RETURNING *`,
+                [
+                    appointment.company_id,
+                    appointment.customer_id || null,
+                    primaryServiceId,
+                    mainStaffId,
+                    appointment.appointment_date,
+                    appointment.start_time,
+                    appointment.end_time,
+                    appointment.status || 'pending',
+                    appointment.notes || null,
+                    appointment.price || null,
+                    appointment.customer_phone || null,
+                    appointment.customer_name || null,
+                    appointment.device_id || null,
+                    appointment.package_id || null,
+                ]
+            );
+            const newAppointment = insertRes.rows[0];
 
-            // Insert into appointment_services with sequential timing (ham SQL, 8 kolon)
+            // 2) INSERT appointment_services (8 kolon, sequential timing)
             let currentOffset = 0;
             const [baseH, baseM] = newAppointment.start_time.split(':').map(Number);
 
@@ -243,10 +257,20 @@ class AppointmentService {
                 const sTime = `${String(sH).padStart(2, '0')}:${String(sM).padStart(2, '0')}`;
                 const eTime = `${String(eH).padStart(2, '0')}:${String(eM).padStart(2, '0')}`;
 
-                await tx.execute(sql`
-                    INSERT INTO appointment_services (appointment_id, service_id, price, duration_minutes, staff_id, status, start_time, end_time)
-                    VALUES (${newAppointment.id}, ${s.id}, ${s.price}, ${s.duration_minutes}, ${s.staff_id || null}, ${newAppointment.status}, ${sTime}, ${eTime})
-                `);
+                await pool.query(
+                    `INSERT INTO appointment_services (appointment_id, service_id, price, duration_minutes, staff_id, status, start_time, end_time)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                    [
+                        newAppointment.id,
+                        s.id,
+                        s.price,
+                        s.duration_minutes,
+                        s.staff_id || null,
+                        newAppointment.status,
+                        sTime,
+                        eTime,
+                    ]
+                );
                 currentOffset += s.duration_minutes;
             }
 
