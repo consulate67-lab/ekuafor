@@ -362,11 +362,21 @@ router.post('/deep-clean-cities', async (req: Request, res: Response) => {
  *  - kebap / et lokantası / restoran / aşçı / pastane
  *  - düğün salonu / davet / organizasyon / toplantı
  *  - isimsiz (name NULL, empty, 'İsimsiz İşletme')
+ *  - spor salonu / fitness / gym / pilates / yoga / crossfit
+ *  - wellness / hamam / sauna / spa / masaj / solaryum
+ *  - dövme / piercing / dişçi / veteriner / hastane
  *
- * Body: { dryRun?: boolean, kebap?: boolean, dugun?: boolean, isimsiz?: boolean }
+ * Sadece berber, kuaför, güzellik merkezi, saç tasarım, erkek/kadın kuaförü
+ * gibi gerçek salon firmaları kalmalı.
+ *
+ * Body: { dryRun?: boolean, kebap?: boolean, dugun?: boolean, isimsiz?: boolean,
+ *         spor?: boolean, wellness?: boolean, diger?: boolean }
  *   - kebap=true (default): kebap/restoran sil
  *   - dugun=true (default): düğün salonu sil
  *   - isimsiz=true (default): isimsiz firmaları sil
+ *   - spor=true (default): spor salonu/fitness sil
+ *   - wellness=true (default): hamam/sauna/spa sil
+ *   - diger=true (default): dövme/dişçi/veteriner sil
  *   - dryRun=true: sadece rapor, silmez
  *
  * KVKK: kullanıcı talebi, loglanır.
@@ -377,6 +387,9 @@ router.post('/cleanup-companies', async (req: Request, res: Response) => {
         const kebap = Boolean(req.body?.kebap ?? req.query?.kebap ?? true);
         const dugun = Boolean(req.body?.dugun ?? req.query?.dugun ?? true);
         const isimsiz = Boolean(req.body?.isimsiz ?? req.query?.isimsiz ?? true);
+        const spor = Boolean(req.body?.spor ?? req.query?.spor ?? true);
+        const wellness = Boolean(req.body?.wellness ?? req.query?.wellness ?? true);
+        const diger = Boolean(req.body?.diger ?? req.query?.diger ?? true);
         const triggeredBy = req.user?.email || 'unknown';
 
         // WHERE koşullarını oluştur
@@ -390,9 +403,20 @@ router.post('/cleanup-companies', async (req: Request, res: Response) => {
         if (isimsiz) {
             conditions.push(sql`(name IS NULL OR TRIM(name) = '' OR name = 'İsimsiz İşletme')`);
         }
+        if (spor) {
+            // NOT: 'salon' kelimesi tek başına filtrelenmez (kuaför salonu için de geçerli),
+            // sadece spor+fitness bağlamında filtrelenir
+            conditions.push(sql`(name ILIKE '%spor salonu%' OR name ILIKE '%fitness%' OR name ILIKE '%gym%' OR name ILIKE '%pilates%' OR name ILIKE '%yoga%' OR name ILIKE '%crossfit%' OR name ILIKE '%bodybuilding%' OR name ILIKE '%fitness center%' OR name ILIKE '%spor merkezi%' OR name ILIKE '%spor kulübü%' OR name ILIKE '%kick boks%' OR name ILIKE '%boks%' OR name ILIKE '%taekwondo%')`);
+        }
+        if (wellness) {
+            conditions.push(sql`(name ILIKE '%hamam%' OR name ILIKE '%sauna%' OR name ILIKE '%spa%' OR name ILIKE '%masaj%' OR name ILIKE '%solaryum%' OR name ILIKE '%wellness%')`);
+        }
+        if (diger) {
+            conditions.push(sql`(name ILIKE '%dövme%' OR name ILIKE '%piercing%' OR name ILIKE '%dişçi%' OR name ILIKE '%diş hekimi%' OR name ILIKE '%diş kliniği%' OR name ILIKE '%diş polikliniği%' OR name ILIKE '%veteriner%' OR name ILIKE '%hastane%' OR name ILIKE '%eczane%' OR name ILIKE '%kuaför olmayan%')`);
+        }
 
         if (conditions.length === 0) {
-            return res.status(400).json({ success: false, error: 'En az bir kategori seçilmeli (kebap/dugun/isimsiz)' });
+            return res.status(400).json({ success: false, error: 'En az bir kategori seçilmeli (kebap/dugun/isimsiz/spor/wellness/diger)' });
         }
 
         const whereSql = sql.join(conditions, sql` OR `);
@@ -412,6 +436,18 @@ router.post('/cleanup-companies', async (req: Request, res: Response) => {
             const r: any = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE (name IS NULL OR TRIM(name) = '' OR name = 'İsimsiz İşletme')`);
             counts.isimsiz = (r as any).rows?.[0]?.n ?? 0;
         }
+        if (spor) {
+            const r: any = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE (name ILIKE '%spor salonu%' OR name ILIKE '%fitness%' OR name ILIKE '%gym%' OR name ILIKE '%pilates%' OR name ILIKE '%yoga%' OR name ILIKE '%crossfit%' OR name ILIKE '%bodybuilding%' OR name ILIKE '%fitness center%' OR name ILIKE '%spor merkezi%' OR name ILIKE '%spor kulübü%' OR name ILIKE '%kick boks%' OR name ILIKE '%boks%' OR name ILIKE '%taekwondo%')`);
+            counts.spor = (r as any).rows?.[0]?.n ?? 0;
+        }
+        if (wellness) {
+            const r: any = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE (name ILIKE '%hamam%' OR name ILIKE '%sauna%' OR name ILIKE '%spa%' OR name ILIKE '%masaj%' OR name ILIKE '%solaryum%' OR name ILIKE '%wellness%')`);
+            counts.wellness = (r as any).rows?.[0]?.n ?? 0;
+        }
+        if (diger) {
+            const r: any = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE (name ILIKE '%dövme%' OR name ILIKE '%piercing%' OR name ILIKE '%dişçi%' OR name ILIKE '%diş hekimi%' OR name ILIKE '%diş kliniği%' OR name ILIKE '%diş polikliniği%' OR name ILIKE '%veteriner%' OR name ILIKE '%hastane%' OR name ILIKE '%eczane%' OR name ILIKE '%kuaför olmayan%')`);
+            counts.diger = (r as any).rows?.[0]?.n ?? 0;
+        }
 
         // Örnekleri al (her kategoriden 5)
         const samples: Record<string, any[]> = {};
@@ -426,6 +462,18 @@ router.post('/cleanup-companies', async (req: Request, res: Response) => {
         if (isimsiz) {
             const r: any = await db.execute(sql`SELECT id, name, city FROM companies WHERE (name IS NULL OR TRIM(name) = '' OR name = 'İsimsiz İşletme') LIMIT 5`);
             samples.isimsiz = (r as any).rows || [];
+        }
+        if (spor) {
+            const r: any = await db.execute(sql`SELECT id, name, city FROM companies WHERE (name ILIKE '%spor salonu%' OR name ILIKE '%fitness%' OR name ILIKE '%gym%' OR name ILIKE '%pilates%' OR name ILIKE '%yoga%' OR name ILIKE '%crossfit%' OR name ILIKE '%bodybuilding%' OR name ILIKE '%fitness center%' OR name ILIKE '%spor merkezi%' OR name ILIKE '%spor kulübü%' OR name ILIKE '%kick boks%' OR name ILIKE '%boks%' OR name ILIKE '%taekwondo%') LIMIT 5`);
+            samples.spor = (r as any).rows || [];
+        }
+        if (wellness) {
+            const r: any = await db.execute(sql`SELECT id, name, city FROM companies WHERE (name ILIKE '%hamam%' OR name ILIKE '%sauna%' OR name ILIKE '%spa%' OR name ILIKE '%masaj%' OR name ILIKE '%solaryum%' OR name ILIKE '%wellness%') LIMIT 5`);
+            samples.wellness = (r as any).rows || [];
+        }
+        if (diger) {
+            const r: any = await db.execute(sql`SELECT id, name, city FROM companies WHERE (name ILIKE '%dövme%' OR name ILIKE '%piercing%' OR name ILIKE '%dişçi%' OR name ILIKE '%diş hekimi%' OR name ILIKE '%diş kliniği%' OR name ILIKE '%diş polikliniği%' OR name ILIKE '%veteriner%' OR name ILIKE '%hastane%' OR name ILIKE '%eczane%' OR name ILIKE '%kuaför olmayan%') LIMIT 5`);
+            samples.diger = (r as any).rows || [];
         }
         const totalToDelete = Object.values(counts).reduce((s, n) => s + Number(n), 0);
 
