@@ -19,7 +19,6 @@ export interface Appointment {
     price?: number;
     duration_minutes?: number; // Total duration (can be overridden)
     package_id?: number | null;
-    original_price?: number; // Paket indirimi uygulanmadan önceki toplam fiyat
     customer_name?: string;
     customer_phone?: string;
     device_id?: string;
@@ -179,11 +178,14 @@ class AppointmentService {
         // Tek transaction: appointments INSERT + appointment_services INSERT(s)
         // original_price schema'da yok → raw SQL.
         return await db.transaction(async (tx) => {
+            // NOT 02.09.2026: Schema'da original_price kolonu yok (sadece price).
+            // Onceki bug: 15 kolon icin 15 VALUE yazmaya calisildi ama 15. VALUE
+            // yine price idi. Duzeltme: 14 kolon (schema ile uyumlu), duplicate kaldirildi.
             const insertRes = await tx.execute(sql`
                 INSERT INTO appointments (
                     company_id, customer_id, service_id, staff_id,
                     appointment_date, start_time, end_time, status, notes, price,
-                    customer_phone, customer_name, device_id, package_id, original_price
+                    customer_phone, customer_name, device_id, package_id
                 ) VALUES (
                     ${appointment.company_id},
                     ${appointment.customer_id || null},
@@ -198,8 +200,7 @@ class AppointmentService {
                     ${appointment.customer_phone || null},
                     ${appointment.customer_name || null},
                     ${appointment.device_id || null},
-                    ${appointment.package_id || null},
-                    ${appointment.original_price ?? appointment.price ?? null}
+                    ${appointment.package_id || null}
                 )
                 RETURNING *
             `);
