@@ -29,12 +29,27 @@ export const createApp = (): Express => {
     // ("Access-Control-Allow-Origin: *" ile credentials gonderilmez).
     // Token zaten Authorization header'da tasiniyor (axios interceptor),
     // cookie/session yok — credentials:true gereksiz ve Capacitor'da bloklanmaya yol aciyor.
+    //
+    // NOT 2 (02.09.2026 19:02): Capacitor Android WebView origin='https://localhost'
+    // (androidScheme:'https' ayari yuzunden), iOS'ta 'capacitor://localhost'.
+    // Render env'inde ALLOWED_ORIGINS yoksa default bos liste geliyor. Bu iki origin'i
+    // HER ZAMAN kabul et (env'ye bakmadan), yoksa Capacitor WebView CORS engelleniyor.
+    const ALWAYS_ALLOWED_ORIGINS = [
+        'https://localhost',       // Capacitor Android (androidScheme:'https')
+        'capacitor://localhost',   // Capacitor iOS (default)
+        'http://localhost',        // Capacitor Android (eski default)
+        'app://.',                 // Capacitor bazı versiyonlar
+    ];
     app.use(cors({
         origin: (origin, callback) => {
             // Mobile/Capacitor origin header olmayabilir; izin ver
             if (!origin) return callback(null, true);
 
-            if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+            if (
+                allowedOrigins.includes(origin) ||
+                allowedOrigins.includes('*') ||
+                ALWAYS_ALLOWED_ORIGINS.includes(origin)
+            ) {
                 callback(null, true);
             } else {
                 logger.warn({ origin, allowed: allowedOrigins }, 'CORS blocked');
