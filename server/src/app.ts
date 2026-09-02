@@ -24,6 +24,11 @@ export const createApp = (): Express => {
     app.set('trust proxy', 1);
 
     // === CORS — origin whitelist ===
+    // NOT (02.09.2026): credentials: false yapildi. Capacitor WebView (Android)
+    // origin='https://localhost' ile `* + credentials:true` CORS spec cakisiyor
+    // ("Access-Control-Allow-Origin: *" ile credentials gonderilmez).
+    // Token zaten Authorization header'da tasiniyor (axios interceptor),
+    // cookie/session yok — credentials:true gereksiz ve Capacitor'da bloklanmaya yol aciyor.
     app.use(cors({
         origin: (origin, callback) => {
             // Mobile/Capacitor origin header olmayabilir; izin ver
@@ -36,7 +41,7 @@ export const createApp = (): Express => {
                 callback(new Error(`CORS: origin not allowed: ${origin}`));
             }
         },
-        credentials: true,
+        credentials: false,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization', 'X-No-Mock', 'X-Company-Id'],
     }));
