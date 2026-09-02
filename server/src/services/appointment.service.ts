@@ -1,8 +1,11 @@
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
+import { appointments, appointmentServices } from '../db/schema/appointments';
+import { services } from '../db/schema/services';
 import smsService from './sms.service';
 import redis from '../config/redis';
 import { normalizePhone, formatPhoneWithSpaces } from '../utils/phone';
+import { logger } from '../utils/logger';
 
 export interface Appointment {
     id?: number;
@@ -182,39 +185,31 @@ class AppointmentService {
 
         // Tek transaction: appointments INSERT + appointment_services INSERT(s)
         // original_price schema'da yok → raw SQL.
+        // NOT 02.09.2026 23:30: tx.execute(sql\`...raw SQL\`) syntax error at or near ',' hatasi veriyor
+        // (Drizzle 0.36 tx context'inde parametreler yanlis serialize ediliyor). tx.insert() ile
+        // type-safe ORM insert'a gecildi — parametre binding otomatik, syntax hatasi riski sifir.
         return await db.transaction(async (tx) => {
-            // NOT 02.09.2026: Schema'da original_price kolonu yok (sadece price).
-            // Onceki bug: 15 kolon icin 15 VALUE yazmaya calisildi ama 15. VALUE
-            // yine price idi. Duzeltme: 14 kolon (schema ile uyumlu), duplicate kaldirildi.
-            const insertRes = await tx.execute(sql`
-                INSERT INTO appointments (
-                    company_id, customer_id, service_id, staff_id,
-                    appointment_date, start_time, end_time, status, notes, price,
-                    customer_phone, customer_name, device_id, package_id
-                ) VALUES (
-                    ${appointment.company_id},
-                    ${appointment.customer_id || null},
-                    ${primaryServiceId},
-                    ${mainStaffId},
-                    ${appointment.appointment_date},
-                    ${appointment.start_time},
-                    ${appointment.end_time},
-                    ${appointment.status || 'pending'},
-                    ${appointment.notes || null},
-                    ${appointment.price || null},
-                    ${appointment.customer_phone || null},
-                    ${appointment.customer_name || null},
-                    ${appointment.device_id || null},
-                    ${appointment.package_id || null}
-                )
-                RETURNING *
-            `);
-            const insertedRows = (insertRes as any).rows as any[];
-            const newAppointment = insertedRows[0];
+            // ORM type-safe INSERT: otomatik kolon/parametre binding
+            const [newAppointment] = await tx.insert(appointments).values({
+                companyId: appointment.company_id,
+                customerId: appointment.customer_id || null,
+                serviceId: primaryServiceId,
+                staffId: mainStaffId,
+                appointmentDate: appointment.appointment_date,
+                startTime: appointment.start_time,
+                endTime: appointment.end_time,
+                status: appointment.status || 'pending',
+                notes: appointment.notes || null,
+                price: appointment.price?.toString() || null,  // decimal string
+                customerPhone: appointment.customer_phone || null,
+                customerName: appointment.customer_name || null,
+                deviceId: appointment.device_id || null,
+                packageId: appointment.package_id || null,
+            }).returning();
 
             // Insert into appointment_services with sequential timing
             let currentOffset = 0;
-            const [baseH, baseM] = newAppointment.start_time.split(':').map(Number);
+            const [baseH, baseM] = newAppointment.startTime.split(':').map(Number);
 
             for (const s of serviceRecords) {
                 const startTotal = baseH * 60 + baseM + currentOffset;
@@ -228,10 +223,17 @@ class AppointmentService {
                 const sTime = `${String(sH).padStart(2, '0')}:${String(sM).padStart(2, '0')}`;
                 const eTime = `${String(eH).padStart(2, '0')}:${String(eM).padStart(2, '0')}`;
 
-                await tx.execute(sql`
-                    INSERT INTO appointment_services (appointment_id, service_id, price, duration_minutes, staff_id, status, start_time, end_time)
-                    VALUES (${newAppointment.id}, ${s.id}, ${s.price}, ${s.duration_minutes}, ${s.staff_id || null}, ${newAppointment.status}, ${sTime}, ${eTime})
-                `);
+                // Type-safe ORM insert — Drizzle otomatik kolon sirasi, parametre binding
+                await tx.insert(appointmentServices).values({
+                    appointmentId: newAppointment.id,
+                    serviceId: s.id,
+                    price: s.price?.toString() || null,
+                    durationMinutes: s.duration_minutes,
+                    staffId: s.staff_id || null,
+                    status: newAppointment.status,
+                    startTime: sTime,
+                    endTime: eTime,
+                });
                 currentOffset += s.duration_minutes;
             }
 
