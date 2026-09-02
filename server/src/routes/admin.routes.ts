@@ -409,7 +409,10 @@ router.post('/cleanup-companies', async (req: Request, res: Response) => {
             conditions.push(sql`(name ILIKE '%spor salonu%' OR name ILIKE '%fitness%' OR name ILIKE '%gym%' OR name ILIKE '%pilates%' OR name ILIKE '%yoga%' OR name ILIKE '%crossfit%' OR name ILIKE '%bodybuilding%' OR name ILIKE '%fitness center%' OR name ILIKE '%spor merkezi%' OR name ILIKE '%spor kulübü%' OR name ILIKE '%kick boks%' OR name ILIKE '%boks%' OR name ILIKE '%taekwondo%')`);
         }
         if (wellness) {
-            conditions.push(sql`(name ILIKE '%hamam%' OR name ILIKE '%sauna%' OR name ILIKE '%spa%' OR name ILIKE '%masaj%' OR name ILIKE '%solaryum%' OR name ILIKE '%wellness%')`);
+            // Wellness: hamam, sauna, spa, masaj, solaryum, wellness
+            // AMA: 'Beauty'/'Güzellik'/'Kuaför' içerenler EXCLUDE — bunlar güzellik merkezi
+            // (false positive örnekleri: "Ayça Türkar Beauty & Spa Center", "Ateş Kuaför Solaryum")
+            conditions.push(sql`((name ILIKE '%hamam%' OR name ILIKE '%sauna%' OR name ILIKE '%spa%' OR name ILIKE '%masaj%' OR name ILIKE '%solaryum%' OR name ILIKE '%wellness%') AND NOT (name ILIKE '%beauty%' OR name ILIKE '%güzellik%' OR name ILIKE '%kuaför%' OR name ILIKE '%kuaförü%' OR name ILIKE '%erbek%' OR name ILIKE '%nail%' OR name ILIKE '%tırnak%'))`);
         }
         if (diger) {
             conditions.push(sql`(name ILIKE '%dövme%' OR name ILIKE '%piercing%' OR name ILIKE '%dişçi%' OR name ILIKE '%diş hekimi%' OR name ILIKE '%diş kliniği%' OR name ILIKE '%diş polikliniği%' OR name ILIKE '%veteriner%' OR name ILIKE '%hastane%' OR name ILIKE '%eczane%' OR name ILIKE '%kuaför olmayan%')`);
@@ -441,7 +444,7 @@ router.post('/cleanup-companies', async (req: Request, res: Response) => {
             counts.spor = (r as any).rows?.[0]?.n ?? 0;
         }
         if (wellness) {
-            const r: any = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE (name ILIKE '%hamam%' OR name ILIKE '%sauna%' OR name ILIKE '%spa%' OR name ILIKE '%masaj%' OR name ILIKE '%solaryum%' OR name ILIKE '%wellness%')`);
+            const r: any = await db.execute(sql`SELECT count(*)::int AS n FROM companies WHERE ((name ILIKE '%hamam%' OR name ILIKE '%sauna%' OR name ILIKE '%spa%' OR name ILIKE '%masaj%' OR name ILIKE '%solaryum%' OR name ILIKE '%wellness%') AND NOT (name ILIKE '%beauty%' OR name ILIKE '%güzellik%' OR name ILIKE '%kuaför%' OR name ILIKE '%kuaförü%' OR name ILIKE '%erbek%' OR name ILIKE '%nail%' OR name ILIKE '%tırnak%'))`);
             counts.wellness = (r as any).rows?.[0]?.n ?? 0;
         }
         if (diger) {
@@ -468,7 +471,7 @@ router.post('/cleanup-companies', async (req: Request, res: Response) => {
             samples.spor = (r as any).rows || [];
         }
         if (wellness) {
-            const r: any = await db.execute(sql`SELECT id, name, city FROM companies WHERE (name ILIKE '%hamam%' OR name ILIKE '%sauna%' OR name ILIKE '%spa%' OR name ILIKE '%masaj%' OR name ILIKE '%solaryum%' OR name ILIKE '%wellness%') LIMIT 5`);
+            const r: any = await db.execute(sql`SELECT id, name, city FROM companies WHERE ((name ILIKE '%hamam%' OR name ILIKE '%sauna%' OR name ILIKE '%spa%' OR name ILIKE '%masaj%' OR name ILIKE '%solaryum%' OR name ILIKE '%wellness%') AND NOT (name ILIKE '%beauty%' OR name ILIKE '%güzellik%' OR name ILIKE '%kuaför%' OR name ILIKE '%kuaförü%' OR name ILIKE '%erbek%' OR name ILIKE '%nail%' OR name ILIKE '%tırnak%')) LIMIT 5`);
             samples.wellness = (r as any).rows || [];
         }
         if (diger) {
