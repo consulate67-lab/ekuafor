@@ -188,28 +188,32 @@ class AppointmentService {
         // NOT 02.09.2026 23:30: tx.execute(sql\`...raw SQL\`) syntax error at or near ',' hatasi veriyor
         // (Drizzle 0.36 tx context'inde parametreler yanlis serialize ediliyor). tx.insert() ile
         // type-safe ORM insert'a gecildi — parametre binding otomatik, syntax hatasi riski sifir.
+        //
+        // NOT 2 (02.09.2026 23:35): Drizzle 0.36 pgTable field adlari snake_case (package_id
+        // gibi) — camelCase packageId yazinca TS 'does not exist' hatasi verdi. snake_case
+        // kullanildi.
         return await db.transaction(async (tx) => {
             // ORM type-safe INSERT: otomatik kolon/parametre binding
             const [newAppointment] = await tx.insert(appointments).values({
-                companyId: appointment.company_id,
-                customerId: appointment.customer_id || null,
-                serviceId: primaryServiceId,
-                staffId: mainStaffId,
-                appointmentDate: appointment.appointment_date,
-                startTime: appointment.start_time,
-                endTime: appointment.end_time,
+                company_id: appointment.company_id,
+                customer_id: appointment.customer_id || null,
+                service_id: primaryServiceId,
+                staff_id: mainStaffId,
+                appointment_date: appointment.appointment_date,
+                start_time: appointment.start_time,
+                end_time: appointment.end_time,
                 status: appointment.status || 'pending',
                 notes: appointment.notes || null,
                 price: appointment.price?.toString() || null,  // decimal string
-                customerPhone: appointment.customer_phone || null,
-                customerName: appointment.customer_name || null,
-                deviceId: appointment.device_id || null,
-                packageId: appointment.package_id || null,
+                customer_phone: appointment.customer_phone || null,
+                customer_name: appointment.customer_name || null,
+                device_id: appointment.device_id || null,
+                package_id: appointment.package_id || null,
             }).returning();
 
             // Insert into appointment_services with sequential timing
             let currentOffset = 0;
-            const [baseH, baseM] = newAppointment.startTime.split(':').map(Number);
+            const [baseH, baseM] = newAppointment.start_time.split(':').map(Number);
 
             for (const s of serviceRecords) {
                 const startTotal = baseH * 60 + baseM + currentOffset;
@@ -225,14 +229,14 @@ class AppointmentService {
 
                 // Type-safe ORM insert — Drizzle otomatik kolon sirasi, parametre binding
                 await tx.insert(appointmentServices).values({
-                    appointmentId: newAppointment.id,
-                    serviceId: s.id,
+                    appointment_id: newAppointment.id,
+                    service_id: s.id,
                     price: s.price?.toString() || null,
-                    durationMinutes: s.duration_minutes,
-                    staffId: s.staff_id || null,
+                    duration_minutes: s.duration_minutes,
+                    staff_id: s.staff_id || null,
                     status: newAppointment.status,
-                    startTime: sTime,
-                    endTime: eTime,
+                    start_time: sTime,
+                    end_time: eTime,
                 });
                 currentOffset += s.duration_minutes;
             }
