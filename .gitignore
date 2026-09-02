@@ -65,6 +65,7 @@ model-tr/
 *.ipa
 release/
 release_apk/
+client/android/
 
 # tsc error logs (legacy, regenerated on demand)
 tsc_errors.txt
