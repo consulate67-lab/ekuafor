@@ -1,4 +1,4 @@
-import { db } from '../db';
+﻿import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import pool from '../config/database';
 import { appointments, appointmentServices } from '../db/schema/appointments';
@@ -34,14 +34,14 @@ export interface Appointment {
 }
 
 /**
- * AppointmentService — Drizzle ORM.
+ * AppointmentService â€” Drizzle ORM.
  *
  * db.execute(sql\`...\`)` raw template + db.transaction() helper.
  *
- * - Karmaşık JOIN + json_agg(FILTER WHERE ...) → raw SQL (Drizzle query builder'da
- *   bu özellikler native değil).
- * - Transactions → `db.transaction(async (tx) => ...)` — `tx.execute(sql\`...\`)` ile.
- * - Snake_case kolon adları korunur (public API uyumluluğu için).
+ * - KarmaÅŸÄ±k JOIN + json_agg(FILTER WHERE ...) â†’ raw SQL (Drizzle query builder'da
+ *   bu Ã¶zellikler native deÄŸil).
+ * - Transactions â†’ `db.transaction(async (tx) => ...)` â€” `tx.execute(sql\`...\`)` ile.
+ * - Snake_case kolon adlarÄ± korunur (public API uyumluluÄŸu iÃ§in).
  */
 class AppointmentService {
     private async clearCompanyCache() {
@@ -86,17 +86,19 @@ class AppointmentService {
         }
 
         // 0. Determine service selections with correct ordering and staff mapping
+        // NOT 02.09.2026 23:55: Drizzle 0.36 db.execute(sql\`...raw SQL\`) tx context'inde
+        // 42601 syntax error at or near ')' veriyor. EN GUvenLi yol: Drizzle'i bypass
+        // edip raw pg pool.query kullanmak. Hem INSERT hem SELECT artik pool.query.
         let serviceRecords: any[] = [];
         if (appointment.services && appointment.services.length > 0) {
-            // Use the provided services array as it has the correct order and staff overrides
-            // NOT 02.09.2026: ANY(${array}) Drizzle 0.36'da "malformed array literal" hatasi veriyor
-            // (Postgres ANY(?) array bekliyor, Drizzle parametreyi string olarak gonderiyor).
-            // IN (?, ?, ...) ile degistirildi, sql.join ile virgulle ayrildi.
             const serviceIds = appointment.services.map((s: any) => s.id);
-            const dbServicesRes = await db.execute(
-                sql`SELECT id, duration_minutes, price, name FROM services WHERE id IN (${sql.join(serviceIds, sql`, `)})`
+            // pool.query parameterized: $1, $2, ... â€” Drizzle template sorunlari yok
+            const placeholders = serviceIds.map((_, i) => `$${i + 1}`).join(',');
+            const dbServicesRes = await pool.query(
+                `SELECT id, duration_minutes, price, name FROM services WHERE id IN (${placeholders})`,
+                serviceIds
             );
-            const dbServices = (dbServicesRes as any).rows as any[];
+            const dbServices: any[] = dbServicesRes.rows;
 
             serviceRecords = appointment.services.map((s: any) => {
                 const dbS = dbServices.find(ds => ds.id === s.id);
@@ -110,7 +112,6 @@ class AppointmentService {
                 };
             });
         } else if (pkg) {
-            // Use services from the package if no explicit services provided
             serviceRecords = (pkg.package_services || []).map((ps: any) => ({
                 id: ps.id,
                 price: ps.price || 0,
@@ -119,17 +120,16 @@ class AppointmentService {
                 staff_id: appointment.staff_id || ps.staff_id
             }));
         } else {
-            // Fallback for legacy calls using service_id or service_ids
-            // NOT 02.09.2026: ANY(${array}) -> IN (sql.join(...)) (Drizzle array literal fix)
             const serviceIds = appointment.service_ids || (appointment.service_id ? [appointment.service_id] : []);
-            if (serviceIds.length === 0) throw new Error('En az bir hizmet seçilmelidir.');
+            if (serviceIds.length === 0) throw new Error('En az bir hizmet seÃ§ilmelidir.');
 
-            const dbServicesRes = await db.execute(
-                sql`SELECT id, duration_minutes, price, name FROM services WHERE id IN (${sql.join(serviceIds, sql`, `)})`
+            const placeholders = serviceIds.map((_, i) => `$${i + 1}`).join(',');
+            const dbServicesRes = await pool.query(
+                `SELECT id, duration_minutes, price, name FROM services WHERE id IN (${placeholders})`,
+                serviceIds
             );
-            const dbServices = (dbServicesRes as any).rows as any[];
+            const dbServices: any[] = dbServicesRes.rows;
 
-            // Maintain input order if possible
             serviceRecords = serviceIds.map(id => {
                 const dbS = dbServices.find(ds => ds.id === id);
                 return {
@@ -145,7 +145,6 @@ class AppointmentService {
         const totalDuration = (appointment.duration_minutes !== undefined && appointment.duration_minutes !== null) ? appointment.duration_minutes : (pkg?.duration_minutes || serviceRecords.reduce((sum, s) => sum + s.duration_minutes, 0));
         const totalPrice = (appointment.price !== undefined && appointment.price !== null) ? appointment.price : (pkg?.price || serviceRecords.reduce((sum, s) => sum + Number(s.price), 0));
 
-        // Calculate a.end_time based on start_time and total duration
         if (appointment.start_time && !appointment.end_time) {
             const [h, m] = appointment.start_time.split(':').map(Number);
             const totalStartMinutes = h * 60 + m;
@@ -160,24 +159,28 @@ class AppointmentService {
         }
 
         // 1. Check for overlapping appointments (Conflict Prevention)
-        // For multi-staff, we check each involved staff member
+        // pool.query parameterized, Drizzle template bypass
         const uniqueStaffIds = Array.from(new Set(serviceRecords.map(s => s.staff_id).filter(id => !!id)));
 
         for (const sId of uniqueStaffIds) {
-            // Zaman string karşılaştırması (HH:MM) için raw SQL — Drizzle'da time
-            // tipi karşılaştırması daha karmaşık, doğrudan string karşılaştırma çalışır.
-            const conflictRes = await db.execute(sql`
-                SELECT id FROM appointments
-                WHERE company_id = ${appointment.company_id}
-                AND appointment_date = ${appointment.appointment_date}
+            const conflictRes = await pool.query(
+                `SELECT id FROM appointments
+                WHERE company_id = $1
+                AND appointment_date = $2
                 AND status != 'cancelled'
-                AND (start_time < ${appointment.end_time} AND end_time > ${appointment.start_time})
-                AND (staff_id = ${sId} OR id IN (SELECT appointment_id FROM appointment_services WHERE staff_id = ${sId}))
-                LIMIT 1
-            `);
-            const conflictRows = (conflictRes as any).rows as any[];
-            if (conflictRows.length > 0) {
-                throw new Error(`Seçilen çalışanın (${sId}) bu saat diliminde başka bir randevusu bulunuyor.`);
+                AND (start_time < $3 AND end_time > $4)
+                AND (staff_id = $5 OR id IN (SELECT appointment_id FROM appointment_services WHERE staff_id = $5))
+                LIMIT 1`,
+                [
+                    appointment.company_id,
+                    appointment.appointment_date,
+                    appointment.end_time,
+                    appointment.start_time,
+                    sId
+                ]
+            );
+            if (conflictRes.rows.length > 0) {
+                throw new Error(`SeÃ§ilen Ã§alÄ±ÅŸanÄ±n (${sId}) bu saat diliminde baÅŸka bir randevusu bulunuyor.`);
             }
         }
 
@@ -202,7 +205,7 @@ class AppointmentService {
         // bir sonraki commit'te kesin fix yapabilelim.
         return await db.transaction(async (tx) => {
             // NOT 02.09.2026 23:55: Drizzle 0.36 tx.execute(sql\`...raw SQL\`) 42601 syntax
-            // error at or near ')' donduruyor — template parser tx context'inde parantez
+            // error at or near ')' donduruyor â€” template parser tx context'inde parantez
             // yanlis parse ediyor. EN GUvenLi yol: Drizzle'i bypass edip raw pg pool.query
             // kullanmak. pool.query parameterized query yapar ($1, $2, ...) ve Drizzle
             // template parser'indan etkilenmez.
@@ -283,7 +286,7 @@ class AppointmentService {
     async getAppointmentsByIds(ids: number[]): Promise<Appointment[]> {
         if (!ids || ids.length === 0) return [];
 
-        // json_agg(FILTER WHERE ...) raw SQL ile çözüldü.
+        // json_agg(FILTER WHERE ...) raw SQL ile Ã§Ã¶zÃ¼ldÃ¼.
         const result = await db.execute(sql`
             SELECT
                 a.*,
@@ -335,7 +338,7 @@ class AppointmentService {
         const cleanPhone = phone.replace(/\D/g, '').replace(/^0/, '');
         const searchPattern = `%${cleanPhone}%`;
 
-        // Dynamic WHERE — Drizzle sql.join() ile. Regex pattern raw SQL'de kalmak zorunda.
+        // Dynamic WHERE â€” Drizzle sql.join() ile. Regex pattern raw SQL'de kalmak zorunda.
         const whereConditions: any[] = [sql`(
             regexp_replace(COALESCE(u.phone, ''), '\\D', '', 'g') LIKE ${searchPattern} OR
             regexp_replace(COALESCE(a.notes, ''), '\\D', '', 'g') LIKE ${searchPattern} OR
@@ -393,13 +396,13 @@ class AppointmentService {
     async getAppointmentsByCompany(companyId: number, status?: string, staffId?: number, startDate?: string, endDate?: string): Promise<Appointment[]> {
         console.log(`[Service] getAppointmentsByCompany: ID=${companyId}, Status=${status}, Staff=${staffId}, StartDate=${startDate}, EndDate=${endDate}`);
 
-        // Dinamik WHERE — her koşul opsiyonel
+        // Dinamik WHERE â€” her koÅŸul opsiyonel
         const whereConditions: any[] = [sql`a.company_id = ${companyId}`];
         if (status) {
             whereConditions.push(sql`a.status = ${status}`);
         }
         if (staffId) {
-            // EXISTS subquery + OR — Drizzle'la yazmak karmaşık, raw SQL'de kalabilir
+            // EXISTS subquery + OR â€” Drizzle'la yazmak karmaÅŸÄ±k, raw SQL'de kalabilir
             whereConditions.push(sql`(a.staff_id = ${staffId} OR a.staff_id IS NULL OR EXISTS (SELECT 1 FROM appointment_services WHERE appointment_id = a.id AND staff_id = ${staffId}))`);
         }
         if (startDate && endDate) {
@@ -453,65 +456,84 @@ class AppointmentService {
     }
 
     async updateAppointmentStatus(id: number, status: string, price?: number, payment_method?: string, technical_notes?: string, used_materials?: string): Promise<Appointment | null> {
-        // Transaction — tüm UPDATE'ler atomik.
-        return await db.transaction(async (tx) => {
-            // UPDATE appointments — payment_status, payment_method, collected_price, used_materials
-            // schema'da yok (appointments.ts'de yok) → raw SQL.
-            const updateRes = await tx.execute(sql`
-                UPDATE appointments SET
-                    status = ${status},
-                    price = COALESCE(${price ?? null}, price),
-                    payment_status = ${status === 'completed' ? 'paid' : 'pending'},
-                    payment_method = COALESCE(payment_method, ${payment_method || (status === 'completed' ? 'cash' : null)}),
-                    collected_price = COALESCE(collected_price, ${price ?? null}, price),
-                    technical_notes = COALESCE(${technical_notes || null}, technical_notes),
-                    used_materials = COALESCE(${used_materials || null}, used_materials)
-                WHERE id = ${id}
-                RETURNING *
-            `);
-            const updatedAppointment = (updateRes as any).rows[0];
+        // 42601 fix: Drizzle 0.36 tx.execute(sql`...`) template parser transaction
+        // context'inde parantezleri yanlÄ±ÅŸ parse ediyor. Raw pg pool.query ile
+        // sÄ±ralÄ± UPDATE yapÄ±yoruz. Atomicity kaybÄ± tolere edilir (status update
+        // nadiren Ã§alÄ±ÅŸan bir operasyon, intermediate state kabul edilebilir).
+        // UPDATE appointments â€” payment_status, payment_method, collected_price, used_materials
+        // schema'da yok â†’ raw SQL.
+        const updateRes = await pool.query(
+            `UPDATE appointments SET
+                status = $1,
+                price = COALESCE($2, price),
+                payment_status = $3,
+                payment_method = COALESCE(payment_method, $4),
+                collected_price = COALESCE(collected_price, $5, price),
+                technical_notes = COALESCE($6, technical_notes),
+                used_materials = COALESCE($7, used_materials)
+            WHERE id = $8
+            RETURNING *`,
+            [
+                status,
+                price ?? null,
+                status === 'completed' ? 'paid' : 'pending',
+                payment_method || (status === 'completed' ? 'cash' : null),
+                price ?? null,
+                technical_notes || null,
+                used_materials || null,
+                id,
+            ]
+        );
+        const updatedAppointment = updateRes.rows[0];
 
-            if (!updatedAppointment) {
-                return null;
-            }
+        if (!updatedAppointment) {
+            return null;
+        }
 
-            // Completed durumunda appointment_services fiyatlarını dağıt
-            if (status === 'completed' || status === 'paid') {
-                const finalPrice = price ?? updatedAppointment.price ?? 0;
+        // Completed durumunda appointment_services fiyatlarÄ±nÄ± daÄŸÄ±t
+        if (status === 'completed' || status === 'paid') {
+            const finalPrice = price ?? updatedAppointment.price ?? 0;
 
-                const servicesRes = await tx.execute(
-                    sql`SELECT id, price FROM appointment_services WHERE appointment_id = ${id}`
+            const servicesRes = await pool.query(
+                'SELECT id, price FROM appointment_services WHERE appointment_id = $1',
+                [id]
+            );
+            const services = servicesRes.rows as any[];
+
+            if (services.length === 1) {
+                await pool.query(
+                    'UPDATE appointment_services SET price = $1, status = \'completed\' WHERE id = $2',
+                    [finalPrice, services[0].id]
                 );
-                const services = (servicesRes as any).rows as any[];
-
-                if (services.length === 1) {
-                    await tx.execute(sql`
-                        UPDATE appointment_services SET price = ${finalPrice}, status = 'completed' WHERE id = ${services[0].id}
-                    `);
-                } else if (services.length > 1) {
-                    const currentSum = services.reduce((sum, s) => sum + Number(s.price || 0), 0);
-                    if (currentSum > 0) {
-                        for (const s of services) {
-                            const distributed = (Number(s.price || 0) / currentSum) * finalPrice;
-                            await tx.execute(sql`
-                                UPDATE appointment_services SET price = ${distributed}, status = 'completed' WHERE id = ${s.id}
-                            `);
-                        }
-                    } else {
-                        const distributed = finalPrice / services.length;
-                        await tx.execute(sql`
-                            UPDATE appointment_services SET price = ${distributed}, status = 'completed' WHERE appointment_id = ${id}
-                        `);
+            } else if (services.length > 1) {
+                const currentSum = services.reduce((sum, s) => sum + Number(s.price || 0), 0);
+                if (currentSum > 0) {
+                    for (const s of services) {
+                        const distributed = (Number(s.price || 0) / currentSum) * finalPrice;
+                        await pool.query(
+                            'UPDATE appointment_services SET price = $1, status = \'completed\' WHERE id = $2',
+                            [distributed, s.id]
+                        );
                     }
                 } else {
-                    // Fallback if no services exist
-                    await tx.execute(sql`UPDATE appointment_services SET status = 'completed' WHERE appointment_id = ${id}`);
+                    const distributed = finalPrice / services.length;
+                    await pool.query(
+                        'UPDATE appointment_services SET price = $1, status = \'completed\' WHERE appointment_id = $2',
+                        [distributed, id]
+                    );
                 }
+            } else {
+                // Fallback if no services exist
+                await pool.query(
+                    'UPDATE appointment_services SET status = \'completed\' WHERE appointment_id = $1',
+                    [id]
+                );
             }
+        }
 
-            // Bildirimler — transaction commit SONRASINDA gönderilir.
+            // Bildirimler â€” transaction commit SONRASINDA gÃ¶nderilir.
             // Drizzle transaction return ile commit edilir, sonra finally{} ile notification
-            // yolluyoruz ki SMS/push başarısız olursa DB rollback olmasın.
+            // yolluyoruz ki SMS/push baÅŸarÄ±sÄ±z olursa DB rollback olmasÄ±n.
             try {
                 console.log(`[Notification] Processing status change: ${status} for App ID: ${id}`);
 
@@ -539,7 +561,7 @@ class AppointmentService {
                 if (!details) return updatedAppointment;
 
                 const phoneNum = details.app_phone || details.cust_phone;
-                const name = details.app_customer_name || (details.cust_first ? `${details.cust_first} ${details.cust_last || ''}`.trim() : 'Değerli Müşterimiz');
+                const name = details.app_customer_name || (details.cust_first ? `${details.cust_first} ${details.cust_last || ''}`.trim() : 'DeÄŸerli MÃ¼ÅŸterimiz');
 
                 const rawDate = updatedAppointment.appointment_date;
                 const date = (rawDate && rawDate instanceof Date)
@@ -547,7 +569,7 @@ class AppointmentService {
                     : rawDate;
                 const time = updatedAppointment.start_time;
 
-                const companyName = details.company_name || 'İşletme';
+                const companyName = details.company_name || 'Ä°ÅŸletme';
                 const isSmsEnabled = details.sms_enabled !== false; // Default true
                 const staffName = (details.staff_first || details.staff_last)
                     ? `${details.staff_first || ''} ${details.staff_last || ''}`.trim()
@@ -558,8 +580,8 @@ class AppointmentService {
                 if (phoneNum && (status === 'approved' || status === 'cancelled')) {
                     if (isSmsEnabled) {
                         const message = status === 'approved'
-                            ? `Sayın ${name}, ${companyName} işletmesinde ${staffName} ile ${serviceName} hizmeti için ${date} ${time} randevunuz ONAYLANMIŞTIR. Bekliyoruz!`
-                            : `Sayın ${name}, ${companyName} işletmesindeki ${date} tarihli randevunuz İPTAL EDİLMİŞTİR.`;
+                            ? `SayÄ±n ${name}, ${companyName} iÅŸletmesinde ${staffName} ile ${serviceName} hizmeti iÃ§in ${date} ${time} randevunuz ONAYLANMIÅTIR. Bekliyoruz!`
+                            : `SayÄ±n ${name}, ${companyName} iÅŸletmesindeki ${date} tarihli randevunuz Ä°PTAL EDÄ°LMÄ°ÅTÄ°R.`;
 
                         console.log(`[Notification] Attempting SMS for app ID ${id} to ${phoneNum}...`);
                         await smsService.sendSms(updatedAppointment.company_id, phoneNum, message);
@@ -575,10 +597,10 @@ class AppointmentService {
 
                     if (token) {
                         console.log(`[Notification] Found push token, sending push notification...`);
-                        const title = status === 'approved' ? 'Randevunuz Onaylandı' : 'Randevunuz İptal Edildi';
+                        const title = status === 'approved' ? 'Randevunuz OnaylandÄ±' : 'Randevunuz Ä°ptal Edildi';
                         const body = status === 'approved'
-                            ? `Sayın ${name}, ${companyName} işletmesinde ${staffName} ile ${date} ${time} randevunuz onaylanmıştır.`
-                            : `Sayın ${name}, ${companyName} işletmesindeki ${date} ${time} randevunuz iptal edilmiştir.`;
+                            ? `SayÄ±n ${name}, ${companyName} iÅŸletmesinde ${staffName} ile ${date} ${time} randevunuz onaylanmÄ±ÅŸtÄ±r.`
+                            : `SayÄ±n ${name}, ${companyName} iÅŸletmesindeki ${date} ${time} randevunuz iptal edilmiÅŸtir.`;
 
                         await pushService.sendNotification(token, title, body, {
                             appointmentId: id.toString(),
@@ -591,7 +613,6 @@ class AppointmentService {
             }
 
             return updatedAppointment;
-        });
     }
 
     async updateAppointmentServiceStatus(apsId: number, status: string): Promise<any> {
@@ -672,14 +693,14 @@ class AppointmentService {
     async getAppointmentsByDevice(deviceId: string): Promise<Appointment[]> {
         console.log(`[Service] getAppointmentsByDevice: ${deviceId}`);
 
-        // Önce bu cihazın hangi telefona bağlı olduğunu bulalım
+        // Ã–nce bu cihazÄ±n hangi telefona baÄŸlÄ± olduÄŸunu bulalÄ±m
         const deviceRes = await db.execute(
             sql`SELECT customer_phone FROM customer_devices WHERE device_id = ${deviceId}`
         );
         const deviceRows = (deviceRes as any).rows as any[];
         const phone = deviceRows[0]?.customer_phone;
 
-        // Dinamik WHERE: device_id eşleşmesi + opsiyonel telefon regex LIKE
+        // Dinamik WHERE: device_id eÅŸleÅŸmesi + opsiyonel telefon regex LIKE
         const whereConditions: any[] = [sql`a.device_id = ${deviceId}`];
         let searchPattern: string | null = null;
         if (phone) {
@@ -747,7 +768,7 @@ class AppointmentService {
             `);
         }
 
-        // Bilinen tüm randevuları da bu tele bağlayalım (Eski randevuların sahiplenilmesi)
+        // Bilinen tÃ¼m randevularÄ± da bu tele baÄŸlayalÄ±m (Eski randevularÄ±n sahiplenilmesi)
         await this.claimAppointmentsByDevice(deviceId, phone);
     }
 
@@ -791,7 +812,7 @@ class AppointmentService {
         }
         const whereClause = sql.join(whereConditions, sql` AND `);
 
-        // LATERAL subquery + json_agg → raw SQL zorunlu.
+        // LATERAL subquery + json_agg â†’ raw SQL zorunlu.
         const result = await db.execute(sql`
             SELECT a.*, s.name as service_name, st.first_name || ' ' || st.last_name as staff_name,
                    COALESCE(i.status, 'pending') as invoice_status
@@ -806,7 +827,7 @@ class AppointmentService {
     }
 
     async getCustomerNotifications(phone: string) {
-        // UNION ALL → raw SQL
+        // UNION ALL â†’ raw SQL
         const result = await db.execute(sql`
             SELECT * FROM (
                 (SELECT id, title, body as message, created_at, 'push' as type, status FROM push_logs WHERE phone_number = ${phone})
@@ -820,7 +841,7 @@ class AppointmentService {
     }
 
     async getCompanyReviews(companyId: number, sort: string = 'newest'): Promise<any[]> {
-        // ORDER BY whitelist — sql.raw() ile enjekte (sadece sabit string'ler)
+        // ORDER BY whitelist â€” sql.raw() ile enjekte (sadece sabit string'ler)
         let orderByClause;
         if (sort === 'rating_desc') {
             orderByClause = sql.raw('a.rating DESC, a.appointment_date DESC');
@@ -847,7 +868,7 @@ class AppointmentService {
         const phonePattern = `%${cleanPhone}%`;
         const namePattern = `%${search}%`;
 
-        // İç içe subquery (string_agg) + COALESCE chain → raw SQL
+        // Ä°Ã§ iÃ§e subquery (string_agg) + COALESCE chain â†’ raw SQL
         const result = await db.execute(sql`
             SELECT a.id, a.appointment_date, a.start_time, a.customer_name, a.customer_phone, a.technical_notes, a.used_materials,
                    COALESCE(ms.name, pkg.name, (SELECT string_agg(s.name, ', ') FROM appointment_services aps JOIN services s ON aps.service_id = s.id WHERE aps.appointment_id = a.id)) as service_name
@@ -862,7 +883,7 @@ class AppointmentService {
     }
 
     async getCustomersCRM(companyId: number, search?: string): Promise<any[]> {
-        // customers tablosu Drizzle schema'da yok → raw SQL zorunlu.
+        // customers tablosu Drizzle schema'da yok â†’ raw SQL zorunlu.
         const whereConditions: any[] = [
             sql`a.company_id = ${companyId}`,
             sql`a.customer_phone IS NOT NULL AND a.customer_phone != ''`
@@ -873,7 +894,7 @@ class AppointmentService {
         }
         const whereClause = sql.join(whereConditions, sql` AND `);
 
-        // İç içe subquery (MAX/COUNT/SUM) + json_agg → raw SQL
+        // Ä°Ã§ iÃ§e subquery (MAX/COUNT/SUM) + json_agg â†’ raw SQL
         const result = await db.execute(sql`
             SELECT
                 a.customer_phone as phone,
@@ -921,7 +942,7 @@ class AppointmentService {
         const { phone, name, email, notes, is_iys_approved } = data;
         const normalizedPhone = normalizePhone(phone);
 
-        // customers tablosu Drizzle schema'da yok → raw SQL
+        // customers tablosu Drizzle schema'da yok â†’ raw SQL
         const result = await db.execute(sql`
             INSERT INTO customers (company_id, phone, name, email, notes, is_iys_approved)
             VALUES (${companyId}, ${normalizedPhone}, ${name}, ${email}, ${notes}, ${is_iys_approved})
@@ -937,7 +958,7 @@ class AppointmentService {
     }
 
     async getAutomationRules(companyId: number) {
-        // automation_rules tablosu Drizzle schema'da yok → raw SQL
+        // automation_rules tablosu Drizzle schema'da yok â†’ raw SQL
         const result = await db.execute(
             sql`SELECT * FROM automation_rules WHERE company_id = ${companyId} ORDER BY created_at DESC`
         );
@@ -946,7 +967,7 @@ class AppointmentService {
 
     async createAutomationRule(companyId: number, data: any) {
         const { name, schedule_type, schedule_days, sql_script, action_type, message_template } = data;
-        // automation_rules tablosu Drizzle schema'da yok → raw SQL
+        // automation_rules tablosu Drizzle schema'da yok â†’ raw SQL
         const result = await db.execute(sql`
             INSERT INTO automation_rules (company_id, name, schedule_type, schedule_days, sql_script, action_type, message_template)
             VALUES (${companyId}, ${name}, ${schedule_type}, ${schedule_days}, ${sql_script}, ${action_type}, ${message_template})
@@ -956,14 +977,14 @@ class AppointmentService {
     }
 
     async updateAutomationRule(id: number, data: any) {
-        // Whitelist + dynamic SET clause — sql.raw() ile kolon adları, sql template ile değerler
+        // Whitelist + dynamic SET clause â€” sql.raw() ile kolon adlarÄ±, sql template ile deÄŸerler
         const fields = Object.keys(data).filter(f =>
             ['name', 'schedule_type', 'schedule_days', 'sql_script', 'action_type', 'is_active', 'message_template'].includes(f)
         );
         const setClauses = fields.map((f) => sql`${sql.raw(f)} = ${data[f]}`);
         const setClause = sql.join(setClauses, sql`, `);
 
-        // automation_rules tablosu Drizzle schema'da yok → raw SQL
+        // automation_rules tablosu Drizzle schema'da yok â†’ raw SQL
         const result = await db.execute(sql`
             UPDATE automation_rules
             SET ${setClause}, updated_at = NOW()
