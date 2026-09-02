@@ -19,10 +19,10 @@ import { logger } from '../utils/logger';
 // Render free plan IP'si bazı mirror'lar tarafından bloklanıyor / transient hata dönüyor.
 // Bu yüzden 4 mirror'ı sırayla deniyoruz, hangisi veri döndürürse onu kullanıyoruz.
 const OVERPASS_MIRRORS = [
-  'https://overpass-api.de/api/interpreter',       // ana, bazen bloklu
-  'https://overpass.kumi.systems/api/interpreter', // Almanya, bazen 500
-  'https://overpass.osm.ch/api/interpreter',       // İsviçre
-  'https://overpass.openstreetmap.fr/api/interpreter', // Fransa, bazen 504
+  'https://overpass.openstreetmap.fr/api/interpreter', // Fransa, en stabil (Render IP'si için)
+  'https://overpass.kumi.systems/api/interpreter',     // Almanya, bazen 500
+  'https://overpass-api.de/api/interpreter',           // ana, bazen bloklu
+  'https://overpass.osm.ch/api/interpreter',           // İsviçre, çoğunlukla 0 element (sona)
 ];
 
 export interface ImportOpts {
@@ -196,27 +196,46 @@ function mapToCompany(e: OSMElement, city: string, adminId: number) {
   const code = Math.random().toString(36).substring(2, 8).toUpperCase()
     + Date.now().toString(36).slice(-2);
 
+  // String validation: DB şemasındaki varchar limit'lerine truncate.
+  // OSM'den gelen bazı alanlar (phone, postalCode, name, vb.) şema limitini aşabilir.
+  // Postgres "value too long for type character varying(N)" hatası fırlatır;
+  // bunu önlemek için INSERT öncesi güvenli truncation yapılır.
+  // NOT: Boş string ('') döndürür, null değil — schema'da notNull() alanlar için gerekli.
+  // Nullable alanlar için caller kendi null fallback'ini ekler.
+  const trunc = (v: any, max: number): string => {
+    if (v == null) return '';
+    const s = String(v);
+    return s.length > max ? s.slice(0, max) : s;
+  };
+  const nameRaw = t.name || 'İsimsiz İşletme';
+  const phoneRaw = t.phone || t['contact:phone'] || '';
+  const postalRaw = t['addr:postcode'] || '';
+  const websiteRaw = t.website || t['contact:website'] || '';
+  const districtRaw = t['addr:district'] || t['addr:suburb'] || '';
+  const neighborhoodRaw = t['addr:neighbourhood'] || '';
+  const cityRaw = t['addr:city'] || city;
+
   return {
-    name: t.name || 'İsimsiz İşletme',
-    phone: t.phone || t['contact:phone'] || null,
-    addressLine: addr || null,
-    city: t['addr:city'] || city,
-    district: t['addr:district'] || t['addr:suburb'] || null,
-    neighborhood: t['addr:neighbourhood'] || null,
-    postalCode: t['addr:postcode'] || null,
+    name: trunc(nameRaw, 255),                                                 // varchar(255), notNull
+    phone: trunc(phoneRaw, 20) || null,                                        // varchar(20) — OSM phone bazen 25+ char
+    addressLine: addr || null,                                                  // text
+    city: trunc(cityRaw, 100) || null,                                        // varchar(100)
+    district: trunc(districtRaw, 100) || null,                                // varchar(100)
+    neighborhood: trunc(neighborhoodRaw, 100) || null,                         // varchar(100)
+    postalCode: trunc(postalRaw, 10) || null,                                  // varchar(10) — uzun ülke kodları
     latitude: lat?.toString() || null,
     longitude: lon?.toString() || null,
-    website: t.website || t['contact:website'] || null,
-    description: [t.operator, t.opening_hours, `OSM ID: ${e.id}`].filter(Boolean).join(' | ') || null,
-    boardCode: code,
+    website: trunc(websiteRaw, 255) || null,                                   // varchar(255)
+    description: [t.operator, t.opening_hours, `OSM ID: ${e.id}`].filter(Boolean).join(' | ') || null, // text
+    boardCode: code,                                                           // varchar(20) unique — zaten 8 char
     isActive: true,
     createdBy: adminId,
     isVerified: false,
     paymentEnabled: false,
     genders: ['Kadın', 'Erkek'],
-    workStartTime: '09:00',
-    workEndTime: '20:00',
-    slotInterval: '30',
+    workStartTime: '09:00',                                                    // varchar(10)
+    workEndTime: '20:00',                                                      // varchar(10)
+    slotInterval: '30',                                                        // text
   };
 }
 

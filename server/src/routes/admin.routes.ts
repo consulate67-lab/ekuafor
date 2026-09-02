@@ -621,6 +621,109 @@ router.get('/import-status', (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/admin/retry-errors
+ * osm_import_progress'te status='error' (ve isteğe bağlı 'running') olanları
+ * status='pending' yapar ve import-osm'u fire-and-forget tetikler.
+ * runOsmImport sadece done olanları skip eder, error/running/pending'leri işler.
+ *
+ * Body: {
+ *   mode?: 'standard' | 'extended' | 'all' (default: 'all'),
+ *   includeRunning?: boolean (default: true),  // Takılı running'leri de unblock et
+ *   dryRun?: boolean (default: true)
+ * }
+ */
+router.post('/retry-errors', async (req: Request, res: Response) => {
+    try {
+        const modeRaw = String(req.body?.mode ?? req.query?.mode ?? 'all');
+        const mode = modeRaw === 'standard' || modeRaw === 'extended' ? modeRaw : 'all';
+        const includeRunning = req.body?.includeRunning !== false && req.query?.includeRunning !== 'false';
+        const dryRun = req.body?.dryRun !== false && req.query?.dryRun !== 'true' ? req.body?.dryRun : (req.query?.dryRun === 'true' ? false : true);
+        const triggeredBy = req.user?.email || 'unknown';
+
+        // Mode filtresi: 'all' ise hem standard hem extended
+        const modeCond = mode === 'all' ? sql`` : sql` AND mode = ${mode}`;
+        const statusCond = includeRunning ? sql`status IN ('error', 'running')` : sql`status = 'error'`;
+
+        // Etkilenecek satırları listele (dry-run için)
+        const listRes: any = await db.execute(
+            sql`SELECT id, city, mode, status, started_at, error_message FROM osm_import_progress WHERE ${statusCond}${modeCond} ORDER BY city`
+        );
+        const toReset = (listRes as any).rows || [];
+
+        if (dryRun) {
+            return res.json({
+                success: true,
+                dryRun: true,
+                mode,
+                includeRunning,
+                toResetCount: toReset.length,
+                toReset: toReset.slice(0, 50),
+            });
+        }
+
+        if (toReset.length === 0) {
+            return res.json({
+                success: true,
+                dryRun: false,
+                reset: 0,
+                message: 'Hata/takılı kayıt yok, bir şey yapılmadı.',
+            });
+        }
+
+        // Pending'e çevir
+        const updRes: any = await db.execute(
+            sql`UPDATE osm_import_progress SET status = 'pending', error_message = NULL, started_at = NULL, finished_at = NULL WHERE ${statusCond}${modeCond}`
+        );
+        const reset = Number(updRes?.rowCount ?? 0);
+        logger.info(
+            { reset, mode, includeRunning, triggeredBy, toResetCities: toReset.map((r: any) => r.city) },
+            '[admin/retry-errors] progress pending yapıldı'
+        );
+
+        // Fire-and-forget import tetikle
+        const jobId = randomUUID();
+        const job: ImportJob = {
+            id: jobId,
+            startedAt: new Date().toISOString(),
+            status: 'running',
+            opts: { limit: 0, city: 'Türkiye (retry)', dryRun: false, grid: 'all', mode: mode === 'all' ? 'standard' : mode },
+        };
+        jobs.set(jobId, job);
+
+        runOsmImport({ limit: 0, city: 'Türkiye (retry)', dryRun: false, grid: 'all', mode: mode === 'all' ? 'standard' : mode })
+            .then(result => {
+                job.finishedAt = new Date().toISOString();
+                job.status = result.ok ? 'done' : 'error';
+                job.result = result;
+                logger.info(
+                    { jobId, fetched: result.fetched, inserted: result.inserted, durationMs: result.durationMs, ok: result.ok },
+                    '[admin/retry-errors] fire-and-forget bitti'
+                );
+            })
+            .catch(e => {
+                job.finishedAt = new Date().toISOString();
+                job.status = 'error';
+                job.error = e.message || String(e);
+                logger.error({ jobId, err: e.message }, '[admin/retry-errors] job hata');
+            });
+
+        res.status(202).json({
+            success: true,
+            dryRun: false,
+            mode,
+            includeRunning,
+            reset,
+            jobId,
+            statusUrl: `/api/admin/import-status/${jobId}`,
+            message: `${reset} satır pending yapıldı, fire-and-forget import tetiklendi.`,
+        });
+    } catch (e: any) {
+        logger.error({ err: e.message, stack: e.stack?.slice(0, 500) }, '[admin/retry-errors] hata');
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+/**
  * GET /api/admin/osm-progress-detail
  * osm_import_progress tablosundaki TÜM satırları listele.
  * Hata analizi için: her error satırı için city/mode/errorMessage/fetched/inserted/duration.
