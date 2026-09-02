@@ -164,13 +164,17 @@ router.post('/', async (req: Request, res: Response) => {
             errDetail: anyErr?.cause?.detail || anyErr?.detail,
             errHint: anyErr?.cause?.hint,
             errCode: anyErr?.cause?.code || anyErr?.code,
-            errStack: anyErr?.stack?.slice(0, 1000)
+            errPosition: anyErr?.cause?.position || anyErr?.position,
+            errRoutine: anyErr?.cause?.routine,
+            errStack: anyErr?.stack?.slice(0, 1500)
         }, '[POST /api/appointments] detaylı hata');
         res.status(500).json({
             success: false,
             error: anyErr?.message || 'Hata',
             detail: anyErr?.cause?.detail || anyErr?.detail || null,
-            code: anyErr?.cause?.code || anyErr?.code || null
+            hint: anyErr?.cause?.hint || null,
+            code: anyErr?.cause?.code || anyErr?.code || null,
+            position: anyErr?.cause?.position || anyErr?.position || null
         });
     }
 });
