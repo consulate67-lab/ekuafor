@@ -56,7 +56,7 @@ class AppointmentService {
         }
     }
 
-    async createAppointment(appointment: Appointment): Promise<Appointment> {
+    async createAppointment(appointment: Appointment) {
         // Normalize customer phone
         if (appointment.customer_phone) {
             appointment.customer_phone = normalizePhone(appointment.customer_phone);
