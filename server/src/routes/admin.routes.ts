@@ -621,6 +621,66 @@ router.get('/import-status', (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/admin/osm-progress-detail
+ * osm_import_progress tablosundaki TÜM satırları listele.
+ * Hata analizi için: her error satırı için city/mode/errorMessage/fetched/inserted/duration.
+ * Running izleme için: startedAt, süre, fetched (canlı).
+ *
+ * Query params:
+ *  - status: 'error' | 'running' | 'done' | 'pending' (default: tümü)
+ *  - mode: 'standard' | 'extended' (default: tümü)
+ *  - limit: max satır (default: 200)
+ */
+router.get('/osm-progress-detail', async (req: Request, res: Response) => {
+    try {
+        const status = String(req.query.status || '');
+        const mode = String(req.query.mode || '');
+        const limit = Math.min(Number(req.query.limit || 200), 500);
+
+        const conditions: any[] = [];
+        if (status) conditions.push(sql`status = ${status}`);
+        if (mode) conditions.push(sql`mode = ${mode}`);
+        const whereSql = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
+
+        const r: any = await db.execute(sql`
+            SELECT id, city, mode, status, fetched, inserted,
+                   started_at, finished_at, error_message,
+                   EXTRACT(EPOCH FROM (COALESCE(finished_at, NOW()) - started_at))::int AS duration_sec
+            FROM osm_import_progress
+            ${whereSql}
+            ORDER BY
+                CASE status WHEN 'running' THEN 0 WHEN 'error' THEN 1 WHEN 'done' THEN 2 ELSE 3 END,
+                COALESCE(started_at, NOW()) DESC
+            LIMIT ${limit}
+        `);
+        const rows = (r as any).rows || [];
+
+        // Özet istatistikler
+        const summary: any = { total: rows.length };
+        const byStatus: Record<string, number> = {};
+        const byMode: Record<string, number> = {};
+        let totalFetched = 0, totalInserted = 0, totalDuration = 0;
+        for (const row of rows) {
+            byStatus[row.status] = (byStatus[row.status] || 0) + 1;
+            byMode[row.mode] = (byMode[row.mode] || 0) + 1;
+            totalFetched += Number(row.fetched || 0);
+            totalInserted += Number(row.inserted || 0);
+            totalDuration += Number(row.duration_sec || 0);
+        }
+        summary.byStatus = byStatus;
+        summary.byMode = byMode;
+        summary.totalFetched = totalFetched;
+        summary.totalInserted = totalInserted;
+        summary.avgDurationSec = rows.length > 0 ? Math.round(totalDuration / rows.length) : 0;
+
+        res.json({ success: true, summary, count: rows.length, rows });
+    } catch (e: any) {
+        logger.error({ err: e.message, stack: e.stack?.slice(0, 500) }, '[admin/osm-progress-detail] hata');
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+/**
  * GET /api/admin/import-status/:id
  * Tek bir job'un detayı.
  */
