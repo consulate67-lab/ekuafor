@@ -1,0 +1,22 @@
+# Manual deploy trigger
+
+Bu dosya Render auto-deploy'u tetiklemek icin olusturuldu.
+02.09.2026 15:13'te 4 commit push edildi (957 ilce map, debug endpoint,
+nikah/kultur, extended mode regex fix) ama auto-deploy tetiklenmedi.
+Selim bu dosyayi silmeli — sadece tetikleyici.
+
+## Bekleyen degisiklikler
+
+- server/src/data/turkiye-il-ilce-data.json (yeni, 11.4 KB)
+- server/src/data/turkiye-il-ilce.ts (yeni)
+- server/src/routes/admin.routes.ts (findIlInAddress + debug-ilce-fallback + nikah/kultur)
+- server/src/jobs/import-osm.ts (extended mode regex: Salon cikarildi)
+
+## Sonraki adim
+
+1. Render dashboard -> ekuafor-backend -> Manual Deploy -> latest commit (2227ae3)
+2. 15dk rate limit sonrasi:
+   - GET /api/admin/debug-ilce-fallback?address=Sisli -> Istanbul
+   - POST /api/admin/cleanup-companies { nikah:true, kultur:true, dryRun:true }
+   - dryRun=false ile nikah+kultur sil
+   - GET /api/admin/stats (toplam 7184 -> 7184-? firma)
