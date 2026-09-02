@@ -732,6 +732,7 @@ router.post('/import-osm', async (req: Request, res: Response) => {
 const DIRTY_CITY_RULES: { from: string; action: 'update' | 'delete'; to?: string; reason: string }[] = [
     { from: '20/b',                       action: 'delete', reason: 'anlamsız (adres/numara)' },
     { from: 'Altındağ/ankara',            action: 'update', to: 'Ankara',     reason: 'Altındağ → Ankara ilçesi' },
+    { from: 'Արմավիր',                  action: 'delete', reason: 'Ermenistan şehri (Armavir)' },
     { from: 'Bağlar/diyarbakır',          action: 'update', to: 'Diyarbakır',  reason: 'Bağlar → Diyarbakır ilçesi' },
     { from: 'Bostanlı mahallesi',         action: 'delete', reason: 'mahalle + konum belirsiz' },
     { from: 'Büyükkarıştıran',            action: 'update', to: 'Kırklareli',  reason: 'Büyükkarıştıran → Kırklareli ili beldesi' },
@@ -744,14 +745,18 @@ const DIRTY_CITY_RULES: { from: string; action: 'update' | 'delete'; to?: string
     { from: 'Köyiçi mahallesi',           action: 'delete', reason: 'anlamsız mahalle adı' },
     { from: 'Kütahya merkez',             action: 'update', to: 'Kütahya',     reason: '"merkez" suffix temizleme' },
     { from: 'Mamak/ankara',               action: 'update', to: 'Ankara',      reason: 'Mamak → Ankara ilçesi' },
+    { from: 'Muratpaşa/antalya',          action: 'update', to: 'Antalya',     reason: 'Muratpaşa → Antalya ilçesi' },
     { from: 'Odunpazarı / eskişehir',     action: 'update', to: 'Eskişehir',   reason: 'Odunpazarı → Eskişehir ilçesi' },
     { from: 'Şarköy',                     action: 'update', to: 'Tekirdağ',    reason: 'Şarköy → Tekirdağ ilçesi' },
     { from: 'Sağlık',                     action: 'delete', reason: 'anlamsız (tek kelime, ili belirsiz)' },
     { from: 'Şişli',                      action: 'update', to: 'İstanbul',    reason: 'Şişli → İstanbul ilçesi' },
     { from: 'Sur/diyarbakır',             action: 'update', to: 'Diyarbakır',  reason: 'Sur → Diyarbakır ilçesi' },
     { from: 'Tire/izmir',                 action: 'update', to: 'İzmir',       reason: 'Tire → İzmir ilçesi' },
+    { from: 'Վաղարշապատ',                action: 'delete', reason: 'Ermenistan şehri (Vagharshapat)' },
     { from: 'Yalova merkez',              action: 'update', to: 'Yalova',      reason: '"merkez" suffix temizleme' },
     { from: 'Yeşiltepe mahallesi',        action: 'delete', reason: 'konum belirsiz (Erzurum/Karaman/Ankara vb.)' },
+    { from: 'زاخو',                       action: 'delete', reason: 'Arapça "Zakho" — Irak şehri' },
+    { from: 'Zakho',                      action: 'delete', reason: 'Irak şehri (Kuzey Irak)' },
 ];
 
 /**
