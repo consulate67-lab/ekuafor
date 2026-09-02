@@ -19,6 +19,7 @@ export interface Appointment {
     price?: number;
     duration_minutes?: number; // Total duration (can be overridden)
     package_id?: number | null;
+    original_price?: number; // Paket indirimi uygulanmadan önceki toplam fiyat
     customer_name?: string;
     customer_phone?: string;
     device_id?: string;
