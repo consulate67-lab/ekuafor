@@ -177,9 +177,14 @@ function buildQueryForBbox(bbox: [number, number, number, number], limit: number
     // Türkiye'de yaygın OSM tag'leri: shop=hairdresser (en yaygın), shop=beauty, amenity=beauty_salon
     return `[out:json][timeout:120];(node["shop"="hairdresser"](${s},${w},${n},${e});node["shop"="beauty"](${s},${w},${n},${e});node["amenity"="beauty_salon"](${s},${w},${n},${e});way["shop"="hairdresser"](${s},${w},${n},${e});way["shop"="beauty"](${s},${w},${n},${e});way["amenity"="beauty_salon"](${s},${w},${n},${e}););${limitStr} center;`;
   }
-  // EXTENDED: standard tag'ler + craft=hairdresser + name regex (Kuaför/Salon/Güzellik/Beauty/Parfümeri)
+  // EXTENDED: standard tag'ler + craft=hairdresser + name regex
+  // DÜZELTME (02.09.2026): "Salon" kelimesi çıkarıldı — "Spor Salonu" nu da alıyordu.
+  // "Parfümeri" de çıkarıldı (yanlış kategori).
+  // Eklenenler: "Berber", "Hair", "Stilist", "Saç", "Erkek Kuaförü", "Kadın Kuaförü"
+  // Negatif lookahead: "Spor" kelimesi varsa match etme (sadece spor salonu)
   // Not: name~regex case-insensitive bayrağı (i) ile Türkçe karakterler aranır
-  return `[out:json][timeout:120];(node["shop"="hairdresser"](${s},${w},${n},${e});node["shop"="beauty"](${s},${w},${n},${e});node["amenity"="beauty_salon"](${s},${w},${n},${e});node["craft"="hairdresser"](${s},${w},${n},${e});node["name"~"Kuaför|Salon|Güzellik|Beauty|Parfümeri|Kuafor",i](${s},${w},${n},${e});way["shop"="hairdresser"](${s},${w},${n},${e});way["shop"="beauty"](${s},${w},${n},${e});way["amenity"="beauty_salon"](${s},${w},${n},${e});way["craft"="hairdresser"](${s},${w},${n},${e});way["name"~"Kuaför|Salon|Güzellik|Beauty|Parfümeri|Kuafor",i](${s},${w},${n},${e}););${limitStr} center;`;
+  const nameRegex = `Kuaför|Kuafor|Berber|Güzellik|Beauty|Hair|Stilist|Stylist|Saç Tasarım|Erkek Kuaförü|Kadın Kuaförü|Beauty Center|Beauty Shop|Beauty Studio|Beauty Salon|Güzellik Merkezi|Güzellik Salonu`;
+  return `[out:json][timeout:120];(node["shop"="hairdresser"](${s},${w},${n},${e});node["shop"="beauty"](${s},${w},${n},${e});node["amenity"="beauty_salon"](${s},${w},${n},${e});node["craft"="hairdresser"](${s},${w},${n},${e});node["name"~"${nameRegex}",i](${s},${w},${n},${e});way["shop"="hairdresser"](${s},${w},${n},${e});way["shop"="beauty"](${s},${w},${n},${e});way["amenity"="beauty_salon"](${s},${w},${n},${e});way["craft"="hairdresser"](${s},${w},${n},${e});way["name"~"${nameRegex}",i](${s},${w},${n},${e}););${limitStr} center;`;
 }
 
 function buildQuery(city: string, limit: number): string {
