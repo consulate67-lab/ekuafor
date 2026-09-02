@@ -85,8 +85,12 @@ class AppointmentService {
         let serviceRecords: any[] = [];
         if (appointment.services && appointment.services.length > 0) {
             // Use the provided services array as it has the correct order and staff overrides
+            // NOT 02.09.2026: ANY(${array}) Drizzle 0.36'da "malformed array literal" hatasi veriyor
+            // (Postgres ANY(?) array bekliyor, Drizzle parametreyi string olarak gonderiyor).
+            // IN (?, ?, ...) ile degistirildi, sql.join ile virgulle ayrildi.
+            const serviceIds = appointment.services.map((s: any) => s.id);
             const dbServicesRes = await db.execute(
-                sql`SELECT id, duration_minutes, price, name FROM services WHERE id = ANY(${appointment.services.map((s: any) => s.id)})`
+                sql`SELECT id, duration_minutes, price, name FROM services WHERE id IN (${sql.join(serviceIds, sql`, `)})`
             );
             const dbServices = (dbServicesRes as any).rows as any[];
 
@@ -112,11 +116,12 @@ class AppointmentService {
             }));
         } else {
             // Fallback for legacy calls using service_id or service_ids
+            // NOT 02.09.2026: ANY(${array}) -> IN (sql.join(...)) (Drizzle array literal fix)
             const serviceIds = appointment.service_ids || (appointment.service_id ? [appointment.service_id] : []);
             if (serviceIds.length === 0) throw new Error('En az bir hizmet seçilmelidir.');
 
             const dbServicesRes = await db.execute(
-                sql`SELECT id, duration_minutes, price, name FROM services WHERE id = ANY(${serviceIds})`
+                sql`SELECT id, duration_minutes, price, name FROM services WHERE id IN (${sql.join(serviceIds, sql`, `)})`
             );
             const dbServices = (dbServicesRes as any).rows as any[];
 
@@ -270,7 +275,8 @@ class AppointmentService {
             LEFT JOIN users st ON a.staff_id = st.id
             LEFT JOIN companies c ON a.company_id = c.id
             LEFT JOIN users u ON a.customer_id = u.id
-            WHERE a.id = ANY(${ids})
+            // NOT 02.09.2026: ANY -> IN (sql.join) Drizzle array literal fix
+            WHERE a.id IN (${sql.join(ids, sql`, `)})
             GROUP BY a.id, c.name, ms.name, pkg.name, st.first_name, st.last_name, u.first_name, u.last_name
             ORDER BY a.appointment_date DESC, a.start_time DESC
         `);
