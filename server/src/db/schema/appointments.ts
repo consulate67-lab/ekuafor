@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 import { companies } from './core';
 import { users } from './core';
 import { services } from './services';
+import { packages } from './services';
 
 /**
  * appointments tablosu
@@ -25,8 +26,11 @@ export const appointments = pgTable('appointments', {
     customerPhone: varchar('customer_phone', { length: 20 }),
     customerName: varchar('customer_name', { length: 255 }),
     deviceId: varchar('device_id', { length: 255 }),
+    // NOT 02.09.2026: packageId eklendi. Drizzle field camelCase, DB column snake_case.
+    packageId: integer('package_id').references(() => packages.id),
     rating: text('rating'),
     comment: text('comment'),
+    technicalNotes: text('technical_notes'),
     createdAt: timestamp('created_at', { withTimezone: true }),
     updatedAt: timestamp('updated_at', { withTimezone: true })
 });
