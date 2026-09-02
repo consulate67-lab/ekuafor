@@ -3,6 +3,7 @@ import { authMiddleware, roleCheck } from '../middleware/auth.middleware';
 import { runOsmImport, ImportResult, ALL_CITY_BBOX } from '../jobs/import-osm';
 import { TURKIYE_ILLERI } from '../data/turkiye-illeri';
 import { TURKIYE_ILCELERI } from '../data/turkiye-ilceler';
+import { ILCE_TO_IL_LOWER } from '../data/turkiye-il-ilce';
 import { logger } from '../utils/logger';
 import { randomUUID } from 'node:crypto';
 import { db } from '../db';
@@ -992,18 +993,26 @@ const IL_MAP_LOWER: Map<string, string> = (() => {
  * Adres string'inden 81 il proper name'ini bul.
  * Bulursa proper name (Türkçe karakterli) döner, bulamazsa null.
  *
- * NOT: Hem haystack hem il isimleri normalize edilir (i → ı, lowercase).
+ * 1. Önce 81 il proper name Map'inde ara (ör. "ankara", "diyarbakır")
+ * 2. Bulamazsan, 957 ilçe Map'inde ara (ör. "şişli" → "İstanbul", "altındağ" → "Ankara")
+ *
+ * NOT: Hem haystack hem il/isimleri normalize edilir (i → ı, lowercase).
  * Basit substring match: ` ${haystack} `.includes(` ${lower} `).
  * - Kısa isimlerde yanlış pozitif riski yok (boşluk sınırı)
  * - "Afyonkarahisar" içinde "ankara" yanlış eşleşmesi önlenir
- * - Performans: 81 includes() çağrısı, regex compile yok
+ * - Performans: 81 + 957 includes() çağrısı, regex compile yok
  */
-function findIlInAddress(address: string | null | undefined, name: string | null | undefined): string | null {
+function findIlInAddress(address: string | null | undefined, name: string | null | undefined): { il: string; source: 'il' | 'ilce' } | null {
     const normalize = (s: string) => s.toLowerCase().split('i').join('ı');
     // Boşluk-padded haystack: kelime sınırı kontrolü için
     const haystack = ` ${normalize(`${address || ''} ${name || ''}`)} `;
+    // 1) Önce 81 il proper name (daha yüksek öncelik)
     for (const [lower, proper] of IL_MAP_LOWER.entries()) {
-        if (haystack.includes(` ${lower} `)) return proper;
+        if (haystack.includes(` ${lower} `)) return { il: proper, source: 'il' };
+    }
+    // 2) Sonra 957 ilçe (ilçe → il mapping)
+    for (const [lowerIlce, il] of ILCE_TO_IL_LOWER.entries()) {
+        if (haystack.includes(` ${lowerIlce} `)) return { il, source: 'ilce' };
     }
     return null;
 }
@@ -1030,22 +1039,23 @@ router.get('/inspect-dirty-cities', async (req: Request, res: Response) => {
                 const samples = (samplesRes as any).rows || [];
 
                 // Adres fallback analizi (address_line + district + neighborhood birleşik aranır)
-                const addressOverrides: { id: number; name: string; address: string; proposedCity: string }[] = [];
+                const addressOverrides: { id: number; name: string; address: string; proposedCity: string; source: 'il' | 'ilce' }[] = [];
                 if (rule.action === 'update' && rule.to) {
                     for (const s of samples) {
                         const fullAddress = `${s.address_line || ''} ${s.district || ''} ${s.neighborhood || ''}`;
-                        let detected: string | null = null;
+                        let detected: { il: string; source: 'il' | 'ilce' } | null = null;
                         try {
                             detected = findIlInAddress(fullAddress, s.name);
                         } catch (e: any) {
                             logger.error({ ruleFrom: rule.from, sampleId: s.id, err: e.message }, '[inspect] findIlInAddress hata');
                         }
-                        if (detected && detected !== rule.to) {
+                        if (detected && detected.il !== rule.to) {
                             addressOverrides.push({
                                 id: s.id,
                                 name: s.name,
                                 address: fullAddress.trim(),
-                                proposedCity: detected,
+                                proposedCity: detected.il,
+                                source: detected.source,
                             });
                         }
                     }
@@ -1119,14 +1129,14 @@ router.post('/fix-dirty-cities', async (req: Request, res: Response) => {
                     // Adres fallback: hard-coded `to` yerine address_line+district+neighborhood'ten bulunan il
                     const fullAddress = `${row.address_line || ''} ${row.district || ''} ${row.neighborhood || ''}`;
                     const detected = findIlInAddress(fullAddress, row.name);
-                    const targetCity = detected || rule.to;
+                    const targetCity = detected?.il || rule.to;
                     if (!dryRun) {
                         const r: any = await db.execute(
                             sql`UPDATE companies SET city = ${targetCity} WHERE id = ${row.id}`
                         );
                         if (Number(r?.rowCount ?? 0) > 0) updated++;
                     }
-                    if (detected && detected !== rule.to) viaAddress++;
+                    if (detected && detected.il !== rule.to) viaAddress++;
                 }
 
                 if (!dryRun) updated = matched; // dryRun=false ise tüm matched güncellendi
