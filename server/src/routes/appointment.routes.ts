@@ -5,6 +5,7 @@ import appointmentService from '../services/appointment.service';
 import { authMiddleware } from '../middleware/auth.middleware';
 import pool from '../config/database';
 import { z } from 'zod';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -155,7 +156,22 @@ router.post('/', async (req: Request, res: Response) => {
         res.status(201).json({ success: true, data: appointment });
     } catch (error) {
         if (error instanceof z.ZodError) return res.status(400).json({ success: false, error: 'Validasyon hatası', details: error.errors });
-        res.status(500).json({ success: false, error: error instanceof Error ? error.message : 'Hata' });
+        // Detaylı hata log'u (02.09.2026): Drizzle pg hatası err.cause.detail'de gelir
+        const anyErr = error as any;
+        logger.error({
+            errMessage: anyErr?.message,
+            errCause: anyErr?.cause?.message,
+            errDetail: anyErr?.cause?.detail || anyErr?.detail,
+            errHint: anyErr?.cause?.hint,
+            errCode: anyErr?.cause?.code || anyErr?.code,
+            errStack: anyErr?.stack?.slice(0, 1000)
+        }, '[POST /api/appointments] detaylı hata');
+        res.status(500).json({
+            success: false,
+            error: anyErr?.message || 'Hata',
+            detail: anyErr?.cause?.detail || anyErr?.detail || null,
+            code: anyErr?.cause?.code || anyErr?.code || null
+        });
     }
 });
 
