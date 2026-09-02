@@ -309,8 +309,12 @@ const handleLogin = async (keyToUse?: string) => {
 };
 
 useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlKey = urlParams.get('key');
+    // HashRouter kullanıldığı için window.location.search boş döner; key
+    // URL'de #/company-panel?key=... şeklinde hash içinde gelir.
+    // App.tsx:74 ile aynı pattern: href'ten [?&]key= değerini yakala
+    // (hem hash içi hem dışı query'leri kapsar).
+    const keyMatch = window.location.href.match(/[?&]key=([^&#]+)/);
+    const urlKey = keyMatch ? decodeURIComponent(keyMatch[1]) : null;
     const saved = localStorage.getItem('company_admin_key');
     const keyToUse = urlKey || saved;
     if (keyToUse) {
