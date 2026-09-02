@@ -192,7 +192,7 @@ class AppointmentService {
         // (ornek: companyId TS property, company_id DB kolon). camelCase kullanildi.
         return await db.transaction(async (tx) => {
             // ORM type-safe INSERT: otomatik kolon/parametre binding
-            const [newAppointment] = await tx.insert(appointments).values({
+            const insertQuery = tx.insert(appointments).values({
                 companyId: appointment.company_id,
                 customerId: appointment.customer_id || null,
                 serviceId: primaryServiceId,
@@ -207,7 +207,21 @@ class AppointmentService {
                 customerName: appointment.customer_name || null,
                 deviceId: appointment.device_id || null,
                 packageId: appointment.package_id || null,
-            }).returning();
+            });
+            // NOT 02.09.2026 23:43: SQL debug — 42601 syntax error kaynagi bulmak icin
+            // Drizzle'in urettigi SQL ve parametreleri logla
+            try {
+                const sqlStr = (insertQuery as any).toSQL?.();
+                if (sqlStr) {
+                    logger.info({
+                        sql: sqlStr.sql,
+                        params: sqlStr.params
+                    }, '[createAppointment] INSERT appointments SQL');
+                }
+            } catch (e) {
+                logger.warn({err: (e as Error).message}, '[createAppointment] toSQL failed');
+            }
+            const [newAppointment] = await insertQuery.returning();
 
             // Insert into appointment_services with sequential timing
             let currentOffset = 0;
