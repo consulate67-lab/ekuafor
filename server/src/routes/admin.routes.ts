@@ -673,6 +673,52 @@ router.get('/import-status', (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/admin/debug-ilce-fallback?address=...&name=...
+ * findIlInAddress test: address+name içinden 81 il + 957 ilçe map'inde arar.
+ * Sonuç: { il, source: 'il'|'ilce'|null, haystack, ilMatches, ilceMatches }
+ *
+ * Production'da debug amaçlı tutmak zararsız (admin-only).
+ */
+router.get('/debug-ilce-fallback', async (req: Request, res: Response) => {
+    try {
+        const address = String(req.query.address || '');
+        const name = String(req.query.name || '');
+        const normalize = (s: string) => s.toLowerCase().split('i').join('ı');
+        const haystack = ` ${normalize(`${address} ${name}`)} `;
+
+        // İlk 5 il match
+        const ilMatches: { key: string; proper: string }[] = [];
+        for (const [lower, proper] of IL_MAP_LOWER.entries()) {
+            if (haystack.includes(` ${lower} `)) {
+                ilMatches.push({ key: lower, proper });
+                if (ilMatches.length >= 5) break;
+            }
+        }
+
+        // İlk 5 ilçe match
+        const ilceMatches: { key: string; il: string }[] = [];
+        for (const [lowerIlce, il] of ILCE_TO_IL_LOWER.entries()) {
+            if (haystack.includes(` ${lowerIlce} `)) {
+                ilceMatches.push({ key: lowerIlce, il });
+                if (ilceMatches.length >= 5) break;
+            }
+        }
+
+        const result = findIlInAddress(address, name);
+        res.json({
+            success: true,
+            input: { address, name },
+            haystack,
+            ilMatches,
+            ilceMatches,
+            result: result || null,
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+/**
  * POST /api/admin/retry-errors
  * osm_import_progress'te status='error' (ve isteğe bağlı 'running') olanları
  * status='pending' yapar ve import-osm'u fire-and-forget tetikler.
