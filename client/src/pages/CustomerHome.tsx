@@ -345,24 +345,6 @@ export default function CustomerHome() {
         }
 
         const initialFetch = async () => {
-            // Push Notification Permission Check for first load (Native + Web)
-            try {
-                const isNative = (window as any).Capacitor?.isNativePlatform();
-                if (isNative) {
-                    const { PushNotifications } = await import('@capacitor/push-notifications');
-                    let permStatus = await PushNotifications.checkPermissions();
-                    if (permStatus.receive === 'prompt') {
-                        await PushNotifications.requestPermissions();
-                    }
-                } else {
-                    if ("Notification" in window && Notification.permission === "default") {
-                        await Notification.requestPermission();
-                    }
-                }
-            } catch (notifyErr) {
-                console.log('Notification permission check failed:', notifyErr);
-            }
-
             // Then try location using Capacitor for better mobile support
             let initialLoc = null;
             try {

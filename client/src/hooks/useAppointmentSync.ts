@@ -118,88 +118,14 @@ export function useAppointmentSync() {
             }
         };
 
-        initDevice().then(async () => {
+        initDevice().then(() => {
             syncAppointments();
-
-            // Push Notification Setup
-            try {
-                const isNative = (window as any).Capacitor?.isNativePlatform();
-                if (isNative) {
-                    const { PushNotifications } = await import('@capacitor/push-notifications');
-
-                    let permStatus = await PushNotifications.checkPermissions();
-
-                    if (permStatus.receive === 'prompt') {
-                        permStatus = await PushNotifications.requestPermissions();
-                    }
-
-                    if (permStatus.receive === 'granted') {
-                        await PushNotifications.register();
-
-                        PushNotifications.addListener('registration', (token) => {
-                            console.log('[Push] Registration token: ', token.value);
-                            localStorage.setItem('push_token', token.value);
-
-                            // Immediately sync if we have a phone number already
-                            const phone = localStorage.getItem('customer_phone');
-                            const deviceId = localStorage.getItem('device_id');
-                            if (phone && deviceId) {
-                                api.post('/appointments/customers/sync', {
-                                    device_id: deviceId,
-                                    customer_phone: phone,
-                                    push_token: token.value
-                                }).catch(err => console.error('Push sync error:', err));
-                            }
-                        });
-
-                        PushNotifications.addListener('registrationError', (error: any) => {
-                            console.error('[Push] Registration error: ', error);
-                        });
-
-                        PushNotifications.addListener('pushNotificationReceived', (notification) => {
-                            console.log('[Push] Notification received: ', notification);
-                        });
-                    }
-                } else {
-                    // Web push integration
-                    try {
-                        const { requestWebPushToken } = await import('../lib/firebase');
-                        const token = await requestWebPushToken();
-                        if (token) {
-                            console.log('[Push] Web registration token: ', token);
-                            localStorage.setItem('push_token', token);
-
-                            const phone = localStorage.getItem('customer_phone');
-                            const deviceId = localStorage.getItem('device_id');
-                            if (phone && deviceId) {
-                                api.post('/appointments/customers/sync', {
-                                    device_id: deviceId,
-                                    customer_phone: phone,
-                                    push_token: token
-                                }).catch(err => console.error('Web Push sync error:', err));
-                            }
-                        }
-                    } catch (webPushErr) {
-                        console.error('[Push] Web Push Setup failed:', webPushErr);
-                    }
-                }
-            } catch (e) {
-                console.error('[Push] Setup failed:', e);
-            }
         });
 
         const interval = setInterval(syncAppointments, 30000);
 
         return () => {
             clearInterval(interval);
-            try {
-                const isNative = (window as any).Capacitor?.isNativePlatform();
-                if (isNative) {
-                    import('@capacitor/push-notifications').then(({ PushNotifications }) => {
-                        PushNotifications.removeAllListeners();
-                    });
-                }
-            } catch (e) { }
         };
     }, [syncAppointments]);
 }
