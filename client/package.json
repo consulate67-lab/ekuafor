@@ -26,7 +26,6 @@
         "@capacitor/device": "^8.0.1",
         "@capacitor/geolocation": "^8.1.0",
         "@capacitor/ios": "^8.1.0",
-        "@capacitor/push-notifications": "^8.0.1",
         "@hookform/resolvers": "^3.3.4",
         "axios": "^1.6.5",
         "cross-env": "^10.1.0",
