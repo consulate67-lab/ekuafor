@@ -198,7 +198,7 @@ class AppointmentService {
                     ${appointment.customer_name || null},
                     ${appointment.device_id || null},
                     ${appointment.package_id || null},
-                    ${appointment.price || null}
+                    ${appointment.original_price ?? appointment.price ?? null}
                 )
                 RETURNING *
             `);
