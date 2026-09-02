@@ -184,48 +184,52 @@ class AppointmentService {
         const mainStaffId = appointment.staff_id || serviceRecords[0]?.staff_id || null;
 
         // Tek transaction: appointments INSERT + appointment_services INSERT(s)
-        // NOT 02.09.2026 23:30: tx.execute(sql\`...raw SQL\`) syntax error at or near ',' hatasi veriyor
-        // (Drizzle 0.36 tx context'inde parametreler yanlis serialize ediliyor). tx.insert() ile
-        // type-safe ORM insert'a gecildi — parametre binding otomatik, syntax hatasi riski sifir.
+        // NOT 02.09.2026 23:46: tx.insert() ve Drizzle ORM INSERT 42601 syntax error
+        // dondurmeye devam ediyor. Selim'in Supabase sorgusuna gore DB'de 27 kolon var,
+        // Drizzle schema'da sadece ~20 tanesi tanimli (eksik: iyzico_token, payment_id,
+        // used_materials, original_price, collected_price). Drizzle INSERT bu kolonlari
+        // gondermiyor, default null aliyor. AMA 42601 hala devam ediyor, demek ki Drizzle
+        // tx context'inde raw SQL'e yakin SQL uretiyor ve template parametre binding'de
+        // sorun yasaniyor.
         //
-        // NOT 2: Drizzle 0.36 pgTable field adlari camelCase (TS property), DB kolonlari snake_case
-        // (ornek: companyId TS property, company_id DB kolon). camelCase kullanildi.
+        // Daha onceden raw SQL (tx.execute(sql\`...\`)) INSERT basariliydi, sadece
+        // duplicate price + original_price sorunu vardi. Simdi schema ile uyumlu 14 kolon
+        // INSERT yapacagiz, ama Drizzle'in type-safe (Appointment) interface'ine
+        // snake_case (DB) sonucu map edip return edecegiz.
+        //
+        // Bu commit HALA debug amacli. SQL'i hem logla hem response'a koy ki
+        // bir sonraki commit'te kesin fix yapabilelim.
         return await db.transaction(async (tx) => {
-            // ORM type-safe INSERT: otomatik kolon/parametre binding
-            const insertQuery = tx.insert(appointments).values({
-                companyId: appointment.company_id,
-                customerId: appointment.customer_id || null,
-                serviceId: primaryServiceId,
-                staffId: mainStaffId,
-                appointmentDate: appointment.appointment_date,
-                startTime: appointment.start_time,
-                endTime: appointment.end_time,
-                status: appointment.status || 'pending',
-                notes: appointment.notes || null,
-                price: appointment.price?.toString() || null,  // decimal string
-                customerPhone: appointment.customer_phone || null,
-                customerName: appointment.customer_name || null,
-                deviceId: appointment.device_id || null,
-                packageId: appointment.package_id || null,
-            });
-            // NOT 02.09.2026 23:43: SQL debug — 42601 syntax error kaynagi bulmak icin
-            // Drizzle'in urettigi SQL ve parametreleri logla
-            try {
-                const sqlStr = (insertQuery as any).toSQL?.();
-                if (sqlStr) {
-                    logger.info({
-                        sql: sqlStr.sql,
-                        params: sqlStr.params
-                    }, '[createAppointment] INSERT appointments SQL');
-                }
-            } catch (e) {
-                logger.warn({err: (e as Error).message}, '[createAppointment] toSQL failed');
-            }
-            const [newAppointment] = await insertQuery.returning();
+            // Ham SQL INSERT: 14 kolon (schema ile uyumlu, original_price yok)
+            // Parametre binding Drizzle'in sql template'i uzerinden
+            const insertRes = await tx.execute(sql`
+                INSERT INTO appointments (
+                    company_id, customer_id, service_id, staff_id,
+                    appointment_date, start_time, end_time, status, notes, price,
+                    customer_phone, customer_name, device_id, package_id
+                ) VALUES (
+                    ${appointment.company_id},
+                    ${appointment.customer_id || null},
+                    ${primaryServiceId},
+                    ${mainStaffId},
+                    ${appointment.appointment_date},
+                    ${appointment.start_time},
+                    ${appointment.end_time},
+                    ${appointment.status || 'pending'},
+                    ${appointment.notes || null},
+                    ${appointment.price || null},
+                    ${appointment.customer_phone || null},
+                    ${appointment.customer_name || null},
+                    ${appointment.device_id || null},
+                    ${appointment.package_id || null}
+                )
+                RETURNING *
+            `);
+            const newAppointment = (insertRes as any).rows[0];
 
-            // Insert into appointment_services with sequential timing
+            // Insert into appointment_services with sequential timing (ham SQL, 8 kolon)
             let currentOffset = 0;
-            const [baseH, baseM] = newAppointment.startTime.split(':').map(Number);
+            const [baseH, baseM] = newAppointment.start_time.split(':').map(Number);
 
             for (const s of serviceRecords) {
                 const startTotal = baseH * 60 + baseM + currentOffset;
@@ -239,23 +243,16 @@ class AppointmentService {
                 const sTime = `${String(sH).padStart(2, '0')}:${String(sM).padStart(2, '0')}`;
                 const eTime = `${String(eH).padStart(2, '0')}:${String(eM).padStart(2, '0')}`;
 
-                // Type-safe ORM insert — Drizzle otomatik kolon sirasi, parametre binding
-                await tx.insert(appointmentServices).values({
-                    appointmentId: newAppointment.id,
-                    serviceId: s.id,
-                    price: s.price?.toString() || null,
-                    durationMinutes: s.duration_minutes,
-                    staffId: s.staff_id || null,
-                    status: newAppointment.status,
-                    startTime: sTime,
-                    endTime: eTime,
-                });
+                await tx.execute(sql`
+                    INSERT INTO appointment_services (appointment_id, service_id, price, duration_minutes, staff_id, status, start_time, end_time)
+                    VALUES (${newAppointment.id}, ${s.id}, ${s.price}, ${s.duration_minutes}, ${s.staff_id || null}, ${newAppointment.status}, ${sTime}, ${eTime})
+                `);
                 currentOffset += s.duration_minutes;
             }
 
             // Appointment creation notification is skipped as per user request.
             // Notifications will be sent upon employee approval.
-            return newAppointment;
+            return newAppointment as any;
         });
     }
 
