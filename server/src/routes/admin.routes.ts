@@ -636,8 +636,10 @@ router.post('/retry-errors', async (req: Request, res: Response) => {
     try {
         const modeRaw = String(req.body?.mode ?? req.query?.mode ?? 'all');
         const mode = modeRaw === 'standard' || modeRaw === 'extended' ? modeRaw : 'all';
+        // includeRunning: default true. false yapmak için açıkça false gönderilmeli.
         const includeRunning = req.body?.includeRunning !== false && req.query?.includeRunning !== 'false';
-        const dryRun = req.body?.dryRun !== false && req.query?.dryRun !== 'true' ? req.body?.dryRun : (req.query?.dryRun === 'true' ? false : true);
+        // dryRun: default true. false yapmak için body.dryRun === false veya query.dryRun === 'false' gönderilmeli.
+        const dryRun = !(req.body?.dryRun === false || req.query?.dryRun === 'false');
         const triggeredBy = req.user?.email || 'unknown';
 
         // Mode filtresi: 'all' ise hem standard hem extended
