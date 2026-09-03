@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 const isProduction = import.meta.env.PROD;
-const baseUrl = import.meta.env.VITE_API_URL || (isProduction 
-  ? 'https://ekuafor-backend.onrender.com/api' // Render veya yeni sunucu adresi
+const baseUrl = import.meta.env.VITE_API_URL || (isProduction
+  ? 'https://web-production-d79c2a.up.railway.app/api' // Railway (eski: Render)
   : 'http://localhost:3000/api');
 
 const api = axios.create({
