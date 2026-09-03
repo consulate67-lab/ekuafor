@@ -4,6 +4,8 @@ import type { Ctx } from './index';
 
 export function AIResultModal({ ctx }: { ctx: Ctx }) {
     const { showAIResultModal, setShowAIResultModal, lastAIResult } = ctx;
+    // lastAIResult null ise modal render etme (TypeError: Cannot read null.autoCreated fix)
+    if (!lastAIResult) return null;
     return (
                 <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
                     <div className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-500">

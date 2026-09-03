@@ -48,7 +48,7 @@ export function CRMTab({ ctx }: { ctx: Ctx }) {
                                                 >
                                                     <div className="flex flex-col lg:flex-row gap-6 items-center">
                                                         <div className="w-16 h-16 bg-gradient-to-br from-slate-100 to-indigo-50 rounded-2xl flex items-center justify-center text-2xl shadow-inner flex-shrink-0 group-hover:from-indigo-500 group-hover:to-purple-600 group-hover:text-white transition-all duration-500">
-                                                            {cust.name.charAt(0).toUpperCase()}
+                                                            {cust.name?.charAt(0)?.toUpperCase() || '?'}
                                                         </div>
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-3 mb-1">
@@ -208,7 +208,7 @@ export function CustomerDetailModal({ ctx }: { ctx: Ctx }) {
                                 {/* Modal Header */}
                                 <div className="p-8 bg-gradient-to-r from-slate-900 to-indigo-950 text-white relative flex flex-col lg:flex-row gap-8 items-start lg:items-center">
                                     <div className="w-24 h-24 bg-white/10 backdrop-blur-md rounded-[2rem] flex items-center justify-center text-5xl flex-shrink-0 animate-bounce-subtle">
-                                        {selectedCustomer.name.charAt(0).toUpperCase()}
+                                        {selectedCustomer.name?.charAt(0)?.toUpperCase() || '?'}
                                     </div>
                                     <div className="flex-1">
                                         <div className="flex items-center gap-4 mb-2">

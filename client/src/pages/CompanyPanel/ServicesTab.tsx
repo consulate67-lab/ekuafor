@@ -3,7 +3,7 @@
 import type { Ctx } from './index';
 
 export function ServicesTab({ ctx }: { ctx: Ctx }) {
-    const { companyServices, packages, activeServiceTab, setActiveServiceTab, setShowTemplatesModal, setShowServiceModal, setServiceForm, setShowPackageModal, setPackageForm, handleDeleteService, handleDeletePackage, templates, handleAddFromTemplate } = ctx;
+    const { company, companyServices, packages, activeServiceTab, setActiveServiceTab, setShowTemplatesModal, setShowServiceModal, setServiceForm, setShowPackageModal, setPackageForm, handleDeleteService, handleDeletePackage, templates, handleAddFromTemplate } = ctx;
     return (
                         <div className="space-y-6">
                             {/* Nested Tabs for Services/Packages */}

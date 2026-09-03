@@ -194,10 +194,10 @@ export function FinanceTab({ ctx }: { ctx: Ctx }) {
                                                         <div className="relative z-10">
                                                             <div className="flex items-center gap-4 mb-4">
                                                                 <div className="w-14 h-14 bg-gradient-to-br from-amber-50 to-orange-50 text-amber-600 rounded-2xl flex items-center justify-center font-black shadow-sm text-xl">
-                                                                    {apt.customer_name?.charAt(0).toUpperCase() || 'M'}
+                                                                    {apt.customer_name?.charAt(0)?.toUpperCase() || 'M'}
                                                                 </div>
                                                                 <div>
-                                                                    <h4 className="font-black text-slate-900 text-lg leading-tight">{apt.customer_name}</h4>
+                                                                    <h4 className="font-black text-slate-900 text-lg leading-tight">{apt.customer_name || 'Müşteri'}</h4>
                                                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
                                                                         📅 {new Date(apt.date).toLocaleDateString('tr-TR')} • 🕒 {apt.time}
                                                                     </p>
@@ -450,7 +450,7 @@ export function FinanceTab({ ctx }: { ctx: Ctx }) {
                                                     className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex items-center justify-between hover:border-indigo-400 cursor-pointer transition-all"
                                                 >
                                                     <div>
-                                                        <h4 className="font-black text-slate-900">{p.supplier_name}</h4>
+                                                        <h4 className="font-black text-slate-900">{p.supplier_name || 'Tedarikçi'}</h4>
                                                         <p className="text-[10px] font-bold text-slate-400 uppercase">Fatura No: {p.invoice_no || '---'}</p>
                                                     </div>
                                                     <div className="text-right">
