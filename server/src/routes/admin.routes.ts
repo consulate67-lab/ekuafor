@@ -28,51 +28,98 @@ function pgEscape(value: any): string {
     return `'${String(value).replace(/'/g, "''")}'`;
 }
 
-router.post('/db-import', (importUpload as any).single('dump'), async (req: Request, res: Response) => {
+// Ortak auth helper
+function checkImportAuth(req: Request, res: Response): boolean {
     const expectedSecret = process.env.IMPORT_SECRET;
     if (!expectedSecret) {
-        return res.status(503).json({ success: false, error: 'IMPORT_SECRET tanımlı değil (server tarafında)' });
+        res.status(503).json({ success: false, error: 'IMPORT_SECRET tanımlı değil' });
+        return false;
     }
     const provided = req.header('x-import-secret') || (req.body && req.body.secret);
     if (provided !== expectedSecret) {
-        return res.status(401).json({ success: false, error: 'Yetkisiz: x-import-secret yanlış veya eksik' });
+        res.status(401).json({ success: false, error: 'Yetkisiz' });
+        return false;
     }
-    if (!req.file) {
-        return res.status(400).json({ success: false, error: 'dump dosyası eksik (multipart: field "dump")' });
-    }
-    const dump = JSON.parse(req.file.buffer.toString('utf-8'));
-    if (!dump?.tables || typeof dump.tables !== 'object') {
-        return res.status(400).json({ success: false, error: 'dump formatı geçersiz: { tables: { ... } } bekleniyor' });
-    }
+    return true;
+}
 
-    const tableNames = Object.keys(dump.tables);
-    logger.info({ tableCount: tableNames.length }, '[admin/db-import] başladı');
+// Tek tablo INSERT (JSON body ile, 11 MB dosya upload OOM sorununu çözer)
+router.post('/db-import-chunk', async (req: Request, res: Response) => {
+    if (!checkImportAuth(req, res)) return;
+    const { table, rows } = req.body || {};
+    if (!table || typeof table !== 'string' || !Array.isArray(rows)) {
+        return res.status(400).json({ success: false, error: 'body: { table: string, rows: any[] } bekleniyor' });
+    }
 
     const pgUrl = process.env.DATABASE_URL;
-    if (!pgUrl) {
-        return res.status(500).json({ success: false, error: 'DATABASE_URL tanımlı değil' });
-    }
+    if (!pgUrl) return res.status(500).json({ success: false, error: 'DATABASE_URL tanımlı değil' });
 
     const client = new PgClient({ connectionString: pgUrl, ssl: { rejectUnauthorized: false } });
     try {
         await client.connect();
         await client.query("SET session_replication_role = 'replica'");
-        await client.query('BEGIN');
-        const sorted = [...tableNames].sort();
-        for (const name of sorted) {
-            await client.query(`TRUNCATE TABLE "${name}" CASCADE`);
+        if (rows.length === 0) {
+            res.json({ success: true, inserted: 0 });
+            return;
         }
-        await client.query('COMMIT');
-        logger.info({ tables: sorted.length }, '[admin/db-import] truncate tamam');
+        const cols = Object.keys(rows[0]);
+        const colList = cols.map(c => `"${c}"`).join(', ');
+        const values = rows.map((row: any) => `(${cols.map(c => pgEscape(row[c])).join(', ')})`).join(',\n');
+        await client.query(`INSERT INTO "${table}" (${colList}) VALUES ${values}`);
+        res.json({ success: true, inserted: rows.length, table });
+        logger.info({ table, count: rows.length }, '[admin/db-import-chunk] ok');
+    } catch (e: any) {
+        logger.error({ err: e.message, table, count: rows?.length }, '[admin/db-import-chunk] hata');
+        res.status(500).json({ success: false, error: e.message, table });
+    } finally {
+        try { await client.query("SET session_replication_role = 'origin'"); } catch { /* ignore */ }
+        await client.end();
+    }
+});
 
+// Tüm tabloları truncate (FK bypass ile)
+router.post('/db-truncate', async (req: Request, res: Response) => {
+    if (!checkImportAuth(req, res)) return;
+    const pgUrl = process.env.DATABASE_URL;
+    if (!pgUrl) return res.status(500).json({ success: false, error: 'DATABASE_URL tanımlı değil' });
+    const client = new PgClient({ connectionString: pgUrl, ssl: { rejectUnauthorized: false } });
+    try {
+        await client.connect();
+        await client.query("SET session_replication_role = 'replica'");
+        const tablesRes = await client.query(`SELECT tablename FROM pg_tables WHERE schemaname='public'`);
+        const names = tablesRes.rows.map(r => r.tablename);
+        for (const n of names) await client.query(`TRUNCATE TABLE "${n}" CASCADE`);
+        res.json({ success: true, truncated: names });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e.message });
+    } finally {
+        try { await client.query("SET session_replication_role = 'origin'"); } catch { /* ignore */ }
+        await client.end();
+    }
+});
+
+// Eski /db-import endpoint'i (multipart upload) — geriye uyumluluk
+router.post('/db-import', (importUpload as any).single('dump'), async (req: Request, res: Response) => {
+    if (!checkImportAuth(req, res)) return;
+    if (!req.file) return res.status(400).json({ success: false, error: 'dump dosyası eksik' });
+    const dump = JSON.parse(req.file.buffer.toString('utf-8'));
+    if (!dump?.tables || typeof dump.tables !== 'object') {
+        return res.status(400).json({ success: false, error: 'dump formatı geçersiz' });
+    }
+    const tableNames = Object.keys(dump.tables);
+    const pgUrl = process.env.DATABASE_URL!;
+    const client = new PgClient({ connectionString: pgUrl, ssl: { rejectUnauthorized: false } });
+    try {
+        await client.connect();
+        await client.query("SET session_replication_role = 'replica'");
+        await client.query('BEGIN');
+        for (const n of tableNames) await client.query(`TRUNCATE TABLE "${n}" CASCADE`);
+        await client.query('COMMIT');
         const result: Record<string, number> = {};
         await client.query('BEGIN');
-        for (const name of sorted) {
-            const rows = dump.tables[name];
-            if (!rows || rows.length === 0) {
-                result[name] = 0;
-                continue;
-            }
+        for (const n of tableNames) {
+            const rows = dump.tables[n] || [];
+            if (rows.length === 0) { result[n] = 0; continue; }
             const cols = Object.keys(rows[0]);
             const colList = cols.map(c => `"${c}"`).join(', ');
             const BATCH = 1000;
@@ -80,19 +127,17 @@ router.post('/db-import', (importUpload as any).single('dump'), async (req: Requ
             for (let i = 0; i < rows.length; i += BATCH) {
                 const batch = rows.slice(i, i + BATCH);
                 const values = batch.map((row: any) => `(${cols.map(c => pgEscape(row[c])).join(', ')})`).join(',\n');
-                await client.query(`INSERT INTO "${name}" (${colList}) VALUES ${values}`);
+                await client.query(`INSERT INTO "${n}" (${colList}) VALUES ${values}`);
                 inserted += batch.length;
             }
-            result[name] = inserted;
+            result[n] = inserted;
         }
         await client.query('COMMIT');
         await client.query("SET session_replication_role = 'origin'");
-        logger.info(result, '[admin/db-import] tamamlandı');
         res.json({ success: true, inserted: result, totalRows: Object.values(result).reduce((s, n) => s + n, 0) });
     } catch (e: any) {
         try { await client.query('ROLLBACK'); } catch { /* ignore */ }
         try { await client.query("SET session_replication_role = 'origin'"); } catch { /* ignore */ }
-        logger.error({ err: e.message }, '[admin/db-import] hata');
         res.status(500).json({ success: false, error: e.message });
     } finally {
         await client.end();
