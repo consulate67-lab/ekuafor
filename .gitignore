@@ -67,6 +67,9 @@ release/
 release_apk/
 client/android/
 
+# DB dump (Render → Railway migration)
+db-dump.json
+
 # tsc error logs (legacy, regenerated on demand)
 tsc_errors.txt
 tsc_output*.txt
