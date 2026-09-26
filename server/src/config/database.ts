@@ -24,7 +24,7 @@ const pool = new Pool({
         : false,
     max: 20,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 30000, // Increased timeout to 30s for Railway
+    connectionTimeoutMillis: 5000, // 5s — fail fast to see real DB error in logs
 });
 
 pool.on('connect', () => {
