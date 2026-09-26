@@ -24,6 +24,18 @@ function pgEscape(value: any): string {
     if (value === null || value === undefined) return 'NULL';
     if (typeof value === 'boolean') return value ? 'true' : 'false';
     if (typeof value === 'number') return Number.isFinite(value) ? String(value) : 'NULL';
+    // Array → PostgreSQL ARRAY[...]::text[] literal (genders, specialties, vb.)
+    if (Array.isArray(value)) {
+        if (value.length === 0) return "ARRAY[]::text[]";
+        const items = value.map(v => {
+            if (v === null || v === undefined) return 'NULL';
+            if (typeof v === 'number') return Number.isFinite(v) ? String(v) : 'NULL';
+            if (typeof v === 'boolean') return v ? 'true' : 'false';
+            return `'${String(v).replace(/'/g, "''")}'`;
+        });
+        return `ARRAY[${items.join(',')}]::text[]`;
+    }
+    // Object → JSONB (metadata, custom_fields, vb.)
     if (typeof value === 'object') return `'${JSON.stringify(value).replace(/'/g, "''")}'::jsonb`;
     return `'${String(value).replace(/'/g, "''")}'`;
 }
