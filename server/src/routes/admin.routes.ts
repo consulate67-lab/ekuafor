@@ -156,7 +156,14 @@ router.post('/db-exec', async (req: Request, res: Response) => {
             if (!trimmed) continue;
             try {
                 const r = await client.query(trimmed);
-                results.push({ ok: true, rows: r.rowCount, command: trimmed.split('\n')[0].slice(0, 80) });
+                // SELECT sonuçları için data ekle (COUNT, SELECT *, vb.)
+                const isSelect = /^\s*(SELECT|WITH|EXPLAIN|VALUES)/i.test(trimmed);
+                results.push({
+                    ok: true,
+                    rows: r.rowCount,
+                    data: isSelect ? r.rows : undefined,
+                    command: trimmed.split('\n')[0].slice(0, 80)
+                });
             } catch (e: any) {
                 results.push({ ok: false, error: e.message, command: trimmed.split('\n')[0].slice(0, 80) });
             }
