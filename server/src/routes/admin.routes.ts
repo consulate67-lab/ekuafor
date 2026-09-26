@@ -55,6 +55,20 @@ function checkImportAuth(req: Request, res: Response): boolean {
     return true;
 }
 
+// Tablo → mevcut kolonlar cache (information_schema'dan bir kez al, sonra filtrele)
+const tableColumnsCache = new Map<string, Set<string>>();
+async function getTableColumns(client: PgClient, table: string): Promise<Set<string>> {
+    const cached = tableColumnsCache.get(table);
+    if (cached) return cached;
+    const result = await client.query(
+        `SELECT column_name FROM information_schema.columns WHERE table_name = $1 AND table_schema = 'public'`,
+        [table]
+    );
+    const cols = new Set(result.rows.map((r: any) => r.column_name));
+    tableColumnsCache.set(table, cols);
+    return cols;
+}
+
 // Tek tablo INSERT (JSON body ile, 11 MB dosya upload OOM sorununu çözer)
 router.post('/db-import-chunk', async (req: Request, res: Response) => {
     if (!checkImportAuth(req, res)) return;
@@ -74,11 +88,22 @@ router.post('/db-import-chunk', async (req: Request, res: Response) => {
             res.json({ success: true, inserted: 0 });
             return;
         }
-        const cols = Object.keys(rows[0]);
+        // DB'de var olan kolonları al, dump'taki fazla kolonları filtrele (schema drift güvenliği)
+        const validCols = await getTableColumns(client, table);
+        const allCols = Object.keys(rows[0]);
+        const cols = allCols.filter(c => validCols.has(c));
+        const skipped = allCols.filter(c => !validCols.has(c));
+        if (skipped.length > 0) {
+            logger.warn({ table, skipped }, '[admin/db-import-chunk] skip edilen kolonlar (DB\'de yok)');
+        }
+        if (cols.length === 0) {
+            res.json({ success: true, inserted: 0, table, skipped });
+            return;
+        }
         const colList = cols.map(c => `"${c}"`).join(', ');
         const values = rows.map((row: any) => `(${cols.map(c => pgEscape(row[c])).join(', ')})`).join(',\n');
         await client.query(`INSERT INTO "${table}" (${colList}) VALUES ${values}`);
-        res.json({ success: true, inserted: rows.length, table });
+        res.json({ success: true, inserted: rows.length, table, skipped });
         logger.info({ table, count: rows.length }, '[admin/db-import-chunk] ok');
     } catch (e: any) {
         logger.error({ err: e.message, table, count: rows?.length }, '[admin/db-import-chunk] hata');
