@@ -135,6 +135,46 @@ router.post('/db-truncate', async (req: Request, res: Response) => {
     }
 });
 
+// Raw SQL çalıştırma (migration için)
+// body: { sql: string } veya { statements: string[] } — IF NOT EXISTS güvenli
+router.post('/db-exec', async (req: Request, res: Response) => {
+    if (!checkImportAuth(req, res)) return;
+    const pgUrl = process.env.DATABASE_URL;
+    if (!pgUrl) return res.status(500).json({ success: false, error: 'DATABASE_URL tanımlı değil' });
+
+    let statements: string[] = [];
+    if (typeof req.body?.sql === 'string') statements = [req.body.sql];
+    else if (Array.isArray(req.body?.statements)) statements = req.body.statements;
+    else return res.status(400).json({ success: false, error: 'body: { sql: string } veya { statements: string[] } bekleniyor' });
+
+    const client = new PgClient({ connectionString: pgUrl, ssl: { rejectUnauthorized: false } });
+    try {
+        await client.connect();
+        const results: any[] = [];
+        for (const stmt of statements) {
+            const trimmed = stmt.trim();
+            if (!trimmed) continue;
+            try {
+                const r = await client.query(trimmed);
+                results.push({ ok: true, rows: r.rowCount, command: trimmed.split('\n')[0].slice(0, 80) });
+            } catch (e: any) {
+                results.push({ ok: false, error: e.message, command: trimmed.split('\n')[0].slice(0, 80) });
+            }
+        }
+        const failed = results.filter(r => !r.ok);
+        res.json({
+            success: failed.length === 0,
+            executed: results.length,
+            failed: failed.length,
+            results
+        });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e.message });
+    } finally {
+        await client.end();
+    }
+});
+
 // Eski /db-import endpoint'i (multipart upload) — geriye uyumluluk
 router.post('/db-import', (importUpload as any).single('dump'), async (req: Request, res: Response) => {
     if (!checkImportAuth(req, res)) return;
