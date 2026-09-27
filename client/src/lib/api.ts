@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const isProduction = import.meta.env.PROD;
 const baseUrl = import.meta.env.VITE_API_URL || (isProduction
-  ? 'https://web-production-d79c2a.up.railway.app/api' // Railway (eski: Render)
+  ? 'https://web-production-db847.up.railway.app/api' // Railway (yeni URL — eski: d79c2a, Render)
   : 'http://localhost:3000/api');
 
 const api = axios.create({
