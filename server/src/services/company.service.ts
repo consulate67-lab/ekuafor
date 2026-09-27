@@ -401,18 +401,20 @@ class CompanyService {
                 : sql.raw('c.created_at DESC');
 
         const whereClause = sql.join(whereClauses, sql` AND `);
+        // 7141 firma × N subquery çok yavaş. JOIN + GROUP BY ile tek sorguya indirgendi.
+        // LIMIT 50 — pagination yok, 50 firma tek seferde (ileride ?limit=&offset= eklenebilir)
         const result = await db.execute(sql`
             SELECT
                 c.*,
-                (CASE
-                    WHEN (SELECT COUNT(*) FROM services WHERE company_id = c.id) > 0
-                     AND (SELECT COUNT(*) FROM company_users WHERE company_id = c.id) > 0
-                    THEN 1 ELSE 0
-                END) as relation_count
+                CASE WHEN COUNT(DISTINCT s.id) > 0 AND COUNT(DISTINCT cu.user_id) > 0
+                     THEN 1 ELSE 0 END as relation_count
             FROM companies c
+            LEFT JOIN services s ON s.company_id = c.id
+            LEFT JOIN company_users cu ON cu.company_id = c.id
             WHERE ${whereClause}
+            GROUP BY c.id
             ORDER BY relation_count DESC, ${orderByClause}
-            LIMIT 500
+            LIMIT 50
         `);
         const companies = (result as any).rows as Company[];
 
