@@ -46,6 +46,17 @@ export const createApp = (): Express => {
             // Mobile/Capacitor origin header olmayabilir; izin ver
             if (!origin) return callback(null, true);
 
+            // Same-origin kontrolü: origin.host === request.host
+            // (SPA ayni Railway subdomain'den serve edildigi icin her zaman izin ver)
+            try {
+                const requestHost = (require('http').IncomingMessage.prototype.getHeader) && undefined;
+                const host = (callback as any).req?.headers?.host;
+                const originHost = new URL(origin).host;
+                if (host && originHost === host) return callback(null, true);
+            } catch {
+                // URL parse hatasi (exotic origin), whitelist'e dus
+            }
+
             if (
                 allowedOrigins.includes(origin) ||
                 allowedOrigins.includes('*') ||
