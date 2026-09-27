@@ -41,10 +41,32 @@ export const createApp = (): Express => {
         'http://localhost',        // Capacitor Android (eski default)
         'app://.',                 // Capacitor bazı versiyonlar
     ];
+
+    // === Self-host capture: SPA'nin kendi origin'inden gelen istekleri
+    // otomatik kabul et. Same-origin tarayici bazen Origin header gonderir
+    // (axios/fetch API) — bu Origin ALLOWED_ORIGINS env'de yoksa bile,
+    // host eslesiyorsa safe. Browser same-origin policy zaten authenticated,
+    // ek CSRF riski yok (credentials: false).
+    let SELF_HOST = '';
+    app.use((req, _res, next) => {
+        const h = req.headers.host;
+        if (h && typeof h === 'string') SELF_HOST = h;
+        next();
+    });
+
     app.use(cors({
         origin: (origin, callback) => {
             // Mobile/Capacitor origin header olmayabilir; izin ver
             if (!origin) return callback(null, true);
+
+            // Self-origin bypass: kendi Railway subdomain'den gelen istekler
+            try {
+                if (SELF_HOST && new URL(origin).host === SELF_HOST) {
+                    return callback(null, true);
+                }
+            } catch {
+                // URL parse hatasi (exotic origin), whitelist'e dus
+            }
 
             if (
                 allowedOrigins.includes(origin) ||
