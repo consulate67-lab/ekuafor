@@ -84,3 +84,10 @@ server/scripts/**/*.js
 server/scripts/**/*.js.map
 server/scripts/**/*.d.ts
 server/scripts/**/*.d.ts.map
+
+# İstisna: build-time client dist kopyalama script'i Railway deploy için gerekli
+!server/scripts/copy-client-dist.js
+
+# Server public/ — Railway build sırasında copy-client-dist.js ile doldurulur
+server/public/
+!server/public/.gitkeep

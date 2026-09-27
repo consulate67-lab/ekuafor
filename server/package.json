@@ -5,7 +5,10 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "npm run build:client && npm run copy:client && tsc",
+    "build:full": "npm run build:client && npm run copy:client && tsc",
+    "build:client": "cd ../client && npm install --silent && npm run build",
+    "copy:client": "node scripts/copy-client-dist.js",
     "start": "node dist/index.js",
     "db:migrate": "node -r dotenv/config scripts/migrate.js || node -e \"process.exit(0)\"",
     "test": "vitest run",

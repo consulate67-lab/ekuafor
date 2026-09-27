@@ -1,6 +1,7 @@
 import express, { Express } from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
+import path from 'path';
 import { requestLogger } from './middleware/requestLogger';
 import { errorHandler } from './middleware/errorHandler';
 import { mountRoutes } from './routes/registry';
@@ -96,6 +97,11 @@ export const createApp = (): Express => {
 
     // === All API routes (single mount point — /api/*) ===
     mountRoutes(app);
+
+    // === Static client bundle (Railway web service serves SPA from /public) ===
+    // Production: build sırasında client/dist/* → server/public/ kopyalanır.
+    // SPA: index.html hash routing kullanır, fallback'e gerek yok.
+    app.use(express.static(path.join(__dirname, '..', 'public')));
 
     // === Global error handler (must be last) ===
     app.use(errorHandler);
