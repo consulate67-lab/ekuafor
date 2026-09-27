@@ -1,18 +1,17 @@
-const CACHE_NAME = 'saloon-v1';
+﻿// v2 — Network-only, eski CORS 500 cache temizle
+const CACHE_NAME = 'saloon-v2-no-cache';
 
 self.addEventListener('install', (event) => {
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            // Minimal catch-all for PWA requirements
-            return cache.addAll(['/']);
-        })
+        caches.keys().then((keys) =>
+            Promise.all(keys.map((k) => caches.delete(k)))
+        ).then(() => self.clients.claim())
     );
 });
 
-self.addEventListener('fetch', (event) => {
-    event.respondWith(
-        fetch(event.request).catch(() => {
-            return caches.match(event.request);
-        })
-    );
-});
+// fetch event handler YOK — her zaman network'e gider, cache kullanmaz
+// (eski CORS 500 response cache temizlendi)
