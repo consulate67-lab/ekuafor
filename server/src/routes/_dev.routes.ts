@@ -160,4 +160,56 @@ router.get('/users-schema', async (req: Request, res: Response) => {
     }
 });
 
+/**
+ * POST /api/_dev/test-password
+ * bcrypt verify debug. Sifre eslesmesinin neden basarisiz oldugunu anlamak icin.
+ */
+router.post('/test-password', async (req: Request, res: Response) => {
+    const adminKey = process.env.ADMIN_KEY;
+    const providedKey = req.headers['x-admin-key'];
+    if (!adminKey || providedKey !== adminKey) {
+        return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const email = (req.body?.email || req.query?.email) as string;
+    const testPassword = (req.body?.password || req.query?.password) as string;
+    if (!email || !testPassword) {
+        return res.status(400).json({ success: false, error: 'email + password required' });
+    }
+    const { default: pool } = await import('../config/database');
+    try {
+        const result = await pool.query(
+            'SELECT id, email, password FROM users WHERE email = $1 LIMIT 1',
+            [email]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'user not found' });
+        }
+        const user = result.rows[0];
+        const storedPassword = user.password;
+        const isBcryptLike = typeof storedPassword === 'string'
+            && /^\$2[aby]\$/.test(storedPassword);
+        let compareResult: boolean | null = null;
+        if (isBcryptLike) {
+            const bcrypt = (await import('bcryptjs')).default;
+            compareResult = await bcrypt.compare(testPassword, storedPassword);
+        } else {
+            // Bcrypt degilse direkt karsilastir
+            compareResult = storedPassword === testPassword;
+        }
+        res.json({
+            success: true,
+            userId: user.id,
+            storedPasswordLength: storedPassword?.length ?? 0,
+            storedPasswordPrefix: typeof storedPassword === 'string'
+                ? storedPassword.substring(0, 7) : null,
+            isBcryptHash: isBcryptLike,
+            isPlaintextMatch: storedPassword === testPassword,
+            compareResult,
+            testPasswordLength: testPassword.length,
+        });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 export default router;
