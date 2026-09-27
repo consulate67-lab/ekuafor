@@ -132,4 +132,30 @@ router.get('/admin-info', async (req: Request, res: Response) => {
     res.json({ success: true, user: result.rows[0] });
 });
 
+/**
+ * GET /api/_dev/users-schema
+ *
+ * Sadece debug icin — users tablosunun column listesi (information_schema).
+ * Dogru kolon ismini bulmaya yarar, sonra silinecek.
+ */
+router.get('/users-schema', async (req: Request, res: Response) => {
+    const adminKey = process.env.ADMIN_KEY;
+    const providedKey = req.headers['x-admin-key'];
+    if (!adminKey || providedKey !== adminKey) {
+        return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const { default: pool } = await import('../config/database');
+    try {
+        const result = await pool.query(
+            `SELECT column_name, data_type, is_nullable
+             FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = 'users'
+             ORDER BY ordinal_position`
+        );
+        res.json({ success: true, columns: result.rows });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 export default router;
