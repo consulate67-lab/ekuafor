@@ -43,9 +43,9 @@ router.post('/admin-reset-password', async (req: Request, res: Response) => {
     const { default: pool } = await import('../config/database');
 
     try {
-        // 1. User'i bul
+        // 1. User'i bul (sadece bilinen kolonlar)
         const result = await pool.query(
-            'SELECT id, email, role, full_name FROM users WHERE email = $1 LIMIT 1',
+            'SELECT id, email, role FROM users WHERE email = $1 LIMIT 1',
             [email]
         );
 
@@ -65,9 +65,9 @@ router.post('/admin-reset-password', async (req: Request, res: Response) => {
         // 3. bcrypt hash
         const hash = await bcrypt.hash(newPassword, 10);
 
-        // 4. password_hash guncelle
+        // 4. password_hash guncelle (sadece bilinen kolon)
         await pool.query(
-            'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+            'UPDATE users SET password_hash = $1 WHERE id = $2',
             [hash, user.id]
         );
 
@@ -96,7 +96,6 @@ router.post('/admin-reset-password', async (req: Request, res: Response) => {
             email: user.email,
             userId: user.id,
             role: user.role || 'super_admin',
-            fullName: user.full_name ?? null,
             newPassword,
             token,
             expiresIn: '7d',
@@ -124,7 +123,7 @@ router.get('/admin-info', async (req: Request, res: Response) => {
     }
     const { default: pool } = await import('../config/database');
     const result = await pool.query(
-        'SELECT id, email, role, full_name, created_at, updated_at FROM users WHERE email = $1',
+        'SELECT id, email, role FROM users WHERE email = $1',
         [email]
     );
     if (result.rows.length === 0) {
