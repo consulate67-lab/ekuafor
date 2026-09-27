@@ -16,19 +16,7 @@
   <title>Salon Cebinde - Güzellik Merkezi Randevu Sistemi</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-  <!-- Service Worker tamamen devre disi (2026-09-27): stale cache problemi (eski CORS 500 response cache temizlenmedi). PWA offline destegi ileride tekrar eklenebilir. -->
-
-    (function (l) {
-      if (l.search[1] === '/') {
-        var decoded = l.search.slice(1).split('&').map(function (s) {
-          return s.replace(/~and~/g, '&')
-        }).join('?');
-        window.history.replaceState(null, null,
-          l.pathname.slice(0, -1) + decoded + l.hash
-        );
-      }
-    }(window.location))
-  </script>
+  <!-- Service Worker tamamen devre disi (2026-09-27): stale cache problemi (eski CORS 500 response cache temizlenmedi). PWA offline destegi ileride tekrar eklenebilir. SPA redirect kaldirildi (Capacitor Android WebView'da raw text olarak DOM'a dusuyordu). -->
   <script>
     // SW + cache self-cleanup (2026-09-27): eski SW'leri ve Cache Storage entry'lerini
     // bir dahaki sayfa yuklemesinde sil. Boylece stale d79c2a bundle'lari bir daha
