@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Cache temizleniyor...</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 60px auto; padding: 20px; text-align: center; color: #1f2937; }
+    h1 { font-size: 20px; margin-bottom: 16px; }
+    p { font-size: 14px; line-height: 1.6; margin: 8px 0; color: #4b5563; }
+    .ok { color: #059669; font-weight: 600; }
+    .err { color: #dc2626; font-weight: 600; }
+    code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+    .btn { display: inline-block; margin-top: 24px; padding: 12px 24px; background: #db2777; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>🧹 Tarayıcı Önbelleği Temizleniyor</h1>
+  <p id="status">Service Worker kayıtları kaldırılıyor...</p>
+  <p style="margin-top: 24px; font-size: 12px;">Bu sayfa <code>client/public/clear-cache.html</code>'den otomatik gelir. Tarayıcının eski bundle'ı unutmasını garantiler.</p>
+
+  <script>
+    (async function () {
+      var statusEl = document.getElementById('status');
+      function setStatus(msg, cls) {
+        statusEl.innerHTML = msg;
+        statusEl.className = cls || '';
+      }
+
+      try {
+        // 1. Tüm Service Worker'ları kaldır
+        if ('serviceWorker' in navigator) {
+          var regs = await navigator.serviceWorker.getRegistrations();
+          for (var i = 0; i < regs.length; i++) {
+            try { await regs[i].unregister(); } catch (e) {}
+          }
+          setStatus('SW unregister edildi (' + regs.length + ' adet). Cache temizleniyor...', 'ok');
+        } else {
+          setStatus('Service Worker API yok. Cache temizleniyor...', 'ok');
+        }
+
+        // 2. Tüm Cache Storage entry'lerini sil
+        if ('caches' in window) {
+          var keys = await caches.keys();
+          for (var j = 0; j < keys.length; j++) {
+            try { await caches.delete(keys[j]); } catch (e) {}
+          }
+          setStatus('Cache temizlendi (' + keys.length + ' adet). Storage temizleniyor...', 'ok');
+        }
+
+        // 3. localStorage + sessionStorage temizle (sadece SW ile ilgili anahtarlar)
+        try {
+          for (var k in localStorage) {
+            if (k.indexOf('sw') !== -1 || k.indexOf('workbox') !== -1 || k.indexOf('cache') !== -1) {
+              localStorage.removeItem(k);
+            }
+          }
+        } catch (e) {}
+
+        setStatus('✅ Temizlik tamam. 2 saniye içinde ana sayfaya yönlendirileceksiniz...', 'ok');
+
+        // 4. Ana sayfaya yönlendir (timestamp query ile cache bypass)
+        setTimeout(function () {
+          window.location.replace('./?cleared=' + Date.now() + '#/app');
+        }, 2000);
+      } catch (err) {
+        setStatus('❌ Hata: ' + (err && err.message ? err.message : err), 'err');
+        setStatus(document.getElementById('status').innerHTML + '<br><br>Manuel olarak şunu deneyin:<br>1. DevTools → Application → Storage → <strong>Clear site data</strong><br>2. Normal <a href="./?nocache=' + Date.now() + '">ana sayfaya dön</a>', 'err');
+      }
+    })();
+  </script>
+</body>
+</html>
