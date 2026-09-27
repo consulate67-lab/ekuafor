@@ -404,10 +404,15 @@ class CompanyService {
         const result = await db.execute(sql`
             SELECT
                 c.*,
-                (CASE WHEN c.service_count > 0 AND c.staff_count > 0 THEN 1 ELSE 0 END) as relation_count
+                (CASE
+                    WHEN (SELECT COUNT(*) FROM services WHERE company_id = c.id) > 0
+                     AND (SELECT COUNT(*) FROM company_users WHERE company_id = c.id) > 0
+                    THEN 1 ELSE 0
+                END) as relation_count
             FROM companies c
             WHERE ${whereClause}
             ORDER BY relation_count DESC, ${orderByClause}
+            LIMIT 500
         `);
         const companies = (result as any).rows as Company[];
 
