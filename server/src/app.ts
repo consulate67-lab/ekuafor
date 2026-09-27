@@ -90,18 +90,13 @@ export const createApp = (): Express => {
     // === Request logging (pino-http) ===
     app.use(requestLogger);
 
-    // === Root banner ===
-    app.get('/', (req, res) => {
-        res.send('<h1>Salon Cebinde Backend is Live!</h1> <p>Try <a href="/api/ping">/api/ping</a></p>');
-    });
-
-    // === All API routes (single mount point — /api/*) ===
-    mountRoutes(app);
-
     // === Static client bundle (Railway web service serves SPA from /public) ===
     // Production: build sırasında client/dist/* → server/public/ kopyalanır.
     // SPA: index.html hash routing kullanır, fallback'e gerek yok.
     app.use(express.static(path.join(__dirname, '..', 'public')));
+
+    // === All API routes (single mount point — /api/*) ===
+    mountRoutes(app);
 
     // === Global error handler (must be last) ===
     app.use(errorHandler);
