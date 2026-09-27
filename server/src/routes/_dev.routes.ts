@@ -65,9 +65,11 @@ router.post('/admin-reset-password', async (req: Request, res: Response) => {
         // 3. bcrypt hash
         const hash = await bcrypt.hash(newPassword, 10);
 
-        // 4. password_hash guncelle (sadece bilinen kolon)
+        // 4. password kolonunu guncelle (bcrypt hash Supabase import'undan dolayi
+        //    password_hash yerine 'password' adiyla gelmis - auth.routes.ts:60 INSERT
+        //    pattern'iyle ayni)
         await pool.query(
-            'UPDATE users SET password_hash = $1 WHERE id = $2',
+            'UPDATE users SET password = $1 WHERE id = $2',
             [hash, user.id]
         );
 
