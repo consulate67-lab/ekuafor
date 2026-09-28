@@ -322,6 +322,7 @@ router.get('/supabase-discover', async (req: Request, res: Response) => {
 
     const supabase = new Pool({
         connectionString: supabaseUrl,
+        // @ts-expect-error node-postgres 'family' option (IPv4-only) destekliyor ama @types/pg tanımı eksik
         family: 4, // IPv4-only (Railway container IPv6 ENETUNREACH, Supabase hostname hem A hem AAAA döner)
         ssl: { rejectUnauthorized: false },
         connectionTimeoutMillis: 15000,
@@ -419,6 +420,327 @@ router.get('/supabase-discover', async (req: Request, res: Response) => {
         await supabase.end().catch(() => {});
         logger.error({ err: err?.message, code: err?.code }, '_dev supabase-discover failed');
         res.status(500).json({ success: false, error: err.message, code: err.code });
+    }
+});
+
+/**
+ * POST /api/_dev/transfer-from-supabase
+ *
+ * Sprint 2 transfer: Supabase DB'den Railway DB'ye tablo bazli INSERT.
+ * 6 aşamalı planın Stage 2+4 endpoint'i. Stage 3 dryRun validation buradan
+ * yapılacak (dryRun=true ile çağır, INSERT yok).
+ *
+ * Body veya query:
+ *   {
+ *     tables: string[] (default: ['companies']),
+ *     dryRun: boolean (default: true — güvenli default),
+ *     chunkSize: number (default: 100 — Railway DB stability),
+ *     skipExisting: boolean (default: true — Selim'in tercihi)
+ *   }
+ *
+ * Header: X-Admin-Key
+ *
+ * Response: {
+ *   success, dryRun, startedAt, completedAt, durationMs,
+ *   results: {
+ *     [tableName]: {
+ *       totalInSupabase, totalInRailway, attempted, inserted, skipped,
+ *       errors, errorSamples, columnMapping, skippedColumns, chunkCount
+ *     }
+ *   }
+ * }
+ *
+ * Mapping stratejisi:
+ *   1. Aynı kolon adı + aynı tip → direkt map
+ *   2. Aynı kolon adı + farklı tip → coerce (best effort)
+ *   3. Özel mapping tablosu (users.password_hash → password vs.)
+ *   4. Supabase'de var + Railway'de yok → skip + log
+ *   5. Railway'de var + Supabase'de yok → null default
+ *
+ * Duplicate detection: name alanı (case-insensitive trim, exact match)
+ */
+router.post('/transfer-from-supabase', async (req: Request, res: Response) => {
+    const adminKey = process.env.ADMIN_KEY;
+    const providedKey = req.headers['x-admin-key'];
+    if (!adminKey || providedKey !== adminKey) {
+        return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+
+    const supabaseUrl = process.env.SUPABASE_DATABASE_URL;
+    if (!supabaseUrl) {
+        return res.status(503).json({
+            success: false,
+            error: 'SUPABASE_DATABASE_URL env not configured',
+        });
+    }
+
+    const tables = (req.body?.tables || req.query?.tables || 'companies') as string | string[];
+    const tablesList: string[] = Array.isArray(tables)
+        ? tables
+        : String(tables).split(',').map(t => t.trim()).filter(Boolean);
+    const dryRun = req.body?.dryRun !== undefined
+        ? Boolean(req.body.dryRun)
+        : (req.query?.dryRun !== undefined ? String(req.query.dryRun) === 'true' : true);
+    const chunkSize = Math.min(
+        parseInt(String(req.body?.chunkSize || req.query?.chunkSize || '100')) || 100,
+        1000
+    );
+    const skipExisting = req.body?.skipExisting !== undefined
+        ? Boolean(req.body.skipExisting)
+        : (req.query?.skipExisting !== undefined ? String(req.query.skipExisting) !== 'false' : true);
+
+    const ALLOWED_TABLES = [
+        'companies',
+        'users',
+        'services',
+        'sector_service_templates',
+        'sector_employee_specialties',
+    ];
+    for (const t of tablesList) {
+        if (!ALLOWED_TABLES.includes(t)) {
+            return res.status(400).json({
+                success: false,
+                error: `table not allowed: ${t}. Allowed: ${ALLOWED_TABLES.join(',')}`,
+            });
+        }
+    }
+
+    // Özel kolon mapping'leri (Supabase → Railway). Memory'den + Stage 1 keşfinden.
+    const SPECIAL_MAPPINGS: Record<string, Record<string, string | null>> = {
+        users: {
+            password_hash: 'password',  // bcrypt hash'i Supabase password_hash, Railway password
+        },
+        companies: {
+            // Şimdilik özel mapping yok — Stage 2 keşfi sonrası eklenecek
+        },
+        services: {},
+        sector_service_templates: {},
+        sector_employee_specialties: {},
+    };
+
+    const supabase = new Pool({
+        connectionString: supabaseUrl,
+        // @ts-expect-error node-postgres 'family' option (IPv4-only) destekliyor ama @types/pg tanımı eksik
+        family: 4,
+        ssl: { rejectUnauthorized: false },
+        connectionTimeoutMillis: 15000,
+    });
+
+    const startedAt = new Date();
+    const t0 = Date.now();
+    const allResults: Record<string, any> = {};
+
+    try {
+        const { default: pool } = await import('../config/database');
+
+        for (const table of tablesList) {
+            const tableStart = Date.now();
+            const tableResult: any = {
+                totalInSupabase: 0,
+                totalInRailway: 0,
+                attempted: 0,
+                inserted: 0,
+                skipped: 0,
+                errors: 0,
+                errorSamples: [],
+                columnMapping: {},
+                skippedColumns: [],
+                chunkCount: 0,
+            };
+
+            // 1. Supabase schema
+            const supabaseSchema = await supabase.query(
+                `SELECT column_name, data_type FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = $1 ORDER BY ordinal_position`,
+                [table]
+            );
+            // 2. Railway schema
+            const railwaySchema = await pool.query(
+                `SELECT column_name, data_type FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = $1 ORDER BY ordinal_position`,
+                [table]
+            );
+
+            if (supabaseSchema.rowCount === 0) {
+                tableResult.error = `Table '${table}' does not exist in Supabase`;
+                allResults[table] = tableResult;
+                continue;
+            }
+            if (railwaySchema.rowCount === 0) {
+                tableResult.error = `Table '${table}' does not exist in Railway`;
+                allResults[table] = tableResult;
+                continue;
+            }
+
+            const supabaseColMap = new Map(supabaseSchema.rows.map((r: any) => [r.column_name, r.data_type]));
+            const railwayColSet = new Set(railwaySchema.rows.map((r: any) => r.column_name));
+
+            // 3. Mapping oluştur (kullanılacak Railway kolonları)
+            const mapping: Record<string, string> = {}; // supabaseCol -> railwayCol
+            const skippedCols: string[] = [];
+            for (const supCol of supabaseColMap.keys()) {
+                if (railwayColSet.has(supCol)) {
+                    mapping[supCol] = supCol;
+                } else if (SPECIAL_MAPPINGS[table]?.[supCol]) {
+                    const target = SPECIAL_MAPPINGS[table][supCol];
+                    if (target && railwayColSet.has(target)) {
+                        mapping[supCol] = target;
+                    } else {
+                        skippedCols.push(`${supCol} -> ${target ?? 'SKIP'} (target not found)`);
+                    }
+                } else {
+                    skippedCols.push(supCol);
+                }
+            }
+            tableResult.columnMapping = mapping;
+            tableResult.skippedColumns = skippedCols;
+
+            // 4. Counts
+            const supabaseCount = await supabase.query(`SELECT COUNT(*)::int AS total FROM ${table}`);
+            tableResult.totalInSupabase = supabaseCount.rows[0].total;
+
+            const railwayCount = await pool.query(`SELECT COUNT(*)::int AS total FROM ${table}`);
+            tableResult.totalInRailway = railwayCount.rows[0].total;
+
+            if (tableResult.totalInSupabase === 0) {
+                allResults[table] = tableResult;
+                continue;
+            }
+
+            // 5. Duplicate detection için Railway'deki mevcut name'leri çek
+            const existingNames = new Set<string>();
+            if (skipExisting && (table === 'companies' || table === 'services' || table === 'sector_service_templates')) {
+                const nameCol = table === 'sector_service_templates' ? 'slug' : 'name';
+                if (railwayColSet.has(nameCol)) {
+                    const existing = await pool.query(`SELECT ${nameCol} FROM ${table}`);
+                    for (const row of existing.rows) {
+                        const v = row[nameCol];
+                        if (v) existingNames.add(String(v).toLowerCase().trim());
+                    }
+                }
+            }
+
+            // 6. Chunked SELECT + INSERT
+            const mappedRailwayCols = Object.values(mapping);
+            const totalChunks = Math.ceil(tableResult.totalInSupabase / chunkSize);
+
+            for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
+                const offset = chunkIdx * chunkSize;
+                tableResult.chunkCount++;
+
+                // Supabase'den chunk oku
+                const chunkRows = await supabase.query(
+                    `SELECT * FROM ${table} ORDER BY id ASC LIMIT $1 OFFSET $2`,
+                    [chunkSize, offset]
+                );
+
+                if (chunkRows.rowCount === 0) break;
+
+                // Filter + sanitize
+                const filteredRows: any[][] = [];
+                const nameCol = table === 'sector_service_templates' ? 'slug' : 'name';
+                const hasNameCol = mapping[nameCol] !== undefined;
+
+                for (const row of chunkRows.rows) {
+                    tableResult.attempted++;
+
+                    // Duplicate check
+                    if (skipExisting && hasNameCol) {
+                        const name = row[nameCol];
+                        if (name && existingNames.has(String(name).toLowerCase().trim())) {
+                            tableResult.skipped++;
+                            continue;
+                        }
+                    }
+
+                    // Map columns
+                    const values: any[] = [];
+                    for (const supCol of Object.keys(mapping)) {
+                        const railCol = mapping[supCol];
+                        const val = row[supCol];
+
+                        // Sanitize: tarih, JSON, vs.
+                        if (val instanceof Date) {
+                            values.push(val.toISOString());
+                        } else if (typeof val === 'object' && val !== null) {
+                            values.push(JSON.stringify(val));
+                        } else {
+                            values.push(val);
+                        }
+                    }
+                    filteredRows.push(values);
+                }
+
+                if (filteredRows.length === 0) continue;
+
+                if (dryRun) {
+                    tableResult.inserted += filteredRows.length;
+                    continue;
+                }
+
+                // Gerçek INSERT — chunk başına tek sorgu (Postgres VALUES array)
+                const placeholders = filteredRows
+                    .map((_, i) => `(${mappedRailwayCols.map((__, j) => `$${i * mappedRailwayCols.length + j + 1}`).join(',')})`)
+                    .join(',');
+                const insertSql = `INSERT INTO ${table} (${mappedRailwayCols.join(',')}) VALUES ${placeholders} ON CONFLICT DO NOTHING`;
+                const flatValues = filteredRows.flat();
+
+                try {
+                    const result = await pool.query(insertSql, flatValues);
+                    tableResult.inserted += result.rowCount || 0;
+                } catch (err: any) {
+                    tableResult.errors++;
+                    if (tableResult.errorSamples.length < 3) {
+                        tableResult.errorSamples.push({
+                            chunk: chunkIdx,
+                            offset,
+                            error: err.message,
+                            code: err.code,
+                            sampleRow: chunkRows.rows[0],
+                        });
+                    }
+                    logger.error({ table, chunk: chunkIdx, err: err.message, code: err.code }, 'transfer chunk failed');
+                }
+            }
+
+            tableResult.durationMs = Date.now() - tableStart;
+            allResults[table] = tableResult;
+        }
+
+        await supabase.end();
+        const completedAt = new Date();
+        logger.info(
+            {
+                dryRun,
+                tables: tablesList,
+                summary: Object.fromEntries(
+                    Object.entries(allResults).map(([k, v]: [string, any]) =>
+                        [k, { inserted: v.inserted, skipped: v.skipped, errors: v.errors, attempted: v.attempted }]
+                    )
+                ),
+            },
+            '_dev transfer-from-supabase: COMPLETED'
+        );
+        res.json({
+            success: true,
+            dryRun,
+            skipExisting,
+            chunkSize,
+            startedAt: startedAt.toISOString(),
+            completedAt: completedAt.toISOString(),
+            durationMs: Date.now() - t0,
+            results: allResults,
+        });
+    } catch (err: any) {
+        await supabase.end().catch(() => {});
+        logger.error({ err: err?.message, code: err?.code }, '_dev transfer-from-supabase failed');
+        res.status(500).json({
+            success: false,
+            error: err.message,
+            code: err.code,
+            partialResults: allResults,
+            durationMs: Date.now() - t0,
+        });
     }
 });
 
