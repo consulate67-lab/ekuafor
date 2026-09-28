@@ -322,6 +322,7 @@ router.get('/supabase-discover', async (req: Request, res: Response) => {
 
     const supabase = new Pool({
         connectionString: supabaseUrl,
+        family: 4, // IPv4-only (Railway container IPv6 ENETUNREACH, Supabase hostname hem A hem AAAA döner)
         ssl: { rejectUnauthorized: false },
         connectionTimeoutMillis: 15000,
     });
