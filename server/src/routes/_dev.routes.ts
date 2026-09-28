@@ -275,4 +275,150 @@ router.post('/list-table', async (req: Request, res: Response) => {
     }
 });
 
+/**
+ * GET /api/_dev/supabase-discover
+ *
+ * Supabase DB'nin gerçek schema'sını keşfeder (information_schema.columns).
+ * Sprint 2 transferi için: Supabase → Railway kolon mapping'i için zemin.
+ *
+ * Tables: companies, users, services, sector_service_templates,
+ *         sector_employee_specialties, sectors, sector_companies,
+ *         company_sectors, packages, appointments, employees
+ *
+ * Response: {
+ *   success, supabaseHost,
+ *   tables: {
+ *     [tableName]: {
+ *       columns: [{ column_name, data_type, is_nullable }],
+ *       count: number,
+ *       samples: [{...3 rows...}]
+ *     }
+ *   }
+ * }
+ */
+router.get('/supabase-discover', async (req: Request, res: Response) => {
+    const adminKey = process.env.ADMIN_KEY;
+    const providedKey = req.headers['x-admin-key'];
+    if (!adminKey || providedKey !== adminKey) {
+        return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+
+    const supabaseUrl = process.env.SUPABASE_DATABASE_URL;
+    if (!supabaseUrl) {
+        return res.status(503).json({
+            success: false,
+            error: 'SUPABASE_DATABASE_URL env not configured (server/.env.local veya Railway env)',
+        });
+    }
+
+    // Parse host for logging (without exposing credentials)
+    let supabaseHost = 'unknown';
+    try {
+        const match = supabaseUrl.match(/@([^:/]+)/);
+        if (match) supabaseHost = match[1];
+    } catch {
+        // ignore
+    }
+
+    const supabase = new Pool({
+        connectionString: supabaseUrl,
+        ssl: { rejectUnauthorized: false },
+        connectionTimeoutMillis: 15000,
+    });
+
+    const TABLES_TO_DISCOVER = [
+        'companies',
+        'users',
+        'services',
+        'sector_service_templates',
+        'sector_employee_specialties',
+        'sectors',
+        'sector_companies',
+        'company_sectors',
+        'packages',
+        'appointments',
+        'employees',
+    ];
+
+    try {
+        logger.info({ supabaseHost }, '_dev supabase-discover: starting');
+        const out: any = {
+            success: true,
+            supabaseHost,
+            discoveredAt: new Date().toISOString(),
+            tables: {},
+        };
+
+        for (const table of TABLES_TO_DISCOVER) {
+            // Schema columns
+            const schemaResult = await supabase.query(
+                `SELECT column_name, data_type, is_nullable
+                 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = $1
+                 ORDER BY ordinal_position`,
+                [table]
+            );
+
+            if (schemaResult.rowCount === 0) {
+                out.tables[table] = { exists: false };
+                continue;
+            }
+
+            // Count
+            const countResult = await supabase.query(`SELECT COUNT(*)::int AS total FROM ${table}`);
+            const count = countResult.rows[0].total;
+
+            // Sample (3 rows, sanitized for size)
+            const sampleResult = await supabase.query(`SELECT * FROM ${table} LIMIT 3`);
+            const samples = sampleResult.rows.map((row: any) => {
+                const sanitized: any = {};
+                for (const k of Object.keys(row)) {
+                    const v = row[k];
+                    if (typeof v === 'string' && v.length > 200) {
+                        sanitized[k] = v.substring(0, 200) + `... [${v.length} chars]`;
+                    } else if (typeof v === 'object' && v !== null && !(v instanceof Date)) {
+                        sanitized[k] = JSON.stringify(v).substring(0, 200);
+                    } else {
+                        sanitized[k] = v;
+                    }
+                }
+                return sanitized;
+            });
+
+            out.tables[table] = {
+                exists: true,
+                columns: schemaResult.rows,
+                columnCount: schemaResult.rowCount,
+                count,
+                sampleCount: sampleResult.rowCount,
+                samples,
+            };
+        }
+
+        // Also fetch Railway (current) companies schema for diff comparison
+        const { default: pool } = await import('../config/database');
+        const railwayCompaniesSchema = await pool.query(
+            `SELECT column_name, data_type, is_nullable
+             FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = 'companies'
+             ORDER BY ordinal_position`
+        );
+        out.railwayCompaniesSchema = {
+            columns: railwayCompaniesSchema.rows,
+            columnCount: railwayCompaniesSchema.rowCount,
+        };
+
+        await supabase.end();
+        logger.info(
+            { supabaseHost, tablesFound: Object.keys(out.tables).filter(t => out.tables[t].exists).length },
+            '_dev supabase-discover: SUCCESS'
+        );
+        res.json(out);
+    } catch (err: any) {
+        await supabase.end().catch(() => {});
+        logger.error({ err: err?.message, code: err?.code }, '_dev supabase-discover failed');
+        res.status(500).json({ success: false, error: err.message, code: err.code });
+    }
+});
+
 export default router;
