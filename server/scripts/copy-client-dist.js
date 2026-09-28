@@ -15,6 +15,9 @@ const path = require('path');
 const src = path.resolve(__dirname, '..', '..', 'client', 'dist');
 const dst = path.resolve(__dirname, '..', 'public');
 
+console.log(`[copy-client] START: src=${src}, dst=${dst}`);
+console.log(`[copy-client] timestamp: ${new Date().toISOString()}`);
+
 if (!fs.existsSync(src)) {
     console.error(`[copy-client] HATA: Kaynak klasör bulunamadı: ${src}`);
     console.error('[copy-client] Önce client build çalıştırın: cd ../client && npm run build');
