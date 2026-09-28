@@ -212,4 +212,67 @@ router.post('/test-password', async (req: Request, res: Response) => {
     }
 });
 
+/**
+ * POST /api/_dev/exec-sql
+ *
+ * Admin key ile korunan raw SQL execution. SADECE production disi debug amacli
+ * kullanilacak, Sprint 3 baslangicinda SILINECEK. Sadece admin istegi yapar.
+ *
+ * Body: { sql: "SELECT * FROM sectors" veya "INSERT INTO ... VALUES (...)" }
+ * Response: { rowCount, rows }
+ */
+router.post('/exec-sql', async (req: Request, res: Response) => {
+    const adminKey = process.env.ADMIN_KEY;
+    const providedKey = req.headers['x-admin-key'];
+    if (!adminKey || providedKey !== adminKey) {
+        return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const sql = (req.body?.sql || req.query?.sql) as string;
+    if (!sql || typeof sql !== 'string') {
+        return res.status(400).json({ success: false, error: 'sql (string) required' });
+    }
+    const { default: pool } = await import('../config/database');
+    try {
+        const result = await pool.query(sql);
+        res.json({
+            success: true,
+            rowCount: result.rowCount,
+            rows: result.rows,
+            command: result.command,
+        });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message, code: err.code });
+    }
+});
+
+/**
+ * POST /api/_dev/list-table
+ *
+ * Generic SELECT listeleme. { table: 'sectors', limit: 50 } gibi.
+ */
+router.post('/list-table', async (req: Request, res: Response) => {
+    const adminKey = process.env.ADMIN_KEY;
+    const providedKey = req.headers['x-admin-key'];
+    if (!adminKey || providedKey !== adminKey) {
+        return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    const table = (req.body?.table || req.query?.table) as string;
+    const limit = Math.min(parseInt((req.body?.limit || req.query?.limit) as string) || 100, 1000);
+    if (!table) {
+        return res.status(400).json({ success: false, error: 'table required' });
+    }
+    const { default: pool } = await import('../config/database');
+    try {
+        // Whitelist only known safe table names
+        const allowed = ['sectors', 'companies', 'sector_service_templates', 'users'];
+        if (!allowed.includes(table)) {
+            return res.status(400).json({ success: false, error: `table not allowed: ${table}. Whitelist: ${allowed.join(',')}` });
+        }
+        const result = await pool.query(`SELECT * FROM ${table} LIMIT $1`, [limit]);
+        res.json({ success: true, rowCount: result.rowCount, rows: result.rows });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message, code: err.code });
+    }
+});
+
 export default router;
