@@ -1,7 +1,7 @@
 # Saloon — Yeniden Yapılandırma Planı
 
 **Tarih:** 2026-10-12
-**Durum:** Onaylandı (2026-10-12) — Faz 0 ve Faz 1 tamamlandı, Faz 2 başladı
+**Durum:** Onaylandı (2026-10-12) — Faz 0, 1 ve 2 tamamlandı; sıradaki Faz 3
 **Kapsam:** Güvenlik düzeltmeleri, gereksiz kodun silinmesi, sektör-bağımsız rezervasyon modeli ve 4 ekranın yeniden düzenlenmesi.
 **Kapsam dışı (sonraki aşama):** Offline çalışma. Bu planda yalnızca offline'a hazırlık yapılır.
 
@@ -114,7 +114,7 @@ Elle yapılacaklar: deploy sonrası süper admin şifresini `server/scripts/rese
 **Sonraya kalan notlar:**
 - `railway.toml` (config-as-code) 2026-12-01'den sonra desteklenmiyor; `railway config migrate` ile taşınmalı.
 - `saloncebinde.com` SSL sertifikası geçersiz, personel SMS linkleri oraya gidiyor (`company.routes.ts`, `company.service.ts`). Faz 5'te ayarlanabilir uygulama adresine (`APP_URL`) bağlanacak.
-- Railway'deki `GOOGLE_MAPS_API_KEY` değişkeni Faz 2.1 ile birlikte silinecek.
+- Railway'deki `GOOGLE_MAPS_API_KEY` değişkeni Faz 2 deploy'undan sonra silindi.
 
 ---
 
@@ -155,6 +155,18 @@ Her modül ayrı commit olarak silinir; her commit sonrası `tsc`, test ve build
 - `trigger.ts`, `.deploy-trigger`, debug `console.log`'lar, `void x` ile susturulmuş kullanılmayan değişkenler
 
 **Kabul:** `tsc --noEmit` temiz, testler geçiyor, istemci build boyutu düşmüş, sunucu açılışında model indirmiyor.
+
+**Durum (2026-10-12):** Tamamlandı (commit `91cc9a8`, `983d929`). Sunucudan 115 paket kaldırıldı; istemci ve sunucu `tsc`, build ve testler temiz.
+- Board'daki sahte SoftPOS/NFC ödeme ekranı kaldırıldı; yerine "Nakit" ve "POS Cihazı" tahsilat kaydı geldi (`payment_method`: `cash` / `card`).
+- Firma panelinin parçalara bölündüğü commit'te (`8ac2a59`) tüm modalların görünürlük koşulları kaybolmuştu (modallar hep açık, müşteri detayı `null` ile çöküyordu); geri eklendi.
+- Yetki açığı kapatıldı: firma yöneticisi kendi `license_end_date`, `company_type`, `main_company_id`, `commission_rate`, `payment_enabled` alanlarını değiştirebiliyordu.
+- Kaldırılan otomasyon modülü, firmanın yazdığı SQL'i (`sql_script`) saklıyordu ve güncelleme ucu firma kontrolü yapmıyordu; cron hiç çalışmadığı için çalıştırılmamıştı.
+- `CustomerHome` içindeki ölü modallar, müşteri ekranı baştan yazılacağı için Faz 5'e bırakıldı.
+- Veritabanındaki artık tablolar/kolonlar (`packages`, `package_services`, `inventory_*`, `service_materials`, `ai_call_logs`, `automation_rules`, `osm_import_progress`, `appointments.package_id`, iyzico/AI kolonları) Faz 3'te yedek alınıp silinecek.
+
+**Açık bulgular (karar bekliyor):**
+- `migrate.ts` her açılışta boş veya 2030'dan önce biten lisansları `2030-12-31`'e çekiyor; lisans kontrolü fiilen kapalı.
+- Firma girişi sadece 6 haneli rastgele `admin_key` ile yapılıyor; Faz 5'te deneme sınırı ve daha güçlü anahtar gerekiyor.
 
 ---
 
