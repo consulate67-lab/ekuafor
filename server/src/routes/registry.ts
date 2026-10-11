@@ -5,17 +5,13 @@ import authRoutes from './auth.routes';
 import companyRoutes from './company.routes';
 import addressRoutes from './address.routes';
 import serviceRoutes from './service.routes';
-import packageRoutes from './package.routes';
 import appointmentRoutes from './appointment.routes';
 import smsRoutes from './sms.routes';
 import departmentRoutes from './department.routes';
 import reportRoutes from './report.routes';
 import mainCompanyRoutes from './mainCompany.routes';
 import financeRoutes from './finance.routes';
-import paymentRoutes from './payment.routes';
 import expenseRoutes from './expense.routes';
-import aiRoutes from './ai.routes';
-import inventoryRoutes from './inventory.routes';
 import kvkkRoutes from './kvkk.routes';
 import sectorRoutes from './sector.routes';
 
@@ -58,17 +54,13 @@ export const mountRoutes = (app: Express) => {
     app.use('/api/companies', companyRoutes);
     app.use('/api/address', addressRoutes);
     app.use('/api/services', serviceRoutes);
-    app.use('/api/packages', packageRoutes);
     app.use('/api/appointments', appointmentRoutes);
     app.use('/api/sms', smsRoutes);
     app.use('/api/departments', departmentRoutes);
     app.use('/api/reports', reportRoutes);
     app.use('/api/main-companies', mainCompanyRoutes);
     app.use('/api/finance', financeRoutes);
-    app.use('/api/payments', paymentRoutes);
     app.use('/api/expenses', expenseRoutes);
-    app.use('/api/inventory', inventoryRoutes);
-    app.use('/api/ai', aiRoutes);
     app.use('/api/kvkk', kvkkRoutes);
     app.use('/api', sectorRoutes);
 

@@ -11,9 +11,6 @@ import {
 void templates;  // used in index.tsx via ctx, but TypeScript needs explicit ref
 import type { TabKey, Department, StaffBoard, CurrentAccount } from './useCompanyPanel';
 import { Camera, CameraResultType, CameraSource, CameraDirection } from '@capacitor/camera';
-import { Capacitor, registerPlugin } from '@capacitor/core';
-import InventoryTab from '../../components/InventoryTab';
-
 const HomeTab = lazy(() => import('./HomeTab').then(m => ({ default: m.HomeTab })));
 const BookingQRTab = lazy(() => import('./HomeTab').then(m => ({ default: m.BookingQRTab })));
 const AdminQRTab = lazy(() => import('./HomeTab').then(m => ({ default: m.AdminQRTab })));
@@ -30,27 +27,17 @@ const DeptModal = lazy(() => import('./StaffTab').then(m => ({ default: m.DeptMo
 const StaffModal = lazy(() => import('./StaffTab').then(m => ({ default: m.StaffModal })));
 const ServiceModal = lazy(() => import('./ServicesTab').then(m => ({ default: m.ServiceModal })));
 const TemplatesModal = lazy(() => import('./ServicesTab').then(m => ({ default: m.TemplatesModal })));
-const PackageModal = lazy(() => import('./ServicesTab').then(m => ({ default: m.PackageModal })));
 const InvoiceModal = lazy(() => import('./FinanceTab').then(m => ({ default: m.InvoiceModal })));
 const PurchaseModal = lazy(() => import('./FinanceTab').then(m => ({ default: m.PurchaseModal })));
 const PurchaseDetailModal = lazy(() => import('./FinanceTab').then(m => ({ default: m.PurchaseDetailModal })));
 const CashModal = lazy(() => import('./FinanceTab').then(m => ({ default: m.CashModal })));
 const CurrentAccountModal = lazy(() => import('./FinanceTab').then(m => ({ default: m.CurrentAccountModal })));
 const CustomerDetailModal = lazy(() => import('./CRMTab').then(m => ({ default: m.CustomerDetailModal })));
-const AutomationModal = lazy(() => import('./CRMTab').then(m => ({ default: m.AutomationModal })));
-const AIResultModal = lazy(() => import('./Modals').then(m => ({ default: m.AIResultModal })));
 
 // Ctx type for tab components
 export type Ctx = {
     [key: string]: any;
 };
-
-// AIAssistant plugin registration
-interface AIAssistantPlugin {
-    syncStaffData(options: { token: string; baseUrl: string; isStaff: boolean }): Promise<void>;
-    getLastResult(): Promise<{ result: string | null }>;
-}
-const AIAssistant = registerPlugin<AIAssistantPlugin>('AIAssistant');
 
 export default function CompanyPanel() {
     void 0;
@@ -88,10 +75,7 @@ const [isCreating, setIsCreating] = useState(false);
 
 // Services states
 const [companyServices, setCompanyServices] = useState<any[]>([]);
-const [packages, setPackages] = useState<any[]>([]);
-const [activeServiceTab, setActiveServiceTab] = useState<'services' | 'packages'>('services');
 const [showServiceModal, setShowServiceModal] = useState(false);
-const [showPackageModal, setShowPackageModal] = useState(false);
 const [showTemplatesModal, setShowTemplatesModal] = useState(false);
 const [serviceForm, setServiceForm] = useState({
     id: null as number | null,
@@ -104,21 +88,7 @@ const [serviceForm, setServiceForm] = useState({
     quantity: '' as string | number,
     unit: ''
 });
-const [packageForm, setPackageForm] = useState({
-    id: null as number | null,
-    name: '',
-    description: '',
-    duration_minutes: 0,
-    price: 0,
-    items: [] as { service_id: number, staff_id: number | null, department_id: number | null, price: number, duration_minutes: number }[],
-    department_id: null as number | null,
-    staff_id: null as number | null
-});
 const [isSavingService, setIsSavingService] = useState(false);
-const [isSavingPackage, setIsSavingPackage] = useState(false);
-
-// AI states
-const [aiRules, setAiRules] = useState('');
 
 // Reports states
 const [reportData, setReportData] = useState<any>(null);
@@ -146,71 +116,12 @@ const [customerSearch, setCustomerSearch] = useState('');
 const [invoices, setInvoices] = useState<any[]>([]);
 const [contactsBalance, setContactsBalance] = useState<any[]>([]);
 const [salesSubTab, setSalesSubTab] = useState<'pending' | 'invoiced'>('pending');
-const [automationRules, setAutomationRules] = useState<any[]>([]);
-const [showAutomationModal, setShowAutomationModal] = useState(false);
-const [editingRule, setEditingRule] = useState<any>(null);
-const [loadingRules, setLoadingRules] = useState(false);
 const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 const [showCashModal, setShowCashModal] = useState(false);
 const [vknCheckResult, setVknCheckResult] = useState<{ vkn: string; isEInvoice: boolean } | null>(null);
-const [lastAIResult, setLastAIResult] = useState<any>(null);
-const [showAIResultModal, setShowAIResultModal] = useState(false);
-const [expandedMenus, setExpandedMenus] = useState<string[]>(['finance', 'crm']);
-const [inventoryProducts, setInventoryProducts] = useState<any[]>([]);
+const [expandedMenus, setExpandedMenus] = useState<string[]>(['finance']);
 const [purchaseSearch, setPurchaseSearch] = useState('');
 
-// Native Sync
-useEffect(() => {
-    const syncMobileData = async () => {
-        if (Capacitor.isNativePlatform()) {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-            const baseUrl = (api.defaults.baseURL || window.location.origin).replace(/\/$/, "");
-            try {
-                await (AIAssistant as any).requestPermissions();
-                await AIAssistant.syncStaffData({
-                    token: token || '',
-                    baseUrl: baseUrl,
-                    isStaff: true
-                });
-                console.log('Mobile AI Assistant synced and permissions requested');
-            } catch (e) {
-                console.warn('Mobile sync/permissions skipped or failed:', e);
-            }
-        }
-    };
-    syncMobileData();
-
-    // Listen for Native Detections
-    const handleNativeDetection = (data: any) => {
-        try {
-            const result = typeof data === 'string' ? JSON.parse(data) : data;
-            if (result && result.success && result.data) {
-                setLastAIResult(result.data);
-                setShowAIResultModal(true);
-                
-                // Trigger a refresh of the home data to show the new appointment
-                if (result.data.autoCreated && company) {
-                    fetchData(company.id);
-                }
-            }
-        } catch (e) {
-            console.error('Failed to parse native AI result:', e);
-        }
-    };
-
-    if (Capacitor.isNativePlatform()) {
-        (window as any).addEventListener('ai_appointment_detected', (event: any) => {
-            handleNativeDetection(event.detail);
-        });
-        
-        // Check for missed result on start/resume
-        const checkMissed = async () => {
-            const { result } = await AIAssistant.getLastResult();
-            if (result) handleNativeDetection(result);
-        };
-        checkMissed();
-    }
-}, [activeTab, company]);
 const [checkingVkn, setCheckingVkn] = useState(false);
 const [purchaseForm, setPurchaseForm] = useState({
     supplier_name: '',
@@ -261,22 +172,6 @@ const [geoDistricts, setGeoDistricts] = useState<any[]>([]);
 const [geoNeighborhoods, setGeoNeighborhoods] = useState<any[]>([]);
 const [loadingGeo, setLoadingGeo] = useState({ provinces: false, districts: false, neighborhoods: false });
 const [isLicenseExpired, setIsLicenseExpired] = useState(false);
-const [renewingLicense, setRenewingLicense] = useState(false);
-
-const handleRenewLicense = async () => {
-    try {
-        setRenewingLicense(true);
-        const res = await api.post('/payments/license/initialize', { months: 12 });
-        if (res.data.success && res.data.data.paymentPageUrl) {
-            window.location.href = res.data.data.paymentPageUrl;
-        }
-    } catch (err: any) {
-        alert(err.response?.data?.error || 'Ödeme başlatılamadı');
-    } finally {
-        setRenewingLicense(false);
-    }
-};
-
 const handleLogin = async (keyToUse?: string) => {
     const key = keyToUse || inputKey.trim();
     if (!key) return;
@@ -294,13 +189,10 @@ const handleLogin = async (keyToUse?: string) => {
         setInputKey(key);
         if (!is_license_expired) {
             fetchData(comp.id);
-            fetchInventoryProducts(comp.id);
             if (comp.city) fetchDistricts(comp.city);
             // Note: Neighborhood fetching usually needs the district ID which we get after fetchDistricts
         }
 
-        // Load AI rules - Backend'den geleni önceliklendir
-        setAiRules(comp.ai_rules || localStorage.getItem(`ai_rules_${comp.id}`) || 'Varsayılan randevu kuralları aktiftir.');
     } catch (err: any) {
         setError(err.response?.data?.error || 'Geçersiz anahtar');
     } finally {
@@ -322,20 +214,6 @@ useEffect(() => {
         handleLogin(keyToUse);
     }
 }, []);
-
-
-const fetchInventoryProducts = async (cid?: number) => {
-    const targetCid = cid || company?.id;
-    if (!targetCid) return;
-    try {
-        const res = await api.get('/inventory/products');
-        if (res.data.success) {
-            setInventoryProducts(res.data.data || []);
-        }
-    } catch (err) {
-        console.error('Envanter ürünleri yüklenemedi:', err);
-    }
-};
 
 const fetchFinanceData = async (cid?: number) => {
     const targetCid = cid || company?.id;
@@ -450,22 +328,6 @@ const fetchCustomersData = async (cid?: number) => {
         console.error('Müşteri verisi yüklenemedi:', err);
     } finally {
         setLoadingCustomers(false);
-    }
-};
-
-const fetchAutomationRules = async (cid?: number) => {
-    const targetCid = cid || company?.id;
-    if (!targetCid) return;
-    setLoadingRules(true);
-    try {
-        const res = await api.get(`/appointments/company/${targetCid}/automation-rules`);
-        if (res.data.success) {
-            setAutomationRules(res.data.data || []);
-        }
-    } catch (err) {
-        console.error('Otomasyon kuralları yüklenemedi:', err);
-    } finally {
-        setLoadingRules(false);
     }
 };
 
@@ -631,19 +493,6 @@ const handleCreatePurchase = async (data: any) => {
 
         const res = await api.post('/finance/purchase-invoices', backendData);
         if (res.data.success) {
-            // Fatura başarıyla kaydedildiyse stokları güncelle
-            for (const item of data.items) {
-                if (item.product_id) {
-                    try {
-                        await api.put(`/inventory/products/${item.product_id}/stock`, {
-                            change: Number(item.quantity)
-                        });
-                    } catch (stockErr) {
-                        console.error(`Ürün (${item.product_id}) stoku güncellenemedi:`, stockErr);
-                    }
-                }
-            }
-            
             setShowPurchaseModal(false);
             setPurchaseForm({
                 supplier_name: '',
@@ -655,7 +504,6 @@ const handleCreatePurchase = async (data: any) => {
                 items: [{ product_name: '', quantity: 1, unit_price: 0, vat_rate: 20, discount_rate: 0 }]
             });
             fetchFinanceData();
-            fetchInventoryProducts();
         }
     } catch (err: any) {
         const errorMsg = err.response?.data?.error || err.message || 'Alış faturası oluşturulamadı';
@@ -813,16 +661,14 @@ useEffect(() => {
 
 const fetchData = async (companyId: number) => {
     try {
-        const [deptRes, staffRes, svcRes, pkgRes] = await Promise.all([
+        const [deptRes, staffRes, svcRes] = await Promise.all([
             api.get('/departments', { params: { company_id: companyId } }),
             api.get(`/companies/${companyId}/staff-boards`),
-            api.get('/services', { params: { company_id: companyId } }),
-            api.get('/packages', { params: { company_id: companyId } })
+            api.get('/services', { params: { company_id: companyId } })
         ]);
         setDepartments(deptRes.data?.data || deptRes.data || []);
         setStaffBoards(staffRes.data?.data || staffRes.data || []);
         setCompanyServices(svcRes.data?.data || svcRes.data || []);
-        setPackages(pkgRes.data?.data || pkgRes.data || []);
     } catch (e) {
         console.error('Data fetch error', e);
     }
@@ -1079,129 +925,6 @@ const handleDeleteService = async (id: number) => {
     }
 };
 
-const handleSavePackage = async () => {
-    if (!company) {
-        alert('Firma bilgileri bulunamadı.');
-        return;
-    }
-    if (!packageForm.name.trim()) {
-        alert('Lütfen paket adını giriniz.');
-        return;
-    }
-    if (packageForm.items.length === 0) {
-        alert('Lütfen en az bir hizmet seçin');
-        return;
-    }
-    if (companyServices.length === 0) {
-        alert('Paket oluşturmak için önce hizmet eklemelisiniz.');
-        return;
-    }
-    setIsSavingPackage(true);
-    try {
-        if (packageForm.id) {
-            await api.put(`/packages/${packageForm.id}`, {
-                ...packageForm,
-                company_id: company.id
-            });
-        } else {
-            await api.post('/packages', {
-                name: packageForm.name.trim(),
-                description: packageForm.description.trim(),
-                duration_minutes: packageForm.duration_minutes,
-                price: packageForm.price,
-                items: packageForm.items,
-                staff_id: packageForm.staff_id,
-                department_id: packageForm.department_id,
-                company_id: company.id
-            });
-        }
-        setPackageForm({ id: null, name: '', description: '', duration_minutes: 0, price: 0, items: [], department_id: null, staff_id: null });
-        setShowPackageModal(false);
-        fetchData(company.id);
-    } catch (err: any) {
-        console.error('Package Save Error:', err);
-        const errorMsg = err.response?.data?.error || 'Paket kaydedilemedi';
-        const details = err.response?.data?.details;
-        if (details && Array.isArray(details)) {
-            const detailStr = details.map((d: any) => `${d.path.join('.')}: ${d.message}`).join('\n');
-            alert(`${errorMsg}\n\nDetaylar:\n${detailStr}`);
-        } else {
-            alert(errorMsg);
-        }
-    } finally {
-        setIsSavingPackage(false);
-    }
-};
-
-const handleDeletePackage = async (id: number) => {
-    if (!confirm('Bu paketi silmek istediğinize emin misiniz?')) return;
-    try {
-        await api.delete(`/packages/${id}`);
-        fetchData(company.id);
-    } catch (err: any) {
-        alert(err.response?.data?.error || 'Paket silinemedi');
-    }
-};
-
-const toggleServiceInPackage = (serviceId: number) => {
-    const currentItems = [...packageForm.items];
-    const index = currentItems.findIndex(i => i.service_id === serviceId);
-
-    if (index > -1) {
-        currentItems.splice(index, 1);
-    } else {
-        const svc = companyServices.find(s => s.id === serviceId);
-        currentItems.push({
-            service_id: serviceId,
-            staff_id: null,
-            department_id: svc?.department_id || null,
-            price: svc?.price || 0,
-            duration_minutes: svc?.duration_minutes || 0
-        });
-    }
-
-    // Calculate total duration and price from selected services (using overrides)
-    const totalDuration = currentItems.reduce((sum, i) => sum + (i.duration_minutes || 0), 0);
-    const totalPrice = currentItems.reduce((sum, i) => sum + Number(i.price || 0), 0);
-
-    setPackageForm({
-        ...packageForm,
-        items: currentItems,
-        duration_minutes: totalDuration,
-        price: totalPrice
-    });
-};
-
-const handleUpdateServicePrice = (serviceId: number, price: number) => {
-    const currentItems = packageForm.items.map(item =>
-        item.service_id === serviceId ? { ...item, price } : item
-    );
-    const totalPrice = currentItems.reduce((sum, i) => sum + Number(i.price || 0), 0);
-    setPackageForm({ ...packageForm, items: currentItems, price: totalPrice });
-};
-
-const handleUpdateServiceDuration = (serviceId: number, duration: number) => {
-    const currentItems = packageForm.items.map(item =>
-        item.service_id === serviceId ? { ...item, duration_minutes: duration } : item
-    );
-    const totalDuration = currentItems.reduce((sum, i) => sum + (i.duration_minutes || 0), 0);
-    setPackageForm({ ...packageForm, items: currentItems, duration_minutes: totalDuration });
-};
-
-const handleUpdateServiceStaff = (serviceId: number, staffId: number | null) => {
-    const currentItems = packageForm.items.map(item =>
-        item.service_id === serviceId ? { ...item, staff_id: staffId } : item
-    );
-    setPackageForm({ ...packageForm, items: currentItems });
-};
-
-const handleUpdateServiceDept = (serviceId: number, deptId: number | null) => {
-    const currentItems = packageForm.items.map(item =>
-        item.service_id === serviceId ? { ...item, department_id: deptId, staff_id: null } : item
-    );
-    setPackageForm({ ...packageForm, items: currentItems });
-};
-
 const handleAddFromTemplate = async (template: any) => {
     if (!company) return;
     setIsSavingService(true);
@@ -1275,7 +998,6 @@ const handleLogout = () => {
     setDepartments([]);
     setStaffBoards([]);
     setCompanyServices([]);
-    setPackages([]);
 };
 
 const copyText = (text: string, field: string) => {
@@ -1294,8 +1016,6 @@ const switchTab = (tab: TabKey) => {
     // Handle parent menu selection
     if (tab === 'finance') {
         targetTab = 'finance-sales-list';
-    } else if (tab === 'crm') {
-        targetTab = 'customers-list';
     }
     
     setActiveTab(targetTab);
@@ -1318,12 +1038,6 @@ const switchTab = (tab: TabKey) => {
         else if (targetTab.startsWith('customers')) {
             fetchCustomersData(company.id);
         }
-        else if (targetTab === 'customers-automations') {
-            fetchAutomationRules(company.id);
-        }
-        else if (targetTab === 'crm') {
-            fetchCustomersData(company.id);
-        }
         // For other tabs (staff, dept, services), fetchData(company.id) covers all of them
         else if (['staff', 'dept', 'services'].includes(targetTab)) {
             fetchData(company.id);
@@ -1338,11 +1052,7 @@ const handleUpdateCompany = async () => {
     if (!company) return;
     setLoading(true);
     try {
-        // Detach AI rules from state to ensure latest are sent
-        const data: any = {
-            ...company,
-            ai_rules: aiRules
-        };
+        const data: any = { ...company };
 
         // Remove internal/read-only or UI-only fields that might block or fail validation
         const fieldsToOmit = [
@@ -1365,8 +1075,6 @@ const handleUpdateCompany = async () => {
         const response = await api.put(`/companies/${company.id}`, data);
         if (response.data.success && response.data.data) {
             setCompany(response.data.data);
-            // Also update localStorage for AI rules as a fallback/cache
-            localStorage.setItem(`ai_rules_${company.id}`, aiRules);
             alert('Firma bilgileri başarıyla güncellendi.');
         } else {
             let errorMsg = response.data.error || 'Güncelleme başarısız oldu.';
@@ -1413,16 +1121,10 @@ const generateBoardKey = () => {
         copiedField,
         isCreating,
         companyServices,
-        packages,
-        activeServiceTab,
         showServiceModal,
-        showPackageModal,
         showTemplatesModal,
         serviceForm,
-        packageForm,
         isSavingService,
-        isSavingPackage,
-        aiRules,
         reportData,
         reportPeriod,
         loadingReport,
@@ -1443,17 +1145,10 @@ const generateBoardKey = () => {
         invoices,
         contactsBalance,
         salesSubTab,
-        automationRules,
-        showAutomationModal,
-        editingRule,
-        loadingRules,
         showPurchaseModal,
         showCashModal,
         vknCheckResult,
-        lastAIResult,
-        showAIResultModal,
         expandedMenus,
-        inventoryProducts,
         purchaseSearch,
         checkingVkn,
         purchaseForm,
@@ -1469,15 +1164,11 @@ const generateBoardKey = () => {
         geoNeighborhoods,
         loadingGeo,
         isLicenseExpired,
-        renewingLicense,
-        handleRenewLicense,
         handleLogin,
         handleLogout,
         handleUpdateCompany,
-        fetchInventoryProducts,
         fetchFinanceData,
         fetchCustomersData,
-        fetchAutomationRules,
         fetchDistricts,
         fetchNeighborhoods,
         handleCreateInvoice,
@@ -1501,13 +1192,6 @@ const generateBoardKey = () => {
         handlePhotoSelection,
         handleSaveService,
         handleDeleteService,
-        handleSavePackage,
-        handleDeletePackage,
-        toggleServiceInPackage,
-        handleUpdateServicePrice,
-        handleUpdateServiceDuration,
-        handleUpdateServiceStaff,
-        handleUpdateServiceDept,
         handleAddFromTemplate,
         generateBoardKey,
         openCurrentAccountModal,
@@ -1536,16 +1220,10 @@ const generateBoardKey = () => {
         setCopiedField,
         setIsCreating,
         setCompanyServices,
-        setPackages,
-        setActiveServiceTab,
         setShowServiceModal,
-        setShowPackageModal,
         setShowTemplatesModal,
         setServiceForm,
-        setPackageForm,
         setIsSavingService,
-        setIsSavingPackage,
-        setAiRules,
         setReportData,
         setReportPeriod,
         setLoadingReport,
@@ -1566,17 +1244,10 @@ const generateBoardKey = () => {
         setInvoices,
         setContactsBalance,
         setSalesSubTab,
-        setAutomationRules,
-        setShowAutomationModal,
-        setEditingRule,
-        setLoadingRules,
         setShowPurchaseModal,
         setShowCashModal,
         setVknCheckResult,
-        setLastAIResult,
-        setShowAIResultModal,
         setExpandedMenus,
-        setInventoryProducts,
         setPurchaseSearch,
         setCheckingVkn,
         setPurchaseForm,
@@ -1592,7 +1263,6 @@ const generateBoardKey = () => {
         setGeoNeighborhoods,
         setLoadingGeo,
         setIsLicenseExpired,
-        setRenewingLicense,
     };
     void Object.keys(ctx).length;
 
@@ -1658,22 +1328,6 @@ const generateBoardKey = () => {
                         </div>
                     </div>
                 </div>
-
-                {/* AI Status Indicator */}
-                {company.ai_enabled !== false && (
-                    <div className="mx-4 mt-6 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl animate-in fade-in slide-in-from-left duration-500">
-                        <div className="flex items-center gap-3">
-                            <div className="relative flex-shrink-0">
-                                <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-ping absolute inset-0" />
-                                <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full relative" />
-                            </div>
-                            <div className="min-w-0">
-                                <p className="text-[9px] font-black text-indigo-300 uppercase tracking-[0.2em] leading-none">Smart Assist</p>
-                                <p className="text-[13px] font-bold text-white mt-1 truncate">Aktif & Dinlemede...</p>
-                            </div>
-                        </div>
-                    </div>
-                )}
 
                 {/* Menu Items */}
                 <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
@@ -1802,9 +1456,8 @@ const generateBoardKey = () => {
                                 case 'staff': return <StaffTab ctx={ctx} />;
                                 case 'services': return <ServicesTab ctx={ctx} />;
                                 case 'reports': return <ReportsTab ctx={ctx} />;
-                                case 'inventory': return <InventoryTab companyId={Number(company.id)} />;
                                 default:
-                                    if (activeTab === 'crm' || activeTab.startsWith('customers-')) {
+                                    if (activeTab.startsWith('customers-')) {
                                         return <CRMTab ctx={ctx} />;
                                     }
                                     return <FinanceTab ctx={ctx} />;
@@ -1816,19 +1469,16 @@ const generateBoardKey = () => {
 
                 {/* ===== MODALS ===== */}
                 <Suspense fallback={null}>
-                    <DeptModal ctx={ctx} />
-                    <StaffModal ctx={ctx} />
-                    <ServiceModal ctx={ctx} />
-                    <TemplatesModal ctx={ctx} />
-                    <PackageModal ctx={ctx} />
-                    <InvoiceModal ctx={ctx} />
-                    <PurchaseModal ctx={ctx} />
-                    <CurrentAccountModal ctx={ctx} />
-                    <PurchaseDetailModal ctx={ctx} />
-                    <CashModal ctx={ctx} />
-                    <CustomerDetailModal ctx={ctx} />
-                    <AutomationModal ctx={ctx} />
-                    <AIResultModal ctx={ctx} />
+                    {showDeptModal && <DeptModal ctx={ctx} />}
+                    {showStaffModal && <StaffModal ctx={ctx} />}
+                    {showServiceModal && <ServiceModal ctx={ctx} />}
+                    {showTemplatesModal && <TemplatesModal ctx={ctx} />}
+                    {showInvoiceModal && selectedAppointment && <InvoiceModal ctx={ctx} />}
+                    {showPurchaseModal && <PurchaseModal ctx={ctx} />}
+                    {showCurrentAccountModal && <CurrentAccountModal ctx={ctx} />}
+                    {showPurchaseDetailModal && selectedPurchaseInvoice && <PurchaseDetailModal ctx={ctx} />}
+                    {showCashModal && <CashModal ctx={ctx} />}
+                    {selectedCustomer && <CustomerDetailModal ctx={ctx} />}
                 </Suspense>
 
                 <style>{`

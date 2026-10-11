@@ -41,9 +41,6 @@ const serverSchema = z.object({
     FIREBASE_SERVICE_ACCOUNT_PATH: z.string().optional(),
     FIREBASE_SERVICE_ACCOUNT_JSON: z.string().optional(),
 
-    // === OpenAI ===
-    OPENAI_API_KEY: z.string().optional(),
-
     // === SMTP ===
     SMTP_HOST: z.string().default('smtp.gmail.com'),
     SMTP_PORT: z.coerce.number().int().default(587),
@@ -53,9 +50,6 @@ const serverSchema = z.object({
 
     // === Sentry (opsiyonel) ===
     SENTRY_DSN: z.string().url().optional(),
-
-    // === Base URL (iyzico callback'leri için) ===
-    BASE_URL: z.string().url().default('http://localhost:3000'),
 
     // === Redis (opsiyonel) ===
     REDIS_URL: z.string().url().optional(),

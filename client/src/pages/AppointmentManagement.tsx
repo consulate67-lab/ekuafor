@@ -1,9 +1,7 @@
-import { useState, useEffect, useRef, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import { Appointment, Service, Company } from '../types';
-import { parseVoiceCommand } from '../lib/aiParser';
-import { Device } from '@capacitor/device';
 
 export default function AppointmentManagement() {
     const getLocalDateString = () => {
@@ -25,8 +23,6 @@ export default function AppointmentManagement() {
 
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [services, setServices] = useState<Service[]>([]);
-    const [packages, setPackages] = useState<any[]>([]);
-    const [staff, setStaff] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [formError, setFormError] = useState('');
@@ -40,25 +36,19 @@ export default function AppointmentManagement() {
         end_time: '10:00',
         customer_name: '',
         customer_phone: '',
-        package_id: 0,
         notes: '',
         price: 0,
         serviceStaffOverrides: {} as Record<number, number>,
         servicePriceOverrides: {} as Record<number, number>,
-        serviceDurationOverrides: {} as Record<number, number>,
-        activeTab: 'services' as 'services' | 'packages'
+        serviceDurationOverrides: {} as Record<number, number>
     });
 
     const [company, setCompany] = useState<Company | null>(null);
-    const [voiceStep, setVoiceStep] = useState<'IDLE' | 'NAME' | 'DATE' | 'TIME' | 'SERVICE' | 'CONFIRM'>('IDLE');
-    const [isListening, setIsListening] = useState(false);
     const [userInfo, setUserInfo] = useState<any>(null);
     const [staffMode, setStaffMode] = useState(false);
     const showAllStaff = true;
     const [selectedDate, setSelectedDate] = useState(getLocalDateString());
     const [showTimePicker, setShowTimePicker] = useState(false);
-    const [voiceTranscript, setVoiceTranscript] = useState('');
-    const [guidedData, setGuidedData] = useState<any>({});
     const [completionModal, setCompletionModal] = useState<{
         open: boolean;
         app: Appointment | null;
@@ -74,185 +64,6 @@ export default function AppointmentManagement() {
     });
     const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
 
-    // ─── AI Ses Kaydı Sistemi ────────────────────────────────────────
-    const [aiMode, setAiMode] = useState<'IDLE' | 'RECORDING' | 'PROCESSING' | 'REVIEW' | 'CREATING' | 'SUCCESS' | 'ERROR'>('IDLE');
-    const [aiRecordingTime, setAiRecordingTime] = useState(0);
-    const [aiTranscription, setAiTranscription] = useState('');
-    const [aiExtracted, setAiExtracted] = useState<any>(null);
-    const [aiError, setAiError] = useState('');
-    const [aiCreatedId, setAiCreatedId] = useState<number | null>(null);
-    const [aiEditData, setAiEditData] = useState<any>(null);
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const audioChunksRef = useRef<Blob[]>([]);
-    const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-    const speak = (text: string) => {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'tr-TR';
-        window.speechSynthesis.speak(utterance);
-    };
-
-    // ─── AI SES KAYIT FONKSİYONLARI ───────────────────────────────────
-
-    const resetAiState = () => {
-        setAiMode('IDLE');
-        setAiRecordingTime(0);
-        setAiTranscription('');
-        setAiExtracted(null);
-        setAiError('');
-        setAiCreatedId(null);
-        setAiEditData(null);
-        if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-            try { mediaRecorderRef.current.stop(); } catch (_) {}
-        }
-        audioChunksRef.current = [];
-    };
-
-    const startAiRecording = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-                ? 'audio/webm;codecs=opus'
-                : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' 
-                : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
-                : '';
-
-            const mr = new MediaRecorder(stream, mimeType ? { mimeType } : {});
-            mediaRecorderRef.current = mr;
-            audioChunksRef.current = [];
-
-            mr.ondataavailable = (e) => {
-                if (e.data.size > 0) audioChunksRef.current.push(e.data);
-            };
-
-            mr.onstop = async () => {
-                stream.getTracks().forEach(t => t.stop());
-                const blob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
-                if (blob.size < 1000) {
-                    setAiError('Kayıt çok kısa. Lütfen tekrar deneyin.');
-                    setAiMode('ERROR');
-                    return;
-                }
-                await processAudioWithAI(blob, mimeType || 'audio/webm');
-            };
-
-            mr.start(1000); // collect chunks every 1s
-            setAiMode('RECORDING');
-            setAiRecordingTime(0);
-
-            recordingTimerRef.current = setInterval(() => {
-                setAiRecordingTime(prev => {
-                    if (prev >= 120) { // max 2 min
-                        stopAiRecording();
-                        return prev;
-                    }
-                    return prev + 1;
-                });
-            }, 1000);
-        } catch (err: any) {
-            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                setAiError('Mikrofon izni reddedildi. Lütfen tarayıcı/uygulama ayarlarından mikrofon iznini etkinleştirin.');
-            } else {
-                setAiError('Mikrofon başlatılamadı: ' + err.message);
-            }
-            setAiMode('ERROR');
-        }
-    };
-
-    const stopAiRecording = () => {
-        if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); }
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-            setAiMode('PROCESSING');
-            mediaRecorderRef.current.stop();
-        }
-    };
-
-    const processAudioWithAI = async (audioBlob: Blob, mimeType: string) => {
-        setAiMode('PROCESSING');
-        try {
-            const ext = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : 'webm';
-            const formData = new FormData();
-            formData.append('audio', audioBlob, `call_recording.${ext}`);
-
-            const res = await api.post('/ai/process-call-audio', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-                timeout: 60000
-            });
-
-            const d = res.data.data;
-            setAiTranscription(d.transcription || '');
-            setAiExtracted(d.extractedInfo);
-
-            if (d.autoCreated && d.appointmentId) {
-                setAiCreatedId(d.appointmentId);
-                setAiMode('SUCCESS');
-                await fetchData();
-            } else {
-                // Show review screen for manual confirmation / edit
-                setAiEditData({
-                    customerName: d.extractedInfo?.customerName || '',
-                    serviceName: d.extractedInfo?.serviceName || '',
-                    date: d.extractedInfo?.date || getLocalDateString(),
-                    time: d.extractedInfo?.time || '10:00',
-                    note: d.extractedInfo?.note || '',
-                });
-                setAiMode('REVIEW');
-            }
-        } catch (err: any) {
-            const msg = err.response?.data?.error || err.message || 'Ses işlenemedi.';
-            setAiError(msg);
-            setAiMode('ERROR');
-        }
-    };
-
-    const confirmAiAppointment = async () => {
-        if (!aiEditData || !company) return;
-        setAiMode('CREATING');
-        try {
-            // Match service from loaded services list
-            const sName = (aiEditData.serviceName || '').toLowerCase().trim();
-            const matchedService = services.find(s =>
-                s.name.toLowerCase().includes(sName) || sName.includes(s.name.toLowerCase())
-            ) || services[0];
-
-            if (!matchedService) {
-                setAiError('Hizmet bulunamadı. Lütfen manuel randevu oluşturun.');
-                setAiMode('ERROR');
-                return;
-            }
-
-            const duration = matchedService.duration_minutes || 30;
-            const startTime = aiEditData.time || '10:00';
-            const [h, m] = startTime.split(':').map(Number);
-            const totalMin = h * 60 + m + duration;
-            const endTime = `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
-
-            const staffId = staff[0]?.id || staff[0]?.user_id || undefined;
-
-            await api.post('/appointments', {
-                company_id: company.id,
-                service_id: matchedService.id,
-                service_ids: [matchedService.id],
-                services: [{ id: matchedService.id, price: matchedService.price, duration_minutes: duration, staff_id: staffId }],
-                staff_id: staffId,
-                customer_name: aiEditData.customerName || 'Sesli Asistan Müşterisi',
-                appointment_date: aiEditData.date,
-                start_time: startTime,
-                end_time: endTime,
-                price: matchedService.price,
-                notes: `Müşteri: ${aiEditData.customerName || '-'} | 🤖 AI Sesli Arama | Not: ${aiEditData.note || '-'} | Transkript: ${aiTranscription.substring(0, 150)}`,
-                status: 'approved'
-            });
-
-            setAiMode('SUCCESS');
-            await fetchData();
-        } catch (err: any) {
-            setAiError(err.response?.data?.error || err.message || 'Randevu oluşturulamadı.');
-            setAiMode('ERROR');
-        }
-    };
-
     const fetchData = async () => {
         setLoading(true);
         setError('');
@@ -267,19 +78,15 @@ export default function AppointmentManagement() {
             const compId = user.company_id;
             if (!compId) throw new Error('Firma bilgisi bulunamadı');
 
-            const [compRes, appRes, servRes, packRes, staffRes] = await Promise.all([
+            const [compRes, appRes, servRes] = await Promise.all([
                 api.get(`/companies/${compId}`),
                 api.get('/appointments'), // This uses companyId from token in backend
-                api.get('/services', { params: { company_id: compId } }),
-                api.get('/packages', { params: { company_id: compId } }),
-                api.get(`/companies/${compId}/staff-boards`)
+                api.get('/services', { params: { company_id: compId } })
             ]);
 
             setCompany(compRes.data.data);
             setAppointments(appRes.data.data || []);
             setServices(servRes.data.data || []);
-            setPackages(packRes.data.data || []);
-            setStaff(staffRes.data.data || []);
         } catch (err: any) {
             const msg = err.response?.data?.error || err.response?.data?.message || err.message;
             setError('Veriler yüklenirken hata oluştu: ' + msg);
@@ -296,165 +103,6 @@ export default function AppointmentManagement() {
     useEffect(() => {
         fetchData();
     }, []);
-
-    const startVoiceCommand = () => {
-        setVoiceStep('NAME');
-        setGuidedData({});
-        speak('Randevu almak istediğiniz kişinin adı nedir?');
-        listenNextStep('NAME');
-    };
-
-    const listenNextStep = async (step: typeof voiceStep) => {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            alert('Tarayıcınız sesli komut özelliğini desteklemiyor.');
-            setVoiceStep('IDLE');
-            return;
-        }
-
-        // Force permission check via getUserMedia - check if mediaDevices exists
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                stream.getTracks().forEach(track => track.stop());
-            } catch (err) {
-                console.error('Mic permission denied', err);
-                alert('Mikrofon izni verilmedi. Lütfen uygulama ayarlarından mikrofon iznini etkinleştirin.');
-                setVoiceStep('IDLE');
-                return;
-            }
-        } else {
-            console.warn('mediaDevices not supported, proceeding with SpeechRecognition directly');
-        }
-
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'tr-TR';
-        recognition.interimResults = true;
-        recognition.maxAlternatives = 1;
-        recognition.continuous = false;
-
-        recognition.onstart = () => setIsListening(true);
-        recognition.onend = () => setIsListening(false);
-
-        recognition.onresult = (event: any) => {
-            const result = event.results[event.results.length - 1];
-            const transcript = result[0].transcript.toLowerCase();
-            setVoiceTranscript(transcript);
-
-            if (result.isFinal) {
-                setTimeout(() => handleGuidedStep(step, transcript), 300);
-            }
-        };
-
-        recognition.onerror = (event: any) => {
-            console.error('Recognition error', event.error);
-            if (event.error === 'not-allowed') {
-                alert('Mikrofon izni kapalı.');
-            }
-            setVoiceStep('IDLE');
-        };
-
-        recognition.start();
-    };
-
-    const handleGuidedStep = async (step: typeof voiceStep, transcript: string) => {
-        const rules = localStorage.getItem(`ai_rules_${company?.id}`) || '';
-
-        if (step === 'NAME') {
-            const cleanName = transcript.replace(/(ismini|adi|olan|musteri|isim)/gi, '').trim();
-            const name = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
-            setGuidedData((prev: any) => ({ ...prev, customerName: name }));
-            setVoiceStep('DATE');
-            setTimeout(() => {
-                speak('Randevu tarihi nedir?');
-                listenNextStep('DATE');
-            }, 600);
-        }
-        else if (step === 'DATE') {
-            const parsed = parseVoiceCommand(transcript, [], rules);
-            setGuidedData((prev: any) => ({ ...prev, date: parsed.date }));
-            setVoiceStep('TIME');
-            setTimeout(() => {
-                speak('Randevu saati kaçta olsun?');
-                listenNextStep('TIME');
-            }, 600);
-        }
-        else if (step === 'TIME') {
-            const parsed = parseVoiceCommand(transcript, [], rules);
-            setGuidedData((prev: any) => ({ ...prev, startTime: parsed.startTime }));
-            setVoiceStep('SERVICE');
-            setTimeout(() => {
-                speak('Yapılacak işlem nedir?');
-                listenNextStep('SERVICE');
-            }, 600);
-        }
-        else if (step === 'SERVICE') {
-            const parsed = parseVoiceCommand(transcript, services, rules);
-            const service = services.find(s => s.id === parsed.serviceId);
-
-            // Calculate end time based on previously captured startTime and service duration
-            let finalEndTime = parsed.endTime;
-            if (service && guidedData.startTime) {
-                const [h, m] = guidedData.startTime.split(':').map(Number);
-                const duration = service.duration_minutes || 30;
-                const totalMin = h * 60 + m + duration;
-                const endH = Math.floor(totalMin / 60) % 24;
-                const endM = totalMin % 60;
-                finalEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-            }
-
-            setGuidedData((prev: any) => ({
-                ...prev,
-                serviceId: parsed.serviceId,
-                endTime: finalEndTime,
-                price: parsed.price
-            }));
-            setVoiceStep('CONFIRM');
-            speak('Randevuyu onaylıyor musunuz?');
-        }
-    };
-
-    const confirmGuidedAppointment = async () => {
-        try {
-            if (!company) return;
-
-            let staffId = undefined;
-            const empRes = await api.get(`/companies/${company.id}/employees`);
-            const employees = empRes.data?.data || [];
-            if (employees.length > 0) {
-                const firstEmp = employees[0];
-                staffId = firstEmp.user_id || firstEmp.id;
-            }
-
-            // Get Device ID
-            let deviceId = undefined;
-            try {
-                const info = await Device.getId();
-                deviceId = info.identifier;
-            } catch (e) { }
-
-            await api.post('/appointments', {
-                company_id: company.id,
-                service_id: guidedData.serviceId,
-                staff_id: staffId,
-                appointment_date: guidedData.date,
-                start_time: guidedData.startTime,
-                end_time: guidedData.endTime,
-                customer_name: guidedData.customerName,
-                notes: `Müşteri: ${guidedData.customerName} | Sesli Komut`,
-                price: guidedData.price,
-                device_id: deviceId,
-                status: 'approved'
-            });
-
-            alert('Randevu başarıyla eklendi.');
-            window.location.reload();
-        } catch (err: any) {
-            console.error('Guided booking error', err);
-            alert('Randevu oluşturulurken hata oluştu.');
-            setVoiceStep('IDLE');
-        }
-    };
 
     const handleWhatsAppNotify = (app: Appointment) => {
         const notes = app.notes || '';
@@ -535,13 +183,7 @@ export default function AppointmentManagement() {
 
     const updateNewAppointmentTime = (startTime: string) => {
         let duration = 30;
-        if (newAppointment.package_id) {
-            const pkg = packages.find(p => p.id === newAppointment.package_id);
-            if (pkg) {
-                duration = pkg.services?.reduce((sum: number, ps: any) =>
-                    sum + (newAppointment.serviceDurationOverrides[ps.id] || ps.duration_minutes || 0), 0) || pkg.duration_minutes;
-            }
-        } else if (newAppointment.service_ids.length > 0) {
+        if (newAppointment.service_ids.length > 0) {
             const selectedServices = services.filter(sv => newAppointment.service_ids.includes(sv.id!));
             duration = selectedServices.reduce((sum, sv) => sum + (sv.duration_minutes || 0), 0);
         }
@@ -566,26 +208,17 @@ export default function AppointmentManagement() {
             if (customerPhone) finalNotes += `| Tel: ${customerPhone} `;
             if (newAppointment.notes) finalNotes += `| ${newAppointment.notes}`;
 
-            const selectedPackage = newAppointment.package_id ? packages.find(p => p.id === newAppointment.package_id) : null;
             const selectedServices = services.filter(s => newAppointment.service_ids.includes(s.id!));
 
-            const sSelections = selectedPackage
-                ? selectedPackage.services.map((s: any) => ({
-                    id: s.id,
-                    price: (newAppointment.servicePriceOverrides[s.id] !== undefined) ? newAppointment.servicePriceOverrides[s.id] : s.price,
-                    duration_minutes: (newAppointment.serviceDurationOverrides[s.id] !== undefined) ? newAppointment.serviceDurationOverrides[s.id] : s.duration_minutes,
-                    staff_id: newAppointment.serviceStaffOverrides[s.id] || newAppointment.staff_id || undefined
-                }))
-                : selectedServices.map(s => ({
-                    id: s.id,
-                    price: s.price,
-                    duration_minutes: s.duration_minutes,
-                    staff_id: newAppointment.staff_id || undefined
-                }));
+            const sSelections = selectedServices.map(s => ({
+                id: s.id,
+                price: s.price,
+                duration_minutes: s.duration_minutes,
+                staff_id: newAppointment.staff_id || undefined
+            }));
 
-            const hasOverrides = Object.keys(newAppointment.servicePriceOverrides).length > 0 || Object.keys(newAppointment.serviceDurationOverrides).length > 0;
-            const totalPr = (selectedPackage && !hasOverrides) ? Number(selectedPackage.price) : sSelections.reduce((sum: number, s: any) => sum + Number(s.price), 0);
-            const totalDur = (selectedPackage && !hasOverrides) ? Number(selectedPackage.duration_minutes) : sSelections.reduce((sum: number, s: any) => sum + Number(s.duration_minutes), 0);
+            const totalPr = sSelections.reduce((sum: number, s: any) => sum + Number(s.price), 0);
+            const totalDur = sSelections.reduce((sum: number, s: any) => sum + Number(s.duration_minutes), 0);
 
             // Geçmiş zaman kontrolü
             const todayStr = new Date().toISOString().split('T')[0];
@@ -643,7 +276,6 @@ export default function AppointmentManagement() {
                 services: sSelections,
                 price: totalPr,
                 end_time: finalEndTime,
-                package_id: newAppointment.package_id === 0 ? undefined : newAppointment.package_id,
                 staff_id: newAppointment.staff_id === 0 ? undefined : newAppointment.staff_id,
                 company_id: company?.id,
                 notes: finalNotes.trim(),
@@ -659,13 +291,11 @@ export default function AppointmentManagement() {
                 end_time: '10:00',
                 customer_name: '',
                 customer_phone: '',
-                package_id: 0,
                 notes: '',
                 price: 0,
                 serviceStaffOverrides: {},
                 servicePriceOverrides: {},
-                serviceDurationOverrides: {},
-                activeTab: 'services'
+                serviceDurationOverrides: {}
             });
             setShowAddForm(false);
             alert('Randevu başarıyla ONAYLI olarak oluşturuldu.');
@@ -712,14 +342,6 @@ export default function AppointmentManagement() {
                         Panel
                     </Link>
                     <div className="flex gap-2">
-                        {/* Guided Voice Step Butonu */}
-                        <button
-                            onClick={startVoiceCommand}
-                            className={`p-2.5 rounded-xl transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-50 text-slate-400 hover:text-purple-600 hover:bg-purple-50'}`}
-                            title="Adım Adım Sesli Komut"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m8 0h-8m4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
-                        </button>
                         <button
                             onClick={() => { setShowAddForm(true); setFormError(''); setError(''); }}
                             className="bg-slate-900 text-white p-2.5 rounded-xl shadow-lg hover:bg-slate-800 transition-all"
@@ -729,11 +351,6 @@ export default function AppointmentManagement() {
                     </div>
                 </div>
                 <h2 className="text-xl font-black text-slate-900 tracking-tight">Randevu Yönetimi</h2>
-                {voiceTranscript && (
-                    <div className="mt-2 bg-pink-50 text-pink-600 px-3 py-1.5 rounded-xl text-[10px] font-bold animate-pulse border border-pink-100 italic">
-                        "{voiceTranscript}"
-                    </div>
-                )}
             </div>
 
 
@@ -896,9 +513,6 @@ export default function AppointmentManagement() {
                                                 )}
                                             </div>
                                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">
-                                                {item.package_name && !item.is_subservice && (
-                                                    <span className="text-amber-600">[{item.package_name}] </span>
-                                                )}
                                                 <span className={item.is_subservice ? 'text-emerald-600 font-black' : ''}>
                                                     {item.is_subservice ? `✂️ ${item.display_service_name}` : (item.service_name || 'Hizmet Bilgisi Yok')}
                                                 </span>
@@ -921,17 +535,6 @@ export default function AppointmentManagement() {
                 </div>
 
                 <div className="mt-16 pt-8 border-t border-gray-100 flex flex-col items-center gap-4 pb-8">
-                    <button
-                        onClick={() => {
-                            if (window.confirm('Sistem verileri sıfırlanacak. Çıkış yapılacak. Devam edilsin mi?')) {
-                                localStorage.clear();
-                                window.location.href = '/';
-                            }
-                        }}
-                        className="text-[10px] font-bold text-gray-300 uppercase tracking-widest hover:text-pink-500 transition-colors"
-                    >
-                        Sistemi Sıfırla
-                    </button>
                     <div className="flex items-center gap-2 grayscale opacity-30">
                         <span className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase whitespace-nowrap">Appointments Edition v1.84.0</span>
                     </div>
@@ -956,25 +559,6 @@ export default function AppointmentManagement() {
                         )}
 
                         <form onSubmit={handleAddAppointment} className="space-y-6">
-                            <div className="flex gap-4 mb-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setNewAppointment({ ...newAppointment, activeTab: 'services', package_id: 0 })}
-                                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${newAppointment.activeTab === 'services' ? 'bg-pink-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400'}`}
-                                >
-                                    Hizmetler
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setNewAppointment({ ...newAppointment, activeTab: 'packages', service_ids: [], package_id: newAppointment.package_id || (packages[0]?.id || 0) })}
-                                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${newAppointment.activeTab === 'packages' ? 'bg-pink-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400'}`}
-                                >
-                                    Paketler
-                                </button>
-                            </div>
-
-                            {newAppointment.activeTab === 'services' ? (
-                                <>
                                     <label className="block text-xs font-bold text-slate-700 mb-2 uppercase ml-1 tracking-wider">Hizmet Seçimi</label>
                                     <div className="space-y-2 max-h-48 overflow-y-auto bg-slate-50 p-4 rounded-2xl">
                                         {services.map(s => {
@@ -1021,100 +605,6 @@ export default function AppointmentManagement() {
                                             );
                                         })}
                                     </div>
-                                </>
-                            ) : (
-                                <>
-                                    <div className="space-y-3 max-h-64 overflow-y-auto bg-slate-50 p-4 rounded-2xl">
-                                        {packages.length === 0 ? (
-                                            <div className="text-center py-6">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Henüz paket tanımlanmamış</p>
-                                            </div>
-                                        ) : (
-                                            packages.map(p => {
-                                                const isSelected = newAppointment.package_id === p.id;
-                                                return (
-                                                    <div key={p.id} className="space-y-4">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setNewAppointment({ ...newAppointment, package_id: p.id, service_ids: [], serviceStaffOverrides: {} })}
-                                                            className={`w-full p-4 rounded-2xl border-2 transition-all flex flex-col gap-1 text-left ${isSelected ? 'bg-pink-50 border-pink-500 shadow-sm' : 'bg-white border-transparent text-slate-600'}`}
-                                                        >
-                                                            <p className={`text-xs font-black uppercase leading-tight ${isSelected ? 'text-pink-600' : 'text-slate-900'}`}>{p.name}</p>
-                                                            <p className="text-[10px] font-bold text-slate-400">₺{p.price} | {p.duration_minutes} dk</p>
-                                                        </button>
-
-                                                        {isSelected && (
-                                                            <div className="pl-6 space-y-4 animate-in slide-in-from-left duration-300 border-l-4 border-pink-200 ml-2">
-                                                                <p className="text-[10px] font-black text-pink-600 uppercase tracking-widest pl-2">🛠️ İşlem Dağılımı</p>
-                                                                <div className="space-y-2">
-                                                                    {p.services?.map((ps: any) => (
-                                                                        <div key={ps.id} className="flex items-center justify-between gap-4 bg-white p-3 rounded-2xl border-2 border-slate-100 shadow-sm transition-all hover:border-pink-300">
-                                                                            <div className="flex flex-col flex-1 min-w-0">
-                                                                                <span className="text-[10px] font-black text-slate-900 uppercase truncate">{ps.name}</span>
-                                                                                <div className="flex gap-2 mt-1">
-                                                                                    <div className="flex-1">
-                                                                                        <label className="block text-[7px] font-bold text-slate-400 uppercase mb-0.5 ml-1">Süre (Dk)</label>
-                                                                                        <div className="w-full px-2 py-1.5 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-400">
-                                                                                            {ps.duration_minutes}
-                                                                                        </div>
-                                                                                    </div>
-                                                                                    <div className="flex-1">
-                                                                                        <label className="block text-[7px] font-bold text-slate-400 uppercase mb-0.5 ml-1">Fiyat (₺)</label>
-                                                                                        <div className="w-full px-2 py-1.5 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-400">
-                                                                                            {ps.price}
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                            <div className="flex flex-col items-end gap-1 px-1">
-                                                                                <span className="text-[8px] font-black text-slate-400 uppercase">{company?.staff_label || 'Uzman'}</span>
-                                                                                <select
-                                                                                    value={newAppointment.serviceStaffOverrides[ps.id] || newAppointment.staff_id || (staff[0]?.user_id || staff[0]?.id)}
-                                                                                    onChange={(e) => {
-                                                                                        setNewAppointment(prev => ({
-                                                                                            ...prev,
-                                                                                            serviceStaffOverrides: {
-                                                                                                ...prev.serviceStaffOverrides,
-                                                                                                [ps.id]: Number(e.target.value)
-                                                                                            }
-                                                                                        }));
-                                                                                    }}
-                                                                                    className="text-[10px] font-bold bg-pink-50 text-pink-900 border-none rounded-xl p-2 outline-none focus:ring-2 focus:ring-pink-500 cursor-pointer"
-                                                                                >
-                                                                                    {staff.map(s => (
-                                                                                        <option key={s.user_id || s.id} value={s.user_id || s.id}>
-                                                                                            {s.first_name}
-                                                                                        </option>
-                                                                                    ))}
-                                                                                </select>
-                                                                            </div>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                                <div className="flex justify-between items-center bg-pink-50/50 p-4 rounded-2xl border-2 border-pink-100 shadow-inner mt-2">
-                                                                    <div className="flex flex-col">
-                                                                        <span className="text-[8px] font-black text-pink-600 uppercase tracking-widest">TOPLAM SÜRE</span>
-                                                                        <span className="text-sm font-black text-pink-900">
-                                                                            {p.duration_minutes || 0} DK
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="flex flex-col items-end">
-                                                                        <span className="text-[8px] font-black text-pink-600 uppercase tracking-widest">TOPLAM FİYAT</span>
-                                                                        <span className="text-lg font-black text-pink-900">
-                                                                            ₺{p.price || 0}
-                                                                        </span>
-                                                                    </div>
-                                                                </div>
-                                                                <p className="text-[8px] font-bold text-slate-400 italic pl-2">* Hizmetler yukarıdan aşağıya sırayla atanacaktır.</p>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })
-                                        )}
-                                    </div>
-                                </>
-                            )}
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -1245,7 +735,7 @@ export default function AppointmentManagement() {
                                             })
                                         ) : (
                                             <div className="flex justify-between items-center">
-                                                <span className="font-black text-slate-900">{selectedAppointment.package_name || selectedAppointment.service_name || 'Hizmet Bilgisi Yok'}</span>
+                                                <span className="font-black text-slate-900">{selectedAppointment.service_name || 'Hizmet Bilgisi Yok'}</span>
                                                 <span className="font-black text-pink-600">₺{selectedAppointment.price || 0}</span>
                                             </div>
                                         )}
@@ -1332,92 +822,6 @@ export default function AppointmentManagement() {
                                     </div>
                                 )}
                             </div>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Ses Dinleme Overlay (Yönlendirmeli) */}
-            {
-                voiceStep !== 'IDLE' && (
-                    <div className="fixed inset-0 z-[100] bg-indigo-950/95 backdrop-blur-2xl flex flex-col items-center justify-center animate-fade-in p-6">
-                        <button
-                            onClick={() => setVoiceStep('IDLE')}
-                            className="absolute top-10 right-10 text-white/40 hover:text-white"
-                        >
-                            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-
-                        <div className="relative mb-12">
-                            {isListening && (
-                                <>
-                                    <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-20 scale-150"></div>
-                                    <div className="absolute inset-0 bg-indigo-400 rounded-full animate-pulse opacity-40 scale-125"></div>
-                                </>
-                            )}
-                            <div className={`relative w-24 h-24 rounded-full flex items-center justify-center shadow-2xl transition-all ${isListening ? 'bg-indigo-600' : 'bg-slate-800'}`}>
-                                <svg className={`w-12 h-12 text-white ${isListening ? 'animate-bounce' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m8 0h-8m4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                                </svg>
-                            </div>
-                        </div>
-
-                        <div className="text-center max-w-lg w-full">
-                            <h2 className="text-4xl font-black text-white tracking-tighter mb-4">
-                                {voiceStep === 'NAME' && '1. Müşteri İsmi?'}
-                                {voiceStep === 'DATE' && '2. Randevu Tarihi?'}
-                                {voiceStep === 'TIME' && '3. Randevu Saati?'}
-                                {voiceStep === 'SERVICE' && '4. Yapılacak İşlem?'}
-                                {voiceStep === 'CONFIRM' && 'Son Kontrol'}
-                            </h2>
-
-                            <p className="text-indigo-300 font-bold uppercase tracking-[0.2em] text-[11px] mb-12">
-                                {voiceStep === 'NAME' && 'Müşterinin adını söyleyin'}
-                                {voiceStep === 'DATE' && 'Bugün, Yarın veya bir gün söyleyin'}
-                                {voiceStep === 'TIME' && 'Saat bilgisini söyleyin (örn: 14:30)'}
-                                {voiceStep === 'SERVICE' && 'Hangi hizmet yapılacak?'}
-                                {voiceStep === 'CONFIRM' && 'Randevu detayları aşağıdadır'}
-                            </p>
-
-                            <div className="space-y-4 bg-white/5 p-8 rounded-[2.5rem] border border-white/10 text-left">
-                                <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                                    <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Müşteri</span>
-                                    <span className="text-white font-black text-lg">{guidedData.customerName || '...'}</span>
-                                </div>
-                                <div className="flex justify-between items-center border-b border-white/5 py-4">
-                                    <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Tarih / Saat</span>
-                                    <span className="text-white font-black text-lg">{guidedData.date ? new Date(guidedData.date).toLocaleDateString('tr-TR') : '...'} - {guidedData.startTime}</span>
-                                </div>
-                                <div className="flex justify-between items-center py-4">
-                                    <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Hizmet</span>
-                                    <span className="text-white font-black text-lg">
-                                        {services.find(s => s.id === guidedData.serviceId)?.name || (voiceStep === 'CONFIRM' ? 'Belirlenemedi' : '...')}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {voiceStep === 'CONFIRM' && (
-                                <div className="mt-12 flex gap-4 w-full">
-                                    <button
-                                        onClick={() => setVoiceStep('IDLE')}
-                                        className="flex-1 py-6 bg-white/10 text-white rounded-3xl font-black uppercase tracking-widest hover:bg-white/20 transition-all"
-                                    >
-                                        İptal
-                                    </button>
-                                    <button
-                                        onClick={confirmGuidedAppointment}
-                                        className="flex-1 py-6 bg-indigo-600 text-white rounded-3xl font-black uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:scale-105 transition-all"
-                                    >
-                                        Onayla
-                                    </button>
-                                </div>
-                            )}
-
-                            {voiceStep !== 'CONFIRM' && isListening && voiceTranscript && (
-                                <div className="mt-8 text-white/60 italic font-medium">
-                                    "{voiceTranscript}..."
-                                </div>
-                            )}
                         </div>
                     </div>
                 )
@@ -1659,259 +1063,6 @@ export default function AppointmentManagement() {
                     </div>
                 )
             }
-
-            {/* ═══════════════════════════════════════════════════════════════
-                AI SES ARAMASI OVERLAY - RECORDING / PROCESSING / REVIEW / SUCCESS / ERROR
-                ═══════════════════════════════════════════════════════════════ */}
-            {aiMode !== 'IDLE' && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/95 backdrop-blur-2xl animate-in fade-in duration-300">
-                    <button
-                        onClick={resetAiState}
-                        className="absolute top-8 right-8 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-all"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-
-                    {/* ── RECORDING State ── */}
-                    {aiMode === 'RECORDING' && (
-                        <div className="flex flex-col items-center gap-8 px-6 w-full max-w-sm">
-                            <div className="relative">
-                                <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-20 scale-[1.8]"></div>
-                                <div className="absolute inset-0 bg-red-400 rounded-full animate-pulse opacity-30 scale-[1.4]"></div>
-                                <div className="relative w-28 h-28 bg-gradient-to-br from-red-500 to-rose-600 rounded-full flex items-center justify-center shadow-2xl shadow-red-500/40">
-                                    <svg className="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                    </svg>
-                                </div>
-                            </div>
-                            {/* Animated waveform bars */}
-                            <div className="flex items-center gap-1 h-12">
-                                {[...Array(12)].map((_, i) => (
-                                    <div
-                                        key={i}
-                                        className="w-1.5 bg-red-400 rounded-full"
-                                        style={{
-                                            height: `${20 + Math.sin(i * 0.8) * 20}px`,
-                                            animation: `pulse ${0.4 + i * 0.1}s ease-in-out infinite alternate`,
-                                            animationDelay: `${i * 0.07}s`
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                            <div className="text-center">
-                                <h2 className="text-3xl font-black text-white tracking-tighter mb-2">Dinliyorum...</h2>
-                                <p className="text-red-300 text-sm font-bold">
-                                    {Math.floor(aiRecordingTime / 60)}:{String(aiRecordingTime % 60).padStart(2, '0')} / 2:00
-                                </p>
-                                <p className="text-white/40 text-xs font-bold uppercase tracking-widest mt-1">
-                                    Görüşmeyi bitirince kayıt düğmesine basın
-                                </p>
-                            </div>
-                            <button
-                                onClick={stopAiRecording}
-                                className="w-full max-w-xs py-5 bg-white text-slate-900 rounded-3xl font-black text-sm uppercase tracking-widest shadow-2xl hover:scale-105 active:scale-95 transition-all"
-                            >
-                                ⏹ Kaydı Durdur & Analiz Et
-                            </button>
-                        </div>
-                    )}
-
-                    {/* ── PROCESSING State ── */}
-                    {aiMode === 'PROCESSING' && (
-                        <div className="flex flex-col items-center gap-8 px-6 text-center">
-                            <div className="relative w-28 h-28">
-                                <div className="absolute inset-0 rounded-full border-4 border-purple-500/20"></div>
-                                <div className="absolute inset-0 rounded-full border-4 border-t-purple-500 animate-spin"></div>
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <span className="text-4xl">🧠</span>
-                                </div>
-                            </div>
-                            <div>
-                                <h2 className="text-3xl font-black text-white tracking-tighter mb-2">Analiz Ediliyor</h2>
-                                <p className="text-purple-300 text-sm font-bold">Yapay zeka konuşmayı işliyor...</p>
-                            </div>
-                            <div className="space-y-2 w-full max-w-xs">
-                                {['Ses transkiript ediliyor (Whisper)', 'Randevu bilgileri çıkarılıyor (GPT-4o)', 'Hizmet eşleştiriliyor'].map((step, i) => (
-                                    <div key={i} className="flex items-center gap-3 bg-white/5 px-4 py-2.5 rounded-xl">
-                                        <div className="w-4 h-4 rounded-full border-2 border-t-purple-400 animate-spin flex-shrink-0" style={{ animationDelay: `${i * 0.3}s` }}></div>
-                                        <span className="text-white/60 text-xs font-bold">{step}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* ── REVIEW State ── */}
-                    {aiMode === 'REVIEW' && aiEditData && (
-                        <div className="w-full max-w-sm px-4 py-6 overflow-y-auto max-h-screen">
-                            <div className="text-center mb-6">
-                                <div className="w-16 h-16 bg-amber-500/20 rounded-2xl flex items-center justify-center mx-auto mb-3 text-3xl">📋</div>
-                                <h2 className="text-2xl font-black text-white tracking-tighter">Randevu Özeti</h2>
-                                <p className="text-amber-300 text-xs font-bold uppercase tracking-widest mt-1">AI bilgileri buldu — lütfen kontrol edin</p>
-                            </div>
-
-                            {/* Transcript */}
-                            {aiTranscription && (
-                                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-5">
-                                    <p className="text-white/30 text-[9px] font-black uppercase tracking-widest mb-2">Transkript</p>
-                                    <p className="text-white/60 text-xs italic leading-relaxed line-clamp-3">{aiTranscription}</p>
-                                </div>
-                            )}
-
-                            <div className="space-y-3 mb-6">
-                                {/* Müşteri Adı */}
-                                <div className="bg-white/5 rounded-2xl p-3">
-                                    <label className="block text-white/40 text-[9px] font-black uppercase tracking-widest mb-1.5">Müşteri Adı</label>
-                                    <input
-                                        type="text"
-                                        value={aiEditData.customerName || ''}
-                                        onChange={e => setAiEditData((p: any) => ({ ...p, customerName: e.target.value }))}
-                                        placeholder="Müşteri adı..."
-                                        className="w-full bg-transparent text-white font-bold text-sm outline-none placeholder-white/20 border-b border-white/10 pb-1"
-                                    />
-                                </div>
-                                {/* Hizmet */}
-                                <div className="bg-white/5 rounded-2xl p-3">
-                                    <label className="block text-white/40 text-[9px] font-black uppercase tracking-widest mb-1.5">Hizmet</label>
-                                    <select
-                                        value={services.find(s => s.name.toLowerCase().includes((aiEditData.serviceName || '').toLowerCase()))?.id || ''}
-                                        onChange={e => {
-                                            const found = services.find(s => String(s.id) === e.target.value);
-                                            if (found) setAiEditData((p: any) => ({ ...p, serviceName: found.name }));
-                                        }}
-                                        className="w-full bg-transparent text-white font-bold text-sm outline-none border-b border-white/10 pb-1"
-                                    >
-                                        <option value="" className="bg-slate-900">— Hizmet Seçin —</option>
-                                        {services.map(s => (
-                                            <option key={s.id} value={s.id} className="bg-slate-900">{s.name} (₺{s.price})</option>
-                                        ))}
-                                    </select>
-                                    {aiExtracted?.serviceName && (
-                                        <p className="text-white/30 text-[9px] mt-1">AI tespit etti: "{aiExtracted.serviceName}"</p>
-                                    )}
-                                </div>
-                                {/* Tarih */}
-                                <div className="bg-white/5 rounded-2xl p-3">
-                                    <label className="block text-white/40 text-[9px] font-black uppercase tracking-widest mb-1.5">Tarih</label>
-                                    <input
-                                        type="date"
-                                        value={aiEditData.date || ''}
-                                        onChange={e => setAiEditData((p: any) => ({ ...p, date: e.target.value }))}
-                                        className="w-full bg-transparent text-white font-bold text-sm outline-none border-b border-white/10 pb-1"
-                                        style={{ colorScheme: 'dark' }}
-                                    />
-                                </div>
-                                {/* Saat */}
-                                <div className="bg-white/5 rounded-2xl p-3">
-                                    <label className="block text-white/40 text-[9px] font-black uppercase tracking-widest mb-1.5">Saat</label>
-                                    <input
-                                        type="time"
-                                        value={aiEditData.time || ''}
-                                        onChange={e => setAiEditData((p: any) => ({ ...p, time: e.target.value }))}
-                                        className="w-full bg-transparent text-white font-bold text-sm outline-none border-b border-white/10 pb-1"
-                                        style={{ colorScheme: 'dark' }}
-                                    />
-                                </div>
-                                {/* Not */}
-                                <div className="bg-white/5 rounded-2xl p-3">
-                                    <label className="block text-white/40 text-[9px] font-black uppercase tracking-widest mb-1.5">Not</label>
-                                    <input
-                                        type="text"
-                                        value={aiEditData.note || ''}
-                                        onChange={e => setAiEditData((p: any) => ({ ...p, note: e.target.value }))}
-                                        placeholder="Ek not..."
-                                        className="w-full bg-transparent text-white font-bold text-sm outline-none placeholder-white/20 border-b border-white/10 pb-1"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={resetAiState}
-                                    className="flex-1 py-4 bg-white/10 text-white/60 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-white/20 transition-all"
-                                >
-                                    İptal
-                                </button>
-                                <button
-                                    onClick={confirmAiAppointment}
-                                    disabled={!aiEditData.serviceName || !aiEditData.date}
-                                    className="flex-2 px-6 py-4 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-purple-500/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                    ✅ Randevu Oluştur
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* ── CREATING State ── */}
-                    {aiMode === 'CREATING' && (
-                        <div className="flex flex-col items-center gap-6 text-center px-6">
-                            <div className="w-20 h-20 bg-violet-500/20 rounded-2xl flex items-center justify-center">
-                                <svg className="w-10 h-10 text-violet-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                            </div>
-                            <div>
-                                <h2 className="text-2xl font-black text-white tracking-tighter">Kaydediliyor...</h2>
-                                <p className="text-violet-300 text-sm font-bold mt-1">Randevu sisteme ekleniyor</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* ── SUCCESS State ── */}
-                    {aiMode === 'SUCCESS' && (
-                        <div className="flex flex-col items-center gap-8 text-center px-6">
-                            <div className="relative">
-                                <div className="absolute inset-0 bg-emerald-500 rounded-full animate-ping opacity-20 scale-[1.5]"></div>
-                                <div className="w-28 h-28 bg-gradient-to-br from-emerald-400 to-green-600 rounded-full flex items-center justify-center shadow-2xl shadow-emerald-500/40">
-                                    <svg className="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                                </div>
-                            </div>
-                            <div>
-                                <h2 className="text-3xl font-black text-white tracking-tighter mb-2">Randevu Oluşturuldu!</h2>
-                                <p className="text-emerald-300 text-sm font-bold">AI sesli aramadan randevu başarıyla kaydedildi.</p>
-                                {aiCreatedId && <p className="text-white/30 text-xs mt-1">Randevu ID: #{aiCreatedId}</p>}
-                            </div>
-                            <button
-                                onClick={resetAiState}
-                                className="w-full max-w-xs py-5 bg-white text-slate-900 rounded-3xl font-black text-sm uppercase tracking-widest shadow-2xl hover:scale-105 active:scale-95 transition-all"
-                            >
-                                Tamam
-                            </button>
-                        </div>
-                    )}
-
-                    {/* ── ERROR State ── */}
-                    {aiMode === 'ERROR' && (
-                        <div className="flex flex-col items-center gap-6 text-center px-6 max-w-sm">
-                            <div className="w-24 h-24 bg-red-500/20 rounded-2xl flex items-center justify-center text-5xl">⚠️</div>
-                            <div>
-                                <h2 className="text-2xl font-black text-white tracking-tighter mb-2">Hata Oluştu</h2>
-                                <p className="text-red-300 text-sm font-bold leading-relaxed">{aiError}</p>
-                            </div>
-                            <div className="flex gap-3 w-full">
-                                <button
-                                    onClick={resetAiState}
-                                    className="flex-1 py-4 bg-white/10 text-white/60 rounded-2xl font-black text-xs uppercase tracking-widest"
-                                >
-                                    Kapat
-                                </button>
-                                <button
-                                    onClick={() => { setAiMode('IDLE'); setAiError(''); startAiRecording(); }}
-                                    className="flex-1 py-4 bg-red-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest"
-                                >
-                                    Tekrar Dene
-                                </button>
-                            </div>
-                            {/* Fallback: Open manual form */}
-                            <button
-                                onClick={() => { resetAiState(); setShowAddForm(true); }}
-                                className="text-white/30 text-xs font-bold uppercase tracking-widest hover:text-white/60 transition-colors"
-                            >
-                                Manuel Randevu Oluştur
-                            </button>
-                        </div>
-                    )}
-                </div>
-            )}
         </div >
     );
 }

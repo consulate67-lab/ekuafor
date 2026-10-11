@@ -22,7 +22,6 @@ export interface Appointment {
     notes?: string;
     price?: number;
     duration_minutes?: number; // Total duration (can be overridden)
-    package_id?: number | null;
     customer_name?: string;
     customer_phone?: string;
     device_id?: string;
@@ -63,28 +62,6 @@ class AppointmentService {
             appointment.customer_phone = normalizePhone(appointment.customer_phone);
         }
 
-        // Fetch package details if provided to get correct defaults
-        let pkg: any = null;
-        if (appointment.package_id) {
-            const pkgRes = await db.execute(sql`
-                SELECT p.*,
-                       json_agg(json_build_object(
-                           'id', s.id,
-                           'name', s.name,
-                           'duration_minutes', s.duration_minutes,
-                           'price', s.price,
-                           'staff_id', ps.staff_id
-                       ) ORDER BY ps.order_index) as package_services
-                FROM packages p
-                LEFT JOIN package_services ps ON p.id = ps.package_id
-                LEFT JOIN services s ON ps.service_id = s.id
-                WHERE p.id = ${appointment.package_id}
-                GROUP BY p.id
-            `);
-            const pkgRows = (pkgRes as any).rows as any[];
-            pkg = pkgRows[0];
-        }
-
         // 0. Determine service selections with correct ordering and staff mapping
         // NOT 02.09.2026 23:55: Drizzle 0.36 db.execute(sql\`...raw SQL\`) tx context'inde
         // 42601 syntax error at or near ')' veriyor. EN GUvenLi yol: Drizzle'i bypass
@@ -102,23 +79,14 @@ class AppointmentService {
 
             serviceRecords = appointment.services.map((s: any) => {
                 const dbS = dbServices.find(ds => ds.id === s.id);
-                const pkgS = pkg?.package_services?.find((ps: any) => ps.id === s.id);
                 return {
                     id: s.id,
-                    price: (s.price !== undefined && s.price !== null) ? s.price : (pkgS?.price || dbS?.price || 0),
-                    duration_minutes: (s.duration_minutes !== undefined && s.duration_minutes !== null) ? s.duration_minutes : (pkgS?.duration_minutes || dbS?.duration_minutes || 30),
-                    name: dbS?.name || pkgS?.name || 'Hizmet',
-                    staff_id: s.staff_id || appointment.staff_id || pkgS?.staff_id
+                    price: (s.price !== undefined && s.price !== null) ? s.price : (dbS?.price || 0),
+                    duration_minutes: (s.duration_minutes !== undefined && s.duration_minutes !== null) ? s.duration_minutes : (dbS?.duration_minutes || 30),
+                    name: dbS?.name || 'Hizmet',
+                    staff_id: s.staff_id || appointment.staff_id
                 };
             });
-        } else if (pkg) {
-            serviceRecords = (pkg.package_services || []).map((ps: any) => ({
-                id: ps.id,
-                price: ps.price || 0,
-                duration_minutes: ps.duration_minutes || 30,
-                name: ps.name || 'Hizmet',
-                staff_id: appointment.staff_id || ps.staff_id
-            }));
         } else {
             const serviceIds = appointment.service_ids || (appointment.service_id ? [appointment.service_id] : []);
             if (serviceIds.length === 0) throw new Error('En az bir hizmet seÃ§ilmelidir.');
@@ -142,8 +110,8 @@ class AppointmentService {
             }).filter(s => !!s);
         }
 
-        const totalDuration = (appointment.duration_minutes !== undefined && appointment.duration_minutes !== null) ? appointment.duration_minutes : (pkg?.duration_minutes || serviceRecords.reduce((sum, s) => sum + s.duration_minutes, 0));
-        const totalPrice = (appointment.price !== undefined && appointment.price !== null) ? appointment.price : (pkg?.price || serviceRecords.reduce((sum, s) => sum + Number(s.price), 0));
+        const totalDuration = (appointment.duration_minutes !== undefined && appointment.duration_minutes !== null) ? appointment.duration_minutes : (serviceRecords.reduce((sum, s) => sum + s.duration_minutes, 0));
+        const totalPrice = (appointment.price !== undefined && appointment.price !== null) ? appointment.price : (serviceRecords.reduce((sum, s) => sum + Number(s.price), 0));
 
         if (appointment.start_time && !appointment.end_time) {
             const [h, m] = appointment.start_time.split(':').map(Number);
@@ -222,8 +190,8 @@ class AppointmentService {
                 `INSERT INTO appointments (
                     company_id, customer_id, service_id, staff_id,
                     appointment_date, start_time, end_time, status, notes, price,
-                    customer_phone, customer_name, device_id, package_id
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                    customer_phone, customer_name, device_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
                 RETURNING *`,
                 [
                     appointment.company_id,
@@ -239,7 +207,6 @@ class AppointmentService {
                     appointment.customer_phone || null,
                     appointment.customer_name || null,
                     appointment.device_id || null,
-                    appointment.package_id || null,
                 ]
             );
             const newAppointment = insertRes.rows[0];
@@ -292,7 +259,6 @@ class AppointmentService {
                 a.*,
                 c.name as company_name,
                 ms.name as service_name,
-                pkg.name as package_name,
                 st.first_name || ' ' || st.last_name as staff_name,
                 COALESCE(u.first_name || ' ' || u.last_name, a.customer_name) as customer_name,
                 COALESCE(json_agg(json_build_object(
@@ -313,13 +279,12 @@ class AppointmentService {
             LEFT JOIN services s ON aps.service_id = s.id
             LEFT JOIN users ast ON aps.staff_id = ast.id
             LEFT JOIN services ms ON a.service_id = ms.id
-            LEFT JOIN packages pkg ON a.package_id = pkg.id
             LEFT JOIN users st ON a.staff_id = st.id
             LEFT JOIN companies c ON a.company_id = c.id
             LEFT JOIN users u ON a.customer_id = u.id
             // NOT 02.09.2026: ANY -> IN (sql.join) Drizzle array literal fix
             WHERE a.id IN (${sql.join(ids, sql`, `)})
-            GROUP BY a.id, c.name, ms.name, pkg.name, st.first_name, st.last_name, u.first_name, u.last_name
+            GROUP BY a.id, c.name, ms.name, st.first_name, st.last_name, u.first_name, u.last_name
             ORDER BY a.appointment_date DESC, a.start_time DESC
         `);
 
@@ -354,7 +319,6 @@ class AppointmentService {
                 a.*,
                 c.name as company_name,
                 ms.name as service_name,
-                pkg.name as package_name,
                 st.first_name || ' ' || st.last_name as staff_name,
                 COALESCE(u.first_name || ' ' || u.last_name, a.customer_name) as customer_name,
                 COALESCE(u.first_name || ' ' || u.last_name, a.notes) as customer_display_name,
@@ -376,12 +340,11 @@ class AppointmentService {
             LEFT JOIN services s ON aps.service_id = s.id
             LEFT JOIN users ast ON aps.staff_id = ast.id
             LEFT JOIN services ms ON a.service_id = ms.id
-            LEFT JOIN packages pkg ON a.package_id = pkg.id
             LEFT JOIN users st ON a.staff_id = st.id
             LEFT JOIN companies c ON a.company_id = c.id
             LEFT JOIN users u ON a.customer_id = u.id
             WHERE ${whereClause}
-            GROUP BY a.id, c.name, ms.name, pkg.name, st.first_name, st.last_name, u.first_name, u.last_name
+            GROUP BY a.id, c.name, ms.name, st.first_name, st.last_name, u.first_name, u.last_name
             ORDER BY a.appointment_date DESC, a.start_time DESC
         `);
 
@@ -415,7 +378,6 @@ class AppointmentService {
         const result = await db.execute(sql`
             SELECT a.*, c.name as company_name,
                    ms.name as service_name,
-                   pkg.name as package_name,
                    st.first_name || ' ' || st.last_name as staff_name,
                    COALESCE(u.first_name || ' ' || u.last_name, a.customer_name) as customer_name,
                    COALESCE(json_agg(json_build_object(
@@ -436,12 +398,11 @@ class AppointmentService {
             LEFT JOIN services s ON aps.service_id = s.id
             LEFT JOIN users ast ON aps.staff_id = ast.id
             LEFT JOIN services ms ON a.service_id = ms.id
-            LEFT JOIN packages pkg ON a.package_id = pkg.id
             LEFT JOIN users st ON a.staff_id = st.id
             LEFT JOIN companies c ON a.company_id = c.id
             LEFT JOIN users u ON a.customer_id = u.id
             WHERE ${whereClause}
-            GROUP BY a.id, c.name, ms.name, pkg.name, st.first_name, st.last_name, u.first_name, u.last_name
+            GROUP BY a.id, c.name, ms.name, st.first_name, st.last_name, u.first_name, u.last_name
             ORDER BY a.appointment_date DESC, a.start_time DESC
         `);
 
@@ -656,7 +617,6 @@ class AppointmentService {
 
         const result = await db.execute(sql`
             SELECT a.*, u.first_name || ' ' || u.last_name as customer_name,
-                   pkg.name as package_name,
                    COALESCE(json_agg(json_build_object(
                        'id', s.id,
                        'aps_id', aps.id,
@@ -673,10 +633,9 @@ class AppointmentService {
             LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
             LEFT JOIN services s ON aps.service_id = s.id
             LEFT JOIN users ast ON aps.staff_id = ast.id
-            LEFT JOIN packages pkg ON a.package_id = pkg.id
             LEFT JOIN users u ON a.customer_id = u.id
             WHERE ${whereClause}
-            GROUP BY a.id, u.first_name, u.last_name, pkg.name
+            GROUP BY a.id, u.first_name, u.last_name
             ORDER BY a.appointment_date, a.start_time
         `);
 
@@ -714,7 +673,6 @@ class AppointmentService {
             SELECT
                 a.*,
                 c.name as company_name,
-                pkg.name as package_name,
                 COALESCE(json_agg(json_build_object(
                     'id', s.id,
                     'aps_id', aps.id,
@@ -731,10 +689,9 @@ class AppointmentService {
             LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
             LEFT JOIN services s ON aps.service_id = s.id
             LEFT JOIN users ast ON aps.staff_id = ast.id
-            LEFT JOIN packages pkg ON a.package_id = pkg.id
             LEFT JOIN companies c ON a.company_id = c.id
             WHERE ${whereClause}
-            GROUP BY a.id, c.name, pkg.name
+            GROUP BY a.id, c.name
             ORDER BY a.appointment_date DESC, a.start_time DESC
         `);
 
@@ -871,10 +828,9 @@ class AppointmentService {
         // Ä°Ã§ iÃ§e subquery (string_agg) + COALESCE chain â†’ raw SQL
         const result = await db.execute(sql`
             SELECT a.id, a.appointment_date, a.start_time, a.customer_name, a.customer_phone, a.technical_notes, a.used_materials,
-                   COALESCE(ms.name, pkg.name, (SELECT string_agg(s.name, ', ') FROM appointment_services aps JOIN services s ON aps.service_id = s.id WHERE aps.appointment_id = a.id)) as service_name
+                   COALESCE(ms.name, (SELECT string_agg(s.name, ', ') FROM appointment_services aps JOIN services s ON aps.service_id = s.id WHERE aps.appointment_id = a.id)) as service_name
             FROM appointments a
             LEFT JOIN services ms ON a.service_id = ms.id
-            LEFT JOIN packages pkg ON a.package_id = pkg.id
             WHERE a.company_id = ${companyId}
             AND (a.customer_phone LIKE ${phonePattern} OR a.customer_name ILIKE ${namePattern})
             ORDER BY a.appointment_date DESC, a.start_time DESC
@@ -936,62 +892,6 @@ class AppointmentService {
             ...row,
             phone: formatPhoneWithSpaces(row.phone)
         }));
-    }
-
-    async syncCustomer(companyId: number, data: any) {
-        const { phone, name, email, notes, is_iys_approved } = data;
-        const normalizedPhone = normalizePhone(phone);
-
-        // customers tablosu Drizzle schema'da yok â†’ raw SQL
-        const result = await db.execute(sql`
-            INSERT INTO customers (company_id, phone, name, email, notes, is_iys_approved)
-            VALUES (${companyId}, ${normalizedPhone}, ${name}, ${email}, ${notes}, ${is_iys_approved})
-            ON CONFLICT (company_id, phone) DO UPDATE SET
-                name = EXCLUDED.name,
-                email = EXCLUDED.email,
-                notes = EXCLUDED.notes,
-                is_iys_approved = EXCLUDED.is_iys_approved,
-                updated_at = NOW()
-            RETURNING *
-        `);
-        return (result as any).rows[0];
-    }
-
-    async getAutomationRules(companyId: number) {
-        // automation_rules tablosu Drizzle schema'da yok â†’ raw SQL
-        const result = await db.execute(
-            sql`SELECT * FROM automation_rules WHERE company_id = ${companyId} ORDER BY created_at DESC`
-        );
-        return (result as any).rows as any[];
-    }
-
-    async createAutomationRule(companyId: number, data: any) {
-        const { name, schedule_type, schedule_days, sql_script, action_type, message_template } = data;
-        // automation_rules tablosu Drizzle schema'da yok â†’ raw SQL
-        const result = await db.execute(sql`
-            INSERT INTO automation_rules (company_id, name, schedule_type, schedule_days, sql_script, action_type, message_template)
-            VALUES (${companyId}, ${name}, ${schedule_type}, ${schedule_days}, ${sql_script}, ${action_type}, ${message_template})
-            RETURNING *
-        `);
-        return (result as any).rows[0];
-    }
-
-    async updateAutomationRule(id: number, data: any) {
-        // Whitelist + dynamic SET clause â€” sql.raw() ile kolon adlarÄ±, sql template ile deÄŸerler
-        const fields = Object.keys(data).filter(f =>
-            ['name', 'schedule_type', 'schedule_days', 'sql_script', 'action_type', 'is_active', 'message_template'].includes(f)
-        );
-        const setClauses = fields.map((f) => sql`${sql.raw(f)} = ${data[f]}`);
-        const setClause = sql.join(setClauses, sql`, `);
-
-        // automation_rules tablosu Drizzle schema'da yok â†’ raw SQL
-        const result = await db.execute(sql`
-            UPDATE automation_rules
-            SET ${setClause}, updated_at = NOW()
-            WHERE id = ${id}
-            RETURNING *
-        `);
-        return (result as any).rows[0];
     }
 }
 

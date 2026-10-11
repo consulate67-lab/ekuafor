@@ -15,7 +15,6 @@ export default function SalonBoard() {
     const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('all');
     const [isOptionsOpen, setIsOptionsOpen] = useState(false);
     const [services, setServices] = useState<any[]>([]);
-    const [packages, setPackages] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [currentHour, setCurrentHour] = useState(new Date().getHours());
@@ -36,7 +35,6 @@ export default function SalonBoard() {
         customerName: '',
         serviceId: '',
         serviceIds: [] as number[],
-        packageId: '',
         notes: '',
         staffId: '' as string | number,
         appointmentDate: '',
@@ -44,15 +42,12 @@ export default function SalonBoard() {
         serviceStaffOverrides: {} as Record<number, number>, // {serviceId: staffId}
         servicePriceOverrides: {} as Record<number, number>, // {serviceId: price}
         serviceDurationOverrides: {} as Record<number, number>, // {serviceId: duration}
-        activeTab: 'services' as 'services' | 'packages'
     });
 
     // Payment States
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [completionModal, setCompletionModal] = useState<{ open: boolean; app: Appointment | null; amount: number }>({ open: false, app: null, amount: 0 });
     const [paymentApp, setPaymentApp] = useState<Appointment | null>(null);
-    const [nfcState, setNfcState] = useState<'IDLE' | 'SCANNING' | 'SUCCESS' | 'ERROR'>('IDLE');
-
     // Expense States
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
     const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -103,12 +98,11 @@ export default function SalonBoard() {
         try {
             const dateToFetch = date || selectedDate;
 
-            const [appsRes, pendingRes, staffRes, servRes, pkgRes, deptRes] = await Promise.all([
+            const [appsRes, pendingRes, staffRes, servRes, deptRes] = await Promise.all([
                 api.get('/appointments', { params: { company_id: compId, start_date: dateToFetch, end_date: dateToFetch } }),
                 api.get('/appointments', { params: { company_id: compId, status: 'pending' } }),
                 api.get(`/companies/${compId}/employees`),
                 api.get('/services', { params: { company_id: compId } }),
-                api.get('/packages', { params: { company_id: compId } }),
                 api.get('/departments', { params: { company_id: compId } })
             ]);
 
@@ -116,7 +110,6 @@ export default function SalonBoard() {
             setPendingAppointments(pendingRes.data.data || []);
             setStaff(staffRes.data.data || []);
             setServices(servRes.data.data || []);
-            setPackages(pkgRes.data.data || []);
             setDepartments(deptRes.data.data || []);
         } catch (err) {
             console.error('Veri senkronizasyonu başarısız', err);
@@ -324,35 +317,18 @@ export default function SalonBoard() {
             let totalPrice = 0;
             let sIds = [...fastForm.serviceIds];
 
-            if (fastForm.packageId) {
-                const pkg = packages.find(p => p.id === parseInt(fastForm.packageId));
-                if (pkg) {
-                    sIds = pkg.services?.map((s: any) => s.id) || [];
-                    const hasOverrides = Object.keys(fastForm.servicePriceOverrides).length > 0 || Object.keys(fastForm.serviceDurationOverrides).length > 0;
-
-                    if (hasOverrides) {
-                        totalDuration = sIds.reduce((sum, sid) => sum + ((fastForm.serviceDurationOverrides[sid] !== undefined) ? fastForm.serviceDurationOverrides[sid] : (pkg.services.find((ps: any) => ps.id === sid)?.duration_minutes || 0)), 0);
-                        totalPrice = sIds.reduce((sum, sid) => sum + Number((fastForm.servicePriceOverrides[sid] !== undefined) ? fastForm.servicePriceOverrides[sid] : (pkg.services.find((ps: any) => ps.id === sid)?.price || 0)), 0);
-                    } else {
-                        totalDuration = pkg.duration_minutes || 0;
-                        totalPrice = Number(pkg.price || 0);
-                    }
-                }
+            const hasOverrides = Object.keys(fastForm.servicePriceOverrides).length > 0 || Object.keys(fastForm.serviceDurationOverrides).length > 0;
+            const pickedServices = services.filter(s => sIds.includes(s.id));
+            if (hasOverrides) {
+                totalDuration = pickedServices.reduce((sum, s) => sum + ((fastForm.serviceDurationOverrides[s.id] !== undefined) ? fastForm.serviceDurationOverrides[s.id] : (s.duration_minutes || 0)), 0);
+                totalPrice = pickedServices.reduce((sum, s) => sum + Number((fastForm.servicePriceOverrides[s.id] !== undefined) ? fastForm.servicePriceOverrides[s.id] : (s.price || 0)), 0);
             } else {
-                const selectedServices = services.filter(s => sIds.includes(s.id));
-                const hasOverrides = Object.keys(fastForm.servicePriceOverrides).length > 0 || Object.keys(fastForm.serviceDurationOverrides).length > 0;
-
-                if (hasOverrides) {
-                    totalDuration = selectedServices.reduce((sum, s) => sum + ((fastForm.serviceDurationOverrides[s.id] !== undefined) ? fastForm.serviceDurationOverrides[s.id] : (s.duration_minutes || 0)), 0);
-                    totalPrice = selectedServices.reduce((sum, s) => sum + Number((fastForm.servicePriceOverrides[s.id] !== undefined) ? fastForm.servicePriceOverrides[s.id] : (s.price || 0)), 0);
-                } else {
-                    totalDuration = selectedServices.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
-                    totalPrice = selectedServices.reduce((sum, s) => sum + Number(s.price), 0);
-                    if (sIds.length === 0 && services[0]) {
-                        sIds = [services[0].id];
-                        totalDuration = services[0].duration_minutes;
-                        totalPrice = Number(services[0].price);
-                    }
+                totalDuration = pickedServices.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+                totalPrice = pickedServices.reduce((sum, s) => sum + Number(s.price), 0);
+                if (sIds.length === 0 && services[0]) {
+                    sIds = [services[0].id];
+                    totalDuration = services[0].duration_minutes;
+                    totalPrice = Number(services[0].price);
                 }
             }
 
@@ -385,23 +361,15 @@ export default function SalonBoard() {
                 return;
             }
 
-            const selectedPackage = fastForm.packageId ? packages.find(p => p.id === parseInt(fastForm.packageId)) : null;
             const selectedServices = services.filter(s => sIds.includes(s.id));
 
             // Map service selection to include requested staff
-            const sSelections = selectedPackage
-                ? selectedPackage.services.map((s: any) => ({
-                    id: s.id,
-                    price: (fastForm.servicePriceOverrides[s.id] !== undefined) ? fastForm.servicePriceOverrides[s.id] : s.price,
-                    duration_minutes: (fastForm.serviceDurationOverrides[s.id] !== undefined) ? fastForm.serviceDurationOverrides[s.id] : s.duration_minutes,
-                    staff_id: fastForm.serviceStaffOverrides[s.id] || Number(staffId)
-                }))
-                : selectedServices.map(s => ({
-                    id: s.id,
-                    price: (fastForm.servicePriceOverrides[s.id] !== undefined) ? fastForm.servicePriceOverrides[s.id] : s.price,
-                    duration_minutes: (fastForm.serviceDurationOverrides[s.id] !== undefined) ? fastForm.serviceDurationOverrides[s.id] : s.duration_minutes,
-                    staff_id: fastForm.serviceStaffOverrides[s.id] || Number(staffId)
-                }));
+            const sSelections = selectedServices.map(s => ({
+                id: s.id,
+                price: (fastForm.servicePriceOverrides[s.id] !== undefined) ? fastForm.servicePriceOverrides[s.id] : s.price,
+                duration_minutes: (fastForm.serviceDurationOverrides[s.id] !== undefined) ? fastForm.serviceDurationOverrides[s.id] : s.duration_minutes,
+                staff_id: fastForm.serviceStaffOverrides[s.id] || Number(staffId)
+            }));
 
             await api.post('/appointments', {
                 company_id: company.id,
@@ -409,7 +377,6 @@ export default function SalonBoard() {
                 service_id: sIds[0],
                 service_ids: sIds,
                 services: sSelections, // Pass the detailed selections with staff_id
-                package_id: fastForm.packageId ? parseInt(fastForm.packageId) : null,
                 appointment_date: date,
                 start_time: startTime,
                 end_time: endTime,
@@ -424,7 +391,6 @@ export default function SalonBoard() {
                 customerName: '',
                 serviceId: '',
                 serviceIds: [],
-                packageId: '',
                 notes: '',
                 staffId: '',
                 appointmentDate: '',
@@ -432,7 +398,6 @@ export default function SalonBoard() {
                 serviceStaffOverrides: {},
                 servicePriceOverrides: {},
                 serviceDurationOverrides: {},
-                activeTab: 'services'
             });
             setSelectedCell(null);
             if (company.id) await fetchData(company.id);
@@ -787,7 +752,6 @@ export default function SalonBoard() {
                                         customerName: '',
                                         serviceId: services[0]?.id?.toString() || '',
                                         serviceIds: [] as number[],
-                                        packageId: '',
                                         notes: '',
                                         staffId: staff[0]?.user_id || staff[0]?.id || '',
                                         appointmentDate: selectedDate,
@@ -798,7 +762,6 @@ export default function SalonBoard() {
                                         serviceStaffOverrides: {},
                                         servicePriceOverrides: {},
                                         serviceDurationOverrides: {},
-                                        activeTab: 'services'
                                     });
                                     setIsModalOpen(true);
                                 }}
@@ -920,7 +883,6 @@ export default function SalonBoard() {
                                                             customerName: '',
                                                             serviceId: services[0]?.id?.toString() || '',
                                                             serviceIds: [],
-                                                            packageId: '',
                                                             notes: '',
                                                             staffId: pId.toString(),
                                                             appointmentDate: selectedDate,
@@ -928,7 +890,6 @@ export default function SalonBoard() {
                                                             serviceStaffOverrides: {},
                                                             servicePriceOverrides: {},
                                                             serviceDurationOverrides: {},
-                                                            activeTab: 'services'
                                                         });
                                                         setIsModalOpen(true);
                                                     }}
@@ -1010,8 +971,6 @@ export default function SalonBoard() {
 
                                                                             if (myService) return <span className="text-emerald-600 font-extrabold">✂️ {myService.name}</span>;
 
-                                                                            if (app.package_name) return <span className="text-indigo-600 font-extrabold">📦 {app.package_name}</span>;
-
                                                                             return app.services && app.services.length > 0
                                                                                 ? app.services.map((s: any) => s.name).join(', ')
                                                                                 : (app.service_name || (company?.service_label || 'Hizmet'));
@@ -1065,25 +1024,6 @@ export default function SalonBoard() {
                                         </div>
 
                                         <div className="space-y-4 col-span-1 md:col-span-2">
-                                            <div className="flex gap-4 mb-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setFastForm({ ...fastForm, activeTab: 'services', packageId: '' })}
-                                                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${fastForm.activeTab === 'services' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}
-                                                >
-                                                    {company?.service_label ? (company.service_label + 'ler') : 'Hizmetler'}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setFastForm({ ...fastForm, activeTab: 'packages', serviceIds: [], packageId: fastForm.packageId || (packages[0]?.id?.toString() || '') })}
-                                                    className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${fastForm.activeTab === 'packages' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}
-                                                >
-                                                    Paketler
-                                                </button>
-                                            </div>
-
-                                            {fastForm.activeTab === 'services' ? (
-                                                <>
                                                     <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">{(company?.service_label || 'Hizmet')} Seçimi (Birden Fazla Seçebilirsiniz)</label>
                                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-48 overflow-y-auto p-4 bg-slate-50 rounded-[2.5rem]">
                                                         {services.map(s => {
@@ -1106,111 +1046,6 @@ export default function SalonBoard() {
                                                             );
                                                         })}
                                                     </div>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <div className="space-y-3 max-h-64 overflow-y-auto p-4 bg-slate-50 rounded-[2.5rem]">
-                                                        {packages.length === 0 ? (
-                                                            <div className="text-center py-10">
-                                                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Henüz paket tanımlanmamış</p>
-                                                            </div>
-                                                        ) : (
-                                                            packages.map(p => {
-                                                                const isSelected = parseInt(fastForm.packageId) === p.id;
-                                                                return (
-                                                                    <div key={p.id} className="space-y-4">
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => setFastForm({ ...fastForm, packageId: p.id.toString(), serviceIds: [], serviceStaffOverrides: {} })}
-                                                                            className={`w-full p-4 rounded-2xl border-2 transition-all flex flex-col gap-1 text-left ${isSelected ? 'bg-amber-600 border-amber-600 text-white shadow-lg' : 'bg-white border-transparent text-slate-600'}`}
-                                                                        >
-                                                                            <p className={`text-xs font-black uppercase leading-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>{p.name}</p>
-                                                                            <div className="flex items-center gap-2">
-                                                                                {p.services && p.services.length > 0 && (() => {
-                                                                                    const originalSum = p.services.reduce((sum: number, ps: any) => sum + (ps.price || 0), 0);
-                                                                                    if (originalSum > (p.price || 0)) {
-                                                                                        return <span className={`text-[8px] font-bold line-through opacity-60 ${isSelected ? 'text-white' : 'text-slate-400'}`}>₺{originalSum}</span>;
-                                                                                    }
-                                                                                    return null;
-                                                                                })()}
-                                                                                <p className={`text-[8px] font-bold ${isSelected ? 'text-amber-100' : 'text-slate-400'}`}>₺{p.price} | {p.duration_minutes} dk</p>
-                                                                            </div>
-                                                                        </button>
-
-                                                                        {isSelected && (
-                                                                            <div className="pl-6 space-y-3 animate-in slide-in-from-left duration-300 border-l-4 border-amber-200 ml-2">
-                                                                                <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest pl-2">🛠️ İşlem Dağılımı (Sıralı Yapılacak)</p>
-                                                                                <div className="space-y-2">
-                                                                                    {p.services?.map((ps: any) => (
-                                                                                        <div key={ps.id} className="flex items-center justify-between gap-4 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-amber-400">
-                                                                                            <div className="flex flex-col flex-1 min-w-0 pl-2">
-                                                                                                <span className="text-[10px] font-black text-slate-700 uppercase truncate">{ps.name}</span>
-                                                                                                <div className="flex gap-2 mt-1">
-                                                                                                    <div className="flex-1">
-                                                                                                        <label className="block text-[7px] font-bold text-slate-400 uppercase mb-0.5 ml-1">Süre (Dk)</label>
-                                                                                                        <div className="w-full p-2 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-400">
-                                                                                                            {ps.duration_minutes}
-                                                                                                        </div>
-                                                                                                    </div>
-                                                                                                    <div className="flex-1">
-                                                                                                        <label className="block text-[7px] font-bold text-slate-400 uppercase mb-0.5 ml-1">Fiyat (₺)</label>
-                                                                                                        <div className="w-full p-2 bg-slate-50 rounded-lg border border-slate-100 text-[10px] font-bold text-slate-400">
-                                                                                                            {ps.price}
-                                                                                                        </div>
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                            </div>
-                                                                                            <div className="flex flex-col items-end gap-1">
-                                                                                                <span className="text-[8px] font-black text-slate-400 uppercase">{company?.staff_label || 'Uzman'}</span>
-                                                                                                <select
-                                                                                                    value={fastForm.serviceStaffOverrides[ps.id] || fastForm.staffId || selectedCell?.person.user_id || selectedCell?.person.id}
-                                                                                                    onChange={(e) => {
-                                                                                                        setFastForm(prev => ({
-                                                                                                            ...prev,
-                                                                                                            serviceStaffOverrides: {
-                                                                                                                ...prev.serviceStaffOverrides,
-                                                                                                                [ps.id]: Number(e.target.value)
-                                                                                                            }
-                                                                                                        }));
-                                                                                                    }}
-                                                                                                    className="text-[10px] font-bold bg-amber-50 text-amber-900 border-none rounded-xl p-2 outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
-                                                                                                >
-                                                                                                    {staff.map(s => (
-                                                                                                        <option key={s.user_id || s.id} value={s.user_id || s.id}>
-                                                                                                            {s.first_name}
-                                                                                                        </option>
-                                                                                                    ))}
-                                                                                                </select>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    ))}
-                                                                                </div>
-                                                                                <div className="flex justify-between items-center bg-amber-50 p-4 rounded-2xl border-2 border-amber-200 shadow-inner mt-2">
-                                                                                    <div className="flex flex-col">
-                                                                                        <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">TOPLAM SÜRE</span>
-                                                                                        <span className="text-sm font-black text-amber-900">
-                                                                                            {p.duration_minutes || 0} DK
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    <div className="flex flex-col items-end">
-                                                                                        <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">TOPLAM FİYAT</span>
-                                                                                        <div className="flex items-center gap-2">
-                                                                                            <span className="text-lg font-black text-amber-900">
-                                                                                                ₺{p.price || 0}
-                                                                                            </span>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </div>
-                                                                                <p className="text-[8px] font-bold text-slate-400 italic pl-2">* Hizmetler yukarıdan aşağıya sırayla atanacaktır.</p>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })
-                                                        )}
-                                                    </div>
-                                                </>
-                                            )}
                                         </div>
 
                                         <div className="space-y-2">
@@ -1325,7 +1160,7 @@ export default function SalonBoard() {
                                     <div className="flex items-start gap-6 p-6 bg-slate-50 rounded-[2.5rem]">
                                         <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center text-2xl shadow-sm shrink-0">✂️</div>
                                         <div className="flex-1">
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Hizmetler {selectedAppointment.package_name && <span className="text-indigo-600 ml-2">📦 {selectedAppointment.package_name}</span>}</p>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Hizmetler</p>
                                             <div className="space-y-2">
                                                 {selectedAppointment.services && selectedAppointment.services.length > 0 ? (
                                                     (() => {
@@ -1435,7 +1270,7 @@ export default function SalonBoard() {
                                                         });
                                                     })()
                                                 ) : (
-                                                    <p className="text-xl font-black text-slate-800 uppercase tracking-tight">{selectedAppointment.package_name || selectedAppointment.service_name || 'Hizmet Bilgisi Yok'}</p>
+                                                    <p className="text-xl font-black text-slate-800 uppercase tracking-tight">{selectedAppointment.service_name || 'Hizmet Bilgisi Yok'}</p>
                                                 )}
                                             </div>
                                             {selectedAppointment.services && selectedAppointment.services.length > 0 && (
@@ -1644,7 +1479,7 @@ export default function SalonBoard() {
             <div className="fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-slate-900/80 backdrop-blur-md rounded-full border border-white/10 shadow-2xl z-[150] pointer-events-none">
                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap">Ekuafor Salon Board Edition <span className="text-white opacity-100 ml-1">v1.80.0</span></p>
             </div>
-            {/* Payment Modal (NFC / SoftPOS Simulation) */}
+            {/* Payment Modal */}
             {showPaymentModal && paymentApp && (
                 <div className="fixed inset-0 z-[300] flex items-end justify-center bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
                     <div className="bg-white w-full max-w-lg rounded-t-[3rem] p-8 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-500">
@@ -1657,41 +1492,26 @@ export default function SalonBoard() {
                             </p>
                         </div>
 
-                        {nfcState === 'IDLE' && (
                             <div className="grid grid-cols-1 gap-4">
                                 <button
                                     onClick={async () => {
-                                        setNfcState('SCANNING');
-                                        setTimeout(async () => {
-                                            try {
-                                                const res = await api.post('/payments/ceppos/initialize', {
-                                                    appointment_id: paymentApp.id,
-                                                    amount: paymentApp.price
-                                                });
-                                                if (res.data.success) {
-                                                    setNfcState('SUCCESS');
-                                                    setTimeout(() => {
-                                                        // Proceed with status update after success
-                                                        api.patch(`/appointments/${paymentApp.id}/status`, {
-                                                            status: 'completed',
-                                                            price: paymentApp.price,
-                                                            payment_method: 'card_ceppos'
-                                                        }).then(() => {
-                                                            if (company?.id) fetchData(company.id);
-                                                            setShowPaymentModal(false);
-                                                            setNfcState('IDLE');
-                                                            setSelectedAppointment(null);
-                                                            setIsDetailModalOpen(false);
-                                                            setIsPendingListModalOpen(false);
-                                                        });
-                                                    }, 1500);
-                                                } else {
-                                                    setNfcState('ERROR');
-                                                }
-                                            } catch (e) {
-                                                setNfcState('ERROR');
-                                            }
-                                        }, 2000);
+                                        try {
+                                            setLoading(true);
+                                            await api.patch(`/appointments/${paymentApp.id}/status`, {
+                                                status: 'completed',
+                                                price: paymentApp.price,
+                                                payment_method: 'card'
+                                            });
+                                            if (company?.id) fetchData(company.id);
+                                            setShowPaymentModal(false);
+                                            setSelectedAppointment(null);
+                                            setIsDetailModalOpen(false);
+                                            setIsPendingListModalOpen(false);
+                                        } catch (e) {
+                                            alert('Hata oluştu');
+                                        } finally {
+                                            setLoading(false);
+                                        }
                                     }}
                                     className="p-6 bg-indigo-600 text-white rounded-[2rem] flex items-center justify-between group active:scale-95 transition-all shadow-xl shadow-indigo-100"
                                 >
@@ -1699,7 +1519,7 @@ export default function SalonBoard() {
                                         <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">💳</div>
                                         <div>
                                             <p className="text-xs font-black uppercase tracking-widest text-indigo-200">Kredi Kartı</p>
-                                            <p className="text-lg font-black leading-tight">Terminal / SoftPOS</p>
+                                            <p className="text-lg font-black leading-tight">POS Cihazı</p>
                                         </div>
                                     </div>
                                     <svg className="w-6 h-6 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
@@ -1744,36 +1564,6 @@ export default function SalonBoard() {
                                     İptal
                                 </button>
                             </div>
-                        )}
-
-                        {nfcState === 'SCANNING' && (
-                            <div className="py-12 flex flex-col items-center">
-                                <div className="relative mb-12">
-                                    <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-20 scale-150"></div>
-                                    <div className="absolute inset-0 bg-indigo-400 rounded-full animate-pulse opacity-40 scale-125"></div>
-                                    <div className="relative w-32 h-32 bg-slate-900 rounded-full flex items-center justify-center text-4xl shadow-2xl">⚡</div>
-                                </div>
-                                <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Kartı Yaklaştırın</h4>
-                                <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] animate-pulse">Temassız ödeme bekleniyor...</p>
-                            </div>
-                        )}
-
-                        {nfcState === 'SUCCESS' && (
-                            <div className="py-12 flex flex-col items-center animate-in zoom-in duration-500">
-                                <div className="w-32 h-32 bg-emerald-500 rounded-full flex items-center justify-center text-5xl shadow-2xl mb-8">✓</div>
-                                <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Ödeme Başarılı</h4>
-                                <p className="text-emerald-500 font-black uppercase tracking-widest text-[10px]">İşlem onaylandı, iyzico kaydı oluşturuldu.</p>
-                            </div>
-                        )}
-
-                        {nfcState === 'ERROR' && (
-                            <div className="py-12 flex flex-col items-center">
-                                <div className="w-32 h-32 bg-red-500 rounded-full flex items-center justify-center text-5xl shadow-2xl mb-8">!</div>
-                                <h4 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Ödeme Başarısız</h4>
-                                <p className="text-red-500 font-black uppercase tracking-widest text-[10px] mb-8">İşlem reddedildi veya hata oluştu.</p>
-                                <button onClick={() => setNfcState('IDLE')} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold text-xs uppercase">Tekrar Dene</button>
-                            </div>
-                        )}
                     </div>
                 </div>
             )}

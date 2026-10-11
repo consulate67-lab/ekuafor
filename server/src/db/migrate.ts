@@ -179,35 +179,6 @@ export const runMigrations = async () => {
         `);
 
         await pool.query(`
-            CREATE TABLE IF NOT EXISTS packages (
-                id SERIAL PRIMARY KEY,
-                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
-                name VARCHAR(255) NOT NULL,
-                description TEXT,
-                duration_minutes INTEGER NOT NULL,
-                price DECIMAL(10, 2) NOT NULL,
-                is_active BOOLEAN DEFAULT true,
-                staff_id INTEGER REFERENCES users(id),
-                department_id INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS package_id INTEGER REFERENCES packages(id)');
-
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS package_services (
-                id SERIAL PRIMARY KEY,
-                package_id INTEGER REFERENCES packages(id) ON DELETE CASCADE,
-                service_id INTEGER REFERENCES services(id) ON DELETE CASCADE,
-                staff_id INTEGER REFERENCES users(id),
-                department_id INTEGER,
-                order_index INTEGER DEFAULT 0
-            )
-        `);
-
-        await pool.query(`
             CREATE TABLE IF NOT EXISTS appointment_services (
                 id SERIAL PRIMARY KEY,
                 appointment_id INTEGER REFERENCES appointments(id) ON DELETE CASCADE,
@@ -403,75 +374,6 @@ export const runMigrations = async () => {
         `);
 
         await pool.query(`
-            CREATE TABLE IF NOT EXISTS inventory_categories (
-                id SERIAL PRIMARY KEY,
-                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
-                name VARCHAR(100) NOT NULL,
-                slug VARCHAR(100),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS inventory_products (
-                id SERIAL PRIMARY KEY,
-                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE, -- NULL means global (all can use)
-                category_id INTEGER REFERENCES inventory_categories(id) ON DELETE SET NULL,
-                brand VARCHAR(100),
-                name VARCHAR(255) NOT NULL,
-                sku VARCHAR(100),
-                barcode VARCHAR(100),
-                unit VARCHAR(20) DEFAULT 'adet', -- ml, gr, adet, paket
-                specs JSONB, -- Color codes, acidity, etc.
-                min_stock_level DECIMAL(10, 2) DEFAULT 0.00,
-                track_stock BOOLEAN DEFAULT true, -- User can choose to not track some (shampoo, etc)
-                is_active BOOLEAN DEFAULT true,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS service_materials (
-                id SERIAL PRIMARY KEY,
-                service_id INTEGER REFERENCES services(id) ON DELETE CASCADE,
-                product_id INTEGER REFERENCES inventory_products(id) ON DELETE CASCADE,
-                required_quantity DECIMAL(10, 2) DEFAULT 1.00,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(service_id, product_id)
-            );
-
-            CREATE TABLE IF NOT EXISTS inventory_stocks (
-                id SERIAL PRIMARY KEY,
-                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
-                product_id INTEGER REFERENCES inventory_products(id) ON DELETE CASCADE,
-                quantity DECIMAL(10, 2) DEFAULT 0.00,
-                avg_cost DECIMAL(10, 2) DEFAULT 0.00,
-                last_purchase_price DECIMAL(10, 2) DEFAULT 0.00,
-                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(company_id, product_id)
-            );
-
-            CREATE TABLE IF NOT EXISTS inventory_assignments (
-                id SERIAL PRIMARY KEY,
-                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
-                staff_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                product_id INTEGER REFERENCES inventory_products(id) ON DELETE CASCADE,
-                quantity DECIMAL(10, 2) NOT NULL,
-                status VARCHAR(20) DEFAULT 'in_use', -- in_use, finished, returned
-                notes TEXT,
-                assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                finished_at TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS inventory_usage_logs (
-                id SERIAL PRIMARY KEY,
-                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
-                appointment_id INTEGER REFERENCES appointments(id) ON DELETE SET NULL,
-                staff_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-                product_id INTEGER REFERENCES inventory_products(id) ON DELETE CASCADE,
-                quantity DECIMAL(10, 2) NOT NULL,
-                usage_type VARCHAR(20) DEFAULT 'service', -- service, wastage, external
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        `);
-
-        await pool.query(`
             CREATE TABLE IF NOT EXISTS cash_transactions (
                 id SERIAL PRIMARY KEY,
                 company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
@@ -508,7 +410,6 @@ export const runMigrations = async () => {
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS device_id VARCHAR(255)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS rating INTEGER CHECK (rating BETWEEN 1 AND 5)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS comment TEXT');
-        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS iyzico_token VARCHAR(255)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS payment_id VARCHAR(255)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS used_materials TEXT');
 
@@ -529,8 +430,6 @@ export const runMigrations = async () => {
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS city VARCHAR(100)');
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS district VARCHAR(100)');
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS neighborhood VARCHAR(100)');
-            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS sub_merchant_key VARCHAR(255)');
-            await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS iyzico_commission_rate DECIMAL(5, 2) DEFAULT 0.00');
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS bank_iban VARCHAR(34)');
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100)');
             await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS license_end_date TIMESTAMP WITH TIME ZONE');
@@ -649,7 +548,6 @@ export const runMigrations = async () => {
             console.warn('⚠️ Company FK Migration warning (non-fatal):', fkErr.message);
         }
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS address_line2 TEXT');
-        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS ai_rules TEXT');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS photo TEXT');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS building_number VARCHAR(20)');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS door_number VARCHAR(20)');
@@ -680,34 +578,8 @@ export const runMigrations = async () => {
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS bank_branch VARCHAR(100)');
         await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS photo TEXT');
         await pool.query('UPDATE services SET is_active = true WHERE is_active IS NULL');
-        await pool.query('UPDATE packages SET is_active = true WHERE is_active IS NULL');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS bank_iban VARCHAR(34)');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS verification_code VARCHAR(10)');
-
-        // --- INVENTORY SEEDS (One-time) ---
-        await pool.query(`
-            INSERT INTO inventory_categories (name, slug) 
-            VALUES ('Saç Boyası', 'sac-boyasi'), ('Saç Bakım', 'sac-bakim'), ('Teknik Ürünler', 'teknik-urunler'), ('Kozmetik', 'kozmetik')
-            ON CONFLICT DO NOTHING;
-        `);
-        
-        await pool.query(`
-            INSERT INTO inventory_products (brand, name, unit, category_id, is_active)
-            SELECT 'Loreal', 'Majirel Saç Boyası 50ml', 'ml', id, true FROM inventory_categories WHERE slug = 'sac-boyasi' LIMIT 1
-            ON CONFLICT DO NOTHING;
-        `);
-
-        await pool.query(`
-            INSERT INTO inventory_products (brand, name, unit, category_id, is_active)
-            SELECT 'Schwarzkopf', 'Igora Royal 60ml', 'ml', id, true FROM inventory_categories WHERE slug = 'sac-boyasi' LIMIT 1
-            ON CONFLICT DO NOTHING;
-        `);
-
-        await pool.query(`
-            INSERT INTO inventory_products (brand, name, unit, category_id, is_active)
-            SELECT 'Loreal', 'Profesyonel Şampuan 1500ml', 'ml', id, true FROM inventory_categories WHERE slug = 'sac-bakim' LIMIT 1
-            ON CONFLICT DO NOTHING;
-        `);
 
         // 3. Triggers & Functions
         await pool.query(`
@@ -793,27 +665,6 @@ export const runMigrations = async () => {
         await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_service_label ON companies(service_label)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_bank_iban ON companies(bank_iban)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_verification_code ON companies(verification_code)');
-
-        // AI Learning System Tables
-        await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN DEFAULT TRUE');
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS ai_call_logs (
-                id SERIAL PRIMARY KEY,
-                company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
-                transcription TEXT,
-                extracted_info JSONB,
-                appointment_id INTEGER REFERENCES appointments(id) ON DELETE SET NULL,
-                was_auto_created BOOLEAN DEFAULT false,
-                confidence VARCHAR(10),
-                feedback VARCHAR(20) DEFAULT 'pending',
-                matched_service_name VARCHAR(255),
-                source VARCHAR(20) DEFAULT 'audio',
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-        await pool.query('CREATE INDEX IF NOT EXISTS idx_ai_call_logs_company ON ai_call_logs(company_id)');
-        await pool.query('CREATE INDEX IF NOT EXISTS idx_ai_call_logs_created ON ai_call_logs(created_at DESC)');
-        await pool.query('CREATE INDEX IF NOT EXISTS idx_ai_call_logs_feedback ON ai_call_logs(feedback)');
 
         await pool.query('DROP TABLE IF EXISTS osm_import_progress');
 

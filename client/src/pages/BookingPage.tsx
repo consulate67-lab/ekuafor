@@ -10,7 +10,6 @@ interface SelectionState {
     staffId: number | null;
     serviceId: number | null;
     serviceIds: number[];
-    packageId: number | null;
     date: string | null;
     time: string | null;
     customerName: string;
@@ -37,7 +36,6 @@ export default function BookingPage() {
     const [company, setCompany] = useState<Company | null>(null);
     const [staff, setStaff] = useState<User[]>([]);
     const [services, setServices] = useState<Service[]>([]);
-    const [packages, setPackages] = useState<any[]>([]);
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -48,7 +46,6 @@ export default function BookingPage() {
         staffId: initialStaffId,
         serviceId: null,
         serviceIds: [],
-        packageId: null as number | null,
         date: null,
         time: null,
         customerName: user ? `${user.first_name} ${user.last_name || ''}`.trim() : '',
@@ -101,7 +98,7 @@ export default function BookingPage() {
     }, [appointments, selection.date]);
 
     const timeSlots = useMemo(() => {
-        if (!company || !selection.date || (services.length === 0 && packages.length === 0)) return [];
+        if (!company || !selection.date || services.length === 0) return [];
 
         const now = new Date();
         const todayStr = now.toLocaleDateString('en-CA');
@@ -114,15 +111,8 @@ export default function BookingPage() {
         const workEnd = (endH || 0) * 60 + (endM || 0);
         const slotInterval = company.slot_interval || 30;
 
-        const pkg = selection.packageId ? packages.find(p => p.id === selection.packageId) : null;
-        const selectedServices: any[] = pkg ? pkg.services || [] : services.filter(s => selection.serviceIds.includes(s.id!));
-
-        let totalDuration = 0;
-        if (pkg) {
-            totalDuration = pkg.duration_minutes || 0;
-        } else {
-            totalDuration = selectedServices.reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
-        }
+        const selectedServices = services.filter(s => selection.serviceIds.includes(s.id!));
+        const totalDuration = selectedServices.reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
 
         if (totalDuration === 0) return [];
 
@@ -135,59 +125,31 @@ export default function BookingPage() {
             if (time + totalDuration > workEnd) { slots.push({ time: timeStr, isAvailable: false }); continue; }
 
             let canApplySlot = false;
-            if (pkg) {
-                // Package: Check if ANY staff is available for each service sequentially
-                let currentOffset = 0;
-                let pkgAvailable = true;
-                for (const svc of selectedServices) {
-                    const svcStart = time + currentOffset;
-                    const svcEnd = svcStart + (svc.duration_minutes || 0);
-                    const availableStaff = staff.filter(s => {
-                        if (svc.department_id && s.department_id !== svc.department_id) return false;
-                        const busyRanges = staffBusyMap.get(Number(s.id)) || [];
-                        return !busyRanges.some(r => svcStart < r.end && svcEnd > r.start);
-                    });
-                    if (availableStaff.length === 0) { pkgAvailable = false; break; }
-                    currentOffset += (svc.duration_minutes || 0);
-                }
-                canApplySlot = pkgAvailable;
+            const slotEnd = time + totalDuration;
+            if (!selection.staffId) {
+                // No staff selected yet (e.g. Service -> Date -> Time flow)
+                // Check if ANY staff exists who can do these services
+                canApplySlot = staff.some(s => {
+                    const busyRanges = staffBusyMap.get(Number(s.id)) || [];
+                    return !busyRanges.some(r => time < r.end && slotEnd > r.start);
+                });
             } else {
-                // Individual Services
-                const slotEnd = time + totalDuration;
-                if (!selection.staffId) {
-                    // No staff selected yet (e.g. Service -> Date -> Time flow)
-                    // Check if ANY staff exists who can do these services
-                    canApplySlot = staff.some(s => {
-                        const busyRanges = staffBusyMap.get(Number(s.id)) || [];
-                        return !busyRanges.some(r => time < r.end && slotEnd > r.start);
-                    });
-                } else {
-                    // Specific staff selected
-                    const busyRanges = staffBusyMap.get(Number(selection.staffId)) || [];
-                    canApplySlot = !busyRanges.some(r => time < r.end && slotEnd > r.start);
-                }
+                const busyRanges = staffBusyMap.get(Number(selection.staffId)) || [];
+                canApplySlot = !busyRanges.some(r => time < r.end && slotEnd > r.start);
             }
             slots.push({ time: timeStr, isAvailable: canApplySlot });
         }
         return slots;
-    }, [company, selection.date, selection.staffId, selection.serviceIds, selection.packageId, services, packages, staff, staffBusyMap]);
+    }, [company, selection.date, selection.staffId, selection.serviceIds, services, staff, staffBusyMap]);
 
     const selectedStaffUser = useMemo(() => staff.find(u => (u.id === selection.staffId) || ((u as any).user_id === selection.staffId)), [staff, selection.staffId]);
 
     const totals = useMemo(() => {
-        let totalPrice = 0;
-        let selectedSvsNames = '';
-        if (selection.packageId) {
-            const pkg = packages.find(p => p.id === selection.packageId);
-            totalPrice = Number(pkg?.price || 0);
-            selectedSvsNames = pkg?.name || '';
-        } else {
-            const selectedSvs = services.filter(s => selection.serviceIds.includes(s.id!));
-            totalPrice = selectedSvs.reduce((sum, s) => sum + Number(s.price), 0);
-            selectedSvsNames = selectedSvs.map(s => s.name).join(', ');
-        }
+        const selectedSvs = services.filter(s => selection.serviceIds.includes(s.id!));
+        const totalPrice = selectedSvs.reduce((sum, s) => sum + Number(s.price), 0);
+        const selectedSvsNames = selectedSvs.map(s => s.name).join(', ');
         return { totalPrice, selectedSvsNames };
-    }, [selection.packageId, selection.serviceIds, packages, services]);
+    }, [selection.serviceIds, services]);
 
     const { totalPrice, selectedSvsNames } = totals;
 
@@ -195,43 +157,14 @@ export default function BookingPage() {
         if (e) e.preventDefault();
         const currentSel = customSelection || selection;
         try {
-            let duration = 0;
-            let finalPrice = 0;
-            let finalServices: any[] = [];
-            const pkg = currentSel.packageId ? packages.find(p => p.id === currentSel.packageId) : null;
             const [h, m] = (currentSel.time || '00:00').split(':').map(Number);
             const startTimeMins = h * 60 + m;
-            const dayApps = appointments.filter(a => (a.appointment_date || '').substring(0, 10) === currentSel.date && a.status !== 'cancelled');
-            if (pkg) {
-                duration = pkg.duration_minutes;
-                finalPrice = Number(pkg.price);
-                let currentOffset = 0;
-                for (const svc of (pkg.services || [])) {
-                    const svcStart = startTimeMins + currentOffset;
-                    const svcEnd = svcStart + svc.duration_minutes;
-                    const candidates = staff.filter(s => !svc.department_id || s.department_id === svc.department_id);
-                    candidates.sort((a, b) => { if (a.id === svc.staff_id) return -1; if (b.id === svc.staff_id) return 1; return 0; });
-                    let bestStaffId = svc.staff_id || currentSel.staffId;
-                    for (const candidate of candidates) {
-                        const isBusy = dayApps.some(app => {
-                            if (Number(app.staff_id) !== Number(candidate.id)) return false;
-                            const [asH, asM] = app.start_time.split(':').map(Number);
-                            const [aeH, aeM] = app.end_time.split(':').map(Number);
-                            return (svcStart < (aeH * 60 + aeM) && svcEnd > (asH * 60 + asM));
-                        });
-                        if (!isBusy) { bestStaffId = candidate.id; break; }
-                    }
-                    finalServices.push({ service_id: svc.id, staff_id: bestStaffId });
-                    currentOffset += svc.duration_minutes;
-                }
-            } else {
-                const selectedServices = services.filter(s => currentSel.serviceIds.includes(s.id!));
-                duration = selectedServices.reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
-                finalPrice = selectedServices.reduce((sum, s) => sum + Number(s.price), 0);
-                finalServices = currentSel.serviceIds.map(sid => ({ service_id: sid, staff_id: currentSel.staffId }));
-            }
+            const selectedServices = services.filter(s => currentSel.serviceIds.includes(s.id!));
+            const duration = selectedServices.reduce((sum: number, s: any) => sum + (s.duration_minutes || 0), 0);
+            const finalPrice = selectedServices.reduce((sum, s) => sum + Number(s.price), 0);
+            const finalServices = currentSel.serviceIds.map(sid => ({ service_id: sid, staff_id: currentSel.staffId }));
             const endTime = `${String(Math.floor((startTimeMins + duration) / 60)).padStart(2, '0')}:${String((startTimeMins + duration) % 60).padStart(2, '0')}`;
-            const serviceNames = pkg ? pkg.name : services.filter(s => currentSel.serviceIds.includes(s.id!)).map(s => s.name).join(', ');
+            const serviceNames = selectedServices.map(s => s.name).join(', ');
             let deviceId = undefined;
             try { const info = await Device.getId(); deviceId = info.identifier; } catch (e) { }
             const cachedPhone = localStorage.getItem('customer_phone');
@@ -241,7 +174,6 @@ export default function BookingPage() {
                 staff_id: finalServices[0]?.staff_id || currentSel.staffId,
                 service_id: finalServices[0]?.service_id,
                 service_ids: finalServices.map(s => s.service_id),
-                package_id: currentSel.packageId,
                 appointment_date: currentSel.date,
                 start_time: currentSel.time,
                 end_time: endTime,
@@ -265,7 +197,7 @@ export default function BookingPage() {
                 navigate('/my-appointments', { replace: true });
             }
         } catch (err: any) { console.error('Booking failed', err); alert('Hata: ' + (err.response?.data?.error || err.message)); }
-    }, [id, appointments, packages, services, staff, selection, user, navigate]);
+    }, [id, services, selection, user, navigate]);
 
     useEffect(() => {
         const backHandler = App.addListener('backButton', () => {
@@ -323,12 +255,8 @@ export default function BookingPage() {
                     let favorites: number[] = savedFavs ? JSON.parse(savedFavs) : [];
                     if (!favorites.includes(companyId)) { favorites.push(companyId); localStorage.setItem('saloon_favorites', JSON.stringify(favorites)); }
                 }
-                const [servicesRes, packagesRes] = await Promise.all([
-                    api.get('/services', { params: { company_id: id } }),
-                    api.get('/packages', { params: { company_id: id } })
-                ]);
+                const servicesRes = await api.get('/services', { params: { company_id: id } });
                 setServices(servicesRes.data?.data || []);
-                setPackages(packagesRes.data?.data || []);
                 const usersRes = await api.get(`/companies/${id}/employees`);
                 const allStaff = usersRes.data?.data || [];
                 // Admin veya role bazlı filtreleme: Randevu sisteminde 'company_admin' görünmemeli
@@ -350,22 +278,22 @@ export default function BookingPage() {
 
     const handleNext = useCallback(() => {
         const currentContent = getStepContent(step);
-        const shouldSkipStaff = !!(selection.packageId || initialStaffId);
+        const shouldSkipStaff = !!initialStaffId;
         if (currentContent === 'service' && shouldSkipStaff) {
-            if (initialStaffId) { setSelection(prev => ({ ...prev, staffId: initialStaffId })); }
+            setSelection(prev => ({ ...prev, staffId: initialStaffId }));
         }
         let nextStep = step + 1;
         if (shouldSkipStaff && getStepContent(nextStep) === 'staff') { nextStep++; }
         setStep(nextStep);
-    }, [step, selection.packageId, initialStaffId, getStepContent]);
+    }, [step, initialStaffId, getStepContent]);
 
     const handleBack = useCallback(() => {
-        const shouldSkipStaff = !!(initialStaffId || selection.packageId);
+        const shouldSkipStaff = !!initialStaffId;
         let prevStep = step - 1;
         if (shouldSkipStaff && getStepContent(prevStep) === 'staff') { prevStep--; }
         if (prevStep < 1) prevStep = 1;
         setStep(prevStep);
-    }, [step, selection.packageId, initialStaffId, getStepContent]);
+    }, [step, initialStaffId, getStepContent]);
 
     // --- 2. RENDER (CRITICAL: ALL HOOKS ABOVE THIS POINT) ---
 
@@ -466,11 +394,6 @@ export default function BookingPage() {
                         {getStepContent(step) === 'service' && (
                             <div className="animate-in slide-in-from-right duration-300 fade-in pb-32">
                                 <h2 className="text-2xl font-black text-gray-900 mb-2">{company?.service_label || 'Hizmet'} Seçimi</h2>
-                                <div className="flex gap-4 mb-6">
-                                    <button onClick={() => setSelection({ ...selection, packageId: null })} className={`flex-1 py-3 text-[10px] font-black uppercase rounded-2xl ${!selection.packageId ? 'bg-[#b45309] text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-100'}`}>Tekli Hizmetler</button>
-                                    <button onClick={() => setSelection({ ...selection, serviceIds: [], packageId: packages[0]?.id || null })} className={`flex-1 py-3 text-[10px] font-black uppercase rounded-2xl ${selection.packageId ? 'bg-[#b45309] text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-100'}`}>Avantajlı Paketler</button>
-                                </div>
-                                {!selection.packageId ? (
                                     <div className="space-y-3">
                                         {services.map(s => {
                                             const isSelected = selection.serviceIds.includes(s.id!);
@@ -496,21 +419,8 @@ export default function BookingPage() {
                                             );
                                         })}
                                     </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        {packages.map(p => {
-                                            const isSelected = selection.packageId === p.id;
-                                            return (
-                                                <button key={p.id} onClick={() => setSelection({ ...selection, packageId: p.id, serviceIds: [] })} className={`w-full p-6 rounded-[2.5rem] border-2 text-left relative ${isSelected ? 'bg-amber-50 border-amber-500 shadow-xl' : 'bg-white border-transparent shadow-sm'}`}>
-                                                    <h3 className="font-black text-lg uppercase">{p.name}</h3>
-                                                    <div className="text-xl font-black text-amber-600">₺{p.price}</div>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                )}
                                 <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white to-transparent z-50">
-                                    <button disabled={selection.serviceIds.length === 0 && !selection.packageId} onClick={handleNext} className="w-full max-w-md mx-auto block bg-slate-900 text-white py-6 rounded-[2rem] font-black uppercase shadow-2xl disabled:opacity-30">Devam Et</button>
+                                    <button disabled={selection.serviceIds.length === 0} onClick={handleNext} className="w-full max-w-md mx-auto block bg-slate-900 text-white py-6 rounded-[2rem] font-black uppercase shadow-2xl disabled:opacity-30">Devam Et</button>
                                 </div>
                             </div>
                         )}
@@ -651,7 +561,6 @@ export default function BookingPage() {
                         )}
 
                         <div className="mt-12 pt-8 border-t border-gray-100 text-center">
-                            <button onClick={() => { if (confirm('Sıfırlansın mı?')) { localStorage.clear(); location.reload(); } }} className="text-[10px] text-gray-300 font-bold uppercase tracking-widest">Sistemi Sıfırla</button>
                             <p className="text-[9px] text-gray-300 mt-2 uppercase">v1.9.9 | ID: {id} | {company.name}</p>
                         </div>
                     </div>

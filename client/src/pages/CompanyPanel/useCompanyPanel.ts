@@ -62,13 +62,13 @@ interface CurrentAccount {
     balance?: number;
 }
 
-type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'finance' | 'ai' | 'reports' | 'profile' | 'integration' | 'voice-assistant' | 
+type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'finance' | 'reports' | 'profile' | 'integration' |
     'finance-sales-dashboard' | 'finance-sales-reports' | 'finance-sales-list' |
     'finance-purchases-dashboard' | 'finance-purchases-reports' | 'finance-purchases-list' |
     'finance-cash-dashboard' | 'finance-cash-reports' | 'finance-cash-list' |
     'finance-contacts' | 'finance-contacts-balance' |
     'header-invoices' | 'header-cash' | 'header-contacts' |
-    'customers-list' | 'customers-marketing' | 'customers-automations' | 'crm' | 'inventory';
+    'customers-list';
 
 interface MenuItem {
     key: TabKey;
@@ -104,17 +104,7 @@ const menuItems: MenuItem[] = [
             { key: 'finance-contacts-balance', label: 'Toplu Bakiye Raporu', icon: '⚖️' },
         ]
     },
-    { key: 'inventory', icon: '📦', label: 'Envanter & Stok' },
-    {
-        key: 'crm',
-        icon: '👥',
-        label: 'Müşteriler (CRM)',
-        children: [
-            { key: 'customers-list', label: 'Müşteri Rehberi', icon: '📇' },
-            { key: 'customers-marketing', label: 'Pazarlama & SMS', icon: '📱' },
-            { key: 'customers-automations', label: 'Akıllı Otomasyonlar', icon: '🤖' },
-        ]
-    },
+    { key: 'customers-list', icon: '👥', label: 'Müşteriler' },
     { key: 'reports', icon: '📊', label: 'Genel Raporlar' },
     { key: 'services', icon: '✂️', label: 'Hizmetler' },
     { key: 'profile', icon: '⚙️', label: 'Firma Ayarları' },

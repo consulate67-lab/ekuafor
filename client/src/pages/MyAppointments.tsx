@@ -142,21 +142,6 @@ export default function MyAppointments() {
         }
     }, [deviceId, user?.phone]);
 
-    const processPayment = async (appId: number) => {
-        try {
-            const res = await api.post('/payments/initialize', { appointment_id: appId });
-            if (res.data.success && res.data.data.paymentPageUrl) {
-                // In real app, we might use a WebView or redirect
-                window.location.href = res.data.data.paymentPageUrl;
-            } else {
-                alert('Ödeme başlatılamadı. Lütfen tekrar deneyin.');
-            }
-        } catch (err: any) {
-            console.error('Payment initialization failed', err);
-            alert('Hata: ' + (err.response?.data?.error || 'Ödeme servisine bağlanılamadı'));
-        }
-    };
-
     const handleRate = async () => {
         if (!ratingModal.app?.id) return;
         try {
@@ -261,7 +246,7 @@ export default function MyAppointments() {
                         <div className="flex-1 min-w-0">
                             <p className="text-[9px] font-black text-indigo-500 uppercase tracking-[0.2em] mb-1 truncate">{app.company_name || 'Salon'}</p>
                             <h3 className="text-base font-black text-slate-900 leading-tight truncate">
-                                {app.package_name || app.service_name || 'Hizmet'}
+                                {app.service_name || 'Hizmet'}
                             </h3>
                             {app.staff_name && (
                                 <p className="text-xs text-slate-400 font-bold mt-0.5">👤 {app.staff_name}</p>
@@ -331,14 +316,6 @@ export default function MyAppointments() {
                                 <div className="flex items-center justify-between">
                                     <p className="text-[10px] font-bold text-slate-400">Memnun kaldınız mı?</p>
                                     <div className="flex gap-2">
-                                        {(app as any).payment_status === 'unpaid' && Number(app.price) > 0 && (
-                                            <button
-                                                onClick={() => processPayment(app.id!)}
-                                                className="px-4 py-2 bg-emerald-600 text-white text-[9px] font-black uppercase tracking-wider rounded-xl hover:bg-emerald-500 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all"
-                                            >
-                                                💳 Ödeme Yap
-                                            </button>
-                                        )}
                                         <button
                                             onClick={() => { setRatingModal({ open: true, app }); setTempRating(5); setTempComment(''); }}
                                             className="px-4 py-2 bg-indigo-600 text-white text-[9px] font-black uppercase tracking-wider rounded-xl hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 active:scale-95 transition-all"
@@ -458,7 +435,7 @@ export default function MyAppointments() {
                         <div className="text-center mb-8">
                             <div className="text-4xl mb-4">⭐</div>
                             <h2 className="text-2xl font-black text-slate-900 tracking-tight">Hizmeti Puanlayın</h2>
-                            <p className="text-slate-500 text-sm mt-1">{ratingModal.app?.service_name || ratingModal.app?.package_name} nasıldı?</p>
+                            <p className="text-slate-500 text-sm mt-1">{ratingModal.app?.service_name} nasıldı?</p>
                         </div>
 
                         <div className="flex justify-center gap-2 mb-8">

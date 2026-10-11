@@ -3,7 +3,7 @@
 import type { Ctx } from './index';
 
 export function FinanceTab({ ctx }: { ctx: Ctx }) {
-    const { activeTab, financeDateRange, setFinanceDateRange, financeSearch, setFinanceSearch, completedAppointments, loadingFinance, invoices, cashTransactions, openingBalance, purchaseInvoices, currentAccounts, contactsBalance, selectedAppointment, setSelectedAppointment, setInvoiceForm, setShowInvoiceModal, salesSubTab, setSalesSubTab, setShowPurchaseModal, setShowCurrentAccountModal, setShowCashModal, setSelectedPurchaseInvoice, setShowPurchaseDetailModal, openCurrentAccountModal, handleDeleteInvoice, handleDeletePurchaseInvoice, handleDeleteCashTransaction, handleViewPurchaseDetail, switchTab, handleDeleteCurrentAccount, purchaseSearch, setPurchaseSearch, inventoryProducts } = ctx;
+    const { activeTab, financeDateRange, setFinanceDateRange, financeSearch, setFinanceSearch, completedAppointments, loadingFinance, invoices, cashTransactions, openingBalance, purchaseInvoices, currentAccounts, contactsBalance, selectedAppointment, setSelectedAppointment, setInvoiceForm, setShowInvoiceModal, salesSubTab, setSalesSubTab, setShowPurchaseModal, setShowCurrentAccountModal, setShowCashModal, setSelectedPurchaseInvoice, setShowPurchaseDetailModal, openCurrentAccountModal, handleDeleteInvoice, handleDeletePurchaseInvoice, handleDeleteCashTransaction, handleViewPurchaseDetail, switchTab, handleDeleteCurrentAccount, purchaseSearch, setPurchaseSearch } = ctx;
     return (
                         <div className="space-y-6">
                             {/* Finance Header - Breadcrumb-like */}
@@ -1010,7 +1010,7 @@ export function InvoiceModal({ ctx }: { ctx: Ctx }) {
 }
 
 export function PurchaseModal({ ctx }: { ctx: Ctx }) {
-    const { showPurchaseModal, setShowPurchaseModal, purchaseForm, setPurchaseForm, currentAccounts, inventoryProducts, handleCreatePurchase } = ctx;
+    const { showPurchaseModal, setShowPurchaseModal, purchaseForm, setPurchaseForm, currentAccounts, handleCreatePurchase } = ctx;
     return (
                 <div className="fixed inset-0 z-[300] flex items-end lg:items-center justify-center bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowPurchaseModal(false)}>
                     <div className="bg-white w-full max-w-2xl rounded-t-[3rem] lg:rounded-[3rem] p-8 lg:p-10 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}
@@ -1092,41 +1092,18 @@ export function PurchaseModal({ ctx }: { ctx: Ctx }) {
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             <div className="md:col-span-2">
-                                                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Ürün / Hizmet Seçin (Envanter)</label>
-                                                <select
-                                                    value={item.product_id || ''}
+                                                <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Ürün / Hizmet</label>
+                                                <input
+                                                    type="text"
+                                                    value={item.product_name}
                                                     onChange={e => {
-                                                        const val = e.target.value;
-                                                        const prod = inventoryProducts.find(p => p.id === parseInt(val));
                                                         const newItems = [...purchaseForm.items];
-                                                        newItems[idx] = {
-                                                            ...newItems[idx],
-                                                            product_id: val ? parseInt(val) : null,
-                                                            product_name: prod ? `${prod.brand} ${prod.name}` : '',
-                                                            unit: prod ? prod.unit : 'Adet'
-                                                        };
+                                                        newItems[idx].product_name = e.target.value;
                                                         setPurchaseForm({ ...purchaseForm, items: newItems });
                                                     }}
-                                                    className="w-full p-3 bg-slate-50 border-2 border-indigo-50 rounded-xl font-bold text-sm outline-none focus:border-indigo-500 transition-all appearance-none"
-                                                >
-                                                    <option value="">Envanter Dışı / Manuel Yaz...</option>
-                                                    {inventoryProducts.map(p => (
-                                                        <option key={p.id} value={p.id}>{p.brand} - {p.name} ({p.current_stock} {p.unit} Mevcut)</option>
-                                                    ))}
-                                                </select>
-                                                {!item.product_id && (
-                                                    <input
-                                                        type="text"
-                                                        value={item.product_name}
-                                                        onChange={e => {
-                                                            const newItems = [...purchaseForm.items];
-                                                            newItems[idx].product_name = e.target.value;
-                                                            setPurchaseForm({ ...purchaseForm, items: newItems });
-                                                        }}
-                                                        className="w-full mt-2 p-3 bg-white border-2 border-slate-100 rounded-xl font-bold text-sm outline-none focus:border-indigo-500"
-                                                        placeholder="Veya manuel bir isim yazın..."
-                                                    />
-                                                )}
+                                                    className="w-full p-3 bg-white border-2 border-slate-100 rounded-xl font-bold text-sm outline-none focus:border-indigo-500"
+                                                    placeholder="Ürün veya hizmet adı"
+                                                />
                                             </div>
                                             <div>
                                                 <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Miktar</label>

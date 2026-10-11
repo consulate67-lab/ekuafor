@@ -1,7 +1,6 @@
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { services } from '../db/schema';
-import iyzicoService from './iyzico.service';
 import smsService from './sms.service';
 import { normalizePhone } from '../utils/phone';
 import redis from '../config/redis';
@@ -31,7 +30,6 @@ export interface Company {
     bank_branch?: string | null;
     iban?: string | null; // Used as fallback or old data
     bank_iban?: string | null; // matches db
-    sub_merchant_key?: string | null;
     account_holder_name?: string | null;
 
     // Ödeme
@@ -66,8 +64,6 @@ export interface Company {
     ubl_outgoing_alias?: string | null;
     license_end_date?: string | Date | null;
     sms_enabled?: boolean | null;
-    ai_rules?: string | null;
-    ai_enabled?: boolean | null;
     photo?: string | null;
     building_number?: string | null;
     door_number?: string | null;
@@ -100,7 +96,6 @@ class CompanyService {
                 await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS district TEXT`);
                 await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS neighborhood TEXT`);
                 await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS sms_enabled BOOLEAN DEFAULT true`);
-                await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS ai_rules TEXT`);
                 await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS photo TEXT`);
                 await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS building_number TEXT`);
                 await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS door_number TEXT`);
@@ -108,10 +103,7 @@ class CompanyService {
                 await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS fax_number TEXT`);
                 await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS verification_code TEXT`);
                 await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS bank_iban TEXT`);
-                await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN DEFAULT true`);
-                // Ensure existing companies have this enabled by default if it was null
                 await tx.execute(sql`UPDATE companies SET sms_enabled = true WHERE sms_enabled IS NULL`);
-                await tx.execute(sql`UPDATE companies SET ai_enabled = true WHERE ai_enabled IS NULL`);
             } catch (e) { /* ignore if fails */ }
 
             if (company.main_company_id) {
@@ -145,7 +137,7 @@ class CompanyService {
                     genders, company_type, main_company_id,
                     tax_number, tax_office,
                     qnb_username, qnb_password, qnb_vkn, efatura_test_mode, invoice_prefix,
-                    ubl_incoming_alias, ubl_outgoing_alias, sms_enabled, ai_rules, photo,
+                    ubl_incoming_alias, ubl_outgoing_alias, sms_enabled, photo,
                     building_number, door_number, nace_code, fax_number, booking_flow, bank_iban,
                     verification_code
                 ) VALUES (
@@ -164,7 +156,7 @@ class CompanyService {
                     ${company.efatura_test_mode !== undefined ? company.efatura_test_mode : true}, ${company.invoice_prefix || 'GIB'},
                     ${company.ubl_incoming_alias ?? null}, ${company.ubl_outgoing_alias ?? null},
                     ${company.sms_enabled !== undefined ? company.sms_enabled : true},
-                    ${company.ai_rules ?? null}, ${company.photo ?? null},
+                    ${company.photo ?? null},
                     ${company.building_number ?? null}, ${company.door_number ?? null},
                     ${company.nace_code ?? null}, ${company.fax_number ?? null},
                     ${company.booking_flow || 'SPDT'}, ${company.bank_iban ?? null},
@@ -206,27 +198,6 @@ class CompanyService {
                     }
                 }
             }
-
-            // --- IYZICO SUB-MERCHANT INTEGRATION ---
-            if (company.bank_iban) {
-                try {
-                    const existingCompanyRes = await tx.execute(sql`SELECT sub_merchant_key FROM companies WHERE id = ${id}`);
-                    const existingRows = (existingCompanyRes as any).rows as any[];
-                    const existingSubMerchantKey = existingRows[0]?.sub_merchant_key;
-
-                    if (!existingSubMerchantKey) {
-                        const newKey = await iyzicoService.createSubMerchant({ ...company, id });
-                        if (newKey) company.sub_merchant_key = newKey;
-                    } else {
-                        await iyzicoService.updateSubMerchant(existingSubMerchantKey, { ...company, id });
-                        company.sub_merchant_key = existingSubMerchantKey;
-                    }
-                } catch (err: any) {
-                    console.error('[CompanyService] SubMerchant Sync Failed:', err.message);
-                    // Continue gracefully — log only
-                }
-            }
-            // ---------------------------------------
 
             // Dinamik SET clause — Drizzle sql template + sql.raw (kolon adları whitelist'ten)
             const setClauses = Object.entries(company)

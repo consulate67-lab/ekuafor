@@ -61,7 +61,6 @@ const companySchema = z.object({
     staff_label: z.string().max(50).nullable().optional(),
     service_label: z.string().max(50).nullable().optional(),
     booking_flow: z.string().nullable().optional(),
-    ai_rules: z.string().nullable().optional(),
     tax_number: nullableString,
     tax_office: nullableString,
     qnb_username: nullableString,
@@ -79,6 +78,10 @@ const companySchema = z.object({
     nace_code: nullableString,
     fax_number: nullableString,
 });
+
+const SUPER_ADMIN_ONLY_FIELDS = [
+    'license_end_date', 'company_type', 'main_company_id', 'commission_rate', 'payment_enabled',
+] as const;
 
 /**
  * POST /api/companies/register
@@ -382,6 +385,9 @@ router.put('/:id', authMiddleware, requireCompanyAccess('id', ['company_admin'])
     try {
         const id = parseInt(req.params.id);
         const validatedData = companySchema.partial().parse(req.body);
+        if (req.user?.role !== 'super_admin') {
+            for (const key of SUPER_ADMIN_ONLY_FIELDS) delete validatedData[key];
+        }
 
         const company = await companyService.updateCompany(id, validatedData);
 

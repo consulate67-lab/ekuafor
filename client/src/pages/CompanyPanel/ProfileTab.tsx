@@ -3,7 +3,7 @@
 import type { Ctx } from './index';
 
 export function ProfileTab({ ctx }: { ctx: Ctx }) {
-    const { company, setCompany, loading, handleUpdateCompany, aiRules, setAiRules, geoProvinces, geoDistricts, geoNeighborhoods, fetchDistricts, fetchNeighborhoods, departments } = ctx;
+    const { company, setCompany, loading, handleUpdateCompany, geoProvinces, geoDistricts, geoNeighborhoods, fetchDistricts, fetchNeighborhoods, departments } = ctx;
     return (
                         <div className="space-y-6">
                             <div className="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/40">
@@ -373,60 +373,6 @@ export function ProfileTab({ ctx }: { ctx: Ctx }) {
                                             </button>
                                         </div>
                                         <p className="text-[9px] text-slate-300 font-bold ml-1 mt-2">ℹ️ SMS gönderimi için SMS Sunucu Ayarlarınızın yapılmış olması gerekmektedir.</p>
-                                    </div>
-
-                                    {/* AI Görüşme Asistanı Ayarı - Yeni Eklendi */}
-                                    <div className="pt-4 border-t border-slate-100">
-                                        <div className="flex items-center justify-between p-4 bg-purple-50/50 rounded-2xl border border-purple-100/50">
-                                            <div className="flex-1">
-                                                <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                                                    <span>🎙️</span> Sesli Görüşme Asistanı (AI)
-                                                </h4>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight mt-0.5">Telefon görüşmelerinde randevu yakalama aktif olsun mu?</p>
-                                            </div>
-                                            <button
-                                                onClick={() => setCompany({ ...company, ai_enabled: !company.ai_enabled })}
-                                                className={`w-14 h-8 rounded-full transition-all relative ${company.ai_enabled !== false ? 'bg-purple-600' : 'bg-slate-200'}`}
-                                            >
-                                                <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${company.ai_enabled !== false ? 'right-1' : 'left-1'}`} />
-                                            </button>
-                                        </div>
-                                        {company.ai_enabled !== false && (
-                                            <div className="mt-4 p-4 bg-white rounded-2xl border border-slate-100 space-y-3">
-                                                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Zeka Modeli Kuralları (Prompts)</label>
-                                                <textarea
-                                                    value={aiRules}
-                                                    onChange={e => setAiRules(e.target.value)}
-                                                    rows={4}
-                                                    placeholder="Örn: 19:00'dan sonrasını alama..."
-                                                    className="w-full p-4 bg-slate-50 rounded-xl border-none text-xs font-medium text-slate-700 outline-none resize-none"
-                                                />
-                                                <p className="text-[8px] text-slate-300 italic">Personelin Android uygulaması üzerinden "Otomatik Dinleme" iznini vermiş olması gerekir.</p>
-                                                <button 
-                                                    onClick={() => {
-                                                        const detail = {
-                                                            success: true,
-                                                            data: {
-                                                                autoCreated: true,
-                                                                transcription: "Merhaba, yarın saat 14:00 için bir saç kesimi randevusu almak istiyordum. İsmim Ahmet Yılmaz.",
-                                                                extractedInfo: {
-                                                                    customerName: "Ahmet Yılmaz",
-                                                                    serviceName: "Saç Kesimi",
-                                                                    date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-                                                                    time: "14:00",
-                                                                    note: "Telefonla otomatik alındı"
-                                                                }
-                                                            }
-                                                        };
-                                                        const event = new CustomEvent('ai_appointment_detected', { detail });
-                                                        window.dispatchEvent(event);
-                                                    }}
-                                                    className="w-full py-2.5 bg-gradient-to-r from-purple-50 to-indigo-50 text-purple-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:from-purple-100 hover:to-indigo-100 transition-all border border-purple-100 mt-2 flex items-center justify-center gap-2"
-                                                >
-                                                    <span>🚀</span> Akış Simülasyonunu Başlat
-                                                </button>
-                                            </div>
-                                        )}
                                     </div>
 
                                     {/* Randevu Akış Sırası Ayarı */}

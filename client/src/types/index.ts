@@ -43,8 +43,6 @@ export interface Company {
     // Ödeme
     commission_rate?: number;
     payment_enabled?: boolean;
-    iyzico_commission_rate?: number;
-    sub_merchant_key?: string;
 
     // Çalışma Saatleri
     work_start_time?: string;
@@ -66,8 +64,6 @@ export interface Company {
     staff_label?: string;
     service_label?: string;
     sms_enabled?: boolean;
-    ai_enabled?: boolean;
-    ai_rules?: string;
 }
 
 export interface Province {
@@ -119,35 +115,12 @@ export interface Service {
     photo?: string | null;
 }
 
-export interface Package {
-    id?: number;
-    company_id: number;
-    name: string;
-    description?: string;
-    duration_minutes: number;
-    price: number;
-    is_active?: boolean;
-    staff_id?: number | null;
-    staff_first_name?: string | null;
-    staff_last_name?: string | null;
-    department_id?: number | null;
-    department_name?: string | null;
-    services?: (Service & { staff_id?: number | null; staff_name?: string })[];
-}
-
-export interface PackageServiceItem {
-    service_id: number;
-    staff_id?: number | null;
-    department_id?: number | null;
-}
-
 export interface Appointment {
     id?: number;
     company_id: number;
     customer_id?: number;
     service_id: number;
     service_ids?: number[];
-    package_id?: number;
     staff_id?: number;
     duration_minutes?: number;
     appointment_date: string;
@@ -157,14 +130,13 @@ export interface Appointment {
     notes?: string;
     price?: number;
     payment_status?: 'unpaid' | 'pending' | 'paid' | 'failed';
-    payment_method?: 'cash' | 'card_ceppos' | 'iyzico';
+    payment_method?: 'cash' | 'card';
     customer_name?: string;
     customer_phone?: string;
     rating?: number;
     comment?: string;
     technical_notes?: string;
     service_name?: string;
-    package_name?: string;
     staff_name?: string;
     company_name?: string;
     original_price?: number;

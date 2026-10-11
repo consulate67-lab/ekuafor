@@ -13,7 +13,6 @@ const appointmentSchema = z.object({
     service_id: z.union([z.number(), z.string().transform(v => parseInt(v, 10))]).optional(),
     service_ids: z.array(z.number()).optional(),
     services: z.array(z.any()).optional(), // Add services array for staff overrides
-    package_id: z.union([z.number(), z.string().transform(v => parseInt(v, 10))]).optional().nullable(),
     staff_id: z.union([z.number(), z.string().transform(v => parseInt(v, 10))]).optional().nullable(),
     appointment_date: z.string(),
     start_time: z.string(),
@@ -272,48 +271,6 @@ router.post('/company/:companyId/send-customer-message', authMiddleware, require
         res.json({ success: true });
     } catch (err: any) {
         res.status(500).json({ success: false, error: err.message });
-    }
-});
-
-router.get('/company/:companyId/automation-rules', authMiddleware, async (req: Request, res: Response) => {
-    try {
-        const companyId = parseInt(req.params.companyId);
-        if (req.user?.companyId !== companyId && req.user?.role !== 'super_admin') return res.status(403).json({ success: false });
-        const rules = await appointmentService.getAutomationRules(companyId);
-        res.json({ success: true, data: rules });
-    } catch (err) {
-        res.status(500).json({ success: false });
-    }
-});
-
-router.post('/company/:companyId/automation-rules', authMiddleware, async (req: Request, res: Response) => {
-    try {
-        const companyId = parseInt(req.params.companyId);
-        if (req.user?.companyId !== companyId && req.user?.role !== 'super_admin') return res.status(403).json({ success: false });
-        const rule = await appointmentService.createAutomationRule(companyId, req.body);
-        res.json({ success: true, data: rule });
-    } catch (err) {
-        res.status(500).json({ success: false });
-    }
-});
-
-router.patch('/automation-rules/:id', authMiddleware, async (req: Request, res: Response) => {
-    try {
-        const rule = await appointmentService.updateAutomationRule(parseInt(req.params.id), req.body);
-        res.json({ success: true, data: rule });
-    } catch (err) {
-        res.status(500).json({ success: false });
-    }
-});
-
-router.post('/company/:companyId/customers-sync', authMiddleware, async (req: Request, res: Response) => {
-    try {
-        const companyId = parseInt(req.params.companyId);
-        if (req.user?.companyId !== companyId && req.user?.role !== 'super_admin') return res.status(403).json({ success: false });
-        const customer = await appointmentService.syncCustomer(companyId, req.body);
-        res.json({ success: true, data: customer });
-    } catch (err) {
-        res.status(500).json({ success: false });
     }
 });
 

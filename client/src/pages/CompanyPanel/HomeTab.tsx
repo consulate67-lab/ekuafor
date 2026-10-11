@@ -3,7 +3,7 @@
 import type { Ctx } from './index';
 
 export function HomeTab({ ctx }: { ctx: Ctx }) {
-    const { company, isLicenseExpired, renewingLicense, handleRenewLicense, staffBoards, departments, switchTab } = ctx;
+    const { company, isLicenseExpired, staffBoards, departments, switchTab } = ctx;
     return (
                         <div className="space-y-6">
                             {isLicenseExpired && (
@@ -13,15 +13,8 @@ export function HomeTab({ ctx }: { ctx: Ctx }) {
                                     </div>
                                     <div className="flex-1 text-center md:text-left">
                                         <h3 className="text-xl font-black text-rose-900 uppercase tracking-tighter">Lisans Süreniz Doldu</h3>
-                                        <p className="text-sm text-rose-600 font-bold mt-1 uppercase tracking-widest opacity-70">İşlemlere devam etmek için ödeme yapmanız gerekmektedir.</p>
+                                        <p className="text-sm text-rose-600 font-bold mt-1 uppercase tracking-widest opacity-70">Lisansı uzatmak için Saloon ile iletişime geçin.</p>
                                     </div>
-                                    <button
-                                        onClick={handleRenewLicense}
-                                        disabled={renewingLicense}
-                                        className="px-10 py-5 bg-rose-500 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-500/30 active:scale-95 transition-all disabled:opacity-50"
-                                    >
-                                        {renewingLicense ? 'Bekleyiniz...' : 'ÖDEME YAP'}
-                                    </button>
                                 </div>
                             )}
 
@@ -38,13 +31,6 @@ export function HomeTab({ ctx }: { ctx: Ctx }) {
                                                 <h3 className="text-xl font-black text-amber-900 uppercase tracking-tighter">Lisans Süresi Yaklaşıyor</h3>
                                                 <p className="text-sm text-amber-600 font-bold mt-1 uppercase tracking-widest opacity-70">Lisansınızın bitmesine {days} gün kaldı.</p>
                                             </div>
-                                            <button
-                                                onClick={handleRenewLicense}
-                                                disabled={renewingLicense}
-                                                className="px-10 py-5 bg-amber-500 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-amber-500/30 active:scale-95 transition-all disabled:opacity-50"
-                                            >
-                                                {renewingLicense ? 'Bekleyiniz...' : 'YENİLE'}
-                                            </button>
                                         </div>
                                     );
                                 }
@@ -84,8 +70,7 @@ export function HomeTab({ ctx }: { ctx: Ctx }) {
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Hızlı İşlemler</p>
                                 {[
                                     { icon: '📅', label: 'Müşteri Randevu QR Kodu', desc: 'Müşterilerin randevu alması için', tab: 'booking' as TabKey },
-                                    { icon: '📦', label: 'Envanter & Stok Yönetimi', desc: 'Malzeme ve sarfiyat takibi', tab: 'inventory' as TabKey },
-                                    { icon: '✂️', label: (company.service_label || 'Hizmet') + ' ve Paket Yönetimi', desc: 'Fiyat ve süre tanımlamaları', tab: 'services' as TabKey },
+                                    { icon: '✂️', label: (company.service_label || 'Hizmet') + ' Yönetimi', desc: 'Fiyat ve süre tanımlamaları', tab: 'services' as TabKey },
                                     { icon: '👤', label: 'Yeni Personel Ekle', desc: 'Board kodu ile giriş yapacak', tab: 'staff' as TabKey },
                                     { icon: '🏢', label: 'Departman Yönet', desc: 'Birimlerinizi düzenleyin', tab: 'dept' as TabKey },
                                 ].map((action, i) => (
