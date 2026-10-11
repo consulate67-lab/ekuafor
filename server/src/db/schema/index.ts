@@ -5,7 +5,7 @@
  * Drizzle generate komutu tüm tabloları buradan okur.
  *
  * Domain dosyaları:
- *   - core.ts              → users, companies, main_companies, company_users, departments, osm_import_progress, kvkk_requests
+ *   - core.ts              → users, companies, main_companies, company_users, departments, kvkk_requests
  *   - services.ts          → services, packages, package_services, working_hours
  *   - appointments.ts      → appointments, appointment_services
  *   - finance.ts           → payments, invoices, purchase_*, cash_transactions, current_accounts

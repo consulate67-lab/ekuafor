@@ -37,9 +37,6 @@ const serverSchema = z.object({
     // === Türkiye API ===
     TURKIYE_API_BASE_URL: z.string().url().default('https://turkiyeapi.dev/api/v1'),
 
-    // === Google Maps ===
-    GOOGLE_MAPS_API_KEY: z.string().optional(),
-
     // === Firebase ===
     FIREBASE_SERVICE_ACCOUNT_PATH: z.string().optional(),
     FIREBASE_SERVICE_ACCOUNT_JSON: z.string().optional(),

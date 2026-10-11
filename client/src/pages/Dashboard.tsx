@@ -1,15 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Company, Service } from '../types';
-import { parseVoiceCommand } from '../lib/aiParser';
-import { Device } from '@capacitor/device';
+import { Company } from '../types';
 import { useAuthStore } from '../store/authStore';
 import {
     Users,
     TrendingUp,
     AlertTriangle,
     Calendar,
-    Mic,
     Plus
 } from 'lucide-react';
 import api from '../lib/api';
@@ -27,18 +24,6 @@ export default function Dashboard() {
     const [statsLoading, setStatsLoading] = useState(false);
     const [fetchError, setFetchError] = useState<string | null>(null);
     const [showReports, setShowReports] = useState(false);
-    const [services, setServices] = useState<Service[]>([]);
-    const [isListening, setIsListening] = useState(false);
-    const [voiceTranscript, setVoiceTranscript] = useState('');
-    const [voiceStep, setVoiceStep] = useState<'IDLE' | 'NAME' | 'DATE' | 'TIME' | 'SERVICE' | 'CONFIRM'>('IDLE');
-    const [guidedData, setGuidedData] = useState<any>({
-        customerName: '',
-        date: '',
-        serviceId: null,
-        startTime: '09:00',
-        endTime: '09:30',
-        price: 0
-    });
     const [allCompanies, setAllCompanies] = useState<Company[]>([]);
     const [loading, setLoading] = useState(false);
     const [companyInfo, setCompanyInfo] = useState<any>(null);
@@ -49,19 +34,12 @@ export default function Dashboard() {
         description: '',
         date: ''
     });
-    const [renewingLicense, setRenewingLicense] = useState(false);
     const [superAdminStats, setSuperAdminStats] = useState<any>(null);
     const [showExpiringModal, setShowExpiringModal] = useState(false);
     const [showCompaniesModal, setShowCompaniesModal] = useState(false);
     const [filteredCompanies, setFilteredCompanies] = useState<Company[]>([]);
     const [companiesModalTitle, setCompaniesModalTitle] = useState('');
     const [modalSearchTerm, setModalSearchTerm] = useState('');
-
-    // Lead Hunter States
-    const [hunterCity, setHunterCity] = useState('');
-    const [hunterResults, setHunterResults] = useState<any[]>([]);
-    const [hunterLoading, setHunterLoading] = useState(false);
-    const [importingId, setImportingId] = useState<string | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -119,20 +97,6 @@ export default function Dashboard() {
         searchTimeout.current = setTimeout(() => fetchCustomerHistory(val), 500);
     };
 
-    const handleRenewLicense = async () => {
-        try {
-            setRenewingLicense(true);
-            const res = await api.post('/payments/license/initialize', { months: 12 });
-            if (res.data.success && res.data.data.paymentPageUrl) {
-                window.location.href = res.data.data.paymentPageUrl;
-            }
-        } catch (err: any) {
-            alert(err.response?.data?.error || 'Ödeme başlatılamadı');
-        } finally {
-            setRenewingLicense(false);
-        }
-    };
-
     const getLocalDateString = () => {
         const d = new Date();
         const year = d.getFullYear();
@@ -161,14 +125,6 @@ export default function Dashboard() {
                 }
             } else if (user?.role === 'company_admin' || user?.role === 'staff') {
                 try {
-                    let services: any[] = [];
-                    try {
-                        const servicesRes = await api.get('/services');
-                        services = servicesRes.data?.data || [];
-                    } catch (e) {
-                        console.warn('Services fetch failed', e);
-                    }
-                    setServices(services);
                     try {
                         const compRes = await api.get(`/companies/${user.company_id}`);
                         const comp = compRes.data?.data;
@@ -200,120 +156,6 @@ export default function Dashboard() {
             console.error('Employee stats fetch error:', e);
         } finally {
             setStatsLoading(false);
-        }
-    };
-
-    const searchLeads = async () => {
-        if (!hunterCity) return;
-        setHunterLoading(true);
-        setHunterResults([]); 
-        try {
-            // Nominatim için en sağlam format: Tek bir sorgu içinde birleştirme
-            const searchTerm = `hairdresser ${hunterCity}`;
-            const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchTerm)}&countrycodes=tr&format=json&addressdetails=1&limit=100`;
-            
-            console.log(`[LeadHunter] Sorgu başlatılıyor: ${url}`);
-            const res = await fetch(url, {
-                headers: { 
-                    'Accept-Language': 'tr-TR'
-                }
-            });
-
-            if (!res.ok) {
-                throw new Error(`API Hatası: ${res.status}`);
-            }
-
-            const data = await res.json();
-            
-            if (!Array.isArray(data)) {
-                console.error("[LeadHunter] Beklenmedik veri formatı:", data);
-                setHunterResults([]);
-                return;
-            }
-
-            console.log(`[LeadHunter] OSM'den ${data.length} ham sonuç geldi.`);
-
-            const filtered = data.filter((item: any) => {
-                const searchName = (item.display_name.split(',')[0] || '').toLowerCase().replace(/\s+/g, ' ').trim();
-                const searchCity = (item.address?.province || item.address?.city || hunterCity || '').toLowerCase().trim();
-                const searchLat = parseFloat(item.lat);
-                const searchLon = parseFloat(item.lon);
-                
-                if (searchName.length < 3) return false;
-
-                const match = allCompanies.find(internal => {
-                    // 1. Lokasyon Kontrolü
-                    if (internal.latitude && internal.longitude) {
-                        const dLat = Math.abs(parseFloat(String(internal.latitude)) - searchLat);
-                        const dLon = Math.abs(parseFloat(String(internal.longitude)) - searchLon);
-                        if (dLat < 0.0008 && dLon < 0.0008) {
-                            console.log(`[Filtre] ${searchName} elendi: Konum çakışması (${internal.name})`);
-                            return true;
-                        }
-                    }
-                    
-                    // 2. İsim + Şehir Kontrolü
-                    const internalName = (internal.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
-                    const internalCity = (internal.city || '').toLowerCase().trim();
-                    
-                    if (internalName === searchName && (internalCity === searchCity || searchName.includes(internalName))) {
-                        console.log(`[Filtre] ${searchName} elendi: İsim/Şehir benzerliği (${internal.name})`);
-                        return true;
-                    }
-                    return false;
-                });
-
-                return !match;
-            });
-
-            console.log(`[LeadHunter] Filtreleme sonrası ${filtered.length} yeni işletme kaldı.`);
-            setHunterResults(filtered);
-            
-            if (filtered.length === 0) {
-                if (data && data.length > 0) {
-                    alert(`Bulunan ${data.length} işletmenin tamamı veritabanınızla çakışıyor.`);
-                } else {
-                    alert(`${hunterCity} bölgesinde sonuç bulunamadı. Lütfen "İlçe, İl" şeklinde deneyin.`);
-                }
-            }
-        } catch (e) {
-            console.error('[LeadHunter] Hata:', e);
-            alert('Arama servisine ulaşılamadı. Lütfen tekrar deneyin.');
-        } finally {
-            setHunterLoading(false);
-        }
-    };
-
-    const importLead = async (lead: any) => {
-        setImportingId(lead.place_id);
-        try {
-            const name = lead.display_name.split(',')[0];
-            const addr = lead.address;
-
-            const payload = {
-                name: name,
-                city: addr.province || addr.city || hunterCity,
-                district: addr.town || addr.district || addr.suburb || '',
-                address_line: lead.display_name,
-                latitude: parseFloat(lead.lat),
-                longitude: parseFloat(lead.lon),
-                company_type: 'ASIL',
-                is_active: true,
-                subscription_type: 'ÜCRETSİZ'
-            };
-
-            const res = await api.post('/companies', payload);
-            if (res.data.success) {
-                alert(`${name} başarıyla sisteme eklendi!`);
-                setHunterResults(prev => prev.filter(item => item.place_id !== lead.place_id));
-                // Update allCompanies list
-                const compRes = await api.get('/companies', { params: { nocache: 'true' } });
-                setAllCompanies(compRes.data.data || []);
-            }
-        } catch (e: any) {
-            alert('Ekleme hatası: ' + (e.response?.data?.error || e.message));
-        } finally {
-            setImportingId(null);
         }
     };
 
@@ -493,163 +335,6 @@ export default function Dashboard() {
         }
     };
 
-    const speak = (text: string) => {
-        if (!window.speechSynthesis) return;
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'tr-TR';
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
-        const voices = window.speechSynthesis.getVoices();
-        const trVoice = voices.find(v => v.lang.includes('tr'));
-        if (trVoice) utterance.voice = trVoice;
-        window.speechSynthesis.speak(utterance);
-    };
-
-    useEffect(() => {
-        if (window.speechSynthesis) window.speechSynthesis.getVoices();
-    }, []);
-
-    const startVoiceCommand = () => {
-        if (window.speechSynthesis) {
-            const warmUp = new SpeechSynthesisUtterance('');
-            warmUp.lang = 'tr-TR';
-            window.speechSynthesis.speak(warmUp);
-        }
-        setVoiceStep('NAME');
-        setGuidedData({
-            customerName: '',
-            date: getLocalDateString(),
-            startTime: '09:00',
-            endTime: '09:30',
-            serviceId: null,
-            price: 0
-        });
-        speak('Müşterinin ismi nedir?');
-        listenNextStep('NAME');
-    };
-
-    const listenNextStep = async (step: typeof voiceStep) => {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            alert('Tarayıcınız sesli komut özelliğini desteklemiyor.');
-            setVoiceStep('IDLE');
-            return;
-        }
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                stream.getTracks().forEach(track => track.stop());
-            } catch (err) {
-                alert('Mikrofon izni verilmedi.');
-                setVoiceStep('IDLE');
-                return;
-            }
-        }
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'tr-TR';
-        recognition.interimResults = true;
-        recognition.maxAlternatives = 1;
-        recognition.continuous = false;
-        recognition.onstart = () => setIsListening(true);
-        recognition.onend = () => setIsListening(false);
-        recognition.onresult = (event: any) => {
-            const result = event.results[event.results.length - 1];
-            const transcript = result[0].transcript.toLowerCase();
-            setVoiceTranscript(transcript);
-            if (result.isFinal) {
-                setTimeout(() => handleGuidedStep(step, transcript), 300);
-            }
-        };
-        recognition.onerror = () => setVoiceStep('IDLE');
-        recognition.start();
-    };
-
-    const handleGuidedStep = async (step: typeof voiceStep, transcript: string) => {
-        const rules = localStorage.getItem(`ai_rules_${user?.company_id}`) || '';
-        if (step === 'NAME') {
-            const cleanName = transcript.replace(/(ismini|adi|olan|musteri|isim)/gi, '').trim();
-            const name = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
-            setGuidedData((prev: any) => ({ ...prev, customerName: name }));
-            setVoiceStep('DATE');
-            setTimeout(() => {
-                speak('Randevu tarihi nedir?');
-                listenNextStep('DATE');
-            }, 600);
-        } else if (step === 'DATE') {
-            const parsed = parseVoiceCommand(transcript, [], rules);
-            setGuidedData((prev: any) => ({ ...prev, date: parsed.date }));
-            setVoiceStep('TIME');
-            setTimeout(() => {
-                speak('Randevu saati kaçta olsun?');
-                listenNextStep('TIME');
-            }, 600);
-        } else if (step === 'TIME') {
-            const parsed = parseVoiceCommand(transcript, [], rules);
-            setGuidedData((prev: any) => ({ ...prev, startTime: parsed.startTime }));
-            setVoiceStep('SERVICE');
-            setTimeout(() => {
-                speak('Yapılacak işlem nedir?');
-                listenNextStep('SERVICE');
-            }, 600);
-        } else if (step === 'SERVICE') {
-            const parsed = parseVoiceCommand(transcript, services, rules);
-            const service = services.find(s => s.id === parsed.serviceId);
-            let finalEndTime = parsed.endTime;
-            if (service && guidedData.startTime) {
-                const [h, m] = guidedData.startTime.split(':').map(Number);
-                const duration = service.duration_minutes || 30;
-                const totalMin = h * 60 + m + duration;
-                const endH = Math.floor(totalMin / 60) % 24;
-                const endM = totalMin % 60;
-                finalEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-            }
-            setGuidedData((prev: any) => ({
-                ...prev,
-                serviceId: parsed.serviceId,
-                endTime: finalEndTime,
-                price: parsed.price
-            }));
-            setVoiceStep('CONFIRM');
-            speak('Randevuyu onaylıyor musunuz?');
-        }
-    };
-
-    const confirmGuidedAppointment = async () => {
-        try {
-            if (!user?.company_id) return;
-            let staffId = (user.role === 'staff') ? user.id : undefined;
-            if (!staffId) {
-                const empRes = await api.get(`/companies/${user.company_id}/employees`);
-                const employees = empRes.data?.data || [];
-                if (employees.length > 0) staffId = employees[0].user_id || employees[0].id;
-            }
-            let deviceId = undefined;
-            try {
-                const info = await Device.getId();
-                deviceId = info.identifier;
-            } catch (e) { }
-            await api.post('/appointments', {
-                company_id: user.company_id,
-                service_id: guidedData.serviceId,
-                staff_id: staffId,
-                appointment_date: guidedData.date,
-                start_time: guidedData.startTime,
-                end_time: guidedData.endTime,
-                customer_name: guidedData.customerName,
-                notes: `Müşteri: ${guidedData.customerName} | Sesli Komut`,
-                price: guidedData.price,
-                device_id: deviceId,
-                status: 'approved'
-            });
-            alert('Randevu başarıyla eklendi.');
-            window.location.reload();
-        } catch (err: any) {
-            alert('Randevu oluşturulurken hata oluştu.');
-            setVoiceStep('IDLE');
-        }
-    };
-
     return (
         <div className="min-h-screen bg-slate-50/50">
             {/* Header */}
@@ -670,11 +355,6 @@ export default function Dashboard() {
                             </button>
                         </div>
                     </div>
-                    {voiceTranscript && (
-                        <div className="mt-4 bg-pink-50 text-pink-600 px-4 py-2 rounded-xl text-[11px] font-bold animate-pulse border border-pink-100 italic text-center mx-auto max-w-md">
-                            " {voiceTranscript} "
-                        </div>
-                    )}
                 </div>
             </header>
 
@@ -708,12 +388,9 @@ export default function Dashboard() {
                         <div className="w-16 h-16 bg-rose-500 rounded-3xl flex items-center justify-center text-3xl shadow-lg shadow-rose-500/20 flex-shrink-0 animate-bounce">💳</div>
                         <div className="flex-1 text-center md:text-left">
                             <h3 className="text-xl font-black text-rose-900 uppercase tracking-tighter">İşletme Lisans Süresi Doldu</h3>
-                            <p className="text-sm text-rose-600 font-bold mt-1 uppercase tracking-widest opacity-70">Sistemi kullanmaya devam etmek için işletme yöneticisinin ödeme yapması gerekmektedir.</p>
+                            <p className="text-sm text-rose-600 font-bold mt-1 uppercase tracking-widest opacity-70">Lisansı uzatmak için Saloon ile iletişime geçin.</p>
                         </div>
                         <div className="flex flex-col gap-2">
-                            <button onClick={handleRenewLicense} disabled={renewingLicense} className="px-8 py-4 bg-rose-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-rose-200 hover:bg-rose-700 transition-all disabled:opacity-50">
-                                {renewingLicense ? 'Bekleyiniz...' : 'Lisansı Yenile'}
-                            </button>
                             <div className="px-6 py-2 bg-rose-100 text-rose-600 rounded-xl font-black text-[9px] uppercase tracking-widest text-center">ERİŞİM KISITLANDI</div>
                         </div>
                     </div>
@@ -756,55 +433,6 @@ export default function Dashboard() {
 
                 {user?.role === 'super_admin' && (
                     <>
-                        <div className="bg-white rounded-[3rem] p-10 shadow-2xl border border-slate-100 mb-12">
-                            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
-                                <div>
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span className="px-3 py-1 bg-indigo-500 text-white text-[9px] font-black rounded-full uppercase tracking-widest">AKILLI AVCI</span>
-                                        <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter font-serif">Potansiyel İşletme Bulucu</h3>
-                                    </div>
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">OpenStreetMap üzerinden bölgenizdeki salonları tarayın ve sisteme kazandırın</p>
-                                </div>
-                                <div className="flex w-full lg:w-auto gap-3">
-                                    <input
-                                        type="text"
-                                        placeholder="Şehir ismi girin (Örn: İstanbul)"
-                                        value={hunterCity}
-                                        onChange={(e) => setHunterCity(e.target.value)}
-                                        className="flex-1 lg:w-64 bg-slate-50 border-none rounded-2xl px-6 py-4 text-slate-900 font-bold focus:ring-2 focus:ring-indigo-600 outline-none transition-all"
-                                    />
-                                    <button
-                                        onClick={searchLeads}
-                                        disabled={hunterLoading || !hunterCity}
-                                        className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95 disabled:opacity-50 flex items-center gap-2"
-                                    >
-                                        {hunterLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'TARAMAYI BAŞLAT'}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {hunterResults.length > 0 && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4">
-                                    {hunterResults.map((lead) => (
-                                        <div key={lead.place_id} className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100 hover:border-indigo-200 transition-all flex flex-col justify-between group">
-                                            <div>
-                                                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-xl shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-all mb-4">🔍</div>
-                                                <h4 className="font-black text-slate-900 uppercase tracking-tight text-sm mb-1">{lead.display_name.split(',')[0]}</h4>
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed line-clamp-2 mb-4">{lead.display_name}</p>
-                                            </div>
-                                            <button
-                                                onClick={() => importLead(lead)}
-                                                disabled={importingId === lead.place_id}
-                                                className="w-full py-3 bg-white text-indigo-600 border border-indigo-100 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all active:scale-95 flex justify-center items-center"
-                                            >
-                                                {importingId === lead.place_id ? 'EKLENİYOR...' : 'SİSTEME AKTAR'}
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
                         <div className="card bg-slate-900 border-none shadow-2xl mb-12 overflow-hidden relative group">
                             <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl group-hover:bg-indigo-500/20 transition-all duration-700"></div>
                             <div className="relative z-10 flex flex-col lg:flex-row gap-10 items-center justify-between">
@@ -1093,15 +721,6 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                             </Link>
-                            <button disabled={true} onClick={() => !isLicenseExpired && startVoiceCommand()} className="w-full card group border-indigo-100 text-left relative overflow-hidden opacity-50 cursor-not-allowed">
-                                <div className="flex items-center gap-5 relative z-10">
-                                    <div className="p-4 rounded-2xl bg-indigo-50 text-indigo-600"><Mic className="w-8 h-8" /></div>
-                                    <div>
-                                        <h3 className="text-xl font-bold text-gray-900 mb-1">Sesli Randevu</h3>
-                                        <p className="text-sm text-gray-500 font-medium leading-relaxed">Geçici olarak devre dışı.</p>
-                                    </div>
-                                </div>
-                            </button>
                             <button disabled={isLicenseExpired} onClick={() => !isLicenseExpired && setShowReports(true)} className={`card group border-amber-100 text-left ${isLicenseExpired ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02] transition-all duration-300'}`}>
                                 <div className="flex items-center gap-5">
                                     <div className="bg-amber-50 p-4 rounded-2xl group-hover:bg-amber-600 group-hover:text-white transition-colors duration-300">
@@ -1150,9 +769,6 @@ export default function Dashboard() {
                     )}
                 </div>
 
-                <div className="mt-16 pt-8 border-t border-gray-100 flex flex-col items-center gap-4 pb-8">
-                    <button onClick={() => { if (window.confirm('Sistem verileri sıfırlanacak. Çıkış yapılacak. Devam edilsin mi?')) { localStorage.clear(); window.location.href = '/'; } }} className="text-[10px] font-bold text-gray-300 uppercase tracking-widest hover:text-pink-500 transition-colors">Sistemi Sıfırla</button>
-                </div>
             </main>
 
             {showExpenseModal && (
@@ -1205,49 +821,6 @@ export default function Dashboard() {
                                     {loading ? 'Kaydediliyor...' : 'Masrafı Kaydet'}
                                 </button>
                             </form>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {voiceStep !== 'IDLE' && (
-                <div className="fixed inset-0 z-[100] bg-indigo-950/95 backdrop-blur-2xl flex flex-col items-center justify-center animate-fade-in p-6">
-                    <button onClick={() => setVoiceStep('IDLE')} className="absolute top-10 right-10 text-white/40 hover:text-white">
-                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                    <div className="relative mb-12">
-                        {isListening && <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-20 scale-150"></div>}
-                        <div className={`relative w-24 h-24 rounded-full flex items-center justify-center shadow-2xl transition-all ${isListening ? 'bg-indigo-600' : 'bg-slate-800'}`}>
-                            <svg className={`w-12 h-12 text-white ${isListening ? 'animate-bounce' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m8 0h-8m4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
-                        </div>
-                    </div>
-                    <div className="text-center max-w-lg w-full">
-                        <h2 className="text-4xl font-black text-white tracking-tighter mb-4">
-                            {voiceStep === 'NAME' && '1. Müşteri İsmi?'}
-                            {voiceStep === 'DATE' && '2. Randevu Tarihi?'}
-                            {voiceStep === 'TIME' && '3. Randevu Saati?'}
-                            {voiceStep === 'SERVICE' && '4. Yapılacak İşlem?'}
-                            {voiceStep === 'CONFIRM' && 'Son Kontrol'}
-                        </h2>
-                        <div className="space-y-4 bg-white/5 p-8 rounded-[2.5rem] border border-white/10 text-left">
-                            <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                                <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Müşteri</span>
-                                <span className="text-white font-black text-lg">{guidedData.customerName || '...'}</span>
-                            </div>
-                            <div className="flex justify-between items-center border-b border-white/5 py-4">
-                                <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Tarih / Saat</span>
-                                <span className="text-white font-black text-lg">{guidedData.date ? new Date(guidedData.date).toLocaleDateString('tr-TR') : '...'} - {guidedData.startTime}</span>
-                            </div>
-                            <div className="flex justify-between items-center py-4">
-                                <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Hizmet</span>
-                                <span className="text-white font-black text-lg">{services.find(s => s.id === guidedData.serviceId)?.name || '...'}</span>
-                            </div>
-                        </div>
-                        {voiceStep === 'CONFIRM' && (
-                            <div className="mt-12 flex gap-4 w-full">
-                                <button onClick={() => setVoiceStep('IDLE')} className="flex-1 py-6 bg-white/10 text-white rounded-3xl font-black uppercase tracking-widest hover:bg-white/20 transition-all">İptal</button>
-                                <button onClick={confirmGuidedAppointment} className="flex-1 py-6 bg-indigo-600 text-white rounded-3xl font-black uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:scale-105 transition-all">Onayla</button>
-                            </div>
                         )}
                     </div>
                 </div>
