@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authMiddleware, requireCompanyAccess } from '../middleware/auth.middleware';
 import { db } from '../db';
 import { sectors, companySectors } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
@@ -58,7 +58,7 @@ router.get('/sectors/:slug', async (req, res) => {
 });
 
 // Auth: firmanın sektörlerini getir
-router.get('/companies/:id/sectors', authMiddleware, async (req, res) => {
+router.get('/companies/:id/sectors', authMiddleware, requireCompanyAccess('id'), async (req, res) => {
     try {
         const companyId = parseInt(req.params.id, 10);
         if (isNaN(companyId)) {
@@ -85,7 +85,7 @@ router.get('/companies/:id/sectors', authMiddleware, async (req, res) => {
 });
 
 // Auth: firma sektör ata
-router.post('/companies/:id/sectors', authMiddleware, async (req, res) => {
+router.post('/companies/:id/sectors', authMiddleware, requireCompanyAccess('id', ['company_admin']), async (req, res) => {
     try {
         const companyId = parseInt(req.params.id, 10);
         const { sector_id, sub_specialty, is_primary } = req.body || {};
@@ -127,7 +127,7 @@ router.post('/companies/:id/sectors', authMiddleware, async (req, res) => {
 });
 
 // Auth: firma sektör kaldır
-router.delete('/companies/:id/sectors/:sectorId', authMiddleware, async (req, res) => {
+router.delete('/companies/:id/sectors/:sectorId', authMiddleware, requireCompanyAccess('id', ['company_admin']), async (req, res) => {
     try {
         const companyId = parseInt(req.params.id, 10);
         const sectorId = parseInt(req.params.sectorId, 10);

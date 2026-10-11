@@ -6,7 +6,8 @@ import bcrypt from 'bcryptjs';
 import pool from '../config/database';
 import companyService from '../services/company.service';
 import employeeRoutes from './employee.routes';
-import { authMiddleware, roleCheck } from '../middleware/auth.middleware';
+import { authMiddleware, roleCheck, companyAuth, requireCompanyAccess } from '../middleware/auth.middleware';
+import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 
 const router = Router();
@@ -214,7 +215,8 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
                     [parseInt(id as string), updateRole, formatPhoneTo12Digits(staff.phone), staff.first_name, staff.last_name, userId]
                 );
             } else {
-                const fakePw = '$2b$10$wI5uJmO/P8/1rFzFqI2f/e./6K67UHT71YmQdG5H73A7z241/O6lO'; // "123456"
+                // Personel şifresini SMS'teki set-password linkiyle belirler; bu hash kimsenin bilmediği bir değerdir.
+                const fakePw = await bcrypt.hash(randomBytes(24).toString('hex'), 10);
 
                 const insertRes = await pool.query(
                     `INSERT INTO users (first_name, last_name, phone, company_id, role, is_active, board_code, email, password)
@@ -376,7 +378,7 @@ router.get('/:id', async (req: Request, res: Response) => {
  * PUT /api/companies/:id
  * Firma güncelle
  */
-router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
+router.put('/:id', authMiddleware, requireCompanyAccess('id', ['company_admin']), async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
         const validatedData = companySchema.partial().parse(req.body);
@@ -414,7 +416,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
  * DELETE /api/companies/:id
  * Firma sil (soft delete)
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, roleCheck(['super_admin']), async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
         const success = await companyService.deleteCompany(id);
@@ -555,12 +557,9 @@ router.post('/admin-login', async (req: Request, res: Response) => {
  * POST /api/companies/:id/create-staff-board
  * Personel board kodu oluştur (yeni kullanıcı + board_code)
  */
-router.post('/:id/create-staff-board', async (req: Request, res: Response) => {
+router.post('/:id/create-staff-board', authMiddleware, requireCompanyAccess('id', ['company_admin']), async (req: Request, res: Response) => {
     try {
         const companyId = parseInt(req.params.id);
-        console.log('--- Staff Creation Request ---');
-        console.log('Company ID:', companyId);
-        console.log('Body:', req.body);
         const { first_name, last_name, gender, department_id, photo, quantity, unit, commission_rate, email: providedEmail, phone, password } = req.body;
 
         if (!first_name || !last_name) {
@@ -616,7 +615,7 @@ router.post('/:id/create-staff-board', async (req: Request, res: Response) => {
  * GET /api/companies/:id/staff-boards
  * Firma personel board kodlarını listele
  */
-router.get('/:id/staff-boards', async (req: Request, res: Response) => {
+router.get('/:id/staff-boards', companyAuth, requireCompanyAccess('id'), async (req: Request, res: Response) => {
     try {
         const companyId = parseInt(req.params.id);
         const result = await pool.query(
@@ -642,7 +641,7 @@ router.get('/:id/staff-boards', async (req: Request, res: Response) => {
  * DELETE /api/companies/:id/staff-boards/:userId
  * Firma personel board kodunu/ilişkisini sil
  */
-router.delete('/:id/staff-boards/:userId', async (req: Request, res: Response) => {
+router.delete('/:id/staff-boards/:userId', authMiddleware, requireCompanyAccess('id', ['company_admin']), async (req: Request, res: Response) => {
     try {
         const { id, userId } = req.params;
         
@@ -675,15 +674,24 @@ router.delete('/:id/staff-boards/:userId', async (req: Request, res: Response) =
  * PATCH /api/companies/:id/staff/:userId/photo
  * Personel fotoğrafını güncelle
  */
-router.patch('/:id/staff/:userId/photo', async (req: Request, res: Response) => {
+router.patch('/:id/staff/:userId/photo', authMiddleware, requireCompanyAccess('id'), async (req: Request, res: Response) => {
     try {
-        const { userId } = req.params;
+        const { id, userId } = req.params;
         const { photo } = req.body;
 
-        await pool.query(
-            'UPDATE users SET photo = $1 WHERE id = $2',
-            [photo, userId]
+        const isSelf = Number(req.user!.userId) === Number(userId);
+        if (!isSelf && !['company_admin', 'super_admin'].includes(req.user!.role)) {
+            return res.status(403).json({ success: false, error: 'Bu işlem için yetkiniz bulunmuyor.' });
+        }
+
+        const result = await pool.query(
+            `UPDATE users SET photo = $1
+             WHERE id = $2 AND (company_id = $3 OR id IN (SELECT user_id FROM company_users WHERE company_id = $3))`,
+            [photo, userId, id]
         );
+        if (result.rowCount === 0) {
+            return res.status(404).json({ success: false, error: 'Personel bulunamadı' });
+        }
 
         res.json({ success: true, message: 'Fotoğraf güncellendi' });
     } catch (error) {
@@ -698,9 +706,9 @@ router.patch('/:id/staff/:userId/photo', async (req: Request, res: Response) => 
  * PUT /api/companies/:id/staff/:userId
  * Personel bilgilerini güncelle (İsim, Soyisim, Email, Telefon, Şifre vb.)
  */
-router.put('/:id/staff/:userId', async (req: Request, res: Response) => {
+router.put('/:id/staff/:userId', authMiddleware, requireCompanyAccess('id', ['company_admin']), async (req: Request, res: Response) => {
     try {
-        const { userId } = req.params;
+        const { id, userId } = req.params;
         const { first_name, last_name, email, phone, password, gender, department_id, quantity, unit, commission_rate } = req.body;
 
         const updates: string[] = [];
@@ -730,8 +738,11 @@ router.put('/:id/staff/:userId', async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, error: 'Güncellenecek veri yok' });
         }
 
-        values.push(userId);
-        const query = `UPDATE users SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`;
+        values.push(userId, id);
+        const query = `UPDATE users SET ${updates.join(', ')}
+            WHERE id = $${i} AND role NOT IN ('super_admin', 'company_admin')
+              AND (company_id = $${i + 1} OR id IN (SELECT user_id FROM company_users WHERE company_id = $${i + 1}))
+            RETURNING *`;
         
         const result = await pool.query(query, values);
         if (result.rowCount === 0) {
@@ -805,17 +816,6 @@ router.post('/check-code', async (req: Request, res: Response) => {
         const { code, password } = req.body;
         if (!code) {
             return res.status(400).json({ success: false, error: 'Kod gereklidir' });
-        }
-
-        // Üst Yönetim Kodu (Özel Durum)
-        if (code === '996633') {
-            return res.json({
-                success: true,
-                data: {
-                    type: 'admin',
-                    redirect: '/main-management'
-                }
-            });
         }
 
         // Önce admin_key mi kontrol et
@@ -956,33 +956,6 @@ router.all('/sms-callback', async (req: Request, res: Response) => {
     } catch (err) {
         console.error('[SMS Callback] CRITICAL ERROR:', err);
         res.status(500).json({ status: "ERROR" });
-    }
-});
-
-/**
- * GET /api/companies/debug/callback-logs
- * Debugging purposes only
- */
-router.get('/debug/callback-logs', async (req: Request, res: Response) => {
-    try {
-        const result = await pool.query('SELECT * FROM callback_logs ORDER BY created_at DESC LIMIT 50');
-        res.json({ success: true, count: result.rowCount, data: result.rows });
-    } catch (err: any) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-});
-
-/**
- * GET /api/verify-test?gsm=...&msg=...
- */
-router.get('/verify-test', async (req: Request, res: Response) => {
-    try {
-        const { gsm, msg } = req.query;
-        if (!gsm || !msg) return res.send('GSM ve MSG gerekli');
-        const company = await companyService.verifyBySmsCode(String(msg), String(gsm));
-        res.json({ success: !!company, name: company?.name || 'BULUNAMADI' });
-    } catch (e: any) {
-        res.status(500).send(e.message);
     }
 });
 

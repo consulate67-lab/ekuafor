@@ -51,7 +51,7 @@ export default function MainCompanyReports() {
             setReportKey(keyToUse);
 
             // 2. Get reports
-            const reportRes = await api.get(`/main-companies/${mc.id}/reports`);
+            const reportRes = await api.get(`/main-companies/${mc.id}/reports`, { headers: { 'X-Report-Key': keyToUse } });
             setStats(reportRes.data.data.stats);
             setBranches(reportRes.data.data.branches);
 

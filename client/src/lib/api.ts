@@ -20,6 +20,10 @@ api.interceptors.request.use(
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+        const boardKey = localStorage.getItem('salon_board_key');
+        if (boardKey) {
+            config.headers['X-Board-Key'] = boardKey;
+        }
         return config;
     },
     (error) => {

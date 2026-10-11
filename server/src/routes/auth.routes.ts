@@ -316,53 +316,6 @@ router.get('/me', async (req: Request, res: Response) => {
     }
 });
 
-// Update user company (Fix for missing company_id) - Support both POST and PUT
-router.all('/update-company', async (req: Request, res: Response) => {
-    if (req.method !== 'POST' && req.method !== 'PUT') return res.status(405).json({ error: 'Method not allowed' });
-
-    try {
-        const token = req.headers.authorization?.replace('Bearer ', '');
-        if (!token) return res.status(401).json({ success: false, error: 'Token bulunamadı' });
-
-        const decoded = jwt.verify(token, env.JWT_SECRET) as any;
-        const { company_id } = req.body;
-
-        if (!company_id) {
-            return res.status(400).json({ success: false, error: 'Firma ID gereklidir' });
-        }
-
-        // Update user
-        const result = await pool.query(
-            'UPDATE users SET company_id = $1 WHERE id = $2 RETURNING *',
-            [company_id, decoded.userId]
-        );
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ success: false, error: 'Kullanıcı bulunamadı' });
-        }
-
-        const user = result.rows[0];
-
-        // Generate new token with updated companyId
-        const newToken = jwt.sign(
-            { userId: user.id, email: user.email, role: user.role, companyId: user.company_id },
-            env.JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-
-        // Remove password from response
-        const { password, ...userWithoutPassword } = user;
-
-        res.json({
-            success: true,
-            data: { user: userWithoutPassword, token: newToken }
-        });
-    } catch (error: any) {
-        console.error('Update Company Error:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
 /**
  * POST /api/auth/set-password
  * Set initial password using board_code

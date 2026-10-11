@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { companyAuth } from '../middleware/auth.middleware';
 import pool from '../config/database';
 
 const router = Router();
@@ -17,7 +17,7 @@ pool.query(`
     );
 `).catch(console.error);
 
-router.post('/', authMiddleware, async (req: Request, res: Response) => {
+router.post('/', companyAuth, async (req: Request, res: Response) => {
     try {
         const { amount, description, date } = req.body;
         const companyId = req.user?.companyId;
@@ -29,7 +29,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
 
         const result = await pool.query(
             'INSERT INTO expenses (company_id, amount, description, expense_date, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [companyId, amount, description, date || new Date().toISOString().split('T')[0], userId]
+            [companyId, amount, description, date || new Date().toISOString().split('T')[0], userId || null]
         );
 
         res.json({ success: true, data: result.rows[0] });
@@ -39,7 +39,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
     }
 });
 
-router.get('/', authMiddleware, async (req: Request, res: Response) => {
+router.get('/', companyAuth, async (req: Request, res: Response) => {
     try {
         const companyId = req.user?.companyId;
         if (!companyId) {

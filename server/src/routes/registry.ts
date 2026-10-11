@@ -1,5 +1,4 @@
 import { Express, Request, Response } from 'express';
-import companyService from '../services/company.service';
 
 // Routes
 import authRoutes from './auth.routes';
@@ -19,11 +18,9 @@ import paymentRoutes from './payment.routes';
 import expenseRoutes from './expense.routes';
 import aiRoutes from './ai.routes';
 import inventoryRoutes from './inventory.routes';
-import setupRoutes from './setup.routes';
 import adminRoutes from './admin.routes';
 import kvkkRoutes from './kvkk.routes';
 import sectorRoutes from './sector.routes';
-import adminResetRoutes from './admin-reset.routes';
 
 const commonPing = (req: Request, res: Response) => res.json({
     status: 'pong',
@@ -31,22 +28,6 @@ const commonPing = (req: Request, res: Response) => res.json({
     version: '1.69.11-NETGSM-FIX',
     port: process.env.PORT || 3000
 });
-
-const commonVerify = async (req: Request, res: Response) => {
-    try {
-        const { gsm, msg } = req.query;
-        console.log(`[VerifyTest] Global Call. GSM: ${gsm}, MSG: ${msg}`);
-        if (!gsm || !msg) return res.json({ success: false, error: 'GSM ve MSG eksik' });
-        const company = await companyService.verifyBySmsCode(String(msg), String(gsm));
-        res.json({
-            success: !!company,
-            name: company?.name || 'BULUNAMADI',
-            status: !!company ? 'APPROVED' : 'PENDING'
-        });
-    } catch (e: any) {
-        res.status(500).json({ success: false, error: e.message });
-    }
-};
 
 const healthHandler = async (req: Request, res: Response) => {
     console.log('[Health] Request received');
@@ -72,9 +53,6 @@ export const mountRoutes = (app: Express) => {
     // Health & Debug Endpoints
     app.get('/ping', commonPing);
     app.get('/api/ping', commonPing);
-    app.get('/verify-test', commonVerify);
-    app.get('/api/verify-test', commonVerify);
-    app.get('/api/companies/verify-test', commonVerify);
     app.get('/health', healthHandler);
     app.get('/api/health', healthHandler);
 
@@ -95,12 +73,10 @@ export const mountRoutes = (app: Express) => {
     app.use('/api/payments', paymentRoutes);
     app.use('/api/expenses', expenseRoutes);
     app.use('/api/inventory', inventoryRoutes);
-    app.use('/api/setup', setupRoutes);
     app.use('/api/ai', aiRoutes);
     app.use('/api/admin', adminRoutes);
     app.use('/api/kvkk', kvkkRoutes);
     app.use('/api', sectorRoutes);
-    app.use('/api/_admin-reset', adminResetRoutes);
 
     // 404 Catch-all
     app.all('*', (req: Request, res: Response) => {

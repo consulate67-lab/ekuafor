@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { env } from '../config/env';
 import jwt from 'jsonwebtoken';
 import appointmentService from '../services/appointment.service';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authMiddleware, companyAuth, canAccessCompany, requireCompanyAccess } from '../middleware/auth.middleware';
 import pool from '../config/database';
 import { z } from 'zod';
 import { logger } from '../utils/logger';
@@ -179,9 +179,15 @@ router.post('/', async (req: Request, res: Response) => {
     }
 });
 
-router.patch('/:id/status', async (req: Request, res: Response) => {
+router.patch('/:id/status', companyAuth, async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
+        const existing = await pool.query('SELECT company_id FROM appointments WHERE id = $1', [id]);
+        if (existing.rows.length === 0) return res.status(404).json({ success: false, error: 'Bulunamadı' });
+        if (!canAccessCompany(req, existing.rows[0].company_id)) {
+            return res.status(403).json({ success: false, error: 'Bu firmada yetkiniz bulunmuyor.' });
+        }
+
         const { status, price, payment_method, technical_notes, used_materials } = req.body;
         const appointment = await appointmentService.updateAppointmentStatus(id, status, price, payment_method, technical_notes, used_materials);
         if (!appointment) return res.status(404).json({ success: false, error: 'Bulunamadı' });
@@ -247,7 +253,7 @@ router.get('/company/:companyId/customers-crm', authMiddleware, async (req: Requ
     }
 });
 
-router.post('/company/:companyId/send-customer-message', authMiddleware, async (req: Request, res: Response) => {
+router.post('/company/:companyId/send-customer-message', authMiddleware, requireCompanyAccess('companyId'), async (req: Request, res: Response) => {
     try {
         const companyId = parseInt(req.params.companyId);
         const { phone: rawPhone, message, type } = req.body;

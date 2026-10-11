@@ -18,55 +18,17 @@ export default function MainCompanyPanel() {
         board_key: '',
     });
 
-    const [authCode, setAuthCode] = useState('');
-    const [isAuthorized, setIsAuthorized] = useState(false);
-
     const { user } = useAuthStore();
-    
+    const isAuthorized = user?.role === 'super_admin';
+
     useEffect(() => {
-        const savedAuth = localStorage.getItem('main_company_auth');
-        if (savedAuth || user?.role === 'super_admin') {
-            setIsAuthorized(true);
+        localStorage.removeItem('main_company_auth');
+        if (isAuthorized) {
             fetchMainCompanies();
         } else {
             setLoading(false);
         }
-    }, [user]);
-
-    const handleAuth = async (e: React.FormEvent) => {
-        e.preventDefault();
-        // 1. Super admin sabit kodu
-        if (authCode === '996633') {
-            localStorage.setItem('main_company_auth', '996633');
-            setIsAuthorized(true);
-            fetchMainCompanies();
-            return;
-        }
-        // 2. Admin Key veya Board Key kontrolü (her iki endpoint'i dene)
-        try {
-            // Önce admin_key dene
-            const res = await api.get(`/main-companies/code/${authCode.toUpperCase()}`, { headers: { 'X-No-Mock': 'true' } });
-            if (res.data.success && res.data.data) {
-                localStorage.setItem('main_company_auth', authCode.toUpperCase());
-                setIsAuthorized(true);
-                fetchMainCompanies();
-                return;
-            }
-        } catch { /* admin_key başarısız, board_key dene */ }
-
-        try {
-            // Board key dene (rapor girişiyle aynı endpoint)
-            const res2 = await api.post('/main-companies/reports-login', { key: authCode.toUpperCase() }, { headers: { 'X-No-Mock': 'true' } });
-            if (res2.data.success && res2.data.data) {
-                localStorage.setItem('main_company_auth', authCode.toUpperCase());
-                setIsAuthorized(true);
-                fetchMainCompanies();
-                return;
-            }
-        } catch { /* board_key de başarısız */ }
-
-        alert('Geçersiz yetki kodu!');
-    };
+    }, [isAuthorized]);
 
     const fetchMainCompanies = async () => {
         try {
@@ -119,18 +81,12 @@ export default function MainCompanyPanel() {
                 <div className="bg-white/10 backdrop-blur-xl p-12 rounded-[3rem] border border-white/10 w-full max-w-md shadow-2xl text-center">
                     <h1 className="text-3xl font-black text-white uppercase tracking-tighter mb-3 italic">Üst Yönetim Paneli</h1>
                     <p className="text-slate-400 text-sm font-bold mb-8">
-                        <span className="text-emerald-400">Admin Key</span> veya <span className="text-indigo-400">Board Key</span> ile giriş yapın
+                        Bu ekran sadece süper admin hesabıyla kullanılabilir. Şube raporları için rapor anahtarınızla giriş yapın.
                     </p>
-                    <form onSubmit={handleAuth} className="space-y-6">
-                        <input
-                            type="text"
-                            placeholder="ADM-XXX-XXXX"
-                            className="w-full bg-white/5 border-none rounded-2xl py-6 px-8 text-center text-2xl font-black text-white placeholder-white/20 focus:ring-2 focus:ring-emerald-500/50 uppercase tracking-widest font-mono"
-                            value={authCode}
-                            onChange={(e) => setAuthCode(e.target.value.toUpperCase())}
-                        />
-                        <button type="submit" className="w-full bg-emerald-500 text-slate-950 py-5 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-[1.02] active:scale-95 transition-all">Giriş Yap</button>
-                    </form>
+                    <div className="space-y-3">
+                        <Link to="/login" className="block w-full bg-emerald-500 text-slate-950 py-5 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-[1.02] active:scale-95 transition-all">Yönetici Girişi</Link>
+                        <Link to="/main-reports" className="block w-full bg-white/10 text-white py-5 rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-white/20 transition-all">Şube Raporları</Link>
+                    </div>
                 </div>
             </div>
         );

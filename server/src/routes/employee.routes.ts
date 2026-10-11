@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import employeeService from '../services/employee.service';
-import { authMiddleware, roleCheck } from '../middleware/auth.middleware';
+import { authMiddleware, requireCompanyAccess } from '../middleware/auth.middleware';
 import { z } from 'zod';
 
 const router = Router({ mergeParams: true }); // Firma ID'sini parent route'dan almak için
@@ -35,12 +35,10 @@ router.get('/', async (req: Request, res: Response) => {
  * POST /api/companies/:companyId/employees
  * Firmaya çalışan ekle
  */
-router.post('/', authMiddleware, async (req: Request, res: Response) => {
+router.post('/', authMiddleware, requireCompanyAccess('companyId', ['company_admin']), async (req: Request, res: Response) => {
     try {
         const companyId = parseInt(req.params.companyId);
         const validatedData = employeeSchema.parse(req.body);
-
-        // TODO: Burada işlem yapan kişinin firma sahibi olup olmadığı kontrol edilebilir
 
         const employee = await employeeService.addEmployee(
             companyId,
@@ -67,7 +65,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
  * DELETE /api/companies/:companyId/employees/:employeeId
  * Çalışanı çıkar
  */
-router.delete('/:employeeId', authMiddleware, async (req: Request, res: Response) => {
+router.delete('/:employeeId', authMiddleware, requireCompanyAccess('companyId', ['company_admin']), async (req: Request, res: Response) => {
     try {
         const companyId = parseInt(req.params.companyId);
         const employeeId = parseInt(req.params.employeeId);

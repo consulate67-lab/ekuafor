@@ -81,7 +81,7 @@ export const createApp = (): Express => {
         },
         credentials: false,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'X-No-Mock', 'X-Company-Id'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-No-Mock', 'X-Company-Id', 'X-Board-Key', 'X-Report-Key'],
     }));
 
     // === Rate limit — global ===

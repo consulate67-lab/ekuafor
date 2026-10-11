@@ -738,24 +738,18 @@ export const runMigrations = async () => {
             `);
         }
 
-        // 4. Seeding (Super Admin)
-        await pool.query(`
-            INSERT INTO users (email, password, role, first_name, last_name, phone, is_active)
-            VALUES (
-                'sarpyilmaz@saloon.com',
-                '$2a$10$Ba0KuHHWuOcEFC/OnP/6gu3CFAcF.Z.4iz2h.ira1C0.xH4vdy4a6',
-                'super_admin',
-                'sarp',
-                'yılmaz',
-                '5336660125',
-                true
-            )
-            ON CONFLICT (email) 
-            DO UPDATE SET
-                password  = EXCLUDED.password,
-                role      = 'super_admin',
-                is_active = true
-        `);
+        // 4. Seeding (Super Admin) — sadece boş kurulumda ve env verilmişse; mevcut hesaba dokunmaz.
+        const adminEmail = process.env.SUPER_ADMIN_EMAIL;
+        const adminPassword = process.env.SUPER_ADMIN_PASSWORD;
+        if (adminEmail && adminPassword) {
+            const bcrypt = (await import('bcryptjs')).default;
+            await pool.query(
+                `INSERT INTO users (email, password, role, first_name, last_name, is_active)
+                 VALUES ($1, $2, 'super_admin', 'Super', 'Admin', true)
+                 ON CONFLICT (email) DO NOTHING`,
+                [adminEmail.toLowerCase().trim(), await bcrypt.hash(adminPassword, 10)]
+            );
+        }
 
         // 5. Indexes
         await pool.query('CREATE INDEX IF NOT EXISTS idx_customer_devices_id ON customer_devices(device_id)');

@@ -1,9 +1,25 @@
 import { Router, Request, Response } from 'express';
 import serviceService from '../services/service.service';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authMiddleware, canAccessCompany } from '../middleware/auth.middleware';
+import pool from '../config/database';
 import { z } from 'zod';
 
 const router = Router();
+
+const ensureServiceAccess = async (req: Request, res: Response, next: any) => {
+    try {
+        const result = await pool.query('SELECT company_id FROM services WHERE id = $1', [parseInt(req.params.id)]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Hizmet bulunamadı' });
+        }
+        if (!canAccessCompany(req, result.rows[0].company_id)) {
+            return res.status(403).json({ success: false, error: 'Bu firmada yetkiniz bulunmuyor.' });
+        }
+        next();
+    } catch (error) {
+        next(error);
+    }
+};
 
 const serviceSchema = z.object({
     name: z.string().min(2, 'Hizmet adı en az 2 karakter olmalıdır'),
@@ -108,7 +124,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
 });
 
 // Hizmet güncelle
-router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
+router.put('/:id', authMiddleware, ensureServiceAccess, async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
         console.log(`[PUT /services/${id}] Update attempt:`, req.body);
@@ -129,7 +145,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
 });
 
 // Hizmet sil
-router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, ensureServiceAccess, async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
         const success = await serviceService.deleteService(id);
