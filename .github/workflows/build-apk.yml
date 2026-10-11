@@ -1,9 +1,7 @@
 name: Build Android APK
 
 on:
-  workflow_dispatch: # Manuel tetikleme için
-  push:
-    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -38,12 +36,13 @@ jobs:
           cd client
           npm run build
         env:
-          VITE_API_URL: "https://ekuafor-backend.onrender.com/api"
+          VITE_API_URL: "https://web-production-db847.up.railway.app/api"
           VITE_BASE: /
 
       - name: Capacitor Sync
         run: |
           cd client
+          [ -d android ] || npx cap add android
           npx cap sync android
 
       - name: Build Android APK

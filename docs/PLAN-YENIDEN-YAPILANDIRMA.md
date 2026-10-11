@@ -1,7 +1,7 @@
 # Saloon — Yeniden Yapılandırma Planı
 
 **Tarih:** 2026-10-12
-**Durum:** Onaylandı (2026-10-12) — Faz 0 başladı
+**Durum:** Onaylandı (2026-10-12) — Faz 0 ve Faz 1 tamamlandı, Faz 2 başladı
 **Kapsam:** Güvenlik düzeltmeleri, gereksiz kodun silinmesi, sektör-bağımsız rezervasyon modeli ve 4 ekranın yeniden düzenlenmesi.
 **Kapsam dışı (sonraki aşama):** Offline çalışma. Bu planda yalnızca offline'a hazırlık yapılır.
 
@@ -73,7 +73,7 @@ Bu maddeler canlıda açık durumda. Diğer her şeyden önce yapılmalı.
 
 **Kabul:** Bu uç noktalar 404 dönüyor; yetkisiz istekler 401/403 alıyor; sunucu yeniden başlatıldığında admin şifresi değişmiyor.
 
-**Durum (2026-10-12):** Kod tarafı tamamlandı (commit edilmedi). Ek olarak bulunup kapatılanlar: `/api/auth/update-company` (herkes kendini istediği firmaya bağlayabiliyordu), başka firmanın hizmetini güncelleme/silme, departman ekleme/silme, `/companies/debug/callback-logs`, `verify-test` uç noktaları, personel için sabit "123456" şifresi.
+**Durum (2026-10-12):** Tamamlandı ve canlıda doğrulandı (commit `747794f`). Süper admin şifreleri değiştirildi, Railway'den `IMPORT_SECRET` silindi. Ek olarak bulunup kapatılanlar: `/api/auth/update-company` (herkes kendini istediği firmaya bağlayabiliyordu), başka firmanın hizmetini güncelleme/silme, departman ekleme/silme, `/companies/debug/callback-logs`, `verify-test` uç noktaları, personel için sabit "123456" şifresi.
 Yeni ortak kontrol: `companyAuth` (JWT veya tablet için `X-Board-Key`), `requireCompanyAccess`, `canAccessCompany` (`server/src/middleware/auth.middleware.ts`).
 Elle yapılacaklar: deploy sonrası süper admin şifresini `server/scripts/reset-admin-password.ts` ile değiştirmek; Railway'den `IMPORT_SECRET` değişkenini silmek; boş kurulum için `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` tanımlamak.
 
@@ -108,6 +108,13 @@ Elle yapılacaklar: deploy sonrası süper admin şifresini `server/scripts/rese
 - Kök `package.json`: `iyzipay`, `basic-ftp` kaldır
 - İstemci: `firebase` (hiç import yok), `basic-ftp`, `dotenv`, `gh-pages` kaldır; `@capacitor/cli` → devDependencies
 - Sunucu: `cron` (kullanılmıyor, `node-cron` var — o da Faz 2'de gidiyor), `@types/*`, `tsx`, `typescript` → devDependencies
+
+**Durum (2026-10-12):** Tamamlandı. XSLT dosyaları `server/resources/xslt/` altına taşındı. Dump ve taşıma artıkları `D:\Saloon-arsiv`, `CabaniFiyat` `D:\CabaniFiyat` klasörüne alındı. APK workflow'u artık sadece elle tetikleniyor. Sunucu bağımlılık temizliği, modüller silinirken Faz 2'de yapılacak.
+
+**Sonraya kalan notlar:**
+- `railway.toml` (config-as-code) 2026-12-01'den sonra desteklenmiyor; `railway config migrate` ile taşınmalı.
+- `saloncebinde.com` SSL sertifikası geçersiz, personel SMS linkleri oraya gidiyor (`company.routes.ts`, `company.service.ts`). Faz 5'te ayarlanabilir uygulama adresine (`APP_URL`) bağlanacak.
+- Railway'deki `GOOGLE_MAPS_API_KEY` değişkeni Faz 2.1 ile birlikte silinecek.
 
 ---
 
