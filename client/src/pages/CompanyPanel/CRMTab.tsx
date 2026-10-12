@@ -122,7 +122,7 @@ export function CustomerDetailModal({ ctx }: { ctx: Ctx }) {
                                                       .catch(e => {
                                                           const err = e.response?.data?.error || e.message;
                                                           if (err.includes('token')) {
-                                                              alert('⚠️ Uygulama Bulunamadı\n\nBu müşteriniz henüz "Salon Cebinde" mobil uygulamasını indirip giriş yapmamış (veya bildirimlere izin vermemiş).\n\nPush Bildirimleri tamamen ücretsizdir ancak sadece uygulaması olan müşterilere ulaşır. Bu müşteriye isterseniz SMS atabilirsiniz!');
+                                                              alert('⚠️ Uygulama Bulunamadı\n\nBu müşteriniz henüz "Saloon" mobil uygulamasını indirip giriş yapmamış (veya bildirimlere izin vermemiş).\n\nPush Bildirimleri tamamen ücretsizdir ancak sadece uygulaması olan müşterilere ulaşır. Bu müşteriye isterseniz SMS atabilirsiniz!');
                                                           } else {
                                                               alert('Hata: ' + err);
                                                           }

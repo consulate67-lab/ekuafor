@@ -117,12 +117,6 @@ const menuItems: MenuItem[] = [
 ];
 export { menuItems };
 
-export const BOOKING_MODE_LABELS: Record<'staff' | 'resource' | 'class', { label: string; hint: string; icon: string }> = {
-    staff: { label: 'Personelle', hint: 'Müşteri personel ve saat seçer (kuaför, masaj, klinik)', icon: '👤' },
-    resource: { label: 'Alan kiralama', hint: 'Saha, kulvar veya oda saatlik kiralanır', icon: '📍' },
-    class: { label: 'Grup dersi', hint: 'Kapasiteli seanslara kayıt alınır (pilates, yoga)', icon: '👥' },
-};
-
 export const emptyServiceForm = {
     id: null as number | null,
     name: '',

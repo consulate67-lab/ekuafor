@@ -142,7 +142,7 @@ const CompanyCard = React.memo(({ company: c, navigatingToId, favorites, toggleF
     );
 });
 
-// Salon Cebinde - V1.9.6 - QR Scanner Fix
+// Saloon - V1.9.6 - QR Scanner Fix
 export default function CustomerHome() {
     const navigate = useNavigate();
     const [companies, setCompanies] = useState<Company[]>([]);
@@ -563,7 +563,7 @@ export default function CustomerHome() {
                             navigate('/dashboard', { replace: true });
                         }
                     } else if (data.type === 'board') {
-                        localStorage.setItem('salon_board_key', data.board_key);
+                        localStorage.setItem('board_key', data.board_key);
                         navigate(data.redirect, { replace: true });
                     }
                 }, 1200);
@@ -757,7 +757,7 @@ export default function CustomerHome() {
                         <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-indigo-500/20">
                             <img src="/app-icon.png" alt="Logo" className="w-full h-full object-cover" />
                         </div>
-                        <h1 className="text-xl font-black text-slate-900 tracking-tighter">Salon Cebinde</h1>
+                        <h1 className="text-xl font-black text-slate-900 tracking-tighter">Saloon</h1>
                     </div>
                     <div className="flex items-center gap-2">
                         <button
@@ -1345,7 +1345,7 @@ export default function CustomerHome() {
                             >
                                 Kapat
                             </button>
-                            <p className="text-[9px] text-slate-300 text-center mt-4 font-black uppercase tracking-widest">Salon Cebinde v1.9.9</p>
+                            <p className="text-[9px] text-slate-300 text-center mt-4 font-black uppercase tracking-widest">Saloon v1.9.9</p>
                         </div>
                     </div>
                 )

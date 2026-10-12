@@ -30,6 +30,7 @@ router.get('/sectors', async (_req, res) => {
                 color: sectors.color,
                 has_medical_consent: sectors.hasMedicalConsent,
                 default_duration_minutes: sectors.defaultDurationMinutes,
+                default_booking_mode: sectors.defaultBookingMode,
                 display_order: sectors.displayOrder,
             })
             .from(sectors)

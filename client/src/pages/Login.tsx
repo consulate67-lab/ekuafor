@@ -75,7 +75,7 @@ export default function Login() {
                     <div className="bg-white p-5 rounded-[2.5rem] w-24 h-24 flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-indigo-900/30">
                         <img src="/app-icon.png" alt="Logo" className="w-full h-full object-contain" />
                     </div>
-                    <h1 className="text-4xl font-black text-white tracking-tighter uppercase mb-2">Salon Cebinde</h1>
+                    <h1 className="text-4xl font-black text-white tracking-tighter uppercase mb-2">Saloon</h1>
                     <p className="text-indigo-100 font-bold text-xs uppercase tracking-[0.3em] opacity-80 italic">Orijinal Yönetim Sistemi</p>
                 </div>
 

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // @ts-nocheck
 import type { Ctx } from './index';
+import { SectorSelector } from '../../components/SectorSelector';
 
 export function ProfileTab({ ctx }: { ctx: Ctx }) {
     const { company, setCompany, loading, handleUpdateCompany, geoProvinces, geoDistricts, geoNeighborhoods, fetchDistricts, fetchNeighborhoods, departments } = ctx;
@@ -625,6 +626,19 @@ export function IntegrationTab({ ctx }: { ctx: Ctx }) {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Sektör Seçimi (Multi-Tenant — Sprint 2) */}
+                            {company?.id && (
+                                <div className="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/40">
+                                    <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter mb-2">
+                                        Meslek Grubu / Sektör
+                                    </h2>
+                                    <p className="text-xs text-slate-400 mb-6 font-bold">
+                                        Hizmet verdiğiniz sektörleri seçin. Birden fazla olabilir (örn. hem kuaför hem güzellik salonu). Birincil sektör müşterilerinize gösterilir.
+                                    </p>
+                                    <SectorSelector companyId={company.id} />
+                                </div>
+                            )}
 
                             <div className="bg-slate-900 rounded-3xl p-8 text-white relative overflow-hidden shadow-2xl">
                                 <h3 className="text-lg font-black mb-2 italic">UBL-TR Bilgilendirme</h3>

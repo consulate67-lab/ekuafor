@@ -30,7 +30,7 @@ class MailService {
             }
 
             const info = await this.transporter.sendMail({
-                from: `"Salon Cebinde" <${process.env.SMTP_USER}>`,
+                from: `"Saloon" <${process.env.SMTP_USER}>`,
                 to: to,
                 subject: subject,
                 html: html,

@@ -345,7 +345,7 @@ export default function Dashboard() {
                             <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-indigo-500/20">
                                 <img src="/app-icon.png" alt="Logo" className="w-full h-full object-cover" />
                             </div>
-                            <h1 className="text-lg font-black heading-serif text-gray-900 tracking-tight">Salon Cebinde</h1>
+                            <h1 className="text-lg font-black heading-serif text-gray-900 tracking-tight">Saloon</h1>
                         </div>
                         <div className="absolute right-0 flex items-center gap-3">
                             <button onClick={logout} className="p-2 text-gray-400 hover:text-[#b45309] transition-colors">

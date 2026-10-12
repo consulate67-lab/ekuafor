@@ -1513,7 +1513,7 @@ export function CurrentAccountModal({ ctx }: { ctx: Ctx }) {
                                     value={currentAccountForm.title}
                                     onChange={e => setCurrentAccountForm({ ...currentAccountForm, title: e.target.value })}
                                     className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold"
-                                    placeholder="Salon Cebinde Bilişim Ltd. Şti."
+                                    placeholder="Örnek Bilişim Ltd. Şti."
                                 />
                             </div>
 

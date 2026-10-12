@@ -483,11 +483,11 @@ Mevcut AI asistan güzellik salonu varsayımıyla çalışıyor. Yeni yaklaşım
 2. **Sabah:** Sprint 1 için Drizzle schema + migration hazırlığı
 3. **Sprint 1 başlangıcı:** Açık sorular cevaplandıktan sonra migration yazımı
 
-**Durum:** ✅ **Onaylandı (2026-09-26 22:33, Selim YILMAZ)** — Wellness dahil 9 sektör, Sprint 1'e geçiş onaylandı.
+**Durum:** ✅ **Onaylandı (2026-09-26 22:33, Selim YILMAZ)** + **DB taşıma tamamlandı (2026-09-27 00:10)**
 
-**Önkoşul:** DB taşıma tamamlanmalı (DB_NAME düzeltme + import_chunks.py). Selim Railway Dashboard'dan `web` service restart atmalı.
+**Önkoşul:** ✅ DB taşıma başarılı — Railway Postgres'e 16 tablo, 9712 satır import edildi (companies: 7141, appointments: 33, kvkk_requests: 1, vb.). `${{Postgres.DATABASE_URL}}` reference variable, pgEscape array literal fix, schema drift auto-filter, pool connectionTimeoutMillis 5s.
 
-**Sprint 1 başlangıç kapsamı:**
+**Sprint 1 başlangıç kapsamı (YARIN):**
 - `src/db/schema/sectors.ts` — sectors master table
 - `src/db/schema/company_sectors.ts` — many-to-many junction
 - `src/db/schema/sector_templates.ts` — service templates

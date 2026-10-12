@@ -5,7 +5,7 @@ import { Company, Appointment, Expense } from '../types';
 
 export default function SalonBoard() {
     const navigate = useNavigate();
-    const [boardKey, setBoardKey] = useState<string | null>(localStorage.getItem('salon_board_key'));
+    const [boardKey, setBoardKey] = useState<string | null>(localStorage.getItem('board_key'));
     const [inputKey, setInputKey] = useState('');
     const [company, setCompany] = useState<Company | null>(null);
     const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -138,8 +138,8 @@ export default function SalonBoard() {
             const res = await api.post('/companies/board-login', { board_key: keyToUse });
             if (res.data.success) {
                 const companyData = res.data.data;
-                localStorage.setItem('salon_board_key', keyToUse);
-                localStorage.setItem('salon_board_company_id', companyData.id.toString());
+                localStorage.setItem('board_key', keyToUse);
+                localStorage.setItem('board_company_id', companyData.id.toString());
                 setBoardKey(keyToUse);
                 setCompany(companyData);
                 fetchData(companyData.id);
@@ -166,7 +166,7 @@ export default function SalonBoard() {
                         setStaffInfo(user);
                         setCompany(comp);
                         setBoardKey('staff-mode');
-                        localStorage.setItem('salon_board_company_id', comp.id.toString());
+                        localStorage.setItem('board_company_id', comp.id.toString());
                         fetchData(comp.id);
                     }
                 } catch {
@@ -177,7 +177,7 @@ export default function SalonBoard() {
     }, []);
 
     useEffect(() => {
-        const storedId = localStorage.getItem('salon_board_company_id');
+        const storedId = localStorage.getItem('board_company_id');
         if (boardKey && boardKey !== 'staff-mode' && storedId) {
             const compId = parseInt(storedId);
             api.get(`/companies/${compId}`).then(res => {
@@ -257,7 +257,7 @@ export default function SalonBoard() {
 
     const handleStaffLogout = () => {
         localStorage.removeItem('staff_board_code');
-        localStorage.removeItem('salon_board_company_id');
+        localStorage.removeItem('board_company_id');
         setStaffMode(false);
         setStaffInfo(null);
         setBoardKey(null);
@@ -730,7 +730,7 @@ export default function SalonBoard() {
                                                     onClick={() => {
                                                         if (confirm('Sistemden çıkış yapılsın mı?')) {
                                                             if (staffMode) handleStaffLogout();
-                                                            else { localStorage.removeItem('salon_board_key'); window.location.reload(); }
+                                                            else { localStorage.removeItem('board_key'); window.location.reload(); }
                                                         }
                                                     }}
                                                     className="w-full flex items-center justify-between px-3 py-2 bg-rose-50 text-rose-600 rounded-xl text-sm font-bold hover:bg-rose-100 transition-all"

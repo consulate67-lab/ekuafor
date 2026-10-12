@@ -1,16 +1,14 @@
 import { Device } from '@capacitor/device';
-
-const DEVICE_KEY = 'device_id';
-const FINGERPRINT_KEY = 'ekuafor_device_fingerprint';
+import { storage, StorageKey } from './storage';
 
 const createWebId = (): string => {
-    const existing = localStorage.getItem(FINGERPRINT_KEY);
+    const existing = storage.get(StorageKey.webDeviceId);
     if (existing) return existing;
     const random = typeof crypto !== 'undefined' && 'randomUUID' in crypto
         ? crypto.randomUUID().replace(/-/g, '').slice(0, 16)
         : Math.random().toString(36).slice(2, 12);
     const id = `WEB-${random.toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
-    localStorage.setItem(FINGERPRINT_KEY, id);
+    storage.set(StorageKey.webDeviceId, id);
     return id;
 };
 
@@ -19,7 +17,7 @@ const createWebId = (): string => {
  * Rezervasyon, "Randevularım" ve puanlama aynı değeri göndermeli; bu yüzden ilk üretilen değer saklanır.
  */
 export const getDeviceId = async (): Promise<string> => {
-    const stored = localStorage.getItem(DEVICE_KEY);
+    const stored = storage.get(StorageKey.deviceId);
     if (stored && stored !== 'unknown' && stored !== 'web-browser') return stored;
     let id: string;
     try {
@@ -27,6 +25,6 @@ export const getDeviceId = async (): Promise<string> => {
     } catch {
         id = createWebId();
     }
-    localStorage.setItem(DEVICE_KEY, id);
+    storage.set(StorageKey.deviceId, id);
     return id;
 };

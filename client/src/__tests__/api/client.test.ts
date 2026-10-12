@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 
 /**
- * api.test.ts — Axios instance, baseURL, request/response interceptor'ları.
+ * client.test.ts — Axios instance, baseURL, request/response interceptor'ları.
  *
  * Not: api.ts import edildiğinde axios.create + interceptor use'lar bir kez
  * çalışır. Her test'te interceptor'ları doğrulamak için axios.interceptors
@@ -16,7 +16,7 @@ describe('api client', () => {
     });
 
     it('creates an axios instance with default baseURL', async () => {
-        const apiModule = await import('../../lib/api');
+        const apiModule = await import('../../api/client');
         const api = apiModule.default;
 
         // Default baseURL dev'te (VITE_API_URL yok, isProduction false)
@@ -24,19 +24,19 @@ describe('api client', () => {
     });
 
     it('sets Content-Type: application/json header', async () => {
-        const { default: api } = await import('../../lib/api');
+        const { default: api } = await import('../../api/client');
         expect(api.defaults.headers['Content-Type']).toBe('application/json');
     });
 
     it('sets 30 second timeout', async () => {
-        const { default: api } = await import('../../lib/api');
+        const { default: api } = await import('../../api/client');
         expect(api.defaults.timeout).toBe(30000);
     });
 
     describe('request interceptor', () => {
         it('adds Authorization header when token exists in localStorage', async () => {
             localStorage.setItem('token', 'test-jwt-123');
-            const { default: api } = await import('../../lib/api');
+            const { default: api } = await import('../../api/client');
 
             const config: any = { headers: {} };
             // İlk request interceptor'ı çağır
@@ -48,7 +48,7 @@ describe('api client', () => {
         });
 
         it('does NOT add Authorization header when no token', async () => {
-            const { default: api } = await import('../../lib/api');
+            const { default: api } = await import('../../api/client');
 
             const config: any = { headers: {} };
             const handlers = (api.interceptors.request as any).handlers;
@@ -63,7 +63,7 @@ describe('api client', () => {
         it('removes token from localStorage on 401', async () => {
             localStorage.setItem('token', 'expired-token');
             localStorage.setItem('user_data', JSON.stringify({ id: 1 }));
-            const { default: api } = await import('../../lib/api');
+            const { default: api } = await import('../../api/client');
 
             const handlers = (api.interceptors.response as any).handlers;
             const onRejected = handlers[0].rejected;
@@ -76,7 +76,7 @@ describe('api client', () => {
 
         it('passes through non-401 errors without clearing localStorage', async () => {
             localStorage.setItem('token', 'valid-token');
-            const { default: api } = await import('../../lib/api');
+            const { default: api } = await import('../../api/client');
 
             const handlers = (api.interceptors.response as any).handlers;
             const onRejected = handlers[0].rejected;

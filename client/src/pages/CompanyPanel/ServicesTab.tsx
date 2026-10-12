@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import api from '../../lib/api';
 import type { Ctx } from './index';
-import { BOOKING_MODE_LABELS, emptyServiceForm } from './useCompanyPanel';
+import { emptyServiceForm } from './useCompanyPanel';
+import { BOOKING_MODE_TEXT } from '../../lib/labels';
+import { sectorsApi } from '../../api/sectors';
 
 export function ServicesTab({ ctx }: { ctx: Ctx }) {
     const { companyServices, setShowTemplatesModal, setShowServiceModal, setServiceForm, handleDeleteService } = ctx;
@@ -36,7 +38,7 @@ export function ServicesTab({ ctx }: { ctx: Ctx }) {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {companyServices.map(svc => {
-                        const mode = BOOKING_MODE_LABELS[svc.booking_mode || 'staff'];
+                        const mode = BOOKING_MODE_TEXT[svc.booking_mode || 'staff'];
                         return (
                             <div key={svc.id} className="bg-white rounded-3xl p-5 shadow-xl shadow-slate-200/20 flex gap-4">
                                 <div className="w-16 h-16 bg-slate-50 rounded-2xl flex-shrink-0 flex items-center justify-center text-2xl overflow-hidden border border-slate-100">
@@ -121,7 +123,7 @@ export function ServiceModal({ ctx }: { ctx: Ctx }) {
                     <div className="flex justify-center mb-6">
                         <div className="relative">
                             <div className="w-24 h-24 rounded-3xl bg-slate-50 overflow-hidden border-4 border-white shadow-xl flex items-center justify-center text-3xl">
-                                {serviceForm.photo ? <img src={serviceForm.photo} alt="Hizmet" className="w-full h-full object-cover" /> : BOOKING_MODE_LABELS[serviceForm.booking_mode].icon}
+                                {serviceForm.photo ? <img src={serviceForm.photo} alt="Hizmet" className="w-full h-full object-cover" /> : BOOKING_MODE_TEXT[serviceForm.booking_mode].icon}
                             </div>
                             <label className="absolute -bottom-2 -right-2 bg-indigo-600 text-white p-2.5 rounded-xl shadow-lg cursor-pointer" aria-label="Fotoğraf seç">
                                 📷
@@ -149,7 +151,7 @@ export function ServiceModal({ ctx }: { ctx: Ctx }) {
                     <div>
                         <label className={labelClass}>Rezervasyon Tipi</label>
                         <div className="grid grid-cols-3 gap-2">
-                            {Object.entries(BOOKING_MODE_LABELS).map(([key, m]) => (
+                            {Object.entries(BOOKING_MODE_TEXT).map(([key, m]) => (
                                 <button
                                     key={key}
                                     type="button"
@@ -161,7 +163,7 @@ export function ServiceModal({ ctx }: { ctx: Ctx }) {
                                 </button>
                             ))}
                         </div>
-                        <p className="text-[11px] text-slate-400 font-bold mt-2 ml-2">{BOOKING_MODE_LABELS[serviceForm.booking_mode].hint}</p>
+                        <p className="text-[11px] text-slate-400 font-bold mt-2 ml-2">{BOOKING_MODE_TEXT[serviceForm.booking_mode].hint}</p>
                     </div>
 
                     <div className="flex gap-4">
@@ -254,17 +256,16 @@ export function TemplatesModal({ ctx }: { ctx: Ctx }) {
     const [added, setAdded] = useState<number[]>([]);
 
     useEffect(() => {
-        api.get('/sectors/templates')
-            .then(res => setTemplates(res.data?.data || []))
+        sectorsApi.templates()
+            .then(setTemplates)
             .catch(() => setTemplates([]))
             .finally(() => setLoading(false));
     }, []);
 
     useEffect(() => {
         if (!ctx.company?.id) return;
-        api.get(`/companies/${ctx.company.id}/sectors`)
-            .then(res => {
-                const list: any[] = res.data?.sectors || [];
+        sectorsApi.ofCompany(ctx.company.id)
+            .then(list => {
                 const primary = list.find(s => s.is_primary) || list[0];
                 if (primary?.sector_slug) setSectorSlug(current => current ?? primary.sector_slug);
             })
@@ -306,7 +307,7 @@ export function TemplatesModal({ ctx }: { ctx: Ctx }) {
                                 <div className="min-w-0">
                                     <p className="font-bold text-sm text-slate-900 truncate">{t.name}</p>
                                     <p className="text-[10px] font-bold text-slate-400 uppercase">
-                                        {t.duration_options?.length ? t.duration_options.join('/') : t.duration_minutes} dk • ₺{Number(t.price || 0)} • {BOOKING_MODE_LABELS[t.booking_mode || 'staff'].label}
+                                        {t.duration_options?.length ? t.duration_options.join('/') : t.duration_minutes} dk • ₺{Number(t.price || 0)} • {BOOKING_MODE_TEXT[t.booking_mode || 'staff'].label}
                                     </p>
                                 </div>
                                 <button

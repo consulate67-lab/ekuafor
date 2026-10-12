@@ -5,6 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import { useAuthStore } from './store/authStore';
 import api from './lib/api';
 import { useAppointmentSync } from './hooks/useAppointmentSync';
+import { FullScreenLoader } from './components/ui';
 
 /**
  * Lazy-loaded page components.
@@ -33,20 +34,6 @@ const CustomerLogin = lazy(() => import('./pages/CustomerLogin'));
 const SetupStaff = lazy(() => import('./pages/SetupStaff'));
 const SetPassword = lazy(() => import('./pages/SetPassword'));
 const KvkkPage = lazy(() => import('./pages/KvkkPage'));
-
-/**
- * Lazy fallback — sayfa chunk yüklenirken gösterilir.
- */
-const LoadingScreen = () => (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-            <div className="w-12 h-12 border-4 border-pink-100 border-t-pink-600 rounded-full animate-spin mx-auto"></div>
-            <p className="mt-4 text-gray-500 font-bold tracking-widest uppercase text-[10px]">Yükleniyor...</p>
-        </div>
-    </div>
-);
-
-
 
 
 function App() {
@@ -90,7 +77,7 @@ function App() {
                                 window.location.hash = '#/dashboard';
                             }
                         } else if (data.type === 'board') {
-                            localStorage.setItem('salon_board_key', data.board_key);
+                            localStorage.setItem('board_key', data.board_key);
                             window.location.hash = '#/board';
                         } else if (data.type === 'admin') {
                             if (!data.is_license_expired) {
@@ -186,20 +173,13 @@ function App() {
     }, [isNative, setInitialized]);
 
     if (!initialized) {
-        return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="w-12 h-12 border-4 border-pink-100 border-t-pink-600 rounded-full animate-spin mx-auto"></div>
-                    <p className="mt-4 text-gray-500 font-bold tracking-widest uppercase text-[10px]">Oturum Kontrol Ediliyor...</p>
-                </div>
-            </div>
-        );
+        return <FullScreenLoader text="Oturum kontrol ediliyor…" />;
     }
 
     return (
         <div className="relative min-h-screen pb-40">
             <Router {...routerProps}>
-                <Suspense fallback={<LoadingScreen />}>
+                <Suspense fallback={<FullScreenLoader />}>
                 <Routes>
                     {/* Public Routes */}
                     <Route

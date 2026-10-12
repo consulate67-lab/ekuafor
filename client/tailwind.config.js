@@ -1,3 +1,5 @@
+import colors from 'tailwindcss/colors';
+
 /** @type {import('tailwindcss').Config} */
 export default {
     content: [
@@ -6,6 +8,9 @@ export default {
     ],
     theme: {
         extend: {
+            colors: {
+                brand: colors.indigo,
+            },
             fontFamily: {
                 sans: ['Outfit', 'Inter', 'sans-serif'],
                 serif: ['Playfair Display', 'serif'],

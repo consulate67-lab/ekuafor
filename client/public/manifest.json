@@ -1,6 +1,6 @@
 {
-    "short_name": "Salon Cebinde",
-    "name": "Salon Cebinde - Randevu Sistemi",
+    "short_name": "Saloon",
+    "name": "Saloon - Online Randevu",
     "icons": [
         {
             "src": "app-icon.png",
@@ -11,9 +11,9 @@
     "start_url": "/",
     "scope": "/",
     "display": "standalone",
-    "theme_color": "#db2777",
-    "background_color": "#ffffff",
+    "theme_color": "#4f46e5",
+    "background_color": "#f8fafc",
     "orientation": "portrait",
-    "description": "Profesyonel Güzellik Merkezi Randevu Sistemi",
+    "description": "Kuaför, güzellik, pilates, halı saha, havuz, masaj ve klinikler için online randevu",
     "lang": "tr"
 }
