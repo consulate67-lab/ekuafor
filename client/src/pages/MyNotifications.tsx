@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuthStore } from '../store/authStore';
+import CustomerNav from '../components/customer/CustomerNav';
+import { NOTIFICATIONS_READ } from '../hooks/useUnreadNotifications';
 
 export default function MyNotifications() {
-    const navigate = useNavigate();
     const [notifications, setNotifications] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const { user } = useAuthStore();
@@ -24,7 +24,7 @@ export default function MyNotifications() {
             localStorage.setItem('read_notifications_count', data.length.toString());
             
             // Eğer varsa bildirim rozetini sildirmek için CustomEvent gönderelim.
-            window.dispatchEvent(new Event('notifications_read'));
+            window.dispatchEvent(new Event(NOTIFICATIONS_READ));
         } catch (err) {
             console.error('Failed to fetch notifications', err);
         } finally {
@@ -40,14 +40,8 @@ export default function MyNotifications() {
         <div className="min-h-screen bg-slate-50 pb-24">
             <header className="bg-white sticky top-0 z-30 shadow-sm border-b border-slate-100"
                 style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-                <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
-                    <button onClick={() => navigate('/')} className="p-2 -ml-2 text-gray-400 hover:text-indigo-600 transition-colors">
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </button>
-                    <h1 className="text-lg font-black text-gray-900 uppercase tracking-widest text-center flex-1">Bildirimlerim</h1>
-                    <div className="w-10" />
+                <div className="max-w-md mx-auto px-4 py-4">
+                    <h1 className="text-lg font-black text-gray-900">Bildirimlerim</h1>
                 </div>
             </header>
 
@@ -95,10 +89,7 @@ export default function MyNotifications() {
                 )}
             </main>
 
-            <style>{`
-                .hide-scrollbar::-webkit-scrollbar { display: none; }
-                .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-            `}</style>
+            <CustomerNav />
         </div>
     );
 }

@@ -130,7 +130,7 @@ class CompanyService {
                     ${company.board_key || Math.random().toString(36).substring(2, 10).toUpperCase()},
                     ${company.work_start_time || '09:00'}, ${company.work_end_time || '19:00'}, ${company.slot_interval || 30},
                     ${company.admin_key || Math.floor(100000 + Math.random() * 900000).toString()},
-                    ${company.genders || []}, ${company.company_type || 'ASIL'}, ${company.main_company_id ?? null},
+                    ${sql.param(company.genders || [])}::text[], ${company.company_type || 'ASIL'}, ${company.main_company_id ?? null},
                     ${company.tax_number ?? null}, ${company.tax_office ?? null},
                     ${company.qnb_username ?? null}, ${company.qnb_password ?? null}, ${company.qnb_vkn ?? null},
                     ${company.efatura_test_mode !== undefined ? company.efatura_test_mode : true}, ${company.invoice_prefix || 'GIB'},
@@ -264,7 +264,8 @@ class CompanyService {
     }
 
     /**
-     * Tüm firmaları getir
+     * Firma listesi. Rezervasyon alabilen (aktif hizmeti olan) firmalar her zaman önce gelir.
+     * Konum verilirse `distance_km` hesaplanır; `sort: 'distance'` en yakından sıralar.
      */
     async getAllCompanies(filters?: {
         is_active?: boolean;
@@ -276,29 +277,28 @@ class CompanyService {
         gender?: string;
         company_type?: string;
         exclude_parent?: boolean;
-        sort?: 'rating' | 'reviews' | 'newest';
+        sector?: string;
+        sort?: 'rating' | 'reviews' | 'newest' | 'distance';
+        page?: number;
+        limit?: number;
         nocache?: boolean;
-    }): Promise<Company[]> {
-        // --- REDIS CACHE CHECK ---
-        const cacheKey = `companies:list:${JSON.stringify(filters || {})}`;
-        if (redis && !filters?.nocache) {
+    }): Promise<{ companies: Company[]; hasMore: boolean }> {
+        const page = Math.max(1, Math.floor(filters?.page || 1));
+        const limit = Math.min(50, Math.max(1, Math.floor(filters?.limit || 50)));
+        const hasLocation = Number.isFinite(filters?.lat) && Number.isFinite(filters?.lng);
+
+        // Konumlu sorgular kullanıcıya özel olduğundan önbelleğe alınmaz.
+        const cacheKey = `companies:list:${JSON.stringify({ ...filters, page, limit })}`;
+        const useCache = !!redis && !filters?.nocache && !hasLocation;
+        if (useCache) {
             try {
-                const cached = await redis.get(cacheKey);
-                if (cached) {
-                    const parsed = JSON.parse(cached);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                        console.log('[Redis] Cache Hit:', cacheKey, 'Count:', parsed.length);
-                        return parsed;
-                    }
-                }
+                const cached = await redis!.get(cacheKey);
+                if (cached) return JSON.parse(cached);
             } catch (err) {
                 console.error('[Redis] Cache Read Error:', err);
             }
         }
-        console.log('[DB] Fetching from DB for:', cacheKey);
-        // -------------------------
 
-        // Dinamik WHERE clause'ları Drizzle sql template ile (parameterize + güvenli)
         const whereClauses: any[] = [sql`1=1`];
 
         if (filters?.is_active !== undefined) {
@@ -323,64 +323,70 @@ class CompanyService {
             whereClauses.push(sql`c.company_type = ${filters.company_type}`);
         }
 
-        // Üst firmaları hariç tut (sadece istendiğinde)
         if (filters?.exclude_parent) {
             whereClauses.push(sql`(c.company_type IS NULL OR c.company_type != 'ÜST FİRMA')`);
         }
 
-        // Spatial filtering (Haversine formula)
-        if (filters?.lat && filters?.lng && filters?.radius) {
-            // Earth radius: 6371 km
-            whereClauses.push(sql`(
-                c.latitude IS NOT NULL AND c.longitude IS NOT NULL AND
-                c.latitude != 0 AND c.longitude != 0 AND
-                (6371 * acos(
-                    LEAST(1.0, GREATEST(-1.0,
-                        cos(radians(${filters.lat})) * cos(radians(c.latitude)) *
-                        cos(radians(c.longitude) - radians(${filters.lng})) +
-                        sin(radians(${filters.lat})) * sin(radians(c.latitude))
-                    ))
-                )) <= ${filters.radius}
+        if (filters?.sector) {
+            whereClauses.push(sql`EXISTS (
+                SELECT 1 FROM company_sectors cs JOIN sectors sx ON sx.id = cs.sector_id
+                WHERE cs.company_id = c.id AND sx.slug = ${filters.sector}
             )`);
         }
 
+        const distanceExpr = hasLocation
+            ? sql`CASE WHEN c.latitude IS NOT NULL AND c.longitude IS NOT NULL AND c.latitude != 0 AND c.longitude != 0
+                THEN 6371 * acos(LEAST(1.0, GREATEST(-1.0,
+                    cos(radians(${filters!.lat})) * cos(radians(c.latitude)) * cos(radians(c.longitude) - radians(${filters!.lng})) +
+                    sin(radians(${filters!.lat})) * sin(radians(c.latitude))
+                ))) END`
+            : sql`NULL::float8`;
+
+        if (hasLocation && filters?.radius) {
+            whereClauses.push(sql`(${distanceExpr}) <= ${filters.radius}`);
+        }
+
         // ORDER BY whitelist (sql.raw ile enjekte, sadece sabit string'ler)
-        const orderByClause = filters?.sort === 'rating'
-            ? sql.raw('c.rating_avg DESC, c.review_count DESC')
-            : filters?.sort === 'reviews'
-                ? sql.raw('c.review_count DESC, c.rating_avg DESC')
-                : sql.raw('c.created_at DESC');
+        const orderByClause = filters?.sort === 'distance' && hasLocation
+            ? sql.raw('distance_km ASC NULLS LAST, c.rating_avg DESC NULLS LAST')
+            : filters?.sort === 'rating'
+                ? sql.raw('c.rating_avg DESC NULLS LAST, c.review_count DESC NULLS LAST')
+                : filters?.sort === 'reviews'
+                    ? sql.raw('c.review_count DESC NULLS LAST, c.rating_avg DESC NULLS LAST')
+                    : sql.raw('c.created_at DESC');
 
         const whereClause = sql.join(whereClauses, sql` AND `);
-        // 7141 firma × N subquery çok yavaş. JOIN + GROUP BY ile tek sorguya indirgendi.
-        // LIMIT 50 — pagination yok, 50 firma tek seferde (ileride ?limit=&offset= eklenebilir)
         const result = await db.execute(sql`
-            SELECT
-                c.*,
-                CASE WHEN COUNT(DISTINCT s.id) > 0 AND COUNT(DISTINCT cu.user_id) > 0
-                     THEN 1 ELSE 0 END as relation_count
-            FROM companies c
-            LEFT JOIN services s ON s.company_id = c.id
-            LEFT JOIN company_users cu ON cu.company_id = c.id
-            WHERE ${whereClause}
-            GROUP BY c.id
-            ORDER BY relation_count DESC, ${orderByClause}
-            LIMIT 50
+            SELECT * FROM (
+                SELECT
+                    c.*,
+                    EXISTS (SELECT 1 FROM services s WHERE s.company_id = c.id AND s.is_active IS NOT FALSE) AS is_bookable,
+                    (${distanceExpr}) AS distance_km,
+                    (
+                        SELECT json_build_object('slug', sx.slug, 'name', sx.name_tr, 'icon', sx.icon, 'color', sx.color)
+                        FROM company_sectors cs JOIN sectors sx ON sx.id = cs.sector_id
+                        WHERE cs.company_id = c.id
+                        ORDER BY cs.is_primary DESC, sx.display_order
+                        LIMIT 1
+                    ) AS primary_sector
+                FROM companies c
+                WHERE ${whereClause}
+            ) c
+            ORDER BY c.is_bookable DESC, ${orderByClause}, c.id
+            LIMIT ${limit + 1} OFFSET ${(page - 1) * limit}
         `);
-        const companies = (result as any).rows as Company[];
+        const rows = (result as any).rows as Company[];
+        const payload = { companies: rows.slice(0, limit), hasMore: rows.length > limit };
 
-        // --- SAVE TO REDIS ---
-        if (redis && companies.length > 0) {
+        if (useCache && payload.companies.length > 0) {
             try {
-                // Cache for 1 hour
-                await redis.setex(cacheKey, 3600, JSON.stringify(companies));
+                await redis!.setex(cacheKey, 3600, JSON.stringify(payload));
             } catch (err) {
                 console.error('[Redis] Cache Set Error:', err);
             }
         }
-        // ---------------------
 
-        return companies;
+        return payload;
     }
 
     /**
@@ -396,6 +402,75 @@ class CompanyService {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Hiç hizmeti olmayan firmaya başlangıç hizmetleri: birincil sektörün şablonları,
+     * sektörü olmayan eski başvurularda cinsiyete göre kuaför listesi.
+     */
+    private async addDefaultServices(id: number, genders: string[]) {
+        const existing = await db.execute(sql`SELECT 1 FROM services WHERE company_id = ${id} LIMIT 1`);
+        if ((existing as any).rows.length > 0) return;
+
+        const fromSector = await db.execute(sql`
+            INSERT INTO services (company_id, name, duration_minutes, price, booking_mode, duration_options, is_active)
+            SELECT ${id}, t.name_tr, COALESCE(t.default_duration_minutes, sx.default_duration_minutes, 60),
+                   COALESCE(t.default_price, 0), t.booking_mode, t.duration_options, true
+            FROM sector_service_templates t
+            JOIN sectors sx ON sx.id = t.sector_id
+            JOIN company_sectors cs ON cs.sector_id = t.sector_id AND cs.is_primary
+            WHERE cs.company_id = ${id} AND t.is_active
+            ORDER BY t.display_order, t.id
+            RETURNING id
+        `);
+        if ((fromSector as any).rows.length > 0) return;
+
+        const defaultServices: { name: string; duration_minutes: number }[] = [];
+        if (genders.includes('Kadın')) {
+            defaultServices.push(
+                { name: 'Kadın Saç Kesimi', duration_minutes: 45 },
+                { name: 'Fön (Kısa)', duration_minutes: 30 },
+                { name: 'Fön (Uzun)', duration_minutes: 45 },
+                { name: 'Boya (Dip)', duration_minutes: 60 },
+                { name: 'Boya (Tüm)', duration_minutes: 90 },
+                { name: 'Manikür', duration_minutes: 30 },
+                { name: 'Pedikür', duration_minutes: 45 },
+                { name: 'Kaş Alımı', duration_minutes: 15 },
+            );
+        }
+        if (genders.includes('Erkek')) {
+            defaultServices.push(
+                { name: 'Erkek Saç Kesimi', duration_minutes: 30 },
+                { name: 'Sakal Tıraşı (Modern)', duration_minutes: 20 },
+                { name: 'Sakal Tıraşı (Klasik)', duration_minutes: 15 },
+                { name: 'Saç & Sakal Kesimi', duration_minutes: 50 },
+                { name: 'Yıkama & Fön', duration_minutes: 15 },
+                { name: 'Cilt Bakımı (Express)', duration_minutes: 20 },
+                { name: 'Ense Düzeltme', duration_minutes: 10 },
+            );
+        }
+        if (genders.includes('Çocuk')) {
+            defaultServices.push(
+                { name: 'Çocuk Saç Kesimi (Erkek)', duration_minutes: 20 },
+                { name: 'Çocuk Saç Kesimi (Kız)', duration_minutes: 30 },
+            );
+        }
+        if (genders.includes('Güzellik Merkezi')) {
+            defaultServices.push(
+                { name: 'Lazer Epilasyon (Tüm Vücut)', duration_minutes: 90 },
+                { name: 'Cilt Bakımı (Profesyonel)', duration_minutes: 60 },
+                { name: 'Hydrafacial', duration_minutes: 45 },
+                { name: 'Microblading', duration_minutes: 120 },
+                { name: 'Dermapen', duration_minutes: 45 },
+                { name: 'İpek Kirpik', duration_minutes: 90 },
+                { name: 'Vücut Şekillendirme', duration_minutes: 60 },
+            );
+        }
+        if (defaultServices.length === 0) return;
+
+        await db.insert(services).values(
+            defaultServices.map(s => ({ companyId: id, name: s.name, durationMinutes: s.duration_minutes, price: '0' }))
+        );
     }
 
     /**
@@ -419,58 +494,9 @@ class CompanyService {
         if (company) {
             await this.clearCompanyCache();
 
-            // Hizmet Cinsiyetine Göre Şablon Hizmet Ekleme
-            try {
-                const genders: string[] = company.genders || [];
-                const defaultServices: { name: string; duration_minutes: number; price: number }[] = [];
-
-                if (genders.includes('Kadın')) {
-                    defaultServices.push({ name: 'Kadın Saç Kesimi', duration_minutes: 45, price: 0 });
-                    defaultServices.push({ name: 'Fön (Kısa)', duration_minutes: 30, price: 0 });
-                    defaultServices.push({ name: 'Fön (Uzun)', duration_minutes: 45, price: 0 });
-                    defaultServices.push({ name: 'Boya (Dip)', duration_minutes: 60, price: 0 });
-                    defaultServices.push({ name: 'Boya (Tüm)', duration_minutes: 90, price: 0 });
-                    defaultServices.push({ name: 'Manikür', duration_minutes: 30, price: 0 });
-                    defaultServices.push({ name: 'Pedikür', duration_minutes: 45, price: 0 });
-                    defaultServices.push({ name: 'Kaş Alımı', duration_minutes: 15, price: 0 });
-                }
-                if (genders.includes('Erkek')) {
-                    defaultServices.push({ name: 'Erkek Saç Kesimi', duration_minutes: 30, price: 0 });
-                    defaultServices.push({ name: 'Sakal Tıraşı (Modern)', duration_minutes: 20, price: 0 });
-                    defaultServices.push({ name: 'Sakal Tıraşı (Klasik)', duration_minutes: 15, price: 0 });
-                    defaultServices.push({ name: 'Saç & Sakal Kesimi', duration_minutes: 50, price: 0 });
-                    defaultServices.push({ name: 'Yıkama & Fön', duration_minutes: 15, price: 0 });
-                    defaultServices.push({ name: 'Cilt Bakımı (Express)', duration_minutes: 20, price: 0 });
-                    defaultServices.push({ name: 'Ense Düzeltme', duration_minutes: 10, price: 0 });
-                }
-                if (genders.includes('Çocuk')) {
-                    defaultServices.push({ name: 'Çocuk Saç Kesimi (Erkek)', duration_minutes: 20, price: 0 });
-                    defaultServices.push({ name: 'Çocuk Saç Kesimi (Kız)', duration_minutes: 30, price: 0 });
-                }
-                if (genders.includes('Güzellik Merkezi')) {
-                    defaultServices.push({ name: 'Lazer Epilasyon (Tüm Vücut)', duration_minutes: 90, price: 0 });
-                    defaultServices.push({ name: 'Cilt Bakımı (Profesyonel)', duration_minutes: 60, price: 0 });
-                    defaultServices.push({ name: 'Hydrafacial', duration_minutes: 45, price: 0 });
-                    defaultServices.push({ name: 'Microblading', duration_minutes: 120, price: 0 });
-                    defaultServices.push({ name: 'Dermapen', duration_minutes: 45, price: 0 });
-                    defaultServices.push({ name: 'İpek Kirpik', duration_minutes: 90, price: 0 });
-                    defaultServices.push({ name: 'Vücut Şekillendirme', duration_minutes: 60, price: 0 });
-                }
-
-                if (defaultServices.length > 0) {
-                    // Drizzle query builder: services schema tam
-                    await db.insert(services).values(
-                        defaultServices.map((s) => ({
-                            companyId: id,
-                            name: s.name,
-                            durationMinutes: s.duration_minutes,
-                            price: s.price.toString(),
-                        }))
-                    );
-                }
-            } catch (err) {
-                console.error(`[CompanyService] Varsayılan hizmetler eklenemedi`, err);
-            }
+            await this.addDefaultServices(id, company.genders || []).catch(err =>
+                console.error(`[CompanyService] Varsayılan hizmetler eklenemedi`, err)
+            );
 
             if (company.phone) {
                 try {
@@ -590,7 +616,7 @@ const PUBLIC_COMPANY_FIELDS = [
     'province_name', 'district_name', 'neighborhood_name', 'latitude', 'longitude',
     'work_start_time', 'work_end_time', 'slot_interval', 'genders', 'booking_flow',
     'staff_label', 'service_label', 'rating_avg', 'review_count', 'is_active', 'is_verified',
-    'service_count', 'staff_count', 'license_end_date', 'distance',
+    'service_count', 'staff_count', 'license_end_date', 'is_bookable', 'distance_km', 'primary_sector', 'sectors',
 ] as const;
 
 export const isLicenseExpired = (company: { license_end_date?: string | Date | null }) =>

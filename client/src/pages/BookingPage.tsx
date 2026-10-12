@@ -224,6 +224,15 @@ function BookingPage({ id }: { id: string }) {
         if (serviceMode !== 'staff' && !isSelected) setTimeout(goNext, 0);
     };
 
+    const preselectedRef = useRef(false);
+    useEffect(() => {
+        if (loading || preselectedRef.current) return;
+        preselectedRef.current = true;
+        const preselected = services.find(s => s.id === Number(searchParams.get('service')));
+        if (preselected) toggleService(preselected);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loading, services]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (submitting) return;

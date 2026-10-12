@@ -99,7 +99,8 @@ router.post('/register', async (req: Request, res: Response) => {
             district: nullableString,
             latitude: nullableNumber,
             longitude: nullableNumber,
-            target_genders: z.array(z.string()).optional()
+            target_genders: z.array(z.string()).optional(),
+            sector_slug: z.string().max(50).optional()
         });
 
         const validatedData = publicSchema.parse(req.body);
@@ -127,11 +128,21 @@ router.post('/register', async (req: Request, res: Response) => {
             commission_rate: 0
         };
         delete companyData.target_genders;
+        delete companyData.sector_slug;
         const passwordHash = await bcrypt.hash(validatedData.password, 10);
         delete companyData.password;
 
         // created_by = null for public self-registration
         const company = await companyService.createCompany(companyData, null as any);
+
+        if (validatedData.sector_slug) {
+            await pool.query(
+                `INSERT INTO company_sectors (company_id, sector_id, is_primary)
+                 SELECT $1, id, true FROM sectors WHERE slug = $2 AND is_active
+                 ON CONFLICT DO NOTHING`,
+                [company.id, validatedData.sector_slug]
+            );
+        }
 
         // Create initial admin user for this company
         await pool.query(
@@ -329,17 +340,21 @@ router.get('/', optionalCompanyAuth, async (req: Request, res: Response) => {
             gender: req.query.gender as string | undefined,
             company_type: req.query.company_type as string | undefined,
             exclude_parent: req.query.exclude_parent === 'true' ? true : undefined,
-            sort: req.query.sort as 'rating' | 'reviews' | 'newest' | undefined,
+            sector: typeof req.query.sector === 'string' && req.query.sector ? req.query.sector : undefined,
+            sort: req.query.sort as 'rating' | 'reviews' | 'newest' | 'distance' | undefined,
+            page: req.query.page ? parseInt(req.query.page as string) : undefined,
+            limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
             nocache: req.query.nocache === 'true'
         };
 
-        const companies = await companyService.getAllCompanies(filters);
+        const { companies, hasMore } = await companyService.getAllCompanies(filters);
         const isSuperAdmin = req.user?.role === 'super_admin';
 
         res.json({
             success: true,
             data: isSuperAdmin ? companies : companies.map(toPublicCompany),
-            count: companies.length
+            count: companies.length,
+            has_more: hasMore
         });
     } catch (error) {
         res.status(500).json({
@@ -368,9 +383,20 @@ router.get('/:id', optionalCompanyAuth, async (req: Request, res: Response) => {
         const isOwnerOrAdmin = req.user?.role === 'super_admin'
             || (req.user?.role === 'company_admin' && canAccessCompany(req, id));
 
+        const extra = await pool.query(
+            `SELECT
+                COALESCE((SELECT json_agg(json_build_object('slug', sx.slug, 'name', sx.name_tr, 'icon', sx.icon, 'color', sx.color)
+                          ORDER BY cs.is_primary DESC, sx.display_order)
+                          FROM company_sectors cs JOIN sectors sx ON sx.id = cs.sector_id WHERE cs.company_id = $1), '[]'::json) AS sectors,
+                EXISTS (SELECT 1 FROM services s WHERE s.company_id = $1 AND s.is_active IS NOT FALSE) AS is_bookable`,
+            [id]
+        );
+        const { sectors, is_bookable } = extra.rows[0];
+        const enriched = { ...company, sectors, primary_sector: sectors[0] ?? null, is_bookable };
+
         res.json({
             success: true,
-            data: isOwnerOrAdmin ? { ...company, is_license_expired: isLicenseExpired(company) } : toPublicCompany(company)
+            data: isOwnerOrAdmin ? { ...enriched, is_license_expired: isLicenseExpired(company) } : toPublicCompany(enriched)
         });
     } catch (error) {
         res.status(500).json({

@@ -8,6 +8,14 @@ import redis from '../config/redis';
 import { normalizePhone, formatPhoneWithSpaces } from '../utils/phone';
 import { logger } from '../utils/logger';
 
+/** "Ayşe Yılmaz" → "Ayşe Y." — herkese açık yorumlarda müşterinin tam adı gösterilmez. */
+export const maskCustomerName = (name?: string | null) => {
+    const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return 'Müşteri';
+    if (parts.length === 1) return parts[0];
+    return `${parts[0]} ${parts[parts.length - 1].charAt(0).toLocaleUpperCase('tr-TR')}.`;
+};
+
 export interface Appointment {
     id?: number;
     company_id: number;
@@ -627,14 +635,14 @@ class AppointmentService {
         }
 
         const result = await db.execute(sql`
-            SELECT a.id, a.rating, a.comment, a.appointment_date, a.customer_name, a.customer_phone,
-                   s.name as service_name
+            SELECT a.id, a.rating, a.comment, a.appointment_date, a.customer_name, s.name as service_name
             FROM appointments a
             LEFT JOIN services s ON a.service_id = s.id
             WHERE a.company_id = ${companyId} AND a.rating IS NOT NULL AND a.rating > 0
             ORDER BY ${orderByClause}
+            LIMIT 50
         `);
-        return (result as any).rows as any[];
+        return ((result as any).rows as any[]).map(r => ({ ...r, customer_name: maskCustomerName(r.customer_name) }));
     }
 
     async getCustomerHistory(companyId: number, search: string): Promise<any[]> {

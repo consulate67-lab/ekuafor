@@ -324,6 +324,105 @@ describe('firma verisi gizliliği', () => {
     });
 });
 
+describe('müşteri firma listesi', () => {
+    let emptyCo: number;
+
+    beforeAll(async () => {
+        const assign = (companyId: number, slug: string) => pool.query(
+            `INSERT INTO company_sectors (company_id, sector_id, is_primary) SELECT $1, id, true FROM sectors WHERE slug = $2`,
+            [companyId, slug]
+        );
+        await assign(ids.salon, 'hair');
+        await assign(ids.pitchCo, 'sports_facility');
+        await assign(ids.studio, 'pilates_yoga');
+        emptyCo = await insertId(
+            `INSERT INTO companies (name, latitude, longitude, created_at) VALUES ('Hizmetsiz Kuaför', 41.0, 29.0, NOW() + interval '1 day') RETURNING id`,
+            []
+        );
+        await assign(emptyCo, 'hair');
+        await pool.query(`UPDATE companies SET latitude = 41.05, longitude = 29.0 WHERE id = $1`, [ids.salon]);
+    });
+
+    it('sektöre göre filtreler, birincil sektörü döner ve rezervasyon alanları önce gelir', async () => {
+        const res = await request(app).get('/api/companies').query({ sector: 'hair' }).expect(200);
+        expect(res.body.data.map((c: any) => c.id)).toEqual([ids.salon, emptyCo]);
+        expect(res.body.data[0]).toMatchObject({ is_bookable: true, primary_sector: { slug: 'hair', name: 'Kuaför' } });
+        expect(res.body.data[1].is_bookable).toBe(false);
+
+        const pitch = await request(app).get('/api/companies').query({ sector: 'sports_facility' }).expect(200);
+        expect(pitch.body.data.map((c: any) => c.id)).toEqual([ids.pitchCo]);
+    });
+
+    it('sayfalar ve konum verilince mesafeyi hesaplar', async () => {
+        const first = await request(app).get('/api/companies').query({ limit: 2, page: 1 }).expect(200);
+        const second = await request(app).get('/api/companies').query({ limit: 2, page: 2 }).expect(200);
+        expect(first.body.has_more).toBe(true);
+        expect(first.body.data).toHaveLength(2);
+        const seen = new Set([...first.body.data, ...second.body.data].map((c: any) => c.id));
+        expect(seen.size).toBe(first.body.data.length + second.body.data.length);
+
+        const near = await request(app).get('/api/companies')
+            .query({ sector: 'hair', lat: 41.0, lng: 29.0, sort: 'distance' }).expect(200);
+        const salon = near.body.data.find((c: any) => c.id === ids.salon);
+        expect(salon.distance_km).toBeGreaterThan(5);
+        expect(salon.distance_km).toBeLessThan(6);
+    });
+
+    it('firma detayı sektörleri ve rezervasyon durumunu içerir', async () => {
+        const res = await request(app).get(`/api/companies/${ids.studio}`).expect(200);
+        expect(res.body.data).toMatchObject({ is_bookable: true, primary_sector: { slug: 'pilates_yoga' } });
+        expect(res.body.data.sectors).toHaveLength(1);
+    });
+
+    it('herkese açık yorumlarda müşteri telefonu yok, ad kısaltılmış', async () => {
+        await pool.query(
+            `INSERT INTO appointments (company_id, service_id, appointment_date, start_time, end_time, status, customer_name, customer_phone, rating, comment)
+             VALUES ($1, $2, CURRENT_DATE - 1, '10:00', '10:30', 'completed', 'Ayşe Yılmaz', '05551112233', 5, 'Harika')`,
+            [ids.salon, ids.haircut]
+        );
+        const res = await request(app).get(`/api/appointments/companies/${ids.salon}/reviews`).expect(200);
+        const review = res.body.data.find((r: any) => r.comment === 'Harika');
+        expect(review.customer_name).toBe('Ayşe Y.');
+        expect(review).not.toHaveProperty('customer_phone');
+    });
+});
+
+describe('firma başvurusu', () => {
+    it('seçilen sektör birincil olur, onayda hizmetler o sektörün şablonlarından gelir', async () => {
+        const res = await request(app).post('/api/companies/register').send({
+            name: 'Yeşil Saha', phone: '05321234567', email: 'saha-basvuru@test.local', password: 'gizli123',
+            city: 'İstanbul', latitude: 41, longitude: 29, sector_slug: 'sports_facility',
+        }).expect(201);
+        const companyId = res.body.data.id;
+
+        const { default: companyService } = await import('../../services/company.service');
+        await companyService.verifyCompany(companyId);
+
+        const sectors = await pool.query(
+            `SELECT s.slug, cs.is_primary FROM company_sectors cs JOIN sectors s ON s.id = cs.sector_id WHERE cs.company_id = $1`,
+            [companyId]
+        );
+        expect(sectors.rows).toEqual([{ slug: 'sports_facility', is_primary: true }]);
+
+        const services = await pool.query(`SELECT booking_mode, duration_options FROM services WHERE company_id = $1`, [companyId]);
+        expect(services.rows.length).toBeGreaterThan(0);
+        expect(services.rows.some(s => s.booking_mode === 'resource' && s.duration_options?.length)).toBe(true);
+
+        await companyService.verifyCompany(companyId);
+        const again = await pool.query(`SELECT COUNT(*)::int n FROM services WHERE company_id = $1`, [companyId]);
+        expect(again.rows[0].n).toBe(services.rows.length);
+    });
+
+    it('birden fazla cinsiyet seçilen eski tip başvuru da kaydolur', async () => {
+        const res = await request(app).post('/api/companies/register').send({
+            name: 'Eski Tip Kuaför', phone: '05329876543', email: 'eski-tip@test.local', password: 'gizli123',
+            target_genders: ['Kadın', 'Erkek'],
+        }).expect(201);
+        const row = await pool.query('SELECT genders FROM companies WHERE id = $1', [res.body.data.id]);
+        expect(row.rows[0].genders).toEqual(['Kadın', 'Erkek']);
+    });
+});
+
 describe('class modu (pilates)', () => {
     it('8 kişilik seans dolana kadar kayıt alır, sonra reddeder', async () => {
         const { ids: sessionIds } = await booking.createClassSessions({

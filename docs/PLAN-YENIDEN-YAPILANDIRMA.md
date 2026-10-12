@@ -1,7 +1,7 @@
 # Saloon — Yeniden Yapılandırma Planı
 
 **Tarih:** 2026-10-12
-**Durum:** Onaylandı (2026-10-12) — Faz 0, 1, 2, 3 ve 4 tamamlandı; sıradaki Faz 5
+**Durum:** Onaylandı (2026-10-12) — Faz 0, 1, 2, 3, 4 ve 5.0–5.1 tamamlandı; sıradaki 5.2 (firma kullanıcısı ekranı)
 **Kapsam:** Güvenlik düzeltmeleri, gereksiz kodun silinmesi, sektör-bağımsız rezervasyon modeli ve 4 ekranın yeniden düzenlenmesi.
 **Kapsam dışı (sonraki aşama):** Offline çalışma. Bu planda yalnızca offline'a hazırlık yapılır.
 
@@ -338,6 +338,17 @@ Sektör seçildiğinde firmaya hazır hizmet şablonları ve (resource sektörle
 - Sunucu: `GET /companies` sektör filtresi + sayfalama alır, liste cevabında birincil sektör döner.
 - `LandingPage` (web): sektörlere göre genel tanıtım, firma başvurusunda sektör seçimi.
 - `KvkkPage` ve OTP SMS metinleri: "güzellik salonu/kuaför" yerine genel randevu platformu dili.
+
+**Durum (2026-10-12) — 5.0 tamamlandı (commit `9dad02b`):** `client/src/api/` katmanı, `components/ui` ortak bileşenleri, Saloon markası ve `lib/sectors.ts` sektör etiketleri.
+
+**Güvenlik düzeltmesi (commit `4059fce`, canlıda doğrulandı):** Herkese açık `GET /companies`, `GET /companies/:id`, `board-login` ve `staff-login` cevapları firmanın `admin_key`, `board_key`, e-fatura ve banka bilgilerini dışarı veriyordu. Artık tüm açık uçlar `toPublicCompany` beyaz listesinden geçiyor; tam veri sadece süper admin ve firmanın kendi yöneticisine dönüyor. Sızan anahtarlar test firmalarına ait olduğu için yenilenmedi.
+
+**Durum (2026-10-12) — 5.1 tamamlandı:**
+- Sunucu: `GET /companies` → `sector`, `page`, `limit`, `sort=distance` parametreleri; cevapta `has_more`, her firmada `primary_sector`, `is_bookable`, `distance_km`. Online randevu alabilen (aktif hizmeti olan) firmalar listede önce gelir — canlıdaki ~7100 OSM firmasının sadece birkaçı randevu alabiliyor. `GET /companies/:id` sektörleri ve `is_bookable` bilgisini döner.
+- İkinci sızıntı kapatıldı: açık yorum listesi müşterinin telefonunu ve tam adını veriyordu; artık telefon yok, ad "Ayşe Y." şeklinde maskeli, en fazla 50 yorum.
+- Firma başvurusunda sektör seçimi (`sector_slug` → birincil sektör). Firma doğrulanınca hizmetler sektör şablonundan (`sector_service_templates`) kopyalanıyor; şablon yoksa eski cinsiyet listesi kullanılıyor. Cinsiyet seçilmeden yapılan başvuruyu bozan boş dizi hatası (`genders`) düzeltildi.
+- İstemci: yeni `pages/customer/CustomerHome` (sektör sekmeleri, arama + sektör önerisi, "Yakınımda", favoriler, sayfalama, cinsiyet filtresi sadece kuaför/berber/güzellikte) ve `CompanyPage` (`/firma/:id`: hizmetler, ekip, yorumlar, ara / yol tarifi, randevu almayan firma için arama butonu). Hizmete dokununca `/book/:id?service=X` ile sihirbaz o hizmet seçili açılıyor. Randevularım ve Bildirimler alt menüye bağlandı. `LandingPage` ve `KvkkPage` sektör-bağımsız dile çevrildi. Eski `CustomerHome.tsx` silindi.
+- Yol tarifi cihazın harita uygulamasını açıyor (Android `geo:`, iOS `maps://`, web'de Google Maps linki).
 
 ### 8.2 Ekran 2 — Firma kullanıcısı (telefon öncelikli)
 

@@ -20,7 +20,8 @@ const CompanyForm = lazy(() => import('./pages/CompanyForm'));
 const CompanyList = lazy(() => import('./pages/CompanyList'));
 const CompanyDetail = lazy(() => import('./pages/CompanyDetail'));
 const AppointmentManagement = lazy(() => import('./pages/AppointmentManagement'));
-const CustomerHome = lazy(() => import('./pages/CustomerHome'));
+const CustomerHome = lazy(() => import('./pages/customer/CustomerHome'));
+const CompanyPage = lazy(() => import('./pages/customer/CompanyPage'));
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const BookingPage = lazy(() => import('./pages/BookingPage'));
 const SmsSettings = lazy(() => import('./pages/SmsSettings'));
@@ -198,6 +199,7 @@ function App() {
                         path="/web"
                         element={isAuthenticated ? (user?.role === 'customer' ? <CustomerHome /> : <Navigate to="/dashboard" replace />) : <LandingPage />}
                     />
+                    <Route path="/firma/:id" element={<CompanyPage />} />
                     <Route path="/book/:id" element={<BookingPage />} />
                     <Route path="/my-appointments" element={<MyAppointments />} />
                     <Route path="/my-notifications" element={<MyNotifications />} />

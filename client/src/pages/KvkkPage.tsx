@@ -67,7 +67,7 @@ export default function KvkkPage() {
                         <span className="w-1.5 h-6 bg-indigo-500 rounded" /> Veri Sorumlusu
                     </h2>
                     <p className="text-slate-700 leading-relaxed mb-4">
-                        SalonCebinde (bundan böyle "Platform") olarak, güzellik salonu / kuaför / spa
+                        Saloon (bundan böyle "Platform") olarak; spor, sağlık, bakım ve benzeri hizmet
                         işletmelerine yönelik dijital randevu ve yönetim hizmeti sunmaktayız.
                         Bu hizmet kapsamında kişisel verileriniz KVKK'ya uygun şekilde işlenmektedir.
                     </p>
@@ -232,7 +232,7 @@ export default function KvkkPage() {
                 </section>
 
                 <p className="text-center text-xs text-slate-500 py-4">
-                    © {new Date().getFullYear()} SalonCebinde — KVKK uyumlu, ücretsiz, açık veri.
+                    © {new Date().getFullYear()} Saloon
                 </p>
             </div>
         </div>

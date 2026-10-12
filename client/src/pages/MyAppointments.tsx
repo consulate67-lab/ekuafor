@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import api from '../lib/api';
 import { Appointment } from '../types';
 import { useAuthStore } from '../store/authStore';
 import { getDeviceId } from '../lib/device';
+import CustomerNav from '../components/customer/CustomerNav';
 
 export default function MyAppointments() {
-    const navigate = useNavigate();
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -297,12 +297,7 @@ export default function MyAppointments() {
             <header className="bg-white sticky top-0 z-30 shadow-sm border-b border-slate-100"
                 style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
                 <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
-                    <button onClick={() => navigate('/')} className="p-2 -ml-2 text-gray-400 hover:text-indigo-600 transition-colors">
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </button>
-                    <h1 className="text-lg font-black text-gray-900 uppercase tracking-widest">Randevularım</h1>
+                    <h1 className="text-lg font-black text-gray-900">Randevularım</h1>
                     <button onClick={fetchMyAppointments} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all active:rotate-180 duration-500">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                     </button>
@@ -364,7 +359,7 @@ export default function MyAppointments() {
                         </p>
 
                         {activeTab === 'active' && (
-                            <Link to="/" className="inline-flex items-center gap-2 px-6 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-wider shadow-xl shadow-indigo-600/20 hover:bg-indigo-500 active:scale-95 transition-all">
+                            <Link to="/app" className="inline-flex items-center gap-2 px-6 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-wider shadow-xl shadow-indigo-600/20 hover:bg-indigo-500 active:scale-95 transition-all">
                                 <span>Yeni Randevu Al</span>
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                             </Link>
@@ -379,7 +374,7 @@ export default function MyAppointments() {
                 {/* Bottom action for active tab */}
                 {activeTab === 'active' && displayApps.length > 0 && (
                     <div className="mt-8">
-                        <Link to="/" className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-white border-2 border-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:border-indigo-200 hover:text-indigo-600 transition-all">
+                        <Link to="/app" className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-white border-2 border-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:border-indigo-200 hover:text-indigo-600 transition-all">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
                             <span>Yeni Randevu Al</span>
                         </Link>
@@ -435,8 +430,7 @@ export default function MyAppointments() {
                 </div>
             )}
 
-            {/* Bottom Nav Spacer */}
-            <div className="h-20"></div>
+            <CustomerNav />
         </div>
     );
 }
