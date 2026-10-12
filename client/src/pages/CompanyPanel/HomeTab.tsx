@@ -205,7 +205,7 @@ export function AdminQRTab({ ctx }: { ctx: Ctx }) {
                                 <div className="flex justify-center mb-6">
                                     <div className="bg-white border-4 border-slate-900 rounded-3xl p-5">
                                         <img
-                                            src={qrApiUrl(`${window.location.origin}${import.meta.env.BASE_URL}company-panel?key=${company.admin_key}`, 250)}
+                                            src={qrApiUrl(`${window.location.origin}/#/isletme?code=${encodeURIComponent(company.admin_key || '')}`, 250)}
                                             alt="Admin Panel QR"
                                             className="w-44 h-44 mx-auto block"
                                         />

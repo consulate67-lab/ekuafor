@@ -13,7 +13,6 @@ export const StorageKey = {
     boardKey: 'board_key',
     boardCompanyId: 'board_company_id',
     staffBoardCode: 'staff_board_code',
-    companyAdminKey: 'company_admin_key',
     mainReportsKey: 'main_reports_key',
     geoProvinces: 'geo_provinces',
 } as const;
@@ -26,7 +25,7 @@ const RENAMED: Record<string, StorageKeyName> = {
     ekuafor_device_fingerprint: StorageKey.webDeviceId,
 };
 
-const OBSOLETE = ['main_company_auth', 'pending_booking'];
+const OBSOLETE = ['main_company_auth', 'pending_booking', 'company_admin_key'];
 
 /** Eski sürümlerden kalan anahtarları yeni adlarına taşır; değer kaybolmaz. Açılışta bir kez çağrılır. */
 export const migrateStorageKeys = () => {

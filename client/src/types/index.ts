@@ -182,7 +182,7 @@ export interface Appointment {
     notes?: string;
     price?: number;
     payment_status?: 'unpaid' | 'pending' | 'paid' | 'failed';
-    payment_method?: 'cash' | 'card';
+    payment_method?: 'cash' | 'card' | 'transfer' | 'unspecified';
     customer_name?: string;
     customer_phone?: string;
     rating?: number;

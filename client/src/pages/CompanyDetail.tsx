@@ -223,7 +223,7 @@ export default function CompanyDetail() {
                                             Kopyala
                                         </button>
                                         <Link
-                                            to={`/company-panel?key=${company.admin_key}`}
+                                            to={`/company-panel?company=${company.id}`}
                                             className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                                         >
                                             Panele Git
@@ -243,7 +243,7 @@ export default function CompanyDetail() {
                                 <div className="flex flex-col items-center gap-4">
                                     <div className="bg-white p-4 rounded-3xl shadow-xl">
                                         <img
-                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/#/company-panel?key=${company.admin_key}`)}`}
+                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/#/isletme?code=${company.admin_key}`)}`}
                                             alt="Admin Panel QR"
                                             className="w-32 h-32"
                                         />

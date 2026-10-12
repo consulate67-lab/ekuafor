@@ -473,3 +473,103 @@ describe('class modu (pilates)', () => {
         );
     });
 });
+
+describe('firma kullanıcısı', () => {
+    let panelCo: number;
+    let ali: number;
+    let veli: number;
+    const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
+    const appointment = (staffId: number | null, start: string, status = 'pending') =>
+        insertId(
+            `INSERT INTO appointments (company_id, staff_id, appointment_date, start_time, end_time, status, price, customer_name)
+             VALUES ($1, $2, $3, $4, ($4::time + interval '30 minutes')::time, $5, 400, 'Test Müşteri') RETURNING id`,
+            [panelCo, staffId, day(40), start, status]
+        );
+
+    beforeAll(async () => {
+        panelCo = await company('Panel Test');
+        await pool.query(`UPDATE companies SET admin_key = 'ADM-PANEL' WHERE id = $1`, [panelCo]);
+        ali = await staff(panelCo, 'Ali');
+        veli = await staff(panelCo, 'Veli');
+        await pool.query(`UPDATE users SET board_code = 'PRS-ALI' WHERE id = $1`, [ali]);
+    });
+
+    it('yönetici anahtarıyla giriş firmanın gerçek yönetici kullanıcısına token verir', async () => {
+        const first = await request(app).post('/api/companies/check-code').send({ code: 'adm-panel' }).expect(200);
+        expect(first.body.data).toMatchObject({ type: 'admin', redirect: '/isletme', company_id: panelCo });
+        const me = await request(app).get('/api/auth/me').set(auth(first.body.data.token)).expect(200);
+        expect(me.body.data).toMatchObject({ role: 'company_admin', company_id: panelCo });
+        expect(me.body.data.id).not.toBe(panelCo);
+
+        const again = await request(app).post('/api/companies/admin-login').send({ admin_key: 'ADM-PANEL' }).expect(200);
+        expect(again.body.data.user.id).toBe(me.body.data.id);
+        const admins = await pool.query(`SELECT count(*)::int AS n FROM users WHERE company_id = $1 AND role = 'company_admin'`, [panelCo]);
+        expect(admins.rows[0].n).toBe(1);
+    });
+
+    it('personel kodla girer ve yalnızca kendi ve atanmamış randevuları görür', async () => {
+        const login = await request(app).post('/api/companies/check-code').send({ code: 'PRS-ALI' }).expect(200);
+        expect(login.body.data).toMatchObject({ type: 'staff', user_id: ali, redirect: '/isletme' });
+        const staffToken = login.body.data.token;
+
+        const own = await appointment(ali, '10:00');
+        const others = await appointment(veli, '11:00');
+        const open = await appointment(null, '12:00');
+        const range = { start_date: day(40), end_date: day(40) };
+
+        const asStaff = await request(app).get('/api/appointments').query({ company_id: panelCo, ...range }).set(auth(staffToken)).expect(200);
+        expect(asStaff.body.data.map((a: any) => a.id).sort()).toEqual([own, open].sort());
+        const privateList = await request(app).get('/api/appointments').query({ ...range, all: 'true' }).set(auth(staffToken)).expect(200);
+        expect(privateList.body.data.map((a: any) => a.id)).not.toContain(others);
+
+        const admin = (await request(app).post('/api/companies/admin-login').send({ admin_key: 'ADM-PANEL' })).body.data.token;
+        const asAdmin = await request(app).get('/api/appointments').query(range).set(auth(admin)).expect(200);
+        expect(asAdmin.body.data.map((a: any) => a.id)).toEqual(expect.arrayContaining([own, others, open]));
+    });
+
+    it('randevu durumu doğrulanır; tamamlanınca tahsilat ve ödeme yöntemi kaydedilir', async () => {
+        const admin = (await request(app).post('/api/companies/admin-login').send({ admin_key: 'ADM-PANEL' })).body.data.token;
+        const id = await appointment(ali, '14:00', 'approved');
+
+        await request(app).patch(`/api/appointments/${id}/status`).set(auth(admin)).send({ status: 'bitti' }).expect(400);
+        await request(app).patch(`/api/appointments/${id}/status`).set(auth(admin)).send({ status: 'completed', payment_method: 'bitcoin' }).expect(400);
+
+        const done = await request(app).patch(`/api/appointments/${id}/status`).set(auth(admin))
+            .send({ status: 'completed', price: 350, payment_method: 'card' }).expect(200);
+        expect(done.body.data).toMatchObject({ status: 'completed', payment_method: 'card', payment_status: 'paid' });
+        expect(Number(done.body.data.collected_price)).toBe(350);
+
+        await pool.query('UPDATE users SET commission_rate = 10 WHERE id = $1', [ali]);
+        const staffToken = (await request(app).post('/api/companies/check-code').send({ code: 'PRS-ALI' })).body.data.token;
+        const mine = await request(app).get('/api/reports/employee-stats')
+            .query({ period: 'today', local_date: day(40) }).set(auth(staffToken)).expect(200);
+        expect(mine.body.data).toMatchObject({ actual_collected: 350, commission: 35 });
+
+        const otherAdmin = (await request(app).post('/api/companies/check-code').send({ code: 'ADM-GIZLI' })).body.data.token;
+        await request(app).patch(`/api/appointments/${id}/status`).set(auth(otherAdmin)).send({ status: 'cancelled' }).expect(403);
+    });
+
+    it('masraf: kategori ile kaydedilir, personel yalnızca kendi masrafını görür ve siler', async () => {
+        const admin = (await request(app).post('/api/companies/admin-login').send({ admin_key: 'ADM-PANEL' })).body.data.token;
+        const staffToken = (await request(app).post('/api/companies/check-code').send({ code: 'PRS-ALI' })).body.data.token;
+
+        await request(app).post('/api/expenses').set(auth(admin)).send({ amount: 0, description: 'x' }).expect(400);
+        const rent = await request(app).post('/api/expenses').set(auth(admin))
+            .send({ amount: 5000, description: 'Ekim kirası', category: 'rent' }).expect(201);
+        expect(rent.body.data).toMatchObject({ category: 'rent', company_id: panelCo });
+        const supplies = await request(app).post('/api/expenses').set(auth(staffToken))
+            .send({ amount: 120.5, description: 'Havlu', category: 'genel' }).expect(201);
+        expect(supplies.body.data.category).toBe('other');
+
+        const adminList = await request(app).get('/api/expenses').query({ period: 'month' }).set(auth(admin)).expect(200);
+        expect(adminList.body.data).toHaveLength(2);
+        const staffList = await request(app).get('/api/expenses').query({ period: 'month' }).set(auth(staffToken)).expect(200);
+        expect(staffList.body.data.map((e: any) => e.id)).toEqual([supplies.body.data.id]);
+
+        await request(app).delete(`/api/expenses/${rent.body.data.id}`).set(auth(staffToken)).expect(404);
+        await request(app).delete(`/api/expenses/${rent.body.data.id}`).set(auth(admin)).expect(200);
+
+        const report = await request(app).get('/api/reports/employee-stats').query({ period: 'month' }).set(auth(admin)).expect(200);
+        expect(report.body.data.total_expenses).toBeCloseTo(120.5);
+    });
+});

@@ -4,6 +4,7 @@ import { services } from '../db/schema';
 import smsService from './sms.service';
 import { normalizePhone } from '../utils/phone';
 import redis from '../config/redis';
+import { env } from '../config/env';
 
 
 export interface Company {
@@ -500,9 +501,7 @@ class CompanyService {
 
             if (company.phone) {
                 try {
-                    const protocol = 'https://';
-                    const baseUrl = 'www.saloncebinde.com';
-                    const message = `Sayın ${company.name}, başvurunuz onaylanmıştır. Firma Yönetim Paneliniz: ${protocol}${baseUrl}/#/company-panel?key=${company.admin_key} Çalışanlarınızı Tanıtmak İçin: ${protocol}${baseUrl}/#/setup-staff/${company.id}?key=${company.admin_key}`;
+                    const message = `Sayın ${company.name}, başvurunuz onaylanmıştır. İşletme paneliniz: ${env.APP_URL}/#/isletme?code=${company.admin_key} Çalışanlarınızı eklemek için: ${env.APP_URL}/#/setup-staff/${company.id}?key=${company.admin_key}`;
 
                     await smsService.sendSms(null, company.phone, message);
                     console.log(`[CompanyService] Onay SMS gonderildi: ${company.phone}`);

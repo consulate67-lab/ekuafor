@@ -1,7 +1,7 @@
 # Saloon — Yeniden Yapılandırma Planı
 
 **Tarih:** 2026-10-12
-**Durum:** Onaylandı (2026-10-12) — Faz 0, 1, 2, 3, 4 ve 5.0–5.1 tamamlandı; sıradaki 5.2 (firma kullanıcısı ekranı)
+**Durum:** Onaylandı (2026-10-12) — Faz 0, 1, 2, 3, 4 ve 5.0–5.2 tamamlandı; sıradaki 5.3 (firma dashboard / board)
 **Kapsam:** Güvenlik düzeltmeleri, gereksiz kodun silinmesi, sektör-bağımsız rezervasyon modeli ve 4 ekranın yeniden düzenlenmesi.
 **Kapsam dışı (sonraki aşama):** Offline çalışma. Bu planda yalnızca offline'a hazırlık yapılır.
 
@@ -364,6 +364,14 @@ Tek bir giriş (JWT), tek bir uygulama kabuğu, alt menüde 4 sekme. `CompanyPan
 - `CompanyPanel/index.tsx` (1731 satır), `Dashboard.tsx`'in firma kısmı ve `AppointmentManagement.tsx` (1769 satır) bu yeni kabuğa dağıtılıp silinir.
 - `FinanceTab` (1627 satır) içinden e-fatura korunur; "hazırlanıyor" yazan boş rapor sayfaları silinir.
 - Gereksiz `window.location.reload()` çağrıları kaldırılır.
+
+**Durum (2026-10-12) — 5.2 tamamlandı:**
+- Tek giriş: `/login` e-posta veya giriş kodu (yönetici / personel / board kodu) kabul ediyor. `check-code` ve `admin-login` artık firmanın gerçek `company_admin` kullanıcısına JWT veriyor (yoksa `firma-{id}@saloon.local` olarak bir kez oluşturuluyor). Eskiden token'daki `userId` firma ID'si olduğu için `/auth/me` başka bir kullanıcıyı dönebiliyordu. `/auth/login` cevabındaki `redirectKey` (yönetici anahtarı) kaldırıldı. Kod girişlerine hatalı denemede 15 dakikada 10 sınırı kondu.
+- Yeni kabuk `pages/business/BusinessApp` (`/isletme?tab=…`): Randevular (bekleyenler üstte, gün gezgini, onayla / reddet / iptal / tamamla + tahsilat nakit-kart-havale, "+" ile müşteri adına randevu — işletmenin girdiği randevu onaylı başlar), Masraf (yalnızca yönetici; kategori, tarih, silme), Raporlar (net, randevu, beklenen ciro, tahsilat, masraf, personel bazında prim; personel kendi rakamlarını ve primini görür), Daha fazla (`CompanyPanel` sekmelerine bağlantılar, QR, board, çıkış).
+- `CompanyPanel`'in `admin_key` kapısı kaldırıldı; JWT ve rol ile açılıyor, `?tab=` ile doğrudan sekmeye gidiliyor. QR ve SMS linkleri `#/isletme?code=…` biçiminde ve `APP_URL` üzerinden (eski `saloncebinde.com` adresi ölüydü). `AppointmentManagement.tsx` silindi.
+- Sunucu düzeltmeleri: personel `all=true` ile tüm firmanın randevularını görebiliyordu, kapatıldı (kendi + atanmamış). Randevu durumu ve ödeme yöntemi doğrulanıyor (geçersiz değer 400). Masraflara `category` sütunu (migration `0004`) ve silme eklendi; personel yalnızca kendi masrafını görür / siler.
+- Testler: sunucu 58 (4 yeni "firma kullanıcısı" testi), istemci 23. Telefon boyutunda (390×844) tarayıcıda yönetici, personel ve board girişleri ile tüm sekmeler denendi.
+- Kalanlar: `CompanyPanel` sekmeleri ve `FinanceTab` henüz kabuğa dağıtılmadı (Daha fazla menüsünden açılıyor); fiş fotoğrafı / OCR yapılmadı; `Dashboard.tsx` artık yalnızca süper admin için (5.4'te `AdminHome`'a taşınacak). Board masrafları 5.3'e kadar `board` rolüyle çalışmaya devam ediyor.
 
 ### 8.3 Ekran 3 — Firma Dashboard (tablet / TV, şık ve modern)
 

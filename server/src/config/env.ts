@@ -34,6 +34,10 @@ const serverSchema = z.object({
         .string()
         .default('http://localhost:5173,http://localhost:3000,capacitor://localhost,app://.'),
 
+    // === SMS'lerdeki linklerin açılacağı web uygulaması ===
+    APP_URL: z.string().url().default('https://web-production-db847.up.railway.app')
+        .transform(url => url.replace(/\/+$/, '')),
+
     // === Türkiye API ===
     TURKIYE_API_BASE_URL: z.string().url().default('https://turkiyeapi.dev/api/v1'),
 

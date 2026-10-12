@@ -151,23 +151,12 @@ router.post('/login', async (req: Request, res: Response) => {
         // Şifreyi response'dan çıkar (Güvenlik)
         const { password, ...userWithoutPassword } = user;
 
-        // Extra info for panel redirects
-        let redirectKey = null;
-        if (user.role === 'company_admin' && user.company_id) {
-            console.log('[Auth] Fetching admin_key for company:', user.company_id);
-            const comp = await pool.query('SELECT admin_key FROM companies WHERE id = $1', [user.company_id]);
-            redirectKey = comp.rows[0]?.admin_key;
-        } else if (user.role === 'staff') {
-            redirectKey = user.board_code;
-        }
-
         console.log('[Auth] Login successful for:', lowerEmail);
         res.json({
             success: true,
             data: {
                 user: userWithoutPassword,
-                token,
-                redirectKey
+                token
             }
         });
     } catch (error: any) {

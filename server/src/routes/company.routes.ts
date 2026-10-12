@@ -5,6 +5,7 @@ import { formatPhoneTo12Digits } from '../utils/phone';
 import bcrypt from 'bcryptjs';
 import pool from '../config/database';
 import companyService, { toPublicCompany, isLicenseExpired } from '../services/company.service';
+import { getOrCreateCompanyAdmin, signUserToken } from '../services/companyLogin.service';
 import employeeRoutes from './employee.routes';
 import { authMiddleware, roleCheck, companyAuth, requireCompanyAccess, optionalCompanyAuth, canAccessCompany } from '../middleware/auth.middleware';
 import { randomBytes } from 'node:crypto';
@@ -262,7 +263,7 @@ router.post('/:id/setup-staff', async (req: Request, res: Response) => {
 
             // Send SMS to staff
             const staffEmail = staff.email.toLowerCase().trim();
-            const smsMsg = `Sn. ${staff.first_name}, ${companyName} personeli olarak eklendiniz. Email: ${staffEmail}. Giris sifrenizi olusturmak icin: https://www.saloncebinde.com/#/set-password/${boardCode}/${staffEmail}`;
+            const smsMsg = `Sn. ${staff.first_name}, ${companyName} personeli olarak eklendiniz. Email: ${staffEmail}. Giris sifrenizi olusturmak icin: ${env.APP_URL}/#/set-password/${boardCode}/${encodeURIComponent(staffEmail)}`;
             
             // Background SMS sending
             require('../services/sms.service').default.sendSms(null as any, staff.phone, smsMsg).catch((e: any) => { 
@@ -548,28 +549,15 @@ router.post('/admin-login', async (req: Request, res: Response) => {
         }
 
         const company = result.rows[0];
-        const userId = company.created_by || 0;
-
-        // JWT token oluştur - admin panelindeki korumalı rotalara erişim için
-        const token = jwt.sign(
-            {
-                userId: userId,
-                email: company.email || `admin@${company.id}.local`,
-                role: 'company_admin',
-                companyId: company.id
-            },
-            env.JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-
-        const isLicenseExpired = company.license_end_date && new Date(company.license_end_date) < new Date();
+        const user = await getOrCreateCompanyAdmin(company);
 
         res.json({
             success: true,
             data: {
-                company: company,
-                token: token,
-                is_license_expired: isLicenseExpired
+                company,
+                user,
+                token: signUserToken(user),
+                is_license_expired: isLicenseExpired(company)
             }
         });
     } catch (error) {
@@ -846,64 +834,52 @@ router.post('/check-code', async (req: Request, res: Response) => {
         }
 
         // Önce admin_key mi kontrol et
-        const adminResult = await pool.query('SELECT id, name, admin_key, license_end_date FROM companies WHERE UPPER(admin_key) = UPPER($1)', [code]);
+        const adminResult = await pool.query('SELECT id, name, phone, license_end_date FROM companies WHERE UPPER(admin_key) = UPPER($1)', [code]);
         if (adminResult.rows.length > 0) {
             const comp = adminResult.rows[0];
-            const isLicenseExpired = comp.license_end_date && new Date(comp.license_end_date) < new Date();
-
-            // JWT token oluştur - firma admini olarak giriş yapsın
-            const token = jwt.sign(
-                { userId: comp.id, email: `admin_${comp.id}@saloncebinde.local`, role: 'company_admin', companyId: comp.id },
-                env.JWT_SECRET,
-                { expiresIn: '30d' }
-            );
+            const user = await getOrCreateCompanyAdmin(comp);
 
             return res.json({
                 success: true,
                 data: {
                     type: 'admin',
-                    redirect: `/company-panel`,
+                    redirect: '/isletme',
                     company_name: comp.name,
                     company_id: comp.id,
-                    user_id: comp.id,
-                    token: token,
-                    is_license_expired: isLicenseExpired
+                    user_id: user.id,
+                    user,
+                    token: signUserToken(user),
+                    is_license_expired: isLicenseExpired(comp)
                 }
             });
         }
 
         // Sonra board_code mu kontrol et
         const staffResult = await pool.query(
-            `SELECT u.id, u.first_name, u.last_name, u.board_code, u.company_id, u.photo, c.name as company_name, c.license_end_date
+            `SELECT u.id, u.email, u.first_name, u.last_name, u.phone, u.role, u.board_code, u.company_id, u.photo, u.created_at,
+                    c.name as company_name, c.license_end_date
              FROM users u
              JOIN companies c ON u.company_id = c.id
-             WHERE UPPER(u.board_code) = UPPER($1)`,
+             WHERE UPPER(u.board_code) = UPPER($1) AND u.role = 'staff'`,
             [code]
         );
         if (staffResult.rows.length > 0) {
-            const sr = staffResult.rows[0];
-            const isLicenseExpired = sr.license_end_date && new Date(sr.license_end_date) < new Date();
-
-            // JWT token oluştur - personel dashboard'a erişsin
-            const token = jwt.sign(
-                { userId: sr.id, email: `${sr.board_code}@staff.local`, role: 'staff', companyId: sr.company_id },
-                env.JWT_SECRET,
-                { expiresIn: '7d' }
-            );
+            const { company_name, license_end_date, board_code, ...user } = staffResult.rows[0];
 
             return res.json({
                 success: true,
                 data: {
                     type: 'staff',
-                    redirect: `/dashboard`,
-                    staff_name: `${sr.first_name} ${sr.last_name}`,
-                    company_name: sr.company_name,
-                    board_code: sr.board_code,
-                    company_id: sr.company_id,
-                    user_id: sr.id,
-                    photo: sr.photo,
-                    token: token,
-                    is_license_expired: isLicenseExpired
+                    redirect: '/isletme',
+                    staff_name: `${user.first_name} ${user.last_name}`,
+                    company_name,
+                    board_code,
+                    company_id: user.company_id,
+                    user_id: user.id,
+                    photo: user.photo,
+                    user,
+                    token: signUserToken(user, '7d'),
+                    is_license_expired: isLicenseExpired({ license_end_date })
                 }
             });
         }

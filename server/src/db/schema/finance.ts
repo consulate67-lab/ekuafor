@@ -175,6 +175,7 @@ export const expenses = pgTable('expenses', {
     companyId: integer('company_id'),
     amount: numeric({ precision: 10, scale: 2 }).notNull(),
     description: text().notNull(),
+    category: varchar({ length: 30 }),
     expenseDate: date('expense_date').default(sql`CURRENT_DATE`).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).default(sql`CURRENT_TIMESTAMP`),
     createdBy: integer('created_by'),

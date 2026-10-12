@@ -63,10 +63,11 @@ const publicAppointmentHandler = async (req: Request, res: Response, next: any) 
             } else if (customerPhone) {
                 appointments = await appointmentService.getAppointmentsByPhone(customerPhone, companyId);
             } else {
+                // Personel firmanın listesinde yalnızca kendisine atanan ve atanmamış randevuları görür.
                 appointments = await appointmentService.getAppointmentsByCompany(
                     companyId!,
                     req.query.status as string,
-                    undefined,
+                    req.user?.role === 'staff' ? req.user.userId : undefined,
                     req.query.start_date as string,
                     req.query.end_date as string
                 );
@@ -100,7 +101,8 @@ const privateAppointmentHandler = async (req: Request, res: Response, next: any)
         else if (!companyRole) return res.status(403).json({ success: false, error: 'Bu firmada yetkiniz bulunmuyor' });
 
         let staffId: number | undefined = userId;
-        const isAdminOrManager = req.user?.role === 'super_admin' || companyRole === 'owner' || companyRole === 'manager' || req.query.all === 'true';
+        const isAdminOrManager = req.user?.role === 'super_admin' || req.user?.role === 'company_admin'
+            || companyRole === 'owner' || companyRole === 'manager';
 
         if (isAdminOrManager) staffId = undefined;
 
@@ -227,6 +229,14 @@ router.patch('/:id/rate', optionalCompanyAuth, async (req: Request, res: Respons
     }
 });
 
+const statusSchema = z.object({
+    status: z.enum(['pending', 'approved', 'cancelled', 'completed']),
+    price: z.coerce.number().nonnegative().max(10_000_000).optional().nullable(),
+    payment_method: z.enum(['cash', 'card', 'transfer', 'unspecified']).optional().nullable(),
+    technical_notes: z.string().max(2000).optional().nullable(),
+    used_materials: z.string().max(2000).optional().nullable(),
+});
+
 router.patch('/:id/status', companyAuth, async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
@@ -236,8 +246,12 @@ router.patch('/:id/status', companyAuth, async (req: Request, res: Response) => 
             return res.status(403).json({ success: false, error: 'Bu firmada yetkiniz bulunmuyor.' });
         }
 
-        const { status, price, payment_method, technical_notes, used_materials } = req.body;
-        const appointment = await appointmentService.updateAppointmentStatus(id, status, price, payment_method, technical_notes, used_materials);
+        const parsed = statusSchema.safeParse(req.body);
+        if (!parsed.success) return res.status(400).json({ success: false, error: 'Geçersiz durum veya ödeme bilgisi' });
+        const { status, price, payment_method, technical_notes, used_materials } = parsed.data;
+        const appointment = await appointmentService.updateAppointmentStatus(
+            id, status, price ?? undefined, payment_method ?? undefined, technical_notes ?? undefined, used_materials ?? undefined
+        );
         if (!appointment) return res.status(404).json({ success: false, error: 'Bulunamadı' });
         res.json({ success: true, data: appointment });
     } catch (error) {

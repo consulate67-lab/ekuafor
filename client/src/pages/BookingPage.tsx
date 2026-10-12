@@ -58,6 +58,8 @@ export default function BookingPageRoute() {
 function BookingPage({ id }: { id: string }) {
     const { isAuthenticated, user } = useAuthStore();
     const companyId = Number(id);
+    /** İşletme kullanıcısı kendi firmasına müşteri adına randevu giriyor. */
+    const isBusiness = !!user && ['company_admin', 'staff'].includes(user.role) && Number(user.company_id) === companyId;
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const initialStaffId = searchParams.get('staff') ? Number(searchParams.get('staff')) : null;
@@ -76,8 +78,8 @@ function BookingPage({ id }: { id: string }) {
         time: null,
         sessionId: null,
         partySize: 1,
-        customerName: user ? `${user.first_name} ${user.last_name || ''}`.trim() : '',
-        customerPhone: user?.phone || '',
+        customerName: user && !isBusiness ? `${user.first_name} ${user.last_name || ''}`.trim() : '',
+        customerPhone: isBusiness ? '' : user?.phone || '',
     });
     const [availability, setAvailability] = useState<Availability | null>(null);
     const [sessions, setSessions] = useState<ClassSession[]>([]);
@@ -142,13 +144,13 @@ function BookingPage({ id }: { id: string }) {
     }, [goBack]);
 
     useEffect(() => {
-        if (!user) return;
+        if (!user || isBusiness) return;
         setSelection(prev => ({
             ...prev,
             customerName: prev.customerName || `${user.first_name} ${user.last_name || ''}`.trim(),
             customerPhone: prev.customerPhone || user.phone || '',
         }));
-    }, [user]);
+    }, [user, isBusiness]);
 
     useEffect(() => {
         const load = async () => {
@@ -239,14 +241,14 @@ function BookingPage({ id }: { id: string }) {
         setSubmitting(true);
         setError(null);
         try {
-            const deviceId = await getDeviceId();
-            const cachedPhone = localStorage.getItem('customer_phone');
-            const phone = user?.phone || cachedPhone || selection.customerPhone;
+            const deviceId = isBusiness ? null : await getDeviceId();
+            const cachedPhone = isBusiness ? null : localStorage.getItem('customer_phone');
+            const phone = isBusiness ? selection.customerPhone : (user?.phone || cachedPhone || selection.customerPhone);
             const base = {
                 company_id: companyId,
                 customer_name: selection.customerName.trim() || undefined,
                 customer_phone: phone || undefined,
-                device_id: deviceId,
+                device_id: deviceId || undefined,
                 client_request_id: requestIdRef.current,
             };
             const body = mode === 'class'
@@ -261,6 +263,10 @@ function BookingPage({ id }: { id: string }) {
                         start_time: selection.time,
                     };
             const res = await api.post('/appointments', body);
+            if (isBusiness) {
+                navigate('/isletme', { replace: true });
+                return;
+            }
             const created = res.data?.data;
             if (created?.id) {
                 const saved: number[] = JSON.parse(localStorage.getItem('my_appointment_ids') || '[]');
@@ -524,8 +530,10 @@ function BookingPage({ id }: { id: string }) {
                             <p className="text-2xl font-black text-amber-600 pt-2">{formatPrice(totalPrice)}</p>
                         </div>
                         <form id="booking-form" onSubmit={handleSubmit} className="space-y-3">
-                            <input type="text" value={selection.customerName} onChange={e => update({ customerName: e.target.value })} className="w-full p-4 bg-white rounded-2xl border-2 border-slate-100 font-bold" placeholder="Adınız Soyadınız" autoComplete="name" required />
-                            {!isAuthenticated && !localStorage.getItem('customer_phone') && (
+                            <input type="text" value={selection.customerName} onChange={e => update({ customerName: e.target.value })} className="w-full p-4 bg-white rounded-2xl border-2 border-slate-100 font-bold" placeholder={isBusiness ? 'Müşteri adı soyadı' : 'Adınız Soyadınız'} autoComplete={isBusiness ? 'off' : 'name'} required />
+                            {isBusiness ? (
+                                <input type="tel" inputMode="numeric" value={selection.customerPhone} onChange={e => update({ customerPhone: e.target.value.replace(/\D/g, '').slice(0, 11) })} className="w-full p-4 bg-white rounded-2xl border-2 border-slate-100 font-bold" placeholder="Müşteri telefonu (isteğe bağlı)" autoComplete="off" minLength={10} />
+                            ) : !isAuthenticated && !localStorage.getItem('customer_phone') && (
                                 <input type="tel" inputMode="numeric" value={selection.customerPhone} onChange={e => update({ customerPhone: e.target.value.replace(/\D/g, '').slice(0, 11) })} className="w-full p-4 bg-white rounded-2xl border-2 border-slate-100 font-bold" placeholder="5XX XXX XX XX" autoComplete="tel" required minLength={10} />
                             )}
                         </form>

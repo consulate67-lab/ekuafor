@@ -100,11 +100,24 @@ class ReportService {
         const expResult = await db.execute(expQuery);
         const expRows = (expResult as any).rows as any[];
 
+        const actualCollected = parseFloat(resultRows[0]?.actual_collected) || 0;
+        let commission: number | undefined;
+        if (staffId) {
+            const rateResult = await db.execute(sql`
+                SELECT COALESCE(u.commission_rate, c.commission_rate, 0) AS rate
+                FROM users u JOIN companies c ON c.id = ${companyId}
+                WHERE u.id = ${staffId}
+            `);
+            const rate = parseFloat(((rateResult as any).rows as any[])[0]?.rate) || 0;
+            commission = (actualCollected * rate) / 100;
+        }
+
         return {
             total_appointments: parseInt(resultRows[0]?.total_appointments) || 0,
             total_booked_value: parseFloat(resultRows[0]?.total_booked_value) || 0,
-            actual_collected: parseFloat(resultRows[0]?.actual_collected) || 0,
-            total_expenses: parseFloat(expRows[0]?.total_expenses) || 0
+            actual_collected: actualCollected,
+            total_expenses: parseFloat(expRows[0]?.total_expenses) || 0,
+            ...(commission !== undefined && { commission }),
         };
     }
 

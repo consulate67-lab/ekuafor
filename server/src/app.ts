@@ -104,6 +104,10 @@ export const createApp = (): Express => {
     app.use('/api/auth/login', authLimiter as any);
     app.use('/api/auth/register', authLimiter as any);
     app.use('/api/auth/forgot-password', authLimiter as any);
+    // Kısa anahtar / kodla girişler deneme-yanılmaya açık; başarısız denemeler sınırlanır.
+    for (const path of ['admin-login', 'check-code', 'staff-login', 'board-login']) {
+        app.use(`/api/companies/${path}`, authLimiter as any);
+    }
 
     // === Body parsers ===
     app.use(express.json({ limit: '10mb' }));

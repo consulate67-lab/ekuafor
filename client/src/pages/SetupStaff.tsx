@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
+import { authApi } from '../api/business';
+import { useAuthStore } from '../store/authStore';
 
 export default function SetupStaff() {
     const { id } = useParams<{ id: string }>();
@@ -90,7 +92,15 @@ export default function SetupStaff() {
                         Personelleriniz başarıyla sisteme kaydedildi. Giriş bilgileri telefonlarına <span className="text-white font-bold">SMS</span> olarak gönderildi.
                     </p>
                     <button
-                        onClick={() => navigate(`/company-panel?key=${adminKey}`)}
+                        onClick={async () => {
+                            try {
+                                const result = await authApi.codeLogin(adminKey!);
+                                if (result.token && result.user) useAuthStore.getState().login(result.user, result.token);
+                                navigate('/isletme', { replace: true });
+                            } catch {
+                                navigate('/login');
+                            }
+                        }}
                         className="group relative px-10 py-5 bg-white text-slate-900 rounded-2xl font-black text-lg shadow-[0_20px_40px_-15px_rgba(255,255,255,0.3)] hover:scale-[1.02] active:scale-95 transition-all w-full overflow-hidden"
                     >
                         <div className="absolute inset-0 bg-gradient-to-r from-pink-500 to-indigo-500 opacity-0 group-hover:opacity-10 transition-opacity" />

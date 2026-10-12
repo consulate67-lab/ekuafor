@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../lib/api';
+import { useAuthStore } from '../../store/authStore';
+import { Button, EmptyState, FullScreenLoader } from '../../components/ui';
 import {
     menuItems,
     normalizePhone,
@@ -49,8 +52,6 @@ const [departments, setDepartments] = useState<Department[]>([]);
 const [staffBoards, setStaffBoards] = useState<StaffBoard[]>([]);
 const [loading, setLoading] = useState(false);
 const [error, setError] = useState('');
-const [inputKey, setInputKey] = useState('');
-
 // UI states
 const [activeTab, setActiveTab] = useState<TabKey>('home');
 const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -163,48 +164,44 @@ const [geoDistricts, setGeoDistricts] = useState<any[]>([]);
 const [geoNeighborhoods, setGeoNeighborhoods] = useState<any[]>([]);
 const [loadingGeo, setLoadingGeo] = useState({ provinces: false, districts: false, neighborhoods: false });
 const [isLicenseExpired, setIsLicenseExpired] = useState(false);
-const handleLogin = async (keyToUse?: string) => {
-    const key = keyToUse || inputKey.trim();
-    if (!key) return;
+const navigate = useNavigate();
+const [searchParams] = useSearchParams();
+const authUser = useAuthStore(s => s.user);
+const isSuperAdmin = authUser?.role === 'super_admin';
+const companyId = isSuperAdmin ? Number(searchParams.get('company')) || undefined : authUser?.company_id;
+const initialTabRef = useRef(searchParams.get('tab') as TabKey | null);
+
+const loadCompany = async () => {
+    if (!companyId) return;
     setLoading(true);
     setError('');
     try {
-        const res = await api.post('/companies/admin-login', { admin_key: key });
-        const { company: comp, token, is_license_expired } = res.data.data;
+        const res = await api.get(`/companies/${companyId}`);
+        const comp = res.data.data;
         setCompany(comp);
-        setIsLicenseExpired(!!is_license_expired);
-        localStorage.setItem('company_admin_key', key);
-        if (token) {
-            localStorage.setItem('token', token);
-        }
-        setInputKey(key);
-        if (!is_license_expired) {
+        setIsLicenseExpired(!!comp.is_license_expired);
+        if (!comp.is_license_expired) {
             fetchData(comp.id);
             if (comp.city) fetchDistricts(comp.city);
-            // Note: Neighborhood fetching usually needs the district ID which we get after fetchDistricts
         }
-
     } catch (err: any) {
-        setError(err.response?.data?.error || 'Geçersiz anahtar');
+        setError(err.response?.data?.error || 'Firma bilgileri yüklenemedi');
     } finally {
         setLoading(false);
     }
 };
 
 useEffect(() => {
-    // HashRouter kullanıldığı için window.location.search boş döner; key
-    // URL'de #/company-panel?key=... şeklinde hash içinde gelir.
-    // App.tsx:74 ile aynı pattern: href'ten [?&]key= değerini yakala
-    // (hem hash içi hem dışı query'leri kapsar).
-    const keyMatch = window.location.href.match(/[?&]key=([^&#]+)/);
-    const urlKey = keyMatch ? decodeURIComponent(keyMatch[1]) : null;
-    const saved = localStorage.getItem('company_admin_key');
-    const keyToUse = urlKey || saved;
-    if (keyToUse) {
-        setInputKey(keyToUse);
-        handleLogin(keyToUse);
-    }
-}, []);
+    loadCompany();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [companyId]);
+
+useEffect(() => {
+    if (!company || !initialTabRef.current) return;
+    switchTab(initialTabRef.current);
+    initialTabRef.current = null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [company]);
 
 const fetchFinanceData = async (cid?: number) => {
     const targetCid = cid || company?.id;
@@ -936,15 +933,7 @@ const handleAddFromTemplate = async (template: any) => {
     }
 };
 
-const handleLogout = () => {
-    localStorage.removeItem('company_admin_key');
-    localStorage.removeItem('token');
-    setCompany(null);
-    setInputKey('');
-    setDepartments([]);
-    setStaffBoards([]);
-    setCompanyServices([]);
-};
+const backToApp = () => navigate(isSuperAdmin ? (companyId ? `/companies/${companyId}` : '/companies') : '/isletme?tab=more');
 
 const copyText = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
@@ -1056,7 +1045,6 @@ const generateBoardKey = () => {
         staffBoards,
         loading,
         error,
-        inputKey,
         activeTab,
         sidebarOpen,
         showDeptModal,
@@ -1110,8 +1098,6 @@ const generateBoardKey = () => {
         geoNeighborhoods,
         loadingGeo,
         isLicenseExpired,
-        handleLogin,
-        handleLogout,
         handleUpdateCompany,
         fetchFinanceData,
         fetchCustomersData,
@@ -1154,7 +1140,6 @@ const generateBoardKey = () => {
         setStaffBoards,
         setLoading,
         setError,
-        setInputKey,
         setActiveTab,
         setSidebarOpen,
         setShowDeptModal,
@@ -1212,40 +1197,15 @@ const generateBoardKey = () => {
     void Object.keys(ctx).length;
 
     if (!company) {
+        if (loading || !error) return <FullScreenLoader text="Firma yükleniyor…" />;
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center p-6">
-                <div className="w-full max-w-sm">
-                    <div className="text-center mb-10">
-                        <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-xl shadow-indigo-500/30">
-                            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                            </svg>
-                        </div>
-                        <h1 className="text-3xl font-black text-white tracking-tight">Firma Paneli</h1>
-                        <p className="text-indigo-300 text-sm mt-2">Yönetim anahtarınızı girin</p>
-                    </div>
-
-                    <div className="space-y-4">
-                        <input
-                            type="text"
-                            value={inputKey}
-                            onChange={e => setInputKey(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                            placeholder="ADM-XXX-XXXX"
-                            className="w-full p-5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl text-white text-center text-xl font-bold tracking-widest placeholder:text-white/30 outline-none focus:border-indigo-400 transition-all"
-                        />
-                        <button
-                            onClick={() => handleLogin()}
-                            disabled={loading}
-                            className="w-full py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl font-black text-lg tracking-wide shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/50 active:scale-95 transition-all disabled:opacity-50"
-                        >
-                            {loading ? 'Giriş Yapılıyor...' : 'Giriş Yap'}
-                        </button>
-                        {error && (
-                            <p className="text-red-400 text-center text-sm font-bold animate-pulse">{error}</p>
-                        )}
-                    </div>
-                </div>
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+                <EmptyState
+                    icon="⚠️"
+                    title="Firma bilgileri açılamadı"
+                    description={error}
+                    action={<Button onClick={backToApp}>İşletme paneline dön</Button>}
+                />
             </div>
         );
     }
@@ -1349,13 +1309,11 @@ const generateBoardKey = () => {
                 {/* Sidebar Footer */}
                 <div className="p-4 border-t border-white/10">
                     <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-red-300 hover:bg-red-500/10 transition-all font-bold text-sm"
+                        onClick={backToApp}
+                        className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-indigo-200 hover:bg-white/5 transition-all font-bold text-sm"
                     >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        <span>Çıkış Yap</span>
+                        <span className="text-lg" aria-hidden>←</span>
+                        <span>İşletme paneline dön</span>
                     </button>
                 </div>
             </aside>
@@ -1378,12 +1336,11 @@ const generateBoardKey = () => {
                         <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest">{menuItems.find(m => m.key === activeTab)?.label}</p>
                     </div>
                     <button
-                        onClick={handleLogout}
-                        className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center"
+                        onClick={backToApp}
+                        aria-label="İşletme paneline dön"
+                        className="w-10 h-10 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center font-black"
                     >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
+                        ←
                     </button>
                 </div>
 

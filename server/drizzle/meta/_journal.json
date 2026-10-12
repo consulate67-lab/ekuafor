@@ -29,6 +29,13 @@
       "when": 1791789755866,
       "tag": "0003_sector_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791797433343,
+      "tag": "0004_expense_category",
+      "breakpoints": true
     }
   ]
 }

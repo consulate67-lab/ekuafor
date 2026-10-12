@@ -32,6 +32,7 @@ export interface PublicCompany {
     rating_avg?: number | string | null;
     review_count?: number | null;
     is_bookable?: boolean;
+    is_license_expired?: boolean;
     distance_km?: number | null;
     primary_sector?: SectorBadge | null;
     sectors?: SectorBadge[];

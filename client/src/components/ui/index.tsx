@@ -210,5 +210,7 @@ export function PageHeader({ title, subtitle, onBack, right }: { title: string; 
     );
 }
 
-export const formatMoney = (value: number | string | null | undefined) =>
-    `₺${Number(value || 0).toLocaleString('tr-TR', { maximumFractionDigits: 2 })}`;
+export const formatMoney = (value: number | string | null | undefined) => {
+    const amount = Number(value || 0);
+    return `${amount < 0 ? '−' : ''}₺${Math.abs(amount).toLocaleString('tr-TR', { maximumFractionDigits: 2 })}`;
+};

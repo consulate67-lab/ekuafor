@@ -28,7 +28,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         localStorage.removeItem('token');
         localStorage.removeItem('user_data');
         set({ user: null, token: null, isAuthenticated: false, initialized: true });
-        window.location.href = '/';
+        window.location.href = '/#/login';
     },
 
     setUser: (user) => {

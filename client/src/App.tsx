@@ -6,6 +6,7 @@ import { useAuthStore } from './store/authStore';
 import api from './lib/api';
 import { useAppointmentSync } from './hooks/useAppointmentSync';
 import { FullScreenLoader } from './components/ui';
+import { homePathFor } from './lib/routes';
 
 /**
  * Lazy-loaded page components.
@@ -19,7 +20,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const CompanyForm = lazy(() => import('./pages/CompanyForm'));
 const CompanyList = lazy(() => import('./pages/CompanyList'));
 const CompanyDetail = lazy(() => import('./pages/CompanyDetail'));
-const AppointmentManagement = lazy(() => import('./pages/AppointmentManagement'));
+const BusinessApp = lazy(() => import('./pages/business/BusinessApp'));
 const CustomerHome = lazy(() => import('./pages/customer/CustomerHome'));
 const CompanyPage = lazy(() => import('./pages/customer/CompanyPage'));
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -43,6 +44,7 @@ function App() {
     useAppointmentSync();
 
     const isNative = Capacitor.isNativePlatform();
+    const isBusinessUser = user?.role === 'company_admin' || user?.role === 'staff';
 
     // Use HashRouter universally to ensure GitHub Pages, Native APKs, and PWAs all function flawlessly without 404 rewrite hacks.
     const Router: any = HashRouter;
@@ -59,31 +61,12 @@ function App() {
                     const res = await api.post('/companies/check-code', { code });
                     if (res.data?.success) {
                         const data = res.data.data;
-                        if (data.type === 'staff') {
-                            if (!data.is_license_expired) {
-                                if (data.token) {
-                                    localStorage.setItem('token', data.token);
-                                    localStorage.setItem('staff_board_code', data.board_code);
-                                    const userPayload = {
-                                        id: data.user_id,
-                                        email: `${data.board_code}@staff.local`,
-                                        first_name: data.staff_name.split(' ')[0],
-                                        last_name: data.staff_name.split(' ').slice(1).join(' '),
-                                        role: 'staff',
-                                        company_id: data.company_id,
-                                        photo: data.photo
-                                    };
-                                    useAuthStore.getState().login(userPayload as any, data.token);
-                                }
-                                window.location.hash = '#/dashboard';
-                            }
-                        } else if (data.type === 'board') {
+                        if (data.type === 'board') {
                             localStorage.setItem('board_key', data.board_key);
                             window.location.hash = '#/board';
-                        } else if (data.type === 'admin') {
-                            if (!data.is_license_expired) {
-                                window.location.hash = '#' + data.redirect;
-                            }
+                        } else if (data.token && data.user) {
+                            useAuthStore.getState().login(data.user, data.token);
+                            window.location.hash = '#/isletme';
                         }
 
                         // Clean up URL safely
@@ -153,12 +136,13 @@ function App() {
                 if (code) {
                     setInitialized(false);
                     const res = await api.post('/companies/check-code', { code });
-                    if (res.data?.success && res.data?.data?.token) {
-                        localStorage.setItem('token', res.data.data.token);
-                        const meRes = await api.get('/auth/me');
-                        if (meRes.data.success) {
-                            useAuthStore.getState().login(meRes.data.data, res.data.data.token);
-                        }
+                    const data = res.data?.data;
+                    if (data?.type === 'board') {
+                        localStorage.setItem('board_key', data.board_key);
+                        window.location.hash = '#/board';
+                    } else if (data?.token && data?.user) {
+                        useAuthStore.getState().login(data.user, data.token);
+                        window.location.hash = '#/isletme';
                     }
                 }
             } catch (e) {
@@ -187,28 +171,36 @@ function App() {
                         path="/"
                         element={
                             isAuthenticated
-                                ? (user?.role === 'customer' ? <CustomerHome /> : <Navigate to="/dashboard" replace />)
+                                ? (user?.role === 'customer' ? <CustomerHome /> : <Navigate to={homePathFor(user?.role)} replace />)
                                 : (isNative ? <CustomerHome /> : <Navigate to="/web" replace />)
                         }
                     />
                     <Route
                         path="/app"
-                        element={isAuthenticated ? (user?.role === 'customer' ? <CustomerHome /> : <Navigate to="/dashboard" replace />) : <CustomerHome />}
+                        element={isAuthenticated && user?.role !== 'customer' ? <Navigate to={homePathFor(user?.role)} replace /> : <CustomerHome />}
                     />
                     <Route
                         path="/web"
-                        element={isAuthenticated ? (user?.role === 'customer' ? <CustomerHome /> : <Navigate to="/dashboard" replace />) : <LandingPage />}
+                        element={isAuthenticated ? (user?.role === 'customer' ? <CustomerHome /> : <Navigate to={homePathFor(user?.role)} replace />) : <LandingPage />}
                     />
+                    <Route path="/isletme" element={<BusinessApp />} />
                     <Route path="/firma/:id" element={<CompanyPage />} />
                     <Route path="/book/:id" element={<BookingPage />} />
                     <Route path="/my-appointments" element={<MyAppointments />} />
                     <Route path="/my-notifications" element={<MyNotifications />} />
-                    <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
+                    <Route path="/login" element={<Login />} />
                     <Route path="/customer-login" element={<CustomerLogin />} />
-                    <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />} />
+                    <Route path="/register" element={isAuthenticated ? <Navigate to={homePathFor(user?.role)} replace /> : <Register />} />
                     <Route path="/kvkk" element={<KvkkPage />} />
                     <Route path="/board" element={<SalonBoard />} />
-                    <Route path="/company-panel" element={<CompanyPanel />} />
+                    <Route
+                        path="/company-panel"
+                        element={
+                            !isAuthenticated ? <Navigate to="/login" replace />
+                                : ['company_admin', 'super_admin'].includes(user?.role ?? '') ? <CompanyPanel />
+                                    : <Navigate to={homePathFor(user?.role)} replace />
+                        }
+                    />
                     <Route path="/main-management" element={<MainCompanyPanel />} />
                     <Route path="/main-reports" element={<MainCompanyReports />} />
                     <Route path="/main-reports/:code" element={<MainCompanyReports />} />
@@ -219,19 +211,18 @@ function App() {
                     {/* Protected Routes */}
                     {isAuthenticated ? (
                         <>
-                            <Route path="/dashboard" element={<Dashboard />} />
+                            <Route path="/dashboard" element={isBusinessUser ? <Navigate to="/isletme" replace /> : <Dashboard />} />
                             <Route path="/companies" element={<CompanyList />} />
                             <Route path="/companies/new" element={<CompanyForm />} />
                             <Route path="/companies/:id" element={<CompanyDetail />} />
                             <Route path="/companies/:id/edit" element={<CompanyForm />} />
-                            <Route path="/appointments" element={<AppointmentManagement />} />
+                            <Route path="/appointments" element={<Navigate to={homePathFor(user?.role)} replace />} />
                             <Route path="/sms-settings" element={<SmsSettings />} />
-                            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                            <Route path="*" element={<Navigate to={homePathFor(user?.role)} replace />} />
                         </>
                     ) : (
                         <>
                             <Route path="/dashboard" element={<Navigate to="/login" replace />} />
-                            <Route path="/appointments" element={<Navigate to="/login" replace />} />
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </>
                     )}
