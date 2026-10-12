@@ -4,19 +4,6 @@ import pool from '../config/database';
 
 const router = Router();
 
-// Create Table on load just in case
-pool.query(`
-    CREATE TABLE IF NOT EXISTS expenses (
-        id SERIAL PRIMARY KEY,
-        company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
-        amount DECIMAL(10,2) NOT NULL,
-        description TEXT NOT NULL,
-        expense_date DATE NOT NULL DEFAULT CURRENT_DATE,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
-    );
-`).catch(console.error);
-
 router.post('/', companyAuth, async (req: Request, res: Response) => {
     try {
         const { amount, description, date } = req.body;

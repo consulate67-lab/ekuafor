@@ -1,34 +1,53 @@
-import { pgTable, serial, integer, bigint, smallint, varchar, text, boolean, timestamp, time, date, numeric, decimal, jsonb, json, uuid, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, foreignKey, check, primaryKey, serial, integer, time, varchar, text, numeric, timestamp, boolean } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 import { companies } from './core';
-import { users } from './core';
 
 /**
  * services tablosu
  */
 export const services = pgTable('services', {
-    id: serial('id').primaryKey(),
-    companyId: integer('company_id').references(() => companies.id),
-    name: varchar('name', { length: 255 }).notNull(),
-    description: text('description'),
+    id: serial().primaryKey().notNull(),
+    companyId: integer('company_id'),
+    name: varchar({ length: 255 }).notNull(),
+    description: text(),
     durationMinutes: integer('duration_minutes').notNull(),
-    price: decimal('price', { precision: 10, scale: 2 }).notNull(),
-    isActive: boolean('is_active'),
+    price: numeric({ precision: 10, scale: 2 }).notNull(),
+    isActive: boolean('is_active').default(true),
+    createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: timestamp('updated_at').default(sql`CURRENT_TIMESTAMP`),
     departmentId: integer('department_id'),
-    createdAt: timestamp('created_at', { withTimezone: true }),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
+    quantity: numeric(),
+    unit: varchar({ length: 30 }),
+    photo: text(),
+}, (table) => {
+    return {
+        servicesCompanyIdFkey: foreignKey({
+            columns: [table.companyId],
+            foreignColumns: [companies.id],
+            name: 'services_company_id_fkey'
+        }).onDelete('cascade'),
+    }
 });
 
 /**
  * working_hours tablosu
  */
 export const workingHours = pgTable('working_hours', {
-    id: serial('id').primaryKey(),
-    companyId: integer('company_id').references(() => companies.id),
-    dayOfWeek: text('day_of_week').notNull(),
+    id: serial().primaryKey().notNull(),
+    companyId: integer('company_id'),
+    dayOfWeek: integer('day_of_week').notNull(),
     startTime: time('start_time').notNull(),
     endTime: time('end_time').notNull(),
-    isActive: boolean('is_active'),
-    createdAt: timestamp('created_at', { withTimezone: true })
+    isActive: boolean('is_active').default(true),
+    createdAt: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`),
+}, (table) => {
+    return {
+        workingHoursCompanyIdFkey: foreignKey({
+            columns: [table.companyId],
+            foreignColumns: [companies.id],
+            name: 'working_hours_company_id_fkey'
+        }).onDelete('cascade'),
+        workingHoursDayOfWeekCheck: check('working_hours_day_of_week_check', sql`(day_of_week >= 0) AND (day_of_week <= 6)`),
+    }
 });

@@ -8,7 +8,7 @@ export interface Employee {
     userId: number;
     role: 'owner' | 'manager' | 'staff';
     isActive: boolean;
-    createdAt?: string;
+    createdAt?: Date | null;
     // Join alanları
     firstName?: string;
     lastName?: string;

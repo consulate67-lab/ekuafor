@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import { eq } from 'drizzle-orm';
 import { db, pool } from '../db';
 import { kvkkRequests } from '../db/schema/core';
 import { authMiddleware, roleCheck } from '../middleware/auth.middleware';
@@ -106,7 +107,7 @@ router.patch('/data-requests/:id', authMiddleware, roleCheck(['super_admin']), a
                 adminNote,
                 processedAt: status !== 'pending' ? new Date() : null,
             })
-            .where(kvkkRequests.id as any)
+            .where(eq(kvkkRequests.id, id))
             .returning();
 
         if (!updated) {

@@ -10,7 +10,7 @@
     "build:client": "cd ../client && npm install --silent && npm run build",
     "copy:client": "node scripts/copy-client-dist.js",
     "start": "node dist/index.js",
-    "db:migrate": "node -r dotenv/config scripts/migrate.js || node -e \"process.exit(0)\"",
+    "db:generate": "drizzle-kit generate",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage"

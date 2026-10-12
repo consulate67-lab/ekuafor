@@ -31,8 +31,6 @@ export interface SmsLog {
  *
  * Notlar:
  * - `sms_settings` ve `sms_logs` tabloları Drizzle schema'da mevcut → query builder
- * - `companies.sms_enabled` kolonu henüz Drizzle schema'da yok → `db.execute(sql\`\`)`
- *   ile raw SQL escape (migrate.ts'de ALTER ile eklenen legacy kolon).
  * - Public API snake_case alan beklediği için select() içinde açık alias veriliyor.
  */
 class SmsService {

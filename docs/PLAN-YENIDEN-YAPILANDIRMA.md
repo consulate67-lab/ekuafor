@@ -1,7 +1,7 @@
 # Saloon — Yeniden Yapılandırma Planı
 
 **Tarih:** 2026-10-12
-**Durum:** Onaylandı (2026-10-12) — Faz 0, 1 ve 2 tamamlandı; sıradaki Faz 3
+**Durum:** Onaylandı (2026-10-12) — Faz 0, 1, 2 ve 3 tamamlandı; sıradaki Faz 4
 **Kapsam:** Güvenlik düzeltmeleri, gereksiz kodun silinmesi, sektör-bağımsız rezervasyon modeli ve 4 ekranın yeniden düzenlenmesi.
 **Kapsam dışı (sonraki aşama):** Offline çalışma. Bu planda yalnızca offline'a hazırlık yapılır.
 
@@ -164,8 +164,8 @@ Her modül ayrı commit olarak silinir; her commit sonrası `tsc`, test ve build
 - `CustomerHome` içindeki ölü modallar, müşteri ekranı baştan yazılacağı için Faz 5'e bırakıldı.
 - Veritabanındaki artık tablolar/kolonlar (`packages`, `package_services`, `inventory_*`, `service_materials`, `ai_call_logs`, `automation_rules`, `osm_import_progress`, `appointments.package_id`, iyzico/AI kolonları) Faz 3'te yedek alınıp silinecek.
 
-**Açık bulgular (karar bekliyor):**
-- `migrate.ts` her açılışta boş veya 2030'dan önce biten lisansları `2030-12-31`'e çekiyor; lisans kontrolü fiilen kapalı.
+**Açık bulgular:**
+- ~~`migrate.ts` her açılışta lisansları `2030-12-31`'e çekiyordu~~ — Faz 3a'da kaldırıldı.
 - Firma girişi sadece 6 haneli rastgele `admin_key` ile yapılıyor; Faz 5'te deneme sınırı ve daha güçlü anahtar gerekiyor.
 
 ---
@@ -182,6 +182,21 @@ Her modül ayrı commit olarak silinir; her commit sonrası `tsc`, test ve build
 8. İlk süper admin, migration ile değil, tek seferlik bir CLI komutuyla (env'den şifre okuyarak) oluşturulur.
 
 **Kabul:** Boş bir veritabanında `npm run migrate` tüm şemayı kuruyor; canlıda migration "değişiklik yok" diyor; repoda başka şema yazan kod kalmıyor.
+
+**Durum (2026-10-12) — 3a tamamlandı (commit `39a61e7`):**
+- Canlı veritabanının tam yedeği alındı: `D:\Saloon-arsiv\db-yedek-faz3-2026-10-12.json.gz` (36 tablo; kolon, kısıt, index tanımları ve tüm satırlar; SHA-256 `9c3ec52d…`).
+- Silinen tablolar: `packages`, `package_services`, `service_materials`, `inventory_*` (5 tablo), `ai_call_logs`, `automation_rules`, `osm_import_progress`, `payments` (iyzico, 0 satır). Silinen kolonlar: `appointments.package_id / iyzico_token / payment_id`, `companies.sub_merchant_key / iyzico_commission_rate / ai_rules / ai_enabled`. Canlıda doğrulandı.
+- Lisansları her açılışta `2030-12-31`'e çeken satır kaldırıldı. Mevcut 7.162 firmanın hepsi hâlâ `2030-12-31` görünüyor; gerçek bitiş tarihleri admin ekranından girilmeli.
+**Durum (2026-10-12) — 3b tamamlandı:**
+- Drizzle şeması (`server/src/db/schema/*`) canlı şemadan yeniden üretildi; `expenses` tablosu eklendi. Boş veritabanında migration'lar canlının birebir aynısını kuruyor (kolon, kısıt, index karşılaştırması: 0 fark).
+- `server/drizzle/` tek kaynak: `0000_baseline` (tüm şema + `pg_trgm`, `updated_at` trigger'ları), `0001_drop_duplicate_kvkk_fk` (canlıdaki çift FK'yi siler). Eski `0000_init`, `0001_sprint1_sectors` ve snapshot'lar `D:\Saloon-arsiv\drizzle-eski-2026-10-12` klasörüne taşındı.
+- Sunucu artık port dinlemeden önce `db/migrator.ts` ile migration'ları uygular; hata olursa süreç kapanır (Railway healthcheck geçmediği için eski sürüm çalışmaya devam eder). Eski veritabanında `drizzle.__drizzle_migrations` tablosu yoksa baseline "uygulanmış" olarak işaretlenir.
+- Silinenler: `db/migrate.ts`, `database/schema.sql`, `scripts/migrate.js`, `migration_v2.js`, `seed-admin.js` (sabit `admin123` şifresi), `generate-admin-hash.js`; `expense.routes.ts`, `company.service.ts` (her firma oluşturmada 11 `ALTER TABLE`) ve `finance.service.ts` içindeki şema yazan kodlar.
+- İki pool teke indirildi (`db/index.ts`, `config/database.ts` pool'unu kullanıyor).
+- İlk süper admin: `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` env verilirse açılışta, yalnızca o e-posta yoksa oluşturulur. Şifre sıfırlama: `scripts/reset-admin-password.ts`.
+- Sektör seed'i migration'a alınmadı: mevcut sektör listesi (diş, veteriner…) yeni hedef sektörlerle uyuşmuyor; Faz 4'te yeni sektör listesiyle seed migration'ı yazılacak.
+- Yeni şema değişikliği: `src/db/schema` düzenlenir → `npm run db:generate -- --name <ad>` → oluşan SQL commit edilir.
+- Ek düzeltme: KVKK talebi güncelleme (`PATCH /api/kvkk/data-requests/:id`) geçersiz `WHERE` yüzünden hep hata veriyordu; düzeltildi.
 
 ---
 

@@ -75,11 +75,7 @@ export interface Company {
 /**
  * Drizzle ORM'e çevrilmiş CompanyService.
  *
- * Not: `companies` tablosu Drizzle schema'da tanımlı olmasına rağmen, gerçek DB
- * tablosunda schema'da OLMAYAN birçok kolon var (sub_merchant_key, bank_iban,
- * tax_number, efatura_*, license_*, sms_enabled, ai_*, building_number, ...).
- *
- * Bu nedenle companies sorguları `db.execute(sql\`\`)` raw template ile yazıldı.
+ * companies sorguları `db.execute(sql\`\`)` raw template ile yazıldı:
  * RETURNING * → satırlar snake_case kolon adlarıyla gelir (public API'yi korumak için).
  *
  * Sadece `services` INSERT'i Drizzle query builder ile yazıldı (schema tam).
@@ -90,22 +86,6 @@ class CompanyService {
      */
     async createCompany(company: Company, createdBy: number): Promise<Company> {
         return await db.transaction(async (tx) => {
-            try {
-                // Self-healing ALTER + UPDATE (best-effort, ignore failures)
-                await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS city TEXT`);
-                await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS district TEXT`);
-                await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS neighborhood TEXT`);
-                await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS sms_enabled BOOLEAN DEFAULT true`);
-                await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS photo TEXT`);
-                await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS building_number TEXT`);
-                await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS door_number TEXT`);
-                await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS nace_code TEXT`);
-                await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS fax_number TEXT`);
-                await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS verification_code TEXT`);
-                await tx.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS bank_iban TEXT`);
-                await tx.execute(sql`UPDATE companies SET sms_enabled = true WHERE sms_enabled IS NULL`);
-            } catch (e) { /* ignore if fails */ }
-
             if (company.main_company_id) {
                 const check = await tx.execute(sql`SELECT id FROM companies WHERE id = ${company.main_company_id}`);
                 const checkRows = (check as any).rows as any[];

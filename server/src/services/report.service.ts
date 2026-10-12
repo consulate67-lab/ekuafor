@@ -7,10 +7,7 @@ import { sql } from 'drizzle-orm';
  * ESKİ: raw pg.query() + string concatenation
  * YENİ: db.execute(sql\`...\`)` — Drizzle'in parametreli raw SQL escape'i.
  *
- * Tüm sorguları raw SQL'e çevirdik çünkü:
- * - `expenses` tablosu Drizzle schema'da yok (migrate.ts'de de yok)
- * - `appointments.original_price` / `collected_price` kolonları schema'da yok
- * - `companies.license_end_date` kolonu schema'da yok
+ * Tüm sorgular raw SQL çünkü:
  * - Sorgular CTE, EXTRACT, TO_CHAR, date_trunc, generate_series, correlated EXISTS
  *   subquery gibi yapılar içeriyor — query builder ile yazılamaz
  * - Public API snake_case alan bekliyor; `db.execute()` sonucu zaten snake_case

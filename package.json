@@ -10,7 +10,6 @@
         "client:dev": "npm run dev --workspace=client",
         "server:dev": "npm run dev --workspace=server",
         "build": "npm run build --workspaces",
-        "migrate": "node server/scripts/migration_v2.js",
         "install:all": "npm install && npm install --workspaces",
         "start": "npm start --workspace=server"
     }

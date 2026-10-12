@@ -3,8 +3,8 @@
  *
  * Mimari:
  *   app.ts        → Express factory (middleware + route registry)
- *   server.ts     → Bootstrap (listen, shutdown, migrations)
- *   db/migrate.ts → Idempotent schema migrations
+ *   server.ts     → Bootstrap (migrations, listen, shutdown)
+ *   db/migrator.ts → drizzle/ altındaki SQL migration'larını uygular
  *   routes/       → Domain route'lar (auth, company, ...)
  *   middleware/   → Global middleware (logger, errorHandler)
  *   services/     → İş mantığı katmanı

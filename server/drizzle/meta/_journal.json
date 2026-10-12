@@ -5,8 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1787843197153,
-      "tag": "0000_init",
+      "when": 1791788469056,
+      "tag": "0000_baseline",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791788491726,
+      "tag": "0001_drop_duplicate_kvkk_fk",
       "breakpoints": true
     }
   ]

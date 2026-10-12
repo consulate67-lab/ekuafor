@@ -1,5 +1,5 @@
 import { createApp } from './app';
-import { runMigrations } from './db/migrate';
+import { runMigrations } from './db/migrator';
 import pool from './config/database';
 import { env } from './config/env';
 import { logger } from './utils/logger';
@@ -7,10 +7,19 @@ import { logger } from './utils/logger';
 const app = createApp();
 
 /**
- * Server bootstrap. Express app'i dinler ve DB migration'larını başlatır.
- * Migration'lar background'da çalışır — server yine de dinlemeye başlar.
+ * Server bootstrap. Önce bekleyen DB migration'larını uygular, sonra dinlemeye başlar.
+ * Migration başarısız olursa süreç kapanır; Railway healthcheck geçmediği için eski sürüm çalışmaya devam eder.
  */
-export const startServer = () => {
+export const startServer = async () => {
+    try {
+        await runMigrations();
+        logger.info('✅ Database migrations applied');
+    } catch (err) {
+        logger.fatal({ err }, '🔥 Database migration failed');
+        await pool.end().catch(() => undefined);
+        process.exit(1);
+    }
+
     const server = app.listen(env.PORT, () => {
         logger.info(
             {
@@ -20,17 +29,6 @@ export const startServer = () => {
             },
             `🚀 Server running on port ${env.PORT}`
         );
-
-        // Background migrations
-        (async () => {
-            logger.info('🏁 Starting background migrations...');
-            try {
-                await runMigrations();
-                logger.info('✅ Background migrations finished successfully');
-            } catch (e: any) {
-                logger.error({ err: e }, '🔥 Background migration failed');
-            }
-        })();
     });
 
     // Graceful shutdown
