@@ -8,7 +8,7 @@
  *   - core.ts              → users, companies, main_companies, company_users, departments, kvkk_requests
  *   - services.ts          → services, working_hours
  *   - appointments.ts      → appointments, appointment_services
- *   - finance.ts           → payments, invoices, purchase_*, cash_transactions, current_accounts
+ *   - finance.ts           → invoices, purchase_*, cash_transactions, current_accounts
  *   - communication.ts     → sms_settings/logs, otp_codes, customer_devices, push_logs, callback_logs
  *   - sectors.ts           → sectors (master data)
  *   - sector_templates.ts  → sector_service_templates (yeni firmaya kopyalanacak hizmet şablonları)

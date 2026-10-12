@@ -194,23 +194,6 @@ export const runMigrations = async () => {
         `);
 
         await pool.query(`
-            CREATE TABLE IF NOT EXISTS payments (
-                id SERIAL PRIMARY KEY,
-                appointment_id INTEGER REFERENCES appointments(id),
-                company_id INTEGER REFERENCES companies(id),
-                amount DECIMAL(10, 2) NOT NULL,
-                commission_amount DECIMAL(10, 2) DEFAULT 0.00,
-                net_amount DECIMAL(10, 2) NOT NULL,
-                payment_method VARCHAR(50),
-                payment_status VARCHAR(50) DEFAULT 'pending',
-                transaction_id VARCHAR(255),
-                transaction_date TIMESTAMP,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        await pool.query(`
             CREATE TABLE IF NOT EXISTS sms_settings (
                 id SERIAL PRIMARY KEY,
                 company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
@@ -410,7 +393,6 @@ export const runMigrations = async () => {
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS device_id VARCHAR(255)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS rating INTEGER CHECK (rating BETWEEN 1 AND 5)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS comment TEXT');
-        await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS payment_id VARCHAR(255)');
         await pool.query('ALTER TABLE appointments ADD COLUMN IF NOT EXISTS used_materials TEXT');
 
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS photo TEXT');
@@ -563,8 +545,6 @@ export const runMigrations = async () => {
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS ubl_incoming_alias VARCHAR(255)');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS ubl_outgoing_alias VARCHAR(255)');
         await pool.query("UPDATE companies SET genders = '{\"Erkek\", \"Kadın\", \"Çocuk\", \"Güzellik Merkezi\"}' WHERE genders IS NULL");
-        await pool.query("UPDATE companies SET license_end_date = '2030-12-31 23:59:59+03' WHERE license_end_date IS NULL OR license_end_date < '2030-01-01'");
-
         await pool.query('ALTER TABLE services ADD COLUMN IF NOT EXISTS department_id INTEGER');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS sms_enabled BOOLEAN DEFAULT true');
         await pool.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS booking_flow VARCHAR(10) DEFAULT \'SPDT\'');
@@ -666,7 +646,26 @@ export const runMigrations = async () => {
         await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_bank_iban ON companies(bank_iban)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_companies_verification_code ON companies(verification_code)');
 
-        await pool.query('DROP TABLE IF EXISTS osm_import_progress');
+        // Removed modules (map discovery, AI assistant, inventory, packages, CRM automation, iyzico)
+        await pool.query(`
+            ALTER TABLE appointments
+                DROP COLUMN IF EXISTS package_id,
+                DROP COLUMN IF EXISTS iyzico_token,
+                DROP COLUMN IF EXISTS payment_id
+        `);
+        await pool.query(`
+            ALTER TABLE companies
+                DROP COLUMN IF EXISTS sub_merchant_key,
+                DROP COLUMN IF EXISTS iyzico_commission_rate,
+                DROP COLUMN IF EXISTS ai_rules,
+                DROP COLUMN IF EXISTS ai_enabled
+        `);
+        await pool.query(`
+            DROP TABLE IF EXISTS
+                osm_import_progress, package_services, packages, service_materials,
+                inventory_usage_logs, inventory_assignments, inventory_stocks, inventory_products, inventory_categories,
+                ai_call_logs, automation_rules, payments
+        `);
 
         // 8. KVKK veri sahibi talepleri tablosu (Aşama 5.4)
         await pool.query(`

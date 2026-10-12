@@ -5,24 +5,6 @@ import { appointments } from './appointments';
 import { companies } from './core';
 
 /**
- * payments tablosu
- */
-export const payments = pgTable('payments', {
-    id: serial('id').primaryKey(),
-    appointmentId: integer('appointment_id').references(() => appointments.id),
-    companyId: integer('company_id').references(() => companies.id),
-    amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
-    commissionAmount: decimal('commission_amount', { precision: 10, scale: 2 }),
-    netAmount: decimal('net_amount', { precision: 10, scale: 2 }).notNull(),
-    paymentMethod: varchar('payment_method', { length: 50 }),
-    paymentStatus: varchar('payment_status', { length: 50 }),
-    transactionId: varchar('transaction_id', { length: 255 }),
-    transactionDate: timestamp('transaction_date', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true }),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-});
-
-/**
  * invoices tablosu
  */
 export const invoices = pgTable('invoices', {
