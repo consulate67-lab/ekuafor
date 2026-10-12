@@ -7,6 +7,7 @@
  * Domain dosyaları:
  *   - core.ts              → users, companies, main_companies, company_users, departments, kvkk_requests
  *   - services.ts          → services, working_hours
+ *   - booking.ts           → resources, service_resources, class_sessions
  *   - appointments.ts      → appointments, appointment_services
  *   - finance.ts           → invoices, purchase_*, cash_transactions, current_accounts
  *   - communication.ts     → sms_settings/logs, otp_codes, customer_devices, push_logs, callback_logs
@@ -18,6 +19,7 @@
 
 export * from './core';
 export * from './services';
+export * from './booking';
 export * from './appointments';
 export * from './finance';
 export * from './communication';

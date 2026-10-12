@@ -29,7 +29,10 @@ const serviceSchema = z.object({
     department_id: z.number().nullable().optional(),
     quantity: z.number().nullable().optional(),
     unit: z.string().max(30).nullable().optional(),
-    photo: z.string().nullable().optional()
+    photo: z.string().nullable().optional(),
+    booking_mode: z.enum(['staff', 'resource', 'class']).optional(),
+    duration_options: z.array(z.number().int().min(5).max(24 * 60)).max(10).nullable().optional(),
+    resource_ids: z.array(z.number().int().positive()).optional(),
 });
 
 // Debug middleware for this router

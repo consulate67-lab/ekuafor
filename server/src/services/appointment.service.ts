@@ -33,14 +33,14 @@ export interface Appointment {
 }
 
 /**
- * AppointmentService â€” Drizzle ORM.
+ * AppointmentService — Drizzle ORM.
  *
  * db.execute(sql\`...\`)` raw template + db.transaction() helper.
  *
- * - KarmaÅŸÄ±k JOIN + json_agg(FILTER WHERE ...) â†’ raw SQL (Drizzle query builder'da
- *   bu Ã¶zellikler native deÄŸil).
- * - Transactions â†’ `db.transaction(async (tx) => ...)` â€” `tx.execute(sql\`...\`)` ile.
- * - Snake_case kolon adlarÄ± korunur (public API uyumluluÄŸu iÃ§in).
+ * - Karmaşık JOIN + json_agg(FILTER WHERE ...) → raw SQL (Drizzle query builder'da
+ *   bu özellikler native değil).
+ * - Transactions → `db.transaction(async (tx) => ...)` — `tx.execute(sql\`...\`)` ile.
+ * - Snake_case kolon adları korunur (public API uyumluluğu için).
  */
 class AppointmentService {
     private async clearCompanyCache() {
@@ -56,210 +56,17 @@ class AppointmentService {
         }
     }
 
-    async createAppointment(appointment: Appointment) {
-        // Normalize customer phone
-        if (appointment.customer_phone) {
-            appointment.customer_phone = normalizePhone(appointment.customer_phone);
-        }
-
-        // 0. Determine service selections with correct ordering and staff mapping
-        // NOT 02.09.2026 23:55: Drizzle 0.36 db.execute(sql\`...raw SQL\`) tx context'inde
-        // 42601 syntax error at or near ')' veriyor. EN GUvenLi yol: Drizzle'i bypass
-        // edip raw pg pool.query kullanmak. Hem INSERT hem SELECT artik pool.query.
-        let serviceRecords: any[] = [];
-        if (appointment.services && appointment.services.length > 0) {
-            const serviceIds = appointment.services.map((s: any) => s.id);
-            // pool.query parameterized: $1, $2, ... â€” Drizzle template sorunlari yok
-            const placeholders = serviceIds.map((_, i) => `$${i + 1}`).join(',');
-            const dbServicesRes = await pool.query(
-                `SELECT id, duration_minutes, price, name FROM services WHERE id IN (${placeholders})`,
-                serviceIds
-            );
-            const dbServices: any[] = dbServicesRes.rows;
-
-            serviceRecords = appointment.services.map((s: any) => {
-                const dbS = dbServices.find(ds => ds.id === s.id);
-                return {
-                    id: s.id,
-                    price: (s.price !== undefined && s.price !== null) ? s.price : (dbS?.price || 0),
-                    duration_minutes: (s.duration_minutes !== undefined && s.duration_minutes !== null) ? s.duration_minutes : (dbS?.duration_minutes || 30),
-                    name: dbS?.name || 'Hizmet',
-                    staff_id: s.staff_id || appointment.staff_id
-                };
-            });
-        } else {
-            const serviceIds = appointment.service_ids || (appointment.service_id ? [appointment.service_id] : []);
-            if (serviceIds.length === 0) throw new Error('En az bir hizmet seÃ§ilmelidir.');
-
-            const placeholders = serviceIds.map((_, i) => `$${i + 1}`).join(',');
-            const dbServicesRes = await pool.query(
-                `SELECT id, duration_minutes, price, name FROM services WHERE id IN (${placeholders})`,
-                serviceIds
-            );
-            const dbServices: any[] = dbServicesRes.rows;
-
-            serviceRecords = serviceIds.map(id => {
-                const dbS = dbServices.find(ds => ds.id === id);
-                return {
-                    id,
-                    price: dbS?.price || 0,
-                    duration_minutes: dbS?.duration_minutes || 30,
-                    name: dbS?.name || 'Hizmet',
-                    staff_id: appointment.staff_id
-                };
-            }).filter(s => !!s);
-        }
-
-        const totalDuration = (appointment.duration_minutes !== undefined && appointment.duration_minutes !== null) ? appointment.duration_minutes : (serviceRecords.reduce((sum, s) => sum + s.duration_minutes, 0));
-        const totalPrice = (appointment.price !== undefined && appointment.price !== null) ? appointment.price : (serviceRecords.reduce((sum, s) => sum + Number(s.price), 0));
-
-        if (appointment.start_time && !appointment.end_time) {
-            const [h, m] = appointment.start_time.split(':').map(Number);
-            const totalStartMinutes = h * 60 + m;
-            const totalEndMinutes = totalStartMinutes + totalDuration;
-            const eh = Math.floor(totalEndMinutes / 60);
-            const em = totalEndMinutes % 60;
-            appointment.end_time = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
-        }
-
-        if (!appointment.price) {
-            appointment.price = totalPrice;
-        }
-
-        // 1. Check for overlapping appointments (Conflict Prevention)
-        // pool.query parameterized, Drizzle template bypass
-        const uniqueStaffIds = Array.from(new Set(serviceRecords.map(s => s.staff_id).filter(id => !!id)));
-
-        for (const sId of uniqueStaffIds) {
-            const conflictRes = await pool.query(
-                `SELECT id FROM appointments
-                WHERE company_id = $1
-                AND appointment_date = $2
-                AND status != 'cancelled'
-                AND (start_time < $3 AND end_time > $4)
-                AND (staff_id = $5 OR id IN (SELECT appointment_id FROM appointment_services WHERE staff_id = $5))
-                LIMIT 1`,
-                [
-                    appointment.company_id,
-                    appointment.appointment_date,
-                    appointment.end_time,
-                    appointment.start_time,
-                    sId
-                ]
-            );
-            if (conflictRes.rows.length > 0) {
-                throw new Error(`SeÃ§ilen Ã§alÄ±ÅŸanÄ±n (${sId}) bu saat diliminde baÅŸka bir randevusu bulunuyor.`);
-            }
-        }
-
-        const primaryServiceId = serviceRecords[0]?.id || appointment.service_id;
-        const mainStaffId = appointment.staff_id || serviceRecords[0]?.staff_id || null;
-
-        // Tek transaction: appointments INSERT + appointment_services INSERT(s)
-        // NOT 02.09.2026 23:46: tx.insert() ve Drizzle ORM INSERT 42601 syntax error
-        // dondurmeye devam ediyor. Selim'in Supabase sorgusuna gore DB'de 27 kolon var,
-        // Drizzle schema'da sadece ~20 tanesi tanimli (eksik: iyzico_token, payment_id,
-        // used_materials, original_price, collected_price). Drizzle INSERT bu kolonlari
-        // gondermiyor, default null aliyor. AMA 42601 hala devam ediyor, demek ki Drizzle
-        // tx context'inde raw SQL'e yakin SQL uretiyor ve template parametre binding'de
-        // sorun yasaniyor.
-        //
-        // Daha onceden raw SQL (tx.execute(sql\`...\`)) INSERT basariliydi, sadece
-        // duplicate price + original_price sorunu vardi. Simdi schema ile uyumlu 14 kolon
-        // INSERT yapacagiz, ama Drizzle'in type-safe (Appointment) interface'ine
-        // snake_case (DB) sonucu map edip return edecegiz.
-        //
-        // Bu commit HALA debug amacli. SQL'i hem logla hem response'a koy ki
-        // bir sonraki commit'te kesin fix yapabilelim.
-        return await db.transaction(async (tx) => {
-            // NOT 02.09.2026 23:55: Drizzle 0.36 tx.execute(sql\`...raw SQL\`) 42601 syntax
-            // error at or near ')' donduruyor â€” template parser tx context'inde parantez
-            // yanlis parse ediyor. EN GUvenLi yol: Drizzle'i bypass edip raw pg pool.query
-            // kullanmak. pool.query parameterized query yapar ($1, $2, ...) ve Drizzle
-            // template parser'indan etkilenmez.
-            //
-            // Drizzle 0.36 tx context'inde raw SQL INSERT sorunlu, dolayisiyla
-            // INSERT'leri transaction disina cikarip sequential yapiyoruz. Bu, transaction
-            // guvenligini biraz bozar ama syntax hatasi onlenir.
-            //
-            // Not: Drizzle 0.40+'ta sql.array() ve tx.insert() duzgun calisiyor,
-            // upgrade ile bu workarounds'a gerek kalmaz. Biz 0.36 kullaniyoruz (0.45 uyumsuz).
-
-            // 1) INSERT appointments (14 kolon, schema uyumlu)
-            const insertRes = await pool.query(
-                `INSERT INTO appointments (
-                    company_id, customer_id, service_id, staff_id,
-                    appointment_date, start_time, end_time, status, notes, price,
-                    customer_phone, customer_name, device_id
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-                RETURNING *`,
-                [
-                    appointment.company_id,
-                    appointment.customer_id || null,
-                    primaryServiceId,
-                    mainStaffId,
-                    appointment.appointment_date,
-                    appointment.start_time,
-                    appointment.end_time,
-                    appointment.status || 'pending',
-                    appointment.notes || null,
-                    appointment.price || null,
-                    appointment.customer_phone || null,
-                    appointment.customer_name || null,
-                    appointment.device_id || null,
-                ]
-            );
-            const newAppointment = insertRes.rows[0];
-
-            // 2) INSERT appointment_services (8 kolon, sequential timing)
-            let currentOffset = 0;
-            const [baseH, baseM] = newAppointment.start_time.split(':').map(Number);
-
-            for (const s of serviceRecords) {
-                const startTotal = baseH * 60 + baseM + currentOffset;
-                const endTotal = startTotal + s.duration_minutes;
-
-                const sH = Math.floor(startTotal / 60);
-                const sM = startTotal % 60;
-                const eH = Math.floor(endTotal / 60);
-                const eM = endTotal % 60;
-
-                const sTime = `${String(sH).padStart(2, '0')}:${String(sM).padStart(2, '0')}`;
-                const eTime = `${String(eH).padStart(2, '0')}:${String(eM).padStart(2, '0')}`;
-
-                await pool.query(
-                    `INSERT INTO appointment_services (appointment_id, service_id, price, duration_minutes, staff_id, status, start_time, end_time)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                    [
-                        newAppointment.id,
-                        s.id,
-                        s.price,
-                        s.duration_minutes,
-                        s.staff_id || null,
-                        newAppointment.status,
-                        sTime,
-                        eTime,
-                    ]
-                );
-                currentOffset += s.duration_minutes;
-            }
-
-            // Appointment creation notification is skipped as per user request.
-            // Notifications will be sent upon employee approval.
-            return newAppointment as any;
-        });
-    }
-
     async getAppointmentsByIds(ids: number[]): Promise<Appointment[]> {
         if (!ids || ids.length === 0) return [];
 
-        // json_agg(FILTER WHERE ...) raw SQL ile Ã§Ã¶zÃ¼ldÃ¼.
+        // json_agg(FILTER WHERE ...) raw SQL ile çözüldü.
         const result = await db.execute(sql`
             SELECT
                 a.*,
                 c.name as company_name,
                 ms.name as service_name,
                 st.first_name || ' ' || st.last_name as staff_name,
+                r.name as resource_name,
                 COALESCE(u.first_name || ' ' || u.last_name, a.customer_name) as customer_name,
                 COALESCE(json_agg(json_build_object(
                     'id', s.id,
@@ -282,9 +89,10 @@ class AppointmentService {
             LEFT JOIN users st ON a.staff_id = st.id
             LEFT JOIN companies c ON a.company_id = c.id
             LEFT JOIN users u ON a.customer_id = u.id
+            LEFT JOIN resources r ON a.resource_id = r.id
             // NOT 02.09.2026: ANY -> IN (sql.join) Drizzle array literal fix
             WHERE a.id IN (${sql.join(ids, sql`, `)})
-            GROUP BY a.id, c.name, ms.name, st.first_name, st.last_name, u.first_name, u.last_name
+            GROUP BY a.id, c.name, ms.name, st.first_name, st.last_name, u.first_name, u.last_name, r.name
             ORDER BY a.appointment_date DESC, a.start_time DESC
         `);
 
@@ -303,7 +111,7 @@ class AppointmentService {
         const cleanPhone = phone.replace(/\D/g, '').replace(/^0/, '');
         const searchPattern = `%${cleanPhone}%`;
 
-        // Dynamic WHERE â€” Drizzle sql.join() ile. Regex pattern raw SQL'de kalmak zorunda.
+        // Dynamic WHERE — Drizzle sql.join() ile. Regex pattern raw SQL'de kalmak zorunda.
         const whereConditions: any[] = [sql`(
             regexp_replace(COALESCE(u.phone, ''), '\\D', '', 'g') LIKE ${searchPattern} OR
             regexp_replace(COALESCE(a.notes, ''), '\\D', '', 'g') LIKE ${searchPattern} OR
@@ -320,6 +128,7 @@ class AppointmentService {
                 c.name as company_name,
                 ms.name as service_name,
                 st.first_name || ' ' || st.last_name as staff_name,
+                r.name as resource_name,
                 COALESCE(u.first_name || ' ' || u.last_name, a.customer_name) as customer_name,
                 COALESCE(u.first_name || ' ' || u.last_name, a.notes) as customer_display_name,
                 COALESCE(json_agg(json_build_object(
@@ -343,8 +152,9 @@ class AppointmentService {
             LEFT JOIN users st ON a.staff_id = st.id
             LEFT JOIN companies c ON a.company_id = c.id
             LEFT JOIN users u ON a.customer_id = u.id
+            LEFT JOIN resources r ON a.resource_id = r.id
             WHERE ${whereClause}
-            GROUP BY a.id, c.name, ms.name, st.first_name, st.last_name, u.first_name, u.last_name
+            GROUP BY a.id, c.name, ms.name, st.first_name, st.last_name, u.first_name, u.last_name, r.name
             ORDER BY a.appointment_date DESC, a.start_time DESC
         `);
 
@@ -359,13 +169,13 @@ class AppointmentService {
     async getAppointmentsByCompany(companyId: number, status?: string, staffId?: number, startDate?: string, endDate?: string): Promise<Appointment[]> {
         console.log(`[Service] getAppointmentsByCompany: ID=${companyId}, Status=${status}, Staff=${staffId}, StartDate=${startDate}, EndDate=${endDate}`);
 
-        // Dinamik WHERE â€” her koÅŸul opsiyonel
+        // Dinamik WHERE — her koşul opsiyonel
         const whereConditions: any[] = [sql`a.company_id = ${companyId}`];
         if (status) {
             whereConditions.push(sql`a.status = ${status}`);
         }
         if (staffId) {
-            // EXISTS subquery + OR â€” Drizzle'la yazmak karmaÅŸÄ±k, raw SQL'de kalabilir
+            // EXISTS subquery + OR — Drizzle'la yazmak karmaşık, raw SQL'de kalabilir
             whereConditions.push(sql`(a.staff_id = ${staffId} OR a.staff_id IS NULL OR EXISTS (SELECT 1 FROM appointment_services WHERE appointment_id = a.id AND staff_id = ${staffId}))`);
         }
         if (startDate && endDate) {
@@ -379,6 +189,7 @@ class AppointmentService {
             SELECT a.*, c.name as company_name,
                    ms.name as service_name,
                    st.first_name || ' ' || st.last_name as staff_name,
+                   r.name as resource_name,
                    COALESCE(u.first_name || ' ' || u.last_name, a.customer_name) as customer_name,
                    COALESCE(json_agg(json_build_object(
                        'id', s.id,
@@ -401,8 +212,9 @@ class AppointmentService {
             LEFT JOIN users st ON a.staff_id = st.id
             LEFT JOIN companies c ON a.company_id = c.id
             LEFT JOIN users u ON a.customer_id = u.id
+            LEFT JOIN resources r ON a.resource_id = r.id
             WHERE ${whereClause}
-            GROUP BY a.id, c.name, ms.name, st.first_name, st.last_name, u.first_name, u.last_name
+            GROUP BY a.id, c.name, ms.name, st.first_name, st.last_name, u.first_name, u.last_name, r.name
             ORDER BY a.appointment_date DESC, a.start_time DESC
         `);
 
@@ -418,11 +230,11 @@ class AppointmentService {
 
     async updateAppointmentStatus(id: number, status: string, price?: number, payment_method?: string, technical_notes?: string, used_materials?: string): Promise<Appointment | null> {
         // 42601 fix: Drizzle 0.36 tx.execute(sql`...`) template parser transaction
-        // context'inde parantezleri yanlÄ±ÅŸ parse ediyor. Raw pg pool.query ile
-        // sÄ±ralÄ± UPDATE yapÄ±yoruz. Atomicity kaybÄ± tolere edilir (status update
-        // nadiren Ã§alÄ±ÅŸan bir operasyon, intermediate state kabul edilebilir).
-        // UPDATE appointments â€” payment_status, payment_method, collected_price, used_materials
-        // schema'da yok â†’ raw SQL.
+        // context'inde parantezleri yanlış parse ediyor. Raw pg pool.query ile
+        // sıralı UPDATE yapıyoruz. Atomicity kaybı tolere edilir (status update
+        // nadiren çalışan bir operasyon, intermediate state kabul edilebilir).
+        // UPDATE appointments — payment_status, payment_method, collected_price, used_materials
+        // schema'da yok → raw SQL.
         const updateRes = await pool.query(
             `UPDATE appointments SET
                 status = $1,
@@ -451,7 +263,7 @@ class AppointmentService {
             return null;
         }
 
-        // Completed durumunda appointment_services fiyatlarÄ±nÄ± daÄŸÄ±t
+        // Completed durumunda appointment_services fiyatlarını dağıt
         if (status === 'completed' || status === 'paid') {
             const finalPrice = price ?? updatedAppointment.price ?? 0;
 
@@ -492,9 +304,9 @@ class AppointmentService {
             }
         }
 
-            // Bildirimler â€” transaction commit SONRASINDA gÃ¶nderilir.
+            // Bildirimler — transaction commit SONRASINDA gönderilir.
             // Drizzle transaction return ile commit edilir, sonra finally{} ile notification
-            // yolluyoruz ki SMS/push baÅŸarÄ±sÄ±z olursa DB rollback olmasÄ±n.
+            // yolluyoruz ki SMS/push başarısız olursa DB rollback olmasın.
             try {
                 console.log(`[Notification] Processing status change: ${status} for App ID: ${id}`);
 
@@ -522,7 +334,7 @@ class AppointmentService {
                 if (!details) return updatedAppointment;
 
                 const phoneNum = details.app_phone || details.cust_phone;
-                const name = details.app_customer_name || (details.cust_first ? `${details.cust_first} ${details.cust_last || ''}`.trim() : 'DeÄŸerli MÃ¼ÅŸterimiz');
+                const name = details.app_customer_name || (details.cust_first ? `${details.cust_first} ${details.cust_last || ''}`.trim() : 'Değerli Müşterimiz');
 
                 const rawDate = updatedAppointment.appointment_date;
                 const date = (rawDate && rawDate instanceof Date)
@@ -530,7 +342,7 @@ class AppointmentService {
                     : rawDate;
                 const time = updatedAppointment.start_time;
 
-                const companyName = details.company_name || 'Ä°ÅŸletme';
+                const companyName = details.company_name || 'İşletme';
                 const isSmsEnabled = details.sms_enabled !== false; // Default true
                 const staffName = (details.staff_first || details.staff_last)
                     ? `${details.staff_first || ''} ${details.staff_last || ''}`.trim()
@@ -541,8 +353,8 @@ class AppointmentService {
                 if (phoneNum && (status === 'approved' || status === 'cancelled')) {
                     if (isSmsEnabled) {
                         const message = status === 'approved'
-                            ? `SayÄ±n ${name}, ${companyName} iÅŸletmesinde ${staffName} ile ${serviceName} hizmeti iÃ§in ${date} ${time} randevunuz ONAYLANMIÅTIR. Bekliyoruz!`
-                            : `SayÄ±n ${name}, ${companyName} iÅŸletmesindeki ${date} tarihli randevunuz Ä°PTAL EDÄ°LMÄ°ÅTÄ°R.`;
+                            ? `Sayın ${name}, ${companyName} işletmesinde ${staffName} ile ${serviceName} hizmeti için ${date} ${time} randevunuz ONAYLANMIŞTIR. Bekliyoruz!`
+                            : `Sayın ${name}, ${companyName} işletmesindeki ${date} tarihli randevunuz İPTAL EDİLMİŞTİR.`;
 
                         console.log(`[Notification] Attempting SMS for app ID ${id} to ${phoneNum}...`);
                         await smsService.sendSms(updatedAppointment.company_id, phoneNum, message);
@@ -558,10 +370,10 @@ class AppointmentService {
 
                     if (token) {
                         console.log(`[Notification] Found push token, sending push notification...`);
-                        const title = status === 'approved' ? 'Randevunuz OnaylandÄ±' : 'Randevunuz Ä°ptal Edildi';
+                        const title = status === 'approved' ? 'Randevunuz Onaylandı' : 'Randevunuz İptal Edildi';
                         const body = status === 'approved'
-                            ? `SayÄ±n ${name}, ${companyName} iÅŸletmesinde ${staffName} ile ${date} ${time} randevunuz onaylanmÄ±ÅŸtÄ±r.`
-                            : `SayÄ±n ${name}, ${companyName} iÅŸletmesindeki ${date} ${time} randevunuz iptal edilmiÅŸtir.`;
+                            ? `Sayın ${name}, ${companyName} işletmesinde ${staffName} ile ${date} ${time} randevunuz onaylanmıştır.`
+                            : `Sayın ${name}, ${companyName} işletmesindeki ${date} ${time} randevunuz iptal edilmiştir.`;
 
                         await pushService.sendNotification(token, title, body, {
                             appointmentId: id.toString(),
@@ -652,14 +464,14 @@ class AppointmentService {
     async getAppointmentsByDevice(deviceId: string): Promise<Appointment[]> {
         console.log(`[Service] getAppointmentsByDevice: ${deviceId}`);
 
-        // Ã–nce bu cihazÄ±n hangi telefona baÄŸlÄ± olduÄŸunu bulalÄ±m
+        // Önce bu cihazın hangi telefona bağlı olduğunu bulalım
         const deviceRes = await db.execute(
             sql`SELECT customer_phone FROM customer_devices WHERE device_id = ${deviceId}`
         );
         const deviceRows = (deviceRes as any).rows as any[];
         const phone = deviceRows[0]?.customer_phone;
 
-        // Dinamik WHERE: device_id eÅŸleÅŸmesi + opsiyonel telefon regex LIKE
+        // Dinamik WHERE: device_id eşleşmesi + opsiyonel telefon regex LIKE
         const whereConditions: any[] = [sql`a.device_id = ${deviceId}`];
         let searchPattern: string | null = null;
         if (phone) {
@@ -673,6 +485,9 @@ class AppointmentService {
             SELECT
                 a.*,
                 c.name as company_name,
+                ms.name as service_name,
+                st.first_name || ' ' || st.last_name as staff_name,
+                r.name as resource_name,
                 COALESCE(json_agg(json_build_object(
                     'id', s.id,
                     'aps_id', aps.id,
@@ -689,9 +504,12 @@ class AppointmentService {
             LEFT JOIN appointment_services aps ON a.id = aps.appointment_id
             LEFT JOIN services s ON aps.service_id = s.id
             LEFT JOIN users ast ON aps.staff_id = ast.id
+            LEFT JOIN services ms ON a.service_id = ms.id
+            LEFT JOIN users st ON a.staff_id = st.id
+            LEFT JOIN resources r ON a.resource_id = r.id
             LEFT JOIN companies c ON a.company_id = c.id
             WHERE ${whereClause}
-            GROUP BY a.id, c.name
+            GROUP BY a.id, c.name, ms.name, st.first_name, st.last_name, r.name
             ORDER BY a.appointment_date DESC, a.start_time DESC
         `);
 
@@ -725,7 +543,7 @@ class AppointmentService {
             `);
         }
 
-        // Bilinen tÃ¼m randevularÄ± da bu tele baÄŸlayalÄ±m (Eski randevularÄ±n sahiplenilmesi)
+        // Bilinen tüm randevuları da bu tele bağlayalım (Eski randevuların sahiplenilmesi)
         await this.claimAppointmentsByDevice(deviceId, phone);
     }
 
@@ -769,7 +587,7 @@ class AppointmentService {
         }
         const whereClause = sql.join(whereConditions, sql` AND `);
 
-        // LATERAL subquery + json_agg â†’ raw SQL zorunlu.
+        // LATERAL subquery + json_agg → raw SQL zorunlu.
         const result = await db.execute(sql`
             SELECT a.*, s.name as service_name, st.first_name || ' ' || st.last_name as staff_name,
                    COALESCE(i.status, 'pending') as invoice_status
@@ -784,7 +602,7 @@ class AppointmentService {
     }
 
     async getCustomerNotifications(phone: string) {
-        // UNION ALL â†’ raw SQL
+        // UNION ALL → raw SQL
         const result = await db.execute(sql`
             SELECT * FROM (
                 (SELECT id, title, body as message, created_at, 'push' as type, status FROM push_logs WHERE phone_number = ${phone})
@@ -798,7 +616,7 @@ class AppointmentService {
     }
 
     async getCompanyReviews(companyId: number, sort: string = 'newest'): Promise<any[]> {
-        // ORDER BY whitelist â€” sql.raw() ile enjekte (sadece sabit string'ler)
+        // ORDER BY whitelist — sql.raw() ile enjekte (sadece sabit string'ler)
         let orderByClause;
         if (sort === 'rating_desc') {
             orderByClause = sql.raw('a.rating DESC, a.appointment_date DESC');
@@ -825,7 +643,7 @@ class AppointmentService {
         const phonePattern = `%${cleanPhone}%`;
         const namePattern = `%${search}%`;
 
-        // Ä°Ã§ iÃ§e subquery (string_agg) + COALESCE chain â†’ raw SQL
+        // İç içe subquery (string_agg) + COALESCE chain → raw SQL
         const result = await db.execute(sql`
             SELECT a.id, a.appointment_date, a.start_time, a.customer_name, a.customer_phone, a.technical_notes, a.used_materials,
                    COALESCE(ms.name, (SELECT string_agg(s.name, ', ') FROM appointment_services aps JOIN services s ON aps.service_id = s.id WHERE aps.appointment_id = a.id)) as service_name
@@ -839,29 +657,25 @@ class AppointmentService {
     }
 
     async getCustomersCRM(companyId: number, search?: string): Promise<any[]> {
-        // customers tablosu Drizzle schema'da yok â†’ raw SQL zorunlu.
         const whereConditions: any[] = [
             sql`a.company_id = ${companyId}`,
             sql`a.customer_phone IS NOT NULL AND a.customer_phone != ''`
         ];
         if (search) {
             const term = `%${search}%`;
-            whereConditions.push(sql`(a.customer_phone ILIKE ${term} OR a.customer_name ILIKE ${term} OR c.email ILIKE ${term})`);
+            whereConditions.push(sql`(a.customer_phone ILIKE ${term} OR a.customer_name ILIKE ${term})`);
         }
         const whereClause = sql.join(whereConditions, sql` AND `);
 
-        // Ä°Ã§ iÃ§e subquery (MAX/COUNT/SUM) + json_agg â†’ raw SQL
+        // İç içe subquery (MAX/COUNT/SUM) + json_agg → raw SQL
         const result = await db.execute(sql`
             SELECT
                 a.customer_phone as phone,
-                COALESCE(c.name, (
+                (
                     SELECT customer_name FROM appointments
                     WHERE customer_phone = a.customer_phone AND company_id = ${companyId}
                     ORDER BY appointment_date DESC, start_time DESC LIMIT 1
-                )) as name,
-                c.email,
-                c.notes,
-                c.is_iys_approved,
+                ) as name,
                 MAX(a.appointment_date) as last_visit,
                 COUNT(a.id) as appointment_count,
                 SUM(COALESCE(a.price, 0))::float as total_spent,
@@ -881,9 +695,8 @@ class AppointmentService {
                 ) ORDER BY a.appointment_date DESC, a.start_time DESC) as appointments
             FROM appointments a
             LEFT JOIN users st ON a.staff_id = st.id
-            LEFT JOIN customers c ON c.phone = a.customer_phone AND c.company_id = a.company_id
             WHERE ${whereClause}
-            GROUP BY a.customer_phone, c.name, c.email, c.notes, c.is_iys_approved, c.id
+            GROUP BY a.customer_phone
             ORDER BY last_visit DESC
         `);
 

@@ -14,6 +14,7 @@ import financeRoutes from './finance.routes';
 import expenseRoutes from './expense.routes';
 import kvkkRoutes from './kvkk.routes';
 import sectorRoutes from './sector.routes';
+import bookingRoutes from './booking.routes';
 
 const commonPing = (req: Request, res: Response) => res.json({
     status: 'pong',
@@ -63,6 +64,7 @@ export const mountRoutes = (app: Express) => {
     app.use('/api/expenses', expenseRoutes);
     app.use('/api/kvkk', kvkkRoutes);
     app.use('/api', sectorRoutes);
+    app.use('/api', bookingRoutes);
 
     // 404 Catch-all
     app.all('*', (req: Request, res: Response) => {

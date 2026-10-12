@@ -31,6 +31,8 @@ export const sectors = pgTable('sectors', {
     displayOrder: integer('display_order').notNull().default(0),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    /** Sektörde yeni hizmet açılırken önerilen rezervasyon tipi (staff | resource | class) */
+    defaultBookingMode: varchar('default_booking_mode', { length: 10 }).notNull().default('staff'),
 });
 
 /**

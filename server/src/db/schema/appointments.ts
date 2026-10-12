@@ -1,8 +1,9 @@
-import { pgTable, index, foreignKey, check, primaryKey, serial, integer, date, time, varchar, text, numeric, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, index, uniqueIndex, foreignKey, check, serial, integer, date, time, varchar, text, numeric, timestamp } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 import { users, companies } from './core';
 import { services } from './services';
+import { resources, classSessions } from './booking';
 
 /**
  * appointments tablosu
@@ -32,11 +33,31 @@ export const appointments = pgTable('appointments', {
     collectedPrice: numeric('collected_price', { precision: 10, scale: 2 }),
     usedMaterials: text('used_materials'),
     technicalNotes: text('technical_notes'),
+    resourceId: integer('resource_id'),
+    classSessionId: integer('class_session_id'),
+    partySize: integer('party_size').default(1).notNull(),
+    /** İstemcinin ürettiği tekil anahtar; aynı istek tekrar gelirse yeni kayıt açılmaz */
+    clientRequestId: varchar('client_request_id', { length: 64 }),
 }, (table) => {
     return {
         idxAppointmentsCompany: index('idx_appointments_company').using('btree', table.companyId.asc().nullsLast().op('int4_ops')),
         idxAppointmentsCustomer: index('idx_appointments_customer').using('btree', table.customerId.asc().nullsLast().op('int4_ops')),
         idxAppointmentsDate: index('idx_appointments_date').using('btree', table.appointmentDate.asc().nullsLast().op('date_ops')),
+        idxAppointmentsStaffDate: index('idx_appointments_staff_date').using('btree', table.staffId, table.appointmentDate),
+        idxAppointmentsResourceDate: index('idx_appointments_resource_date').using('btree', table.resourceId, table.appointmentDate),
+        idxAppointmentsClassSession: index('idx_appointments_class_session').using('btree', table.classSessionId),
+        uqAppointmentsClientRequest: uniqueIndex('uq_appointments_client_request').using('btree', table.companyId, table.clientRequestId),
+        appointmentsResourceIdFkey: foreignKey({
+            columns: [table.resourceId],
+            foreignColumns: [resources.id],
+            name: 'appointments_resource_id_fkey'
+        }).onDelete('set null'),
+        appointmentsClassSessionIdFkey: foreignKey({
+            columns: [table.classSessionId],
+            foreignColumns: [classSessions.id],
+            name: 'appointments_class_session_id_fkey'
+        }),
+        appointmentsPartySizeCheck: check('appointments_party_size_check', sql`party_size > 0`),
         appointmentsCompanyIdFkey: foreignKey({
             columns: [table.companyId],
             foreignColumns: [companies.id],

@@ -4,11 +4,11 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import api from '../../lib/api';
 import {
     menuItems,
-    templates,
     normalizePhone,
     formatPhoneWithSpaces,
+    emptyServiceForm,
+    parseDurationOptions,
 } from './useCompanyPanel';
-void templates;  // used in index.tsx via ctx, but TypeScript needs explicit ref
 import type { TabKey, Department, StaffBoard, CurrentAccount } from './useCompanyPanel';
 import { Camera, CameraResultType, CameraSource, CameraDirection } from '@capacitor/camera';
 const HomeTab = lazy(() => import('./HomeTab').then(m => ({ default: m.HomeTab })));
@@ -19,6 +19,7 @@ const IntegrationTab = lazy(() => import('./ProfileTab').then(m => ({ default: m
 const DeptTab = lazy(() => import('./StaffTab').then(m => ({ default: m.DeptTab })));
 const StaffTab = lazy(() => import('./StaffTab').then(m => ({ default: m.StaffTab })));
 const ServicesTab = lazy(() => import('./ServicesTab').then(m => ({ default: m.ServicesTab })));
+const SchedulingTab = lazy(() => import('./SchedulingTab').then(m => ({ default: m.SchedulingTab })));
 const FinanceTab = lazy(() => import('./FinanceTab').then(m => ({ default: m.FinanceTab })));
 const CRMTab = lazy(() => import('./CRMTab').then(m => ({ default: m.CRMTab })));
 const ReportsTab = lazy(() => import('./CRMTab').then(m => ({ default: m.ReportsTab })));
@@ -77,17 +78,7 @@ const [isCreating, setIsCreating] = useState(false);
 const [companyServices, setCompanyServices] = useState<any[]>([]);
 const [showServiceModal, setShowServiceModal] = useState(false);
 const [showTemplatesModal, setShowTemplatesModal] = useState(false);
-const [serviceForm, setServiceForm] = useState({
-    id: null as number | null,
-    name: '',
-    description: '',
-    duration_minutes: 30,
-    price: 0,
-    department_id: null as number | null,
-    photo: '' as string | null,
-    quantity: '' as string | number,
-    unit: ''
-});
+const [serviceForm, setServiceForm] = useState(emptyServiceForm);
 const [isSavingService, setIsSavingService] = useState(false);
 
 // Reports states
@@ -889,10 +880,11 @@ const handleSaveService = async () => {
         department_id: serviceForm.department_id,
         photo: serviceForm.photo,
         quantity: serviceForm.quantity ? Number(serviceForm.quantity) : null,
-        unit: serviceForm.unit || null
+        unit: serviceForm.unit || null,
+        booking_mode: serviceForm.booking_mode,
+        duration_options: serviceForm.booking_mode === 'resource' ? parseDurationOptions(serviceForm.duration_options) : null,
+        resource_ids: serviceForm.booking_mode === 'resource' ? serviceForm.resource_ids : [],
     };
-
-    console.log('Hizmet kaydetme verisi:', submitData);
 
     try {
         if (serviceForm.id) {
@@ -902,7 +894,7 @@ const handleSaveService = async () => {
             // Yeni ekle
             await api.post('/services', submitData);
         }
-        setServiceForm({ id: null, name: '', description: '', duration_minutes: 30, price: 0, department_id: null, photo: null, quantity: '', unit: '' });
+        setServiceForm(emptyServiceForm);
         setShowServiceModal(false);
         fetchData(company.id);
     } catch (err: any) {
@@ -931,9 +923,10 @@ const handleAddFromTemplate = async (template: any) => {
     try {
         await api.post('/services', {
             name: template.name,
-            description: template.description || '',
-            duration_minutes: template.duration,
-            price: template.price
+            duration_minutes: template.duration_minutes || 30,
+            price: Number(template.price) || 0,
+            booking_mode: template.booking_mode || 'staff',
+            duration_options: template.duration_options || null,
         });
         fetchData(company.id);
     } catch (err: any) {
@@ -941,53 +934,6 @@ const handleAddFromTemplate = async (template: any) => {
     } finally {
         setIsSavingService(false);
     }
-};
-
-const templates = {
-    men: [
-        { name: 'Erkek Saç Kesimi', duration: 30, price: 200, description: 'Yıkama dahil saç kesimi' },
-        { name: 'Sakal Tıraşı (Makine)', duration: 15, price: 100, description: 'Makine ile sakal düzeltme' },
-        { name: 'Sakal Tıraşı (Ustura)', duration: 25, price: 150, description: 'Geleneksel ustura tıraşı' },
-        { name: 'Yıkama & Şekillendirme', duration: 20, price: 100, description: 'Saç yıkama ve fön' },
-        { name: 'Çocuk Saç Kesimi', duration: 25, price: 150, description: '12 yaş altı çocuk kesimi' },
-        { name: 'Saç Boyama (Erkek)', duration: 60, price: 400, description: 'Erkek saç boyama işlemi' },
-        { name: 'Beyaz Kapatma', duration: 30, price: 300, description: 'Doğal beyaz kapatma işlemi' },
-        { name: 'Keratin / Bakım', duration: 45, price: 350, description: 'Erkek saç bakım uygulaması' },
-        { name: 'Damat Tıraşı Paketi', duration: 90, price: 1000, description: 'Damat özel bakım paketi' },
-        { name: 'Kaş Düzeltme', duration: 10, price: 50, description: 'Doğal kaş düzeltme' },
-        { name: 'Saç Tasarım (Fade)', duration: 45, price: 250, description: 'Fade ve modern kesimler' }
-    ],
-    women: [
-        { name: 'Saç Kesimi', duration: 45, price: 300, description: 'Modern saç kesimi ve şekillendirme' },
-        { name: 'Fön ve Şekillendirme', duration: 30, price: 150, description: 'Fön ve günlük şekillendirme' },
-        { name: 'Topuz ve Özel Tasarım', duration: 60, price: 500, description: 'Özel gün ve davet saç tasarımı' },
-        { name: 'Saç Boyama (Dip)', duration: 90, price: 600, description: 'Dip boyama işlemi' },
-        { name: 'Saç Boyama (Komple)', duration: 120, price: 1000, description: 'Tüm saç boyama' },
-        { name: 'Röfle / Balyaj', duration: 180, price: 2000, description: 'Röfle, balyaj, ombre, sombre işlemleri' },
-        { name: 'Saç Açma İşlemleri', duration: 150, price: 1500, description: 'Saç rengi açma ve temizleme' },
-        { name: 'Keratin Bakım', duration: 90, price: 800, description: 'Saç düzleştirme ve bakım' },
-        { name: 'Saç Botoksu', duration: 60, price: 600, description: 'Yoğun nem ve dolgunluk veren bakım' },
-        { name: 'Perma', duration: 120, price: 1200, description: 'Kalıcı dalga işlemi' },
-        { name: 'Saç Kaynak', duration: 180, price: 3000, description: 'Mikro veya boncuk kaynak uygulaması' },
-        { name: 'Saç Bakım Kürleri', duration: 30, price: 250, description: 'Özel bakım maskeleri ve kürler' },
-        { name: 'Gelin Saçı & Prova', duration: 120, price: 2500, description: 'Gelin saç tasarımı ve prova' },
-        { name: 'Kaş Alma', duration: 15, price: 100, description: 'Kaş şekillendirme' }
-    ],
-    beauty: [
-        { name: 'Cilt Bakımı (Klasik)', duration: 60, price: 500, description: 'Derinlemesine gözenek temizliği' },
-        { name: 'Hydrafacial / Medikal', duration: 75, price: 1200, description: 'Cihazlı medikal cilt bakımı' },
-        { name: 'Lazer Epilasyon', duration: 60, price: 1500, description: 'Kalıcı tüy yok etme işlemi' },
-        { name: 'IPL Epilasyon', duration: 45, price: 1000, description: 'Işık bazlı tüy azaltma' },
-        { name: 'İğneli Epilasyon', duration: 30, price: 400, description: 'Tekli tüy yok etme işlemi' },
-        { name: 'Kalıcı Makyaj', duration: 120, price: 2500, description: 'Microblading, dudak renklendirme vb.' },
-        { name: 'Kirpik Lifting', duration: 45, price: 400, description: 'Doğal kirpik kaldırma işlemi' },
-        { name: 'Kirpik Uzatma / İpek', duration: 90, price: 800, description: 'İpek kirpik uygulaması' },
-        { name: 'Kaş Laminasyon', duration: 45, price: 450, description: 'Kaş şekillendirme ve sabitleme' },
-        { name: 'Bölgesel İncelme', duration: 45, price: 800, description: 'G5, kavitasyon vb. uygulamalar' },
-        { name: 'Masaj Hizmetleri', duration: 50, price: 750, description: 'Profesyonel vücut masajı' },
-        { name: 'Manikür', duration: 30, price: 200, description: 'Klasik el bakımı' },
-        { name: 'Pedikür', duration: 45, price: 300, description: 'Klasik ayak bakımı' }
-    ]
 };
 
 const handleLogout = () => {
@@ -1203,7 +1149,6 @@ const generateBoardKey = () => {
         normalizePhone,
         api,
         menuItems,
-        templates,
         setCompany,
         setDepartments,
         setStaffBoards,
@@ -1455,6 +1400,7 @@ const generateBoardKey = () => {
                                 case 'dept': return <DeptTab ctx={ctx} />;
                                 case 'staff': return <StaffTab ctx={ctx} />;
                                 case 'services': return <ServicesTab ctx={ctx} />;
+                                case 'scheduling': return <SchedulingTab ctx={ctx} />;
                                 case 'reports': return <ReportsTab ctx={ctx} />;
                                 default:
                                     if (activeTab.startsWith('customers-')) {

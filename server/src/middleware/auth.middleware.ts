@@ -55,31 +55,40 @@ const verifyBearer = (req: Request): JwtPayload | null => {
  * Kullanıcı JWT'si veya tablet board ekranının `X-Board-Key` başlığı ile kimlik doğrular.
  * Board anahtarıyla gelen istekler `role: 'board'` olarak işaretlenir.
  */
-export const companyAuth = async (req: Request, res: Response, next: NextFunction) => {
+const resolveUser = async (req: Request): Promise<JwtPayload | null> => {
     const decoded = verifyBearer(req);
-    if (decoded) {
-        req.user = decoded;
-        return next();
-    }
+    if (decoded) return decoded;
 
     const boardKey = req.header('x-board-key');
-    if (boardKey) {
-        try {
-            const { default: pool } = await import('../config/database');
-            const result = await pool.query(
-                'SELECT id FROM companies WHERE board_key IS NOT NULL AND UPPER(board_key) = UPPER($1) LIMIT 1',
-                [boardKey.trim()]
-            );
-            if (result.rows.length > 0) {
-                req.user = { userId: 0, email: '', role: 'board', companyId: result.rows[0].id };
-                return next();
-            }
-        } catch {
-            return res.status(500).json({ success: false, error: 'Kimlik doğrulanamadı' });
-        }
-    }
+    if (!boardKey) return null;
+    const { default: pool } = await import('../config/database');
+    const result = await pool.query(
+        'SELECT id FROM companies WHERE board_key IS NOT NULL AND UPPER(board_key) = UPPER($1) LIMIT 1',
+        [boardKey.trim()]
+    );
+    return result.rows.length > 0 ? { userId: 0, email: '', role: 'board', companyId: result.rows[0].id } : null;
+};
 
-    return res.status(401).json({ success: false, error: 'Yetkisiz erişim. Token bulunamadı.' });
+export const companyAuth = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const user = await resolveUser(req);
+        if (!user) return res.status(401).json({ success: false, error: 'Yetkisiz erişim. Token bulunamadı.' });
+        req.user = user;
+        next();
+    } catch {
+        return res.status(500).json({ success: false, error: 'Kimlik doğrulanamadı' });
+    }
+};
+
+/** Kimlik varsa (JWT veya board anahtarı) `req.user`'a yazar; yoksa isteği anonim olarak geçirir. */
+export const optionalCompanyAuth = async (req: Request, _res: Response, next: NextFunction) => {
+    try {
+        const user = await resolveUser(req);
+        if (user) req.user = user;
+    } catch {
+        /* anonim devam */
+    }
+    next();
 };
 
 export const canAccessCompany = (req: Request, companyId: number | null | undefined): boolean => {

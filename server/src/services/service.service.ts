@@ -1,7 +1,9 @@
 import { db } from '../db';
-import { services, departments } from '../db/schema';
-import { and, eq, asc } from 'drizzle-orm';
+import { services, departments, serviceResources, resources } from '../db/schema';
+import { and, eq, asc, inArray } from 'drizzle-orm';
 import redis from '../config/redis';
+
+export type BookingMode = 'staff' | 'resource' | 'class';
 
 export interface Service {
     id?: number;
@@ -16,6 +18,9 @@ export interface Service {
     unit?: string | null;
     photo?: string | null;
     department_name?: string | null;
+    booking_mode?: BookingMode;
+    duration_options?: number[] | null;
+    resource_ids?: number[];
 }
 
 class ServiceService {
@@ -32,12 +37,8 @@ class ServiceService {
         }
     }
 
-    /**
-     * Drizzle row → Service interface dönüşümü (camelCase → snake_case).
-     * Schema'da olmayan alanlar (quantity/unit/photo) DB'de tutulmuyor;
-     * public API'yi korumak için interface'de opsiyonel bırakıldı.
-     */
-    private mapRow(row: any): Service {
+    /** Drizzle row → Service (camelCase → snake_case, public API biçimi). */
+    private mapRow(row: any, resourceIds: number[] = []): Service {
         return {
             id: row.id,
             company_id: row.companyId,
@@ -48,7 +49,32 @@ class ServiceService {
             is_active: row.isActive,
             department_id: row.departmentId,
             department_name: row.departmentName ?? null,
+            quantity: row.quantity === null || row.quantity === undefined ? null : Number(row.quantity),
+            unit: row.unit ?? null,
+            photo: row.photo ?? null,
+            booking_mode: row.bookingMode,
+            duration_options: row.durationOptions ?? null,
+            resource_ids: resourceIds,
         };
+    }
+
+    private async getResourceIds(serviceIds: number[]): Promise<Map<number, number[]>> {
+        const map = new Map<number, number[]>();
+        if (serviceIds.length === 0) return map;
+        const rows = await db.select().from(serviceResources).where(inArray(serviceResources.serviceId, serviceIds));
+        for (const r of rows) map.set(r.serviceId, [...(map.get(r.serviceId) || []), r.resourceId]);
+        return map;
+    }
+
+    /** Hizmetin kaynak bağlantılarını verilen listeyle değiştirir; başka firmanın kaynakları yok sayılır. */
+    private async setResourceIds(serviceId: number, companyId: number, resourceIds: number[]) {
+        await db.delete(serviceResources).where(eq(serviceResources.serviceId, serviceId));
+        if (resourceIds.length === 0) return;
+        const owned = await db.select({ id: resources.id }).from(resources)
+            .where(and(eq(resources.companyId, companyId), inArray(resources.id, resourceIds)));
+        if (owned.length > 0) {
+            await db.insert(serviceResources).values(owned.map(r => ({ serviceId, resourceId: r.id })));
+        }
     }
 
     async createService(service: Service): Promise<Service> {
@@ -61,10 +87,16 @@ class ServiceService {
                 durationMinutes: service.duration_minutes,
                 price: String(service.price),
                 departmentId: service.department_id ?? null,
+                quantity: service.quantity === null || service.quantity === undefined ? null : String(service.quantity),
+                unit: service.unit ?? null,
+                photo: service.photo ?? null,
+                bookingMode: service.booking_mode ?? 'staff',
+                durationOptions: service.duration_options?.length ? service.duration_options : null,
             })
             .returning();
+        if (service.resource_ids) await this.setResourceIds(created.id, service.company_id, service.resource_ids);
         await this.clearCompanyCache();
-        return this.mapRow(created);
+        return this.mapRow(created, service.resource_ids ?? []);
     }
 
     async getServicesByCompany(companyId: number): Promise<Service[]> {
@@ -79,12 +111,18 @@ class ServiceService {
                 isActive: services.isActive,
                 departmentId: services.departmentId,
                 departmentName: departments.name,
+                quantity: services.quantity,
+                unit: services.unit,
+                photo: services.photo,
+                bookingMode: services.bookingMode,
+                durationOptions: services.durationOptions,
             })
             .from(services)
             .leftJoin(departments, eq(services.departmentId, departments.id))
             .where(and(eq(services.companyId, companyId), eq(services.isActive, true)))
             .orderBy(asc(services.name));
-        return rows.map(r => this.mapRow(r));
+        const resourceIds = await this.getResourceIds(rows.map(r => r.id));
+        return rows.map(r => this.mapRow(r, resourceIds.get(r.id)));
     }
 
     async updateService(id: number, service: Partial<Service>): Promise<Service | null> {
@@ -95,17 +133,23 @@ class ServiceService {
         if (service.price !== undefined) updates.price = String(service.price);
         if (service.is_active !== undefined) updates.isActive = service.is_active;
         if (service.department_id !== undefined) updates.departmentId = service.department_id;
+        if (service.quantity !== undefined) updates.quantity = service.quantity === null ? null : String(service.quantity);
+        if (service.unit !== undefined) updates.unit = service.unit;
+        if (service.photo !== undefined) updates.photo = service.photo;
+        if (service.booking_mode !== undefined) updates.bookingMode = service.booking_mode;
+        if (service.duration_options !== undefined) updates.durationOptions = service.duration_options?.length ? service.duration_options : null;
 
-        if (Object.keys(updates).length === 0) return null;
+        if (Object.keys(updates).length === 0 && service.resource_ids === undefined) return null;
 
-        const [updated] = await db
-            .update(services)
-            .set(updates)
-            .where(eq(services.id, id))
-            .returning();
+        const [updated] = Object.keys(updates).length > 0
+            ? await db.update(services).set(updates).where(eq(services.id, id)).returning()
+            : await db.select().from(services).where(eq(services.id, id));
+        if (!updated) return null;
 
-        if (updated) await this.clearCompanyCache();
-        return updated ? this.mapRow(updated) : null;
+        if (service.resource_ids !== undefined) await this.setResourceIds(id, updated.companyId!, service.resource_ids);
+        await this.clearCompanyCache();
+        const resourceIds = await this.getResourceIds([id]);
+        return this.mapRow(updated, resourceIds.get(id));
     }
 
     async deleteService(id: number): Promise<boolean> {

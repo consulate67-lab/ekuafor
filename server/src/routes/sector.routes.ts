@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware, requireCompanyAccess } from '../middleware/auth.middleware';
 import { db } from '../db';
-import { sectors, companySectors } from '../db/schema';
+import { sectors, companySectors, sectorServiceTemplates } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
 
 const router = Router();
@@ -10,6 +10,7 @@ const router = Router();
  * Sektör endpoint'leri (Sprint 2 — multi-tenant mimari).
  *
  * - GET /api/sectors          → Aktif sektör listesi (public, landing page için)
+ * - GET /api/sectors/templates → Hizmet şablonları (public)
  * - GET /api/sectors/:slug    → Tek sektör (public)
  * - GET /api/companies/:id/sectors         → Firmanın sektörleri (auth: company_owner veya admin)
  * - POST /api/companies/:id/sectors        → Sektör ata (auth: company_owner)
@@ -35,6 +36,32 @@ router.get('/sectors', async (_req, res) => {
             .where(eq(sectors.isActive, true))
             .orderBy(sectors.displayOrder, sectors.id);
         res.json({ success: true, sectors: rows });
+    } catch (e: any) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// Public: hizmet şablonları (firma panelinde "Şablonlardan ekle")
+router.get('/sectors/templates', async (_req, res) => {
+    try {
+        const rows = await db
+            .select({
+                id: sectorServiceTemplates.id,
+                sector_id: sectorServiceTemplates.sectorId,
+                sector_slug: sectors.slug,
+                sector_name: sectors.nameTr,
+                sector_icon: sectors.icon,
+                name: sectorServiceTemplates.nameTr,
+                duration_minutes: sectorServiceTemplates.defaultDurationMinutes,
+                price: sectorServiceTemplates.defaultPrice,
+                booking_mode: sectorServiceTemplates.bookingMode,
+                duration_options: sectorServiceTemplates.durationOptions,
+            })
+            .from(sectorServiceTemplates)
+            .innerJoin(sectors, eq(sectorServiceTemplates.sectorId, sectors.id))
+            .where(and(eq(sectorServiceTemplates.isActive, true), eq(sectors.isActive, true)))
+            .orderBy(sectors.displayOrder, sectors.id, sectorServiceTemplates.displayOrder, sectorServiceTemplates.id);
+        res.json({ success: true, data: rows });
     } catch (e: any) {
         res.status(500).json({ success: false, error: e.message });
     }

@@ -20,6 +20,10 @@ export const services = pgTable('services', {
     quantity: numeric(),
     unit: varchar({ length: 30 }),
     photo: text(),
+    /** staff: çalışanın zamanı · resource: saha/kulvar/oda · class: grup dersi seansında yer */
+    bookingMode: varchar('booking_mode', { length: 10 }).default('staff').notNull(),
+    /** Müşterinin seçebileceği süreler (örn. halı saha 60/90/120); boşsa sadece duration_minutes */
+    durationOptions: integer('duration_options').array(),
 }, (table) => {
     return {
         servicesCompanyIdFkey: foreignKey({
@@ -27,6 +31,7 @@ export const services = pgTable('services', {
             foreignColumns: [companies.id],
             name: 'services_company_id_fkey'
         }).onDelete('cascade'),
+        servicesBookingModeCheck: check('services_booking_mode_check', sql`booking_mode IN ('staff', 'resource', 'class')`),
     }
 });
 

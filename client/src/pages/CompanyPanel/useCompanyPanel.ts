@@ -62,7 +62,7 @@ interface CurrentAccount {
     balance?: number;
 }
 
-type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'finance' | 'reports' | 'profile' | 'integration' |
+type TabKey = 'home' | 'booking' | 'qr' | 'dept' | 'staff' | 'services' | 'scheduling' | 'finance' | 'reports' | 'profile' | 'integration' |
     'finance-sales-dashboard' | 'finance-sales-reports' | 'finance-sales-list' |
     'finance-purchases-dashboard' | 'finance-purchases-reports' | 'finance-purchases-list' |
     'finance-cash-dashboard' | 'finance-cash-reports' | 'finance-cash-list' |
@@ -106,7 +106,8 @@ const menuItems: MenuItem[] = [
     },
     { key: 'customers-list', icon: '👥', label: 'Müşteriler' },
     { key: 'reports', icon: '📊', label: 'Genel Raporlar' },
-    { key: 'services', icon: '✂️', label: 'Hizmetler' },
+    { key: 'services', icon: '🧾', label: 'Hizmetler' },
+    { key: 'scheduling', icon: '🗓️', label: 'Alanlar & Seanslar' },
     { key: 'profile', icon: '⚙️', label: 'Firma Ayarları' },
     { key: 'integration', icon: '🔌', label: 'Entegrasyon' },
     { key: 'booking', icon: '📅', label: 'Müşteri QR' },
@@ -116,50 +117,29 @@ const menuItems: MenuItem[] = [
 ];
 export { menuItems };
 
-    const templates = {
-        men: [
-            { name: 'Erkek Saç Kesimi', duration: 30, price: 200, description: 'Yıkama dahil saç kesimi' },
-            { name: 'Sakal Tıraşı (Makine)', duration: 15, price: 100, description: 'Makine ile sakal düzeltme' },
-            { name: 'Sakal Tıraşı (Ustura)', duration: 25, price: 150, description: 'Geleneksel ustura tıraşı' },
-            { name: 'Yıkama & Şekillendirme', duration: 20, price: 100, description: 'Saç yıkama ve fön' },
-            { name: 'Çocuk Saç Kesimi', duration: 25, price: 150, description: '12 yaş altı çocuk kesimi' },
-            { name: 'Saç Boyama (Erkek)', duration: 60, price: 400, description: 'Erkek saç boyama işlemi' },
-            { name: 'Beyaz Kapatma', duration: 30, price: 300, description: 'Doğal beyaz kapatma işlemi' },
-            { name: 'Keratin / Bakım', duration: 45, price: 350, description: 'Erkek saç bakım uygulaması' },
-            { name: 'Damat Tıraşı Paketi', duration: 90, price: 1000, description: 'Damat özel bakım paketi' },
-            { name: 'Kaş Düzeltme', duration: 10, price: 50, description: 'Doğal kaş düzeltme' },
-            { name: 'Saç Tasarım (Fade)', duration: 45, price: 250, description: 'Fade ve modern kesimler' }
-        ],
-        women: [
-            { name: 'Saç Kesimi', duration: 45, price: 300, description: 'Modern saç kesimi ve şekillendirme' },
-            { name: 'Fön ve Şekillendirme', duration: 30, price: 150, description: 'Fön ve günlük şekillendirme' },
-            { name: 'Topuz ve Özel Tasarım', duration: 60, price: 500, description: 'Özel gün ve davet saç tasarımı' },
-            { name: 'Saç Boyama (Dip)', duration: 90, price: 600, description: 'Dip boyama işlemi' },
-            { name: 'Saç Boyama (Komple)', duration: 120, price: 1000, description: 'Tüm saç boyama' },
-            { name: 'Röfle / Balyaj', duration: 180, price: 2000, description: 'Röfle, balyaj, ombre, sombre işlemleri' },
-            { name: 'Saç Açma İşlemleri', duration: 150, price: 1500, description: 'Saç rengi açma ve temizleme' },
-            { name: 'Keratin Bakım', duration: 90, price: 800, description: 'Saç düzleştirme ve bakım' },
-            { name: 'Saç Botoksu', duration: 60, price: 600, description: 'Yoğun nem ve dolgunluk veren bakım' },
-            { name: 'Perma', duration: 120, price: 1200, description: 'Kalıcı dalga işlemi' },
-            { name: 'Saç Kaynak', duration: 180, price: 3000, description: 'Mikro veya boncuk kaynak uygulaması' },
-            { name: 'Saç Bakım Kürleri', duration: 30, price: 250, description: 'Özel bakım maskeleri ve kürler' },
-            { name: 'Gelin Saçı & Prova', duration: 120, price: 2500, description: 'Gelin saç tasarımı ve prova' },
-            { name: 'Kaş Alma', duration: 15, price: 100, description: 'Kaş şekillendirme' }
-        ],
-        beauty: [
-            { name: 'Cilt Bakımı (Klasik)', duration: 60, price: 500, description: 'Derinlemesine gözenek temizliği' },
-            { name: 'Hydrafacial / Medikal', duration: 75, price: 1200, description: 'Cihazlı medikal cilt bakımı' },
-            { name: 'Lazer Epilasyon', duration: 60, price: 1500, description: 'Kalıcı tüy yok etme işlemi' },
-            { name: 'IPL Epilasyon', duration: 45, price: 1000, description: 'Işık bazlı tüy azaltma' },
-            { name: 'İğneli Epilasyon', duration: 30, price: 400, description: 'Tekli tüy yok etme işlemi' },
-            { name: 'Kalıcı Makyaj', duration: 120, price: 2500, description: 'Microblading, dudak renklendirme vb.' },
-            { name: 'Kirpik Lifting', duration: 45, price: 400, description: 'Doğal kirpik kaldırma işlemi' },
-            { name: 'Kirpik Uzatma / İpek', duration: 90, price: 800, description: 'İpek kirpik uygulaması' },
-            { name: 'Kaş Laminasyon', duration: 45, price: 450, description: 'Kaş şekillendirme ve sabitleme' },
-            { name: 'Bölgesel İncelme', duration: 45, price: 800, description: 'G5, kavitasyon vb. uygulamalar' },
-            { name: 'Masaj Hizmetleri', duration: 50, price: 750, description: 'Profesyonel vücut masajı' },
-            { name: 'Manikür', duration: 30, price: 200, description: 'Klasik el bakımı' },
-            { name: 'Pedikür', duration: 45, price: 300, description: 'Klasik ayak bakımı' }
-        ]
-    };
-export { templates };
+export const BOOKING_MODE_LABELS: Record<'staff' | 'resource' | 'class', { label: string; hint: string; icon: string }> = {
+    staff: { label: 'Personelle', hint: 'Müşteri personel ve saat seçer (kuaför, masaj, klinik)', icon: '👤' },
+    resource: { label: 'Alan kiralama', hint: 'Saha, kulvar veya oda saatlik kiralanır', icon: '📍' },
+    class: { label: 'Grup dersi', hint: 'Kapasiteli seanslara kayıt alınır (pilates, yoga)', icon: '👥' },
+};
+
+export const emptyServiceForm = {
+    id: null as number | null,
+    name: '',
+    description: '',
+    duration_minutes: 30,
+    price: 0,
+    department_id: null as number | null,
+    photo: null as string | null,
+    quantity: '' as string | number,
+    unit: '',
+    booking_mode: 'staff' as 'staff' | 'resource' | 'class',
+    duration_options: '',
+    resource_ids: [] as number[],
+};
+
+/** "60, 90, 120" → [60, 90, 120]; boşsa null (hizmetin kendi süresi kullanılır). */
+export const parseDurationOptions = (value: string): number[] | null => {
+    const list = [...new Set(value.split(/[,\s]+/).map(Number).filter(n => Number.isInteger(n) && n >= 5 && n <= 1440))];
+    return list.length ? list.sort((a, b) => a - b).slice(0, 10) : null;
+};

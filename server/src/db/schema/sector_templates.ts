@@ -30,6 +30,8 @@ export const sectorServiceTemplates = pgTable('sector_service_templates', {
     displayOrder: integer('display_order').notNull().default(0),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    bookingMode: varchar('booking_mode', { length: 10 }).notNull().default('staff'),
+    durationOptions: integer('duration_options').array(),
 });
 
 /**

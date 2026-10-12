@@ -15,6 +15,20 @@
       "when": 1791788491726,
       "tag": "0001_drop_duplicate_kvkk_fk",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791789719945,
+      "tag": "0002_booking_model",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791789755866,
+      "tag": "0003_sector_catalog",
+      "breakpoints": true
     }
   ]
 }

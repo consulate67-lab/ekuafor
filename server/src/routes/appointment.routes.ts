@@ -1,41 +1,59 @@
 import { Router, Request, Response } from 'express';
-import { env } from '../config/env';
-import jwt from 'jsonwebtoken';
 import appointmentService from '../services/appointment.service';
-import { authMiddleware, companyAuth, canAccessCompany, requireCompanyAccess } from '../middleware/auth.middleware';
+import { createBooking, BookingError } from '../services/booking.service';
+import { authMiddleware, companyAuth, optionalCompanyAuth, canAccessCompany, requireCompanyAccess } from '../middleware/auth.middleware';
 import pool from '../config/database';
 import { z } from 'zod';
 import { logger } from '../utils/logger';
+import { normalizePhone } from '../utils/phone';
 
 const router = Router();
 
-const appointmentSchema = z.object({
-    service_id: z.union([z.number(), z.string().transform(v => parseInt(v, 10))]).optional(),
-    service_ids: z.array(z.number()).optional(),
-    services: z.array(z.any()).optional(), // Add services array for staff overrides
-    staff_id: z.union([z.number(), z.string().transform(v => parseInt(v, 10))]).optional().nullable(),
-    appointment_date: z.string(),
-    start_time: z.string(),
-    end_time: z.string(),
-    notes: z.string().optional(),
-    price: z.union([z.number(), z.string().transform(v => parseFloat(v))]).optional(),
-    customer_name: z.string().optional(),
-    customer_phone: z.string().optional(),
-    device_id: z.string().optional(),
+const id = z.preprocess(v => (v === '' ? null : v), z.coerce.number().int().positive().nullable().optional());
+const positive = z.coerce.number().int().positive().optional();
+const money = z.coerce.number().nonnegative().optional();
+
+const bookingSchema = z.object({
+    company_id: z.coerce.number().int().positive(),
+    services: z.array(z.object({
+        service_id: id,
+        id: id,
+        staff_id: id,
+        duration_minutes: positive,
+        price: money,
+    })).optional(),
+    service_ids: z.array(z.coerce.number().int().positive()).optional(),
+    service_id: id,
+    staff_id: id,
+    resource_id: id,
+    class_session_id: id,
+    party_size: positive,
+    appointment_date: z.string().optional(),
+    start_time: z.string().optional(),
+    duration_minutes: positive,
+    price: money,
+    status: z.enum(['pending', 'approved', 'completed']).optional(),
+    notes: z.string().max(1000).optional().nullable(),
+    customer_name: z.string().max(255).optional().nullable(),
+    customer_phone: z.string().max(20).optional().nullable(),
+    device_id: z.string().max(255).optional().nullable(),
+    client_request_id: z.string().max(64).optional().nullable(),
 });
 
 // Randevuları listele (Firma bazlı, isteğe bağlı durum filtresiyle)
-// 1. PUBLIC HANDLER: Check if it's a public booking request (via query params)
+// 1. PUBLIC HANDLER: müşterinin kendi randevuları (cihaz / telefon / id) ve firmanın kendi listesi (token veya board anahtarı)
 const publicAppointmentHandler = async (req: Request, res: Response, next: any) => {
     const companyId = req.query.company_id ? parseInt(req.query.company_id as string) : undefined;
     const customerPhone = req.query.customer_phone as string;
     const idsString = req.query.ids as string;
     const deviceId = req.query.device_id as string;
 
+    if (companyId && !customerPhone && !idsString && !deviceId && !canAccessCompany(req, companyId)) {
+        return res.status(403).json({ success: false, error: 'Bu firmanın randevularını görme yetkiniz yok' });
+    }
+
     if (companyId || customerPhone || idsString || deviceId) {
         try {
-            console.log(`[GET /appointments] Public Access: Company=${companyId}, Phone=${customerPhone}, Ids=${idsString}`);
-
             let appointments;
             if (idsString) {
                 const ids = idsString.split(',').map(s => parseInt(s)).filter(id => !isNaN(id));
@@ -96,7 +114,7 @@ const privateAppointmentHandler = async (req: Request, res: Response, next: any)
     }
 };
 
-router.get('/', publicAppointmentHandler, authMiddleware, privateAppointmentHandler);
+router.get('/', optionalCompanyAuth, publicAppointmentHandler, authMiddleware, privateAppointmentHandler);
 
 router.get('/calendar', authMiddleware, async (req: Request, res: Response, next: any) => {
     try {
@@ -131,50 +149,81 @@ router.get('/company/:companyId/completed', authMiddleware, async (req: Request,
     }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+/**
+ * POST /api/appointments
+ * Müşteri (anonim veya müşteri hesabı) → `pending`. Firma kullanıcısı / board → varsayılan `approved`,
+ * çalışma saati ve fiyat kısıtı yok. Çakışma ve kapasite kontrolü her durumda sunucuda yapılır.
+ */
+router.post('/', optionalCompanyAuth, async (req: Request, res: Response) => {
     try {
-        let companyId = req.body.company_id ? parseInt(req.body.company_id) : undefined;
-        if (!companyId) return res.status(400).json({ success: false, error: 'Firma ID zorunludur' });
+        const body = bookingSchema.parse(req.body);
+        const user = req.user;
+        const byCompany = !!user && user.role !== 'customer' && canAccessCompany(req, body.company_id);
 
-        const validatedData = appointmentSchema.parse(req.body);
-        let finalStaffId = validatedData.staff_id;
-        let status = 'pending';
+        const items = body.services?.length
+            ? body.services.map(s => ({ serviceId: Number(s.service_id ?? s.id), staffId: s.staff_id, durationMinutes: s.duration_minutes, price: s.price }))
+            : (body.service_ids?.length ? body.service_ids : body.service_id ? [body.service_id] : []).map(serviceId => ({ serviceId }));
+        if (!body.class_session_id && (items.length === 0 || items.some(i => !i.serviceId))) {
+            return res.status(400).json({ success: false, error: 'En az bir hizmet seçilmelidir' });
+        }
 
-        if (req.headers.authorization) {
-            try {
-                const token = req.headers.authorization.split(' ')[1];
-                const decoded = jwt.verify(token, env.JWT_SECRET) as any;
-                if (!companyId && decoded.companyId) companyId = decoded.companyId;
-                if (companyId && (decoded.companyId == companyId || decoded.role === 'super_admin')) status = req.body.status || 'approved';
-                const roleResult = await pool.query('SELECT role FROM company_users WHERE company_id=$1 AND user_id=$2', [companyId, decoded.userId]);
-                if (roleResult.rows[0]?.role === 'staff' && !finalStaffId) finalStaffId = decoded.userId;
-            } catch (e) {}
-        } else if (req.body.status) status = req.body.status;
-
-        const appointment = await appointmentService.createAppointment({ ...validatedData, company_id: companyId as number, status: status as any, staff_id: finalStaffId ?? undefined });
+        const appointment = await createBooking({
+            companyId: body.company_id,
+            items,
+            staffId: body.staff_id ?? (byCompany && user?.role === 'staff' ? user.userId : null),
+            resourceId: body.resource_id,
+            classSessionId: body.class_session_id,
+            partySize: body.party_size,
+            date: body.appointment_date,
+            startTime: body.start_time,
+            durationMinutes: body.duration_minutes,
+            price: body.price,
+            status: byCompany ? (body.status || 'approved') : 'pending',
+            notes: body.notes,
+            customerId: user?.role === 'customer' ? user.userId : null,
+            customerName: body.customer_name,
+            customerPhone: body.customer_phone,
+            deviceId: body.device_id,
+            clientRequestId: body.client_request_id,
+            byCompany,
+        });
         res.status(201).json({ success: true, data: appointment });
     } catch (error) {
         if (error instanceof z.ZodError) return res.status(400).json({ success: false, error: 'Validasyon hatası', details: error.errors });
-        // Detaylı hata log'u (02.09.2026): Drizzle pg hatası err.cause.detail'de gelir
-        const anyErr = error as any;
-        logger.error({
-            errMessage: anyErr?.message,
-            errCause: anyErr?.cause?.message,
-            errDetail: anyErr?.cause?.detail || anyErr?.detail,
-            errHint: anyErr?.cause?.hint,
-            errCode: anyErr?.cause?.code || anyErr?.code,
-            errPosition: anyErr?.cause?.position || anyErr?.position,
-            errRoutine: anyErr?.cause?.routine,
-            errStack: anyErr?.stack?.slice(0, 1500)
-        }, '[POST /api/appointments] detaylı hata');
-        res.status(500).json({
-            success: false,
-            error: anyErr?.message || 'Hata',
-            detail: anyErr?.cause?.detail || anyErr?.detail || null,
-            hint: anyErr?.cause?.hint || null,
-            code: anyErr?.cause?.code || anyErr?.code || null,
-            position: anyErr?.cause?.position || anyErr?.position || null
-        });
+        if (error instanceof BookingError) return res.status(error.status).json({ success: false, error: error.message });
+        logger.error({ err: error }, '[POST /api/appointments] randevu oluşturulamadı');
+        res.status(500).json({ success: false, error: 'Randevu oluşturulamadı' });
+    }
+});
+
+/**
+ * PATCH /api/appointments/:id/rate
+ * Tamamlanmış randevuyu, randevuyu alan cihaz / telefon / müşteri hesabı puanlayabilir.
+ */
+router.patch('/:id/rate', optionalCompanyAuth, async (req: Request, res: Response) => {
+    try {
+        const appointmentId = parseInt(req.params.id, 10);
+        const rating = Number(req.body?.rating);
+        if (Number.isNaN(appointmentId)) return res.status(400).json({ success: false, error: 'Geçersiz id' });
+        if (!Number.isInteger(rating) || rating < 1 || rating > 5) return res.status(400).json({ success: false, error: 'Puan 1-5 arasında olmalıdır' });
+
+        const found = await pool.query('SELECT status, device_id, customer_phone, customer_id FROM appointments WHERE id = $1', [appointmentId]);
+        const row = found.rows[0];
+        if (!row) return res.status(404).json({ success: false, error: 'Randevu bulunamadı' });
+
+        const { device_id, customer_phone } = req.body || {};
+        const isOwner = (!!device_id && row.device_id === device_id)
+            || (!!customer_phone && !!row.customer_phone && normalizePhone(String(customer_phone)) === row.customer_phone)
+            || (req.user?.role === 'customer' && !!row.customer_id && req.user.userId === row.customer_id);
+        if (!isOwner) return res.status(403).json({ success: false, error: 'Bu randevuyu puanlama yetkiniz yok' });
+        if (row.status !== 'completed') return res.status(409).json({ success: false, error: 'Sadece tamamlanan randevular puanlanabilir' });
+
+        const comment = typeof req.body?.comment === 'string' ? req.body.comment.slice(0, 1000) : undefined;
+        const appointment = await appointmentService.rateAppointment(appointmentId, rating, comment);
+        res.json({ success: true, data: appointment });
+    } catch (error) {
+        logger.error({ err: error }, '[PATCH /api/appointments/:id/rate] puanlama hatası');
+        res.status(500).json({ success: false, error: 'Puanlama kaydedilemedi' });
     }
 });
 

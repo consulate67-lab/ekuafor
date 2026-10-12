@@ -1,7 +1,7 @@
 # Saloon — Yeniden Yapılandırma Planı
 
 **Tarih:** 2026-10-12
-**Durum:** Onaylandı (2026-10-12) — Faz 0, 1, 2 ve 3 tamamlandı; sıradaki Faz 4
+**Durum:** Onaylandı (2026-10-12) — Faz 0, 1, 2, 3 ve 4 tamamlandı; sıradaki Faz 5
 **Kapsam:** Güvenlik düzeltmeleri, gereksiz kodun silinmesi, sektör-bağımsız rezervasyon modeli ve 4 ekranın yeniden düzenlenmesi.
 **Kapsam dışı (sonraki aşama):** Offline çalışma. Bu planda yalnızca offline'a hazırlık yapılır.
 
@@ -292,6 +292,27 @@ Sektör seçildiğinde firmaya hazır hizmet şablonları ve (resource sektörle
 - Personel olmadan randevu kabul edilip çakışma kontrolü atlanması düzeltilsin
 
 **Kabul:** Bir kuaför (staff), bir halı saha (resource, 60/90/120 dk) ve bir pilates stüdyosu (class, 8 kişilik seans) aynı sistemde uçtan uca randevu alabiliyor; aynı slot iki kez satılamıyor.
+
+**Durum (2026-10-12) — Faz 4 tamamlandı:**
+- Migration'lar: `0002_booking_model` (`resources`, `service_resources`, `class_sessions`; `services.booking_mode / duration_options`; `appointments.resource_id / class_session_id / party_size / client_request_id`) ve `0003_sector_catalog` (14 sektör, 79 hizmet şablonu). Mevcut hizmetler `staff` olarak kaldı.
+- Plandan sapmalar:
+  - `resources` tablosunda `capacity` yok: kaynak her zaman 1 rezervasyon alır. Kapasite gerekiyorsa `class` tipi kullanılır.
+  - `class_sessions`, `starts_at/ends_at` yerine `session_date + start_time/end_time` (İstanbul saati) tutar; randevularla aynı biçim. Haftalık tekrar `recurrence_rule` yerine aynı `series_id` ile önceden oluşturulmuş seanslardır (en fazla 26 hafta).
+  - Masaj sektörünün slug'ı `massage_spa` değil, mevcut `wellness` kaldı; adı "Masaj & Spa" oldu. `requires_resource_type` (personel + oda) eklenmedi.
+- Sunucu (`services/booking.service.ts`, `routes/booking.routes.ts`):
+  - `GET /availability`, `GET/POST/PATCH /class-sessions`, `GET /class-sessions/:id/attendees`, `GET/POST/PUT/DELETE /resources`, `GET /sectors/templates`.
+  - `POST /appointments` her tip için tek yoldan geçer: firma + gün başına `pg_advisory_xact_lock`, sunucuda süre/fiyat hesabı, `client_request_id` ile tekrar gönderime karşı koruma. Personel seçilmezse sunucu boş personeli atar; personeli olmayan firma tek hat sayılır (çakışma kontrolü atlanmaz).
+  - Personel API'si yalnızca aktif `staff` rolündeki kullanıcıları `id, first_name, last_name` ile döner (e-posta/telefon yok). `PATCH /appointments/:id/rate` eklendi: yalnızca tamamlanmış randevu, cihaz veya telefonla sahiplik kontrolü.
+- İstemci:
+  - `BookingPage` tipe göre adım akışı (staff: hizmet → personel/saat; resource: hizmet → süre → tarih → saat; class: hizmet → seans), saatler sunucudan gelir.
+  - Firma panelinde yeni "Alanlar & Seanslar" sekmesi; hizmet formunda rezervasyon tipi, süre seçenekleri ve alan seçimi; şablonlar sunucudaki katalogdan gelir ve firmanın sektörüyle açılır.
+- Testler: `server/src/__tests__/integration/booking.test.ts` (18 test, PGlite üzerinde gerçek migration'larla). Gerçek PostgreSQL 18 üzerinde 20 eşzamanlı istekle yarış testi yapıldı: kilit açıkken her tipte doğru sayıda kabul (1 / 2 / 2 / 8), kilit kapatıldığında 20/20 kabul ve 305 çakışma. Yani çift satışı engelleyen şey kilit.
+- Canlı kontrol: firmaya bağlı kullanıcılar yalnızca `company_admin` (19) ve `staff` (34); geçmiş randevuların hepsi `staff` rolüne atanmış. Personeli olmayan 1 firma tek hat olarak çalışır.
+- Bilinçli olarak Faz 5'e bırakılanlar:
+  - Board girişinin token'a çevrilmesi, `admin-login` anahtar biçimi.
+  - Herkese açık telefon/cihaz/ID ile randevu sorgularında müşteri kimliği.
+  - Lisans ekranı.
+  - Müşteri ana sayfasındaki "personeli ara": personel telefonu artık herkese açık olmadığı için firma telefonuna düşüyor.
 
 ---
 

@@ -1,6 +1,6 @@
 import { db } from '../db';
 import { companyUsers, users, departments } from '../db/schema';
-import { eq, or, and, ne, asc, sql } from 'drizzle-orm';
+import { eq, or, and, asc, sql } from 'drizzle-orm';
 
 export interface Employee {
     id?: number;
@@ -42,24 +42,22 @@ class EmployeeService {
     }
 
     /**
-     * Firmanın tüm çalışanlarını listele (users.company_id + company_users JOIN).
+     * Randevu alınabilen çalışanlar (users.company_id + company_users JOIN). Public uç noktada
+     * kullanıldığı için iletişim bilgisi döndürülmez.
      */
-    async getEmployeesByCompany(companyId: number): Promise<Employee[]> {
-        return (await db
-            .select({
-                userId: users.id,
-                companyId: users.companyId,
-                firstName: users.firstName,
-                lastName: users.lastName,
-                email: users.email,
-                phone: users.phone,
+    async getEmployeesByCompany(companyId: number) {
+        return db
+            .selectDistinct({
+                id: users.id,
+                user_id: users.id,
+                company_id: users.companyId,
+                first_name: users.firstName,
+                last_name: users.lastName,
                 role: users.role,
+                title: users.title,
                 photo: users.photo,
-                departmentId: users.departmentId,
-                quantity: users.quantity,
-                unit: users.unit,
-                departmentName: departments.name,
-                isActive: sql<boolean>`COALESCE(${users.isActive}, true)`,
+                department_id: users.departmentId,
+                department_name: departments.name,
             })
             .from(users)
             .leftJoin(departments, eq(users.departmentId, departments.id))
@@ -76,12 +74,11 @@ class EmployeeService {
                         eq(users.companyId, companyId),
                         eq(companyUsers.companyId, companyId)
                     ),
-                    ne(users.role, 'company_admin'),
-                    ne(users.role, 'super_admin'),
-                    ne(users.role, 'customer')
+                    eq(users.role, 'staff'),
+                    sql`COALESCE(${users.isActive}, true)`
                 )
             )
-            .orderBy(asc(users.firstName))) as Employee[];
+            .orderBy(asc(users.firstName));
     }
 
     /**

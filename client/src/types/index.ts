@@ -113,6 +113,54 @@ export interface Service {
     quantity?: number | null;
     unit?: string | null;
     photo?: string | null;
+    booking_mode?: BookingMode;
+    duration_options?: number[] | null;
+    resource_ids?: number[];
+}
+
+/** staff: çalışanın zamanı · resource: saha/kulvar/oda · class: kapasiteli grup seansı */
+export type BookingMode = 'staff' | 'resource' | 'class';
+
+export interface Resource {
+    id: number;
+    name: string;
+    resource_type: string;
+    is_active: boolean;
+    display_order: number;
+    service_ids?: number[];
+}
+
+export interface ClassSession {
+    id: number;
+    service_id: number;
+    service_name: string;
+    price: string | number;
+    staff_id: number | null;
+    staff_name: string | null;
+    resource_id: number | null;
+    resource_name: string | null;
+    session_date: string;
+    start_time: string;
+    end_time: string;
+    capacity: number;
+    status: 'scheduled' | 'cancelled';
+    series_id: string | null;
+    booked: number;
+    remaining: number;
+}
+
+export interface AvailabilitySlot {
+    time: string;
+    available: boolean;
+    staff_ids?: number[];
+    resource_ids?: number[];
+}
+
+export interface Availability {
+    mode: BookingMode;
+    date: string;
+    duration: number;
+    slots: AvailabilitySlot[];
 }
 
 export interface Appointment {
@@ -122,6 +170,10 @@ export interface Appointment {
     service_id: number;
     service_ids?: number[];
     staff_id?: number;
+    resource_id?: number | null;
+    resource_name?: string | null;
+    class_session_id?: number | null;
+    party_size?: number;
     duration_minutes?: number;
     appointment_date: string;
     start_time: string;
