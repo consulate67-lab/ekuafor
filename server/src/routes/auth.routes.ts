@@ -130,7 +130,7 @@ router.post('/login', async (req: Request, res: Response) => {
         console.log('[Auth] User found, role:', user.role);
 
         // Şifreyi kontrol et
-        const isPasswordValid = await bcrypt.compare(validatedData.password, user.password);
+        const isPasswordValid = !!user.password && await bcrypt.compare(validatedData.password, user.password);
 
         if (!isPasswordValid) {
             console.warn('[Auth] Invalid password for:', lowerEmail);
@@ -160,11 +160,11 @@ router.post('/login', async (req: Request, res: Response) => {
             }
         });
     } catch (error: any) {
+        if (error instanceof z.ZodError) {
+            return res.status(400).json({ success: false, error: error.errors[0]?.message || 'Geçersiz giriş bilgisi' });
+        }
         console.error('[Auth Critical Error]:', error);
-        res.status(500).json({
-            success: false,
-            error: error instanceof Error ? error.message : 'Giriş sırasında hata oluştu'
-        });
+        res.status(500).json({ success: false, error: 'Giriş sırasında hata oluştu' });
     }
 });
 

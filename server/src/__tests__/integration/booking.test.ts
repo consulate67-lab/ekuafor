@@ -507,6 +507,13 @@ describe('firma kullanıcısı', () => {
         expect(admins.rows[0].n).toBe(1);
     });
 
+    it('e-posta girişi hatalı bilgide 400/401 döner, 500 değil', async () => {
+        await request(app).post('/api/auth/login').send({ email: 'yok@yok.test', password: 'x' }).expect(400);
+        await request(app).post('/api/auth/login').send({ email: 'yok@yok.test', password: 'yanlis-sifre' }).expect(401);
+        await pool.query(`INSERT INTO users (email, password, role, first_name, last_name) VALUES ('otp@yok.test', '', 'customer', 'Otp', 'Kullanici')`);
+        await request(app).post('/api/auth/login').send({ email: 'otp@yok.test', password: 'herhangi' }).expect(401);
+    });
+
     it('personel kodla girer ve yalnızca kendi ve atanmamış randevuları görür', async () => {
         const login = await request(app).post('/api/companies/check-code').send({ code: 'PRS-ALI' }).expect(200);
         expect(login.body.data).toMatchObject({ type: 'staff', user_id: ali, redirect: '/isletme' });
