@@ -4,9 +4,9 @@ import jwt from 'jsonwebtoken';
 import { formatPhoneTo12Digits } from '../utils/phone';
 import bcrypt from 'bcryptjs';
 import pool from '../config/database';
-import companyService from '../services/company.service';
+import companyService, { toPublicCompany, isLicenseExpired } from '../services/company.service';
 import employeeRoutes from './employee.routes';
-import { authMiddleware, roleCheck, companyAuth, requireCompanyAccess } from '../middleware/auth.middleware';
+import { authMiddleware, roleCheck, companyAuth, requireCompanyAccess, optionalCompanyAuth, canAccessCompany } from '../middleware/auth.middleware';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 
@@ -317,7 +317,7 @@ router.post('/', authMiddleware, roleCheck(['super_admin']), async (req: Request
  * GET /api/companies
  * Tüm firmaları listele (Herkes görebilir veya sadece giriş yapanlar)
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', optionalCompanyAuth, async (req: Request, res: Response) => {
     try {
         const filters = {
             is_active: req.query.is_active === 'true' ? true : req.query.is_active === 'false' ? false : undefined,
@@ -334,11 +334,11 @@ router.get('/', async (req: Request, res: Response) => {
         };
 
         const companies = await companyService.getAllCompanies(filters);
-        console.log(`[GET /api/companies] Found ${companies.length} companies with filters:`, JSON.stringify(filters));
+        const isSuperAdmin = req.user?.role === 'super_admin';
 
         res.json({
             success: true,
-            data: companies,
+            data: isSuperAdmin ? companies : companies.map(toPublicCompany),
             count: companies.length
         });
     } catch (error) {
@@ -353,7 +353,7 @@ router.get('/', async (req: Request, res: Response) => {
  * GET /api/companies/:id
  * Belirli bir firmayı getir
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', optionalCompanyAuth, async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
         const company = await companyService.getCompanyById(id);
@@ -365,9 +365,12 @@ router.get('/:id', async (req: Request, res: Response) => {
             });
         }
 
+        const isOwnerOrAdmin = req.user?.role === 'super_admin'
+            || (req.user?.role === 'company_admin' && canAccessCompany(req, id));
+
         res.json({
             success: true,
-            data: company
+            data: isOwnerOrAdmin ? { ...company, is_license_expired: isLicenseExpired(company) } : toPublicCompany(company)
         });
     } catch (error) {
         res.status(500).json({
@@ -481,31 +484,23 @@ router.post('/:id/verify', authMiddleware, roleCheck(['super_admin']), async (re
  */
 router.post('/board-login', async (req: Request, res: Response) => {
     try {
-        const { board_key } = req.body;
-        if (!board_key) {
+        const rawKey = req.body?.board_key ?? req.body?.key;
+        const boardKey = typeof rawKey === 'string' ? rawKey.trim() : '';
+        if (!boardKey) {
             return res.status(400).json({ success: false, error: 'Board Key gereklidir' });
         }
 
-        const result = await companyService.getAllCompanies(); // Simple lookup for now
-        const company = result.find(c => {
-            const storedKey = (c as any).board_key;
-            return storedKey && storedKey.trim().toUpperCase() === board_key.trim().toUpperCase();
-        });
+        const result = await pool.query(
+            'SELECT * FROM companies WHERE board_key IS NOT NULL AND UPPER(TRIM(board_key)) = UPPER($1) LIMIT 1',
+            [boardKey]
+        );
+        const company = result.rows[0];
 
         if (!company) {
-            console.log('Hatalı Board Giriş Denemesi:', board_key); // Debug için log ekledik
             return res.status(401).json({ success: false, error: 'Geçersiz Board Key' });
         }
 
-        const isLicenseExpired = company.license_end_date && new Date(company.license_end_date) < new Date();
-
-        res.json({
-            success: true,
-            data: {
-                ...company,
-                is_license_expired: isLicenseExpired
-            }
-        });
+        res.json({ success: true, data: toPublicCompany(company) });
     } catch (error) {
         res.status(500).json({
             success: false,
@@ -794,14 +789,14 @@ router.post('/staff-login', async (req: Request, res: Response) => {
             return res.status(404).json({ success: false, error: 'Firma bulunamadı' });
         }
 
-        const isLicenseExpired = companyResult.rows[0].license_end_date && new Date(companyResult.rows[0].license_end_date) < new Date();
+        const company = companyResult.rows[0];
 
         res.json({
             success: true,
             data: {
                 user: user,
-                company: companyResult.rows[0],
-                is_license_expired: isLicenseExpired
+                company: toPublicCompany(company),
+                is_license_expired: isLicenseExpired(company)
             }
         });
     } catch (error) {

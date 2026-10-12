@@ -264,6 +264,66 @@ describe('HTTP API', () => {
     });
 });
 
+describe('firma verisi gizliliği', () => {
+    const SECRET_FIELDS = ['admin_key', 'board_key', 'qnb_username', 'qnb_password', 'verification_code', 'bank_iban', 'tax_number'];
+    const expectNoSecrets = (company: Record<string, unknown>) => {
+        for (const field of SECRET_FIELDS) expect(company).not.toHaveProperty(field);
+    };
+    const tokenFor = async (payload: Record<string, unknown>) => {
+        const { env } = await import('../../config/env');
+        return (await import('jsonwebtoken')).default.sign(payload, env.JWT_SECRET);
+    };
+
+    beforeAll(async () => {
+        await pool.query(
+            `UPDATE companies SET admin_key = 'ADM-GIZLI', board_key = 'BRD-GIZLI', qnb_username = 'u', qnb_password = 'p', tax_number = '1234567890'
+             WHERE id = $1`,
+            [ids.salon]
+        );
+    });
+
+    it('herkese açık liste ve detay gizli alan içermez', async () => {
+        const list = await request(app).get('/api/companies').expect(200);
+        const salon = list.body.data.find((c: any) => c.id === ids.salon);
+        expect(salon).toMatchObject({ name: 'Kuaför Test', slot_interval: 30 });
+        list.body.data.forEach(expectNoSecrets);
+
+        const detail = await request(app).get(`/api/companies/${ids.salon}`).expect(200);
+        expect(detail.body.data).toMatchObject({ id: ids.salon, name: 'Kuaför Test' });
+        expectNoSecrets(detail.body.data);
+    });
+
+    it('board anahtarı ve personel girişi firmanın anahtarlarını döndürmez', async () => {
+        const board = await request(app).post('/api/companies/board-login').send({ board_key: 'brd-gizli' }).expect(200);
+        expect(board.body.data).toMatchObject({ id: ids.salon, is_license_expired: false });
+        expectNoSecrets(board.body.data);
+        await request(app).post('/api/companies/board-login').send({ key: 'BRD-GIZLI' }).expect(200);
+        await request(app).post('/api/companies/board-login').send({ board_key: 'YANLIS' }).expect(401);
+
+        await pool.query(`UPDATE users SET board_code = 'PRS-AYSE' WHERE id = $1`, [ids.ayse]);
+        const staffLogin = await request(app).post('/api/companies/staff-login').send({ board_code: 'PRS-AYSE' }).expect(200);
+        expectNoSecrets(staffLogin.body.data.company);
+    });
+
+    it('detayın tamamını sadece süper admin ve firmanın kendi admini görür', async () => {
+        const superAdmin = await tokenFor({ userId: 1, role: 'super_admin' });
+        const full = await request(app).get(`/api/companies/${ids.salon}`).set('Authorization', `Bearer ${superAdmin}`).expect(200);
+        expect(full.body.data.admin_key).toBe('ADM-GIZLI');
+
+        const ownAdmin = await tokenFor({ userId: 1, role: 'company_admin', companyId: ids.salon });
+        const own = await request(app).get(`/api/companies/${ids.salon}`).set('Authorization', `Bearer ${ownAdmin}`).expect(200);
+        expect(own.body.data.board_key).toBe('BRD-GIZLI');
+
+        const otherAdmin = await tokenFor({ userId: 1, role: 'company_admin', companyId: ids.pitchCo });
+        const other = await request(app).get(`/api/companies/${ids.salon}`).set('Authorization', `Bearer ${otherAdmin}`).expect(200);
+        expectNoSecrets(other.body.data);
+
+        const staffToken = await tokenFor({ userId: ids.ayse, role: 'staff', companyId: ids.salon });
+        const asStaff = await request(app).get(`/api/companies/${ids.salon}`).set('Authorization', `Bearer ${staffToken}`).expect(200);
+        expectNoSecrets(asStaff.body.data);
+    });
+});
+
 describe('class modu (pilates)', () => {
     it('8 kişilik seans dolana kadar kayıt alır, sonra reddeder', async () => {
         const { ids: sessionIds } = await booking.createClassSessions({

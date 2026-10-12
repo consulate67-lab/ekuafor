@@ -579,3 +579,28 @@ class CompanyService {
 }
 
 export default new CompanyService();
+
+/**
+ * Herkese açık uçlarda dönülebilecek firma alanları. Anahtarlar (admin/board), e-fatura giriş bilgileri,
+ * banka/vergi bilgileri ve doğrulama kodu burada OLMAMALI; yeni alan eklerken bunu kontrol edin.
+ */
+const PUBLIC_COMPANY_FIELDS = [
+    'id', 'name', 'description', 'phone', 'email', 'website', 'photo',
+    'address_line', 'address_line2', 'city', 'district', 'neighborhood', 'postal_code',
+    'province_name', 'district_name', 'neighborhood_name', 'latitude', 'longitude',
+    'work_start_time', 'work_end_time', 'slot_interval', 'genders', 'booking_flow',
+    'staff_label', 'service_label', 'rating_avg', 'review_count', 'is_active', 'is_verified',
+    'service_count', 'staff_count', 'license_end_date', 'distance',
+] as const;
+
+export const isLicenseExpired = (company: { license_end_date?: string | Date | null }) =>
+    !!company.license_end_date && new Date(company.license_end_date) < new Date();
+
+export const toPublicCompany = (company: Record<string, any>) => {
+    const out: Record<string, unknown> = {};
+    for (const key of PUBLIC_COMPANY_FIELDS) {
+        if (key in company) out[key] = company[key];
+    }
+    out.is_license_expired = isLicenseExpired(company);
+    return out;
+};
