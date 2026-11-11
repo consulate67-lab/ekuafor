@@ -15,6 +15,7 @@ import expenseRoutes from './expense.routes';
 import kvkkRoutes from './kvkk.routes';
 import sectorRoutes from './sector.routes';
 import bookingRoutes from './booking.routes';
+import tabletRoutes from './tablet.routes';
 
 const commonPing = (req: Request, res: Response) => res.json({
     status: 'pong',
@@ -65,6 +66,7 @@ export const mountRoutes = (app: Express) => {
     app.use('/api/kvkk', kvkkRoutes);
     app.use('/api', sectorRoutes);
     app.use('/api', bookingRoutes);
+    app.use('/api', tabletRoutes);
 
     // 404 Catch-all
     app.all('*', (req: Request, res: Response) => {

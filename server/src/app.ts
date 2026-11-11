@@ -39,6 +39,8 @@ export const createApp = (): Express => {
         'https://localhost',       // Capacitor Android (androidScheme:'https')
         'capacitor://localhost',   // Capacitor iOS (default)
         'http://localhost',        // Capacitor Android (eski default)
+        'http://localhost:5180',   // tablet workspace (vite)
+        'http://127.0.0.1:5180',
         'app://.',                 // Capacitor bazı versiyonlar
     ];
 
@@ -81,7 +83,7 @@ export const createApp = (): Express => {
         },
         credentials: false,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'X-No-Mock', 'X-Company-Id', 'X-Board-Key', 'X-Report-Key'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-No-Mock', 'X-Company-Id', 'X-Board-Key', 'X-Report-Key', 'X-Device-Id'],
     }));
 
     // === Rate limit — global ===
