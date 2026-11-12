@@ -44,19 +44,44 @@ function adminAuthorized(req: Request): boolean {
     return !!secret && header === secret;
 }
 
+async function insertActivationKey(createdBy: string): Promise<string> {
+    await ensureTabletTables();
+    const key = makeKey();
+    await pool.query(
+        `INSERT INTO tablet_activation_keys (key_code, created_by, meta) VALUES ($1, $2, $3::jsonb)`,
+        [key, createdBy.slice(0, 80), JSON.stringify({ source: createdBy })],
+    );
+    return key;
+}
+
+async function telegramSend(chatId: number | string, text: string) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) return;
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text }),
+    });
+}
+
+function telegramAllowed(chatId: number | string): boolean {
+    const raw = String(process.env.TELEGRAM_ALLOWED_CHAT_IDS || '').trim();
+    if (!raw) return true;
+    return raw
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+        .includes(String(chatId));
+}
+
 /** Telegram bot / admin: yeni kurulum anahtarı üret */
 router.post('/tablet/keys', async (req: Request, res: Response) => {
     try {
         if (!adminAuthorized(req)) {
             return res.status(401).json({ success: false, error: 'Yetkisiz' });
         }
-        await ensureTabletTables();
-        const key = makeKey();
         const createdBy = String(req.body?.createdBy || 'api').slice(0, 80);
-        await pool.query(
-            `INSERT INTO tablet_activation_keys (key_code, created_by, meta) VALUES ($1, $2, $3::jsonb)`,
-            [key, createdBy, JSON.stringify({ source: createdBy })],
-        );
+        const key = await insertActivationKey(createdBy);
         res.json({
             success: true,
             data: { key, status: 'unused', created_at: new Date().toISOString() },
@@ -64,6 +89,53 @@ router.post('/tablet/keys', async (req: Request, res: Response) => {
     } catch (error) {
         console.error('[tablet/keys]', error);
         res.status(500).json({ success: false, error: 'Anahtar üretilemedi' });
+    }
+});
+
+/**
+ * Telegram webhook: /start /key /yeni
+ * setWebhook → https://…/api/tablet/telegram/webhook
+ */
+router.post('/tablet/telegram/webhook', async (req: Request, res: Response) => {
+    try {
+        const msg = req.body?.message;
+        const chatId = msg?.chat?.id;
+        const text = String(msg?.text || '').trim();
+        res.json({ ok: true });
+        if (!chatId || !text) return;
+
+        if (!telegramAllowed(chatId)) {
+            await telegramSend(chatId, 'Bu botu kullanma yetkiniz yok.');
+            return;
+        }
+
+        const cmd = text.split(/\s+/)[0].toLowerCase();
+        if (cmd === '/start') {
+            await telegramSend(
+                chatId,
+                'Saloon Tablet kurulum botu.\nYeni anahtar için: /key veya /yeni',
+            );
+            return;
+        }
+        if (cmd === '/key' || cmd === '/yeni') {
+            try {
+                const key = await insertActivationKey(`tg:${chatId}`);
+                await telegramSend(
+                    chatId,
+                    `Kurulum anahtarı (bir cihaz):\n\n${key}\n\nTablette kurulumda bu kodu girin. İnternet gerekli.`,
+                );
+            } catch (e) {
+                await telegramSend(
+                    chatId,
+                    `Anahtar üretilemedi: ${e instanceof Error ? e.message : e}`,
+                );
+            }
+            return;
+        }
+        await telegramSend(chatId, 'Komutlar: /start  /key  /yeni');
+    } catch (error) {
+        console.error('[tablet/telegram/webhook]', error);
+        if (!res.headersSent) res.json({ ok: true });
     }
 });
 
