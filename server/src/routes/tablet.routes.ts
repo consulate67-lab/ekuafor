@@ -393,12 +393,18 @@ router.post('/tablet/setup/finalize', async (req: Request, res: Response) => {
                 const deptLocal = String(st.departmentId || '');
                 const departmentId = (deptLocal && deptMap.get(deptLocal)) || defaultDeptId;
 
+                const photoRaw = typeof st.photo === 'string' ? st.photo.trim() : '';
+                const photo =
+                    photoRaw.startsWith('data:image/') || photoRaw.startsWith('https://') || photoRaw.startsWith('http://')
+                        ? photoRaw.slice(0, 2_000_000)
+                        : null;
+
                 await client.query(
                     `INSERT INTO users (
                         email, password, role, first_name, last_name, phone,
-                        company_id, is_active, board_code, department_id, title
-                     ) VALUES ($1, $2, 'staff', $3, $4, $5, $6, true, $7, $8, $9)`,
-                    [email, fakePw, firstName, lastName, phone, companyId, boardCode, departmentId, title],
+                        company_id, is_active, board_code, department_id, title, photo
+                     ) VALUES ($1, $2, 'staff', $3, $4, $5, $6, true, $7, $8, $9, $10)`,
+                    [email, fakePw, firstName, lastName, phone, companyId, boardCode, departmentId, title, photo],
                 );
             }
 
@@ -695,6 +701,55 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
         res.status(500).json({
             success: false,
             error: error instanceof Error ? error.message : 'Profil güncellenemedi',
+        });
+    }
+});
+
+/** Tablet → çalışan fotoğraflarını merkez users.photo alanına yazar */
+router.patch('/tablet/company/staff-photos', async (req: Request, res: Response) => {
+    try {
+        const deviceId = String(req.header('X-Device-Id') || req.body?.deviceId || '').slice(0, 80);
+        const activationKey = String(req.header('X-Activation-Key') || req.body?.activationKey || '');
+        const companyId = Number(req.body?.companyId);
+        const access = await assertTabletCompanyAccess(deviceId, activationKey, companyId);
+        if (!access.ok) {
+            return res.status(access.status).json({ success: false, error: access.error });
+        }
+
+        const staffIn = Array.isArray(req.body?.staff) ? req.body.staff : [];
+        let updated = 0;
+        for (const st of staffIn) {
+            const firstName = String(st.firstName || '').trim();
+            const lastName = String(st.lastName || '').trim();
+            const photoRaw = typeof st.photo === 'string' ? st.photo.trim() : '';
+            if (!firstName || !lastName || !photoRaw) continue;
+            const photo =
+                photoRaw.startsWith('data:image/') || photoRaw.startsWith('https://') || photoRaw.startsWith('http://')
+                    ? photoRaw.slice(0, 2_000_000)
+                    : null;
+            if (!photo) continue;
+            const r = await pool.query(
+                `UPDATE users
+                 SET photo = $1
+                 WHERE company_id = $2
+                   AND role = 'staff'
+                   AND lower(first_name) = lower($3)
+                   AND lower(last_name) = lower($4)`,
+                [photo, companyId, firstName, lastName],
+            );
+            updated += r.rowCount || 0;
+        }
+
+        res.json({
+            success: true,
+            message: updated ? `${updated} çalışan fotoğrafı güncellendi` : 'Güncellenecek fotoğraf yok',
+            data: { updated },
+        });
+    } catch (error) {
+        console.error('[tablet/company/staff-photos]', error);
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Fotoğraflar güncellenemedi',
         });
     }
 });

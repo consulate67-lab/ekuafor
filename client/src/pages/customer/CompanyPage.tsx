@@ -361,25 +361,41 @@ function CompanyPage({ id }: { id: number }) {
                     <section>
                         <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">{labels.staffPlural}</h2>
                         <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 hide-scrollbar">
-                            {team.map(m => (
-                                introMode ? (
-                                    <div key={m.id} className="shrink-0 w-24 text-center">
-                                        <div className="w-16 h-16 mx-auto rounded-full bg-white border border-slate-100 shadow-sm overflow-hidden flex items-center justify-center text-lg font-black text-slate-500">
-                                            {m.photo ? <img src={m.photo} alt="" className="w-full h-full object-cover" /> : `${m.first_name[0] || ''}${m.last_name[0] || ''}`}
-                                        </div>
-                                        <p className="mt-1.5 text-xs font-bold text-slate-700 truncate">{m.first_name} {m.last_name}</p>
+                            {team.map(m => {
+                                const initials = `${m.first_name?.[0] || ''}${m.last_name?.[0] || ''}`.toLocaleUpperCase('tr-TR');
+                                const avatar = (
+                                    <div
+                                        className="mx-auto overflow-hidden rounded-full border-2 shadow-md"
+                                        style={{
+                                            width: introMode ? 72 : 64,
+                                            height: introMode ? 72 : 64,
+                                            borderColor: theme.accentSoft,
+                                            background: `linear-gradient(145deg, ${theme.heroFrom}, ${theme.heroTo})`,
+                                        }}
+                                    >
+                                        {m.photo ? (
+                                            <img src={m.photo} alt={`${m.first_name} ${m.last_name}`} className="h-full w-full object-cover" />
+                                        ) : (
+                                            <div className="flex h-full w-full items-center justify-center text-base font-black text-white">
+                                                {initials}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                                return introMode ? (
+                                    <div key={m.id} className="shrink-0 w-28 text-center">
+                                        {avatar}
+                                        <p className="mt-2 text-xs font-bold text-slate-800 truncate">{m.first_name} {m.last_name}</p>
                                         {m.title && <p className="text-[10px] font-semibold text-slate-400 truncate">{m.title}</p>}
                                     </div>
                                 ) : (
-                                    <button key={m.id} type="button" onClick={() => book(`?staff=${m.id}`)} className="shrink-0 w-24 text-center">
-                                        <div className="w-16 h-16 mx-auto rounded-full bg-white border border-slate-100 shadow-sm overflow-hidden flex items-center justify-center text-lg font-black text-slate-500">
-                                            {m.photo ? <img src={m.photo} alt="" className="w-full h-full object-cover" /> : `${m.first_name[0] || ''}${m.last_name[0] || ''}`}
-                                        </div>
-                                        <p className="mt-1.5 text-xs font-bold text-slate-700 truncate">{m.first_name} {m.last_name}</p>
+                                    <button key={m.id} type="button" onClick={() => book(`?staff=${m.id}`)} className="shrink-0 w-28 text-center">
+                                        {avatar}
+                                        <p className="mt-2 text-xs font-bold text-slate-800 truncate">{m.first_name} {m.last_name}</p>
                                         {m.title && <p className="text-[10px] font-semibold text-slate-400 truncate">{m.title}</p>}
                                     </button>
-                                )
-                            ))}
+                                );
+                            })}
                         </div>
                     </section>
                 )}
