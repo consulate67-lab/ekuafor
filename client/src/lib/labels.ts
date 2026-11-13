@@ -13,24 +13,27 @@ export interface Labels {
 }
 
 const BASE: Labels = {
-    staff: 'Uzman', staffPlural: 'Uzmanlar',
+    staff: 'Çalışan', staffPlural: 'Çalışanlarımız',
     service: 'Hizmet', servicePlural: 'Hizmetler',
     resource: 'Alan', resourcePlural: 'Alanlar',
 };
 
+/** Tüm sektörlerde ekip başlığı: Çalışanlarımız */
 const BY_SECTOR: Record<string, Partial<Labels>> = {
-    barber: { staff: 'Berber', staffPlural: 'Berberler' },
-    pilates_yoga: { staff: 'Eğitmen', staffPlural: 'Eğitmenler', service: 'Ders', servicePlural: 'Dersler', resource: 'Salon', resourcePlural: 'Salonlar' },
-    fitness: { staff: 'Eğitmen', staffPlural: 'Eğitmenler', service: 'Ders', servicePlural: 'Dersler', resource: 'Salon', resourcePlural: 'Salonlar' },
-    pool: { staff: 'Eğitmen', staffPlural: 'Eğitmenler', resource: 'Kulvar', resourcePlural: 'Kulvarlar' },
-    sports_facility: { staff: 'Görevli', staffPlural: 'Görevliler', service: 'Kiralama', servicePlural: 'Kiralamalar', resource: 'Saha', resourcePlural: 'Sahalar' },
-    wellness: { staff: 'Terapist', staffPlural: 'Terapistler', resource: 'Oda', resourcePlural: 'Odalar' },
-    medical: { staff: 'Doktor', staffPlural: 'Doktorlar', service: 'Muayene', servicePlural: 'Muayeneler', resource: 'Oda', resourcePlural: 'Odalar' },
-    dental: { staff: 'Doktor', staffPlural: 'Doktorlar', service: 'Tedavi', servicePlural: 'Tedaviler', resource: 'Ünit', resourcePlural: 'Ünitler' },
-    plastic_surgery: { staff: 'Doktor', staffPlural: 'Doktorlar', service: 'İşlem', servicePlural: 'İşlemler', resource: 'Oda', resourcePlural: 'Odalar' },
-    physio: { staff: 'Fizyoterapist', staffPlural: 'Fizyoterapistler', service: 'Seans', servicePlural: 'Seanslar', resource: 'Oda', resourcePlural: 'Odalar' },
-    podiatry: { staff: 'Uzman', staffPlural: 'Uzmanlar', resource: 'Kabin', resourcePlural: 'Kabinler' },
-    veterinary: { staff: 'Veteriner', staffPlural: 'Veterinerler', service: 'Muayene', servicePlural: 'Muayeneler' },
+    barber: {},
+    hair: {},
+    beauty: {},
+    pilates_yoga: { service: 'Ders', servicePlural: 'Dersler', resource: 'Salon', resourcePlural: 'Salonlar' },
+    fitness: { service: 'Ders', servicePlural: 'Dersler', resource: 'Salon', resourcePlural: 'Salonlar' },
+    pool: { resource: 'Kulvar', resourcePlural: 'Kulvarlar' },
+    sports_facility: { service: 'Kiralama', servicePlural: 'Kiralamalar', resource: 'Saha', resourcePlural: 'Sahalar' },
+    wellness: { resource: 'Oda', resourcePlural: 'Odalar' },
+    medical: { service: 'Muayene', servicePlural: 'Muayeneler', resource: 'Oda', resourcePlural: 'Odalar' },
+    dental: { service: 'Tedavi', servicePlural: 'Tedaviler', resource: 'Ünit', resourcePlural: 'Ünitler' },
+    plastic_surgery: { service: 'İşlem', servicePlural: 'İşlemler', resource: 'Oda', resourcePlural: 'Odalar' },
+    physio: { service: 'Seans', servicePlural: 'Seanslar', resource: 'Oda', resourcePlural: 'Odalar' },
+    podiatry: { resource: 'Kabin', resourcePlural: 'Kabinler' },
+    veterinary: { service: 'Muayene', servicePlural: 'Muayeneler' },
 };
 
 /**
