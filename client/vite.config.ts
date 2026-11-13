@@ -1,9 +1,15 @@
+import path from 'path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
     plugins: [react()],
     base: './',
+    resolve: {
+        alias: {
+            '@shared': path.resolve(__dirname, '../shared'),
+        },
+    },
     server: {
         port: 5173,
         proxy: {
@@ -14,10 +20,7 @@ export default defineConfig({
         }
     },
     build: {
-        // Pages are lazy-loaded via React.lazy, each becomes its own chunk.
-        // This config separates the rest into well-known vendor chunks so the
-        // initial bundle stays small and cache-friendly across deploys.
-        chunkSizeWarningLimit: 1500,  // 1.5 MB uyarı eşiği (eski: 500 KB)
+        chunkSizeWarningLimit: 1500,
         rollupOptions: {
             output: {
                 manualChunks: {

@@ -8,6 +8,7 @@ import { Button, EmptyState, SectorIcon, Spinner } from '../../components/ui';
 import { useFavorites } from '../../hooks/useFavorites';
 import { getPosition, hasLocationPermission, type LatLng } from '../../lib/geo';
 import { useAuthStore } from '../../store/authStore';
+import { getPinnedCompanyId } from '../../lib/pinnedCompany';
 
 const PAGE_SIZE = 20;
 /** Cinsiyet filtresi sadece bu sektörlerde anlamlı. */
@@ -44,6 +45,13 @@ export default function CustomerHome() {
     useEffect(() => {
         if (isAuthenticated && user && user.role !== 'customer') navigate('/dashboard', { replace: true });
     }, [isAuthenticated, user, navigate]);
+
+    /** Ana ekran kısayolu / QR pin: keşfet yerine sadece o firma */
+    useEffect(() => {
+        const pinned = getPinnedCompanyId();
+        if (!pinned) return;
+        navigate(`/firma/${pinned}?ref=qr&home=1`, { replace: true });
+    }, [navigate]);
 
     useEffect(() => {
         sectorsApi.list().then(setSectors).catch(() => setSectors([]));

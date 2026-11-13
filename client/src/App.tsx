@@ -1,5 +1,5 @@
 import { useEffect, lazy, Suspense } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { App as CapApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useAuthStore } from './store/authStore';
@@ -7,6 +7,35 @@ import api from './lib/api';
 import { useAppointmentSync } from './hooks/useAppointmentSync';
 import { FullScreenLoader } from './components/ui';
 import { homePathFor } from './lib/routes';
+
+/** QR kısa yol: /#/42 → /#/firma/42?ref=qr */
+function CompanyIdRedirect() {
+    const { id } = useParams<{ id: string }>();
+    if (!id || !/^\d+$/.test(id)) return <Navigate to="/app" replace />;
+    return <Navigate to={`/firma/${id}?ref=qr`} replace />;
+}
+
+/**
+ * Eski QR / doğrudan #/book/:id açılışlarını tanıtım sayfasına çevirir.
+ * Randevu sihirbazı yalnızca firma sayfasından (from=site) veya personel derin linkinden açılır.
+ */
+function BookingEntry() {
+    const { id } = useParams<{ id: string }>();
+    const [params] = useSearchParams();
+    const location = useLocation();
+    const { user } = useAuthStore();
+    const companyId = Number(id);
+    const isBusiness =
+        !!user && ['company_admin', 'staff'].includes(user.role) && Number(user.company_id) === companyId;
+    const fromCompany =
+        params.get('from') === 'site' ||
+        (location.state as { fromCompany?: boolean } | null)?.fromCompany === true;
+    const deepLink = !!(params.get('staff') || params.get('service'));
+    if (!isBusiness && !fromCompany && !deepLink) {
+        return <Navigate to={`/firma/${id}?ref=qr`} replace />;
+    }
+    return <BookingPage />;
+}
 
 /**
  * Lazy-loaded page components.
@@ -185,7 +214,9 @@ function App() {
                     />
                     <Route path="/isletme" element={<BusinessApp />} />
                     <Route path="/firma/:id" element={<CompanyPage />} />
-                    <Route path="/book/:id" element={<BookingPage />} />
+                    <Route path="/book/:id" element={<BookingEntry />} />
+                    {/* Kısa QR yolu: /#/123 → firma tanıtım sayfası */}
+                    <Route path="/:id" element={<CompanyIdRedirect />} />
                     <Route path="/my-appointments" element={<MyAppointments />} />
                     <Route path="/my-notifications" element={<MyNotifications />} />
                     <Route path="/login" element={<Login />} />

@@ -36,6 +36,8 @@ export interface PublicCompany {
     distance_km?: number | null;
     primary_sector?: SectorBadge | null;
     sectors?: SectorBadge[];
+    /** Sektör web şablonu — örn. hair-03 */
+    web_template_id?: string | null;
 }
 
 export interface CompanyListParams {

@@ -5,6 +5,7 @@ import { Service, Company, BookingMode, Availability, ClassSession } from '../ty
 import { useAuthStore } from '../store/authStore';
 import { App } from '@capacitor/app';
 import { getDeviceId } from '../lib/device';
+import { loadVisitorProfile, visitorFullName } from '../lib/visitorProfile';
 
 type StepKey = 'service' | 'staff' | 'duration' | 'date' | 'time' | 'session' | 'confirm';
 
@@ -70,16 +71,23 @@ function BookingPage({ id }: { id: string }) {
     const [loading, setLoading] = useState(true);
 
     const [stepIndex, setStepIndex] = useState(0);
-    const [selection, setSelection] = useState<SelectionState>({
-        serviceIds: [],
-        staffId: initialStaffId,
-        duration: null,
-        date: null,
-        time: null,
-        sessionId: null,
-        partySize: 1,
-        customerName: user && !isBusiness ? `${user.first_name} ${user.last_name || ''}`.trim() : '',
-        customerPhone: isBusiness ? '' : user?.phone || '',
+    const [selection, setSelection] = useState<SelectionState>(() => {
+        const fromVisitor = !isBusiness ? loadVisitorProfile() : null;
+        return {
+            serviceIds: [],
+            staffId: initialStaffId,
+            duration: null,
+            date: null,
+            time: null,
+            sessionId: null,
+            partySize: 1,
+            customerName: user && !isBusiness
+                ? `${user.first_name} ${user.last_name || ''}`.trim()
+                : fromVisitor
+                    ? visitorFullName(fromVisitor)
+                    : '',
+            customerPhone: isBusiness ? '' : user?.phone || fromVisitor?.phone || '',
+        };
     });
     const [availability, setAvailability] = useState<Availability | null>(null);
     const [sessions, setSessions] = useState<ClassSession[]>([]);
@@ -134,9 +142,11 @@ function BookingPage({ id }: { id: string }) {
     const goNext = useCallback(() => setStepIndex(i => Math.min(i + 1, steps.length - 1)), [steps.length]);
     const goBack = useCallback(() => {
         setError(null);
-        if (stepIndex === 0) navigate(-1);
-        else setStepIndex(i => i - 1);
-    }, [stepIndex, navigate]);
+        if (stepIndex === 0) {
+            if (!isBusiness) navigate(`/firma/${companyId}`, { replace: true });
+            else navigate(-1);
+        } else setStepIndex(i => i - 1);
+    }, [stepIndex, navigate, isBusiness, companyId]);
 
     useEffect(() => {
         const handler = App.addListener('backButton', goBack);
@@ -144,11 +154,21 @@ function BookingPage({ id }: { id: string }) {
     }, [goBack]);
 
     useEffect(() => {
-        if (!user || isBusiness) return;
+        if (isBusiness) return;
+        if (user) {
+            setSelection(prev => ({
+                ...prev,
+                customerName: prev.customerName || `${user.first_name} ${user.last_name || ''}`.trim(),
+                customerPhone: prev.customerPhone || user.phone || '',
+            }));
+            return;
+        }
+        const v = loadVisitorProfile();
+        if (!v) return;
         setSelection(prev => ({
             ...prev,
-            customerName: prev.customerName || `${user.first_name} ${user.last_name || ''}`.trim(),
-            customerPhone: prev.customerPhone || user.phone || '',
+            customerName: prev.customerName || visitorFullName(v),
+            customerPhone: prev.customerPhone || v.phone,
         }));
     }, [user, isBusiness]);
 
@@ -310,7 +330,15 @@ function BookingPage({ id }: { id: string }) {
                     {company?.phone && (
                         <a href={`tel:${formatDialNumber(company.phone)}`} className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest">Firmayı Ara</a>
                     )}
-                    <button onClick={() => navigate(-1)} className="w-full bg-slate-100 text-slate-500 py-4 rounded-2xl font-black uppercase tracking-widest">Geri Dön</button>
+                    <button
+                        onClick={() => {
+                            if (isBusiness) navigate(-1);
+                            else navigate(`/firma/${companyId}`);
+                        }}
+                        className="w-full bg-slate-100 text-slate-500 py-4 rounded-2xl font-black uppercase tracking-widest"
+                    >
+                        Geri Dön
+                    </button>
                 </div>
             </div>
         );

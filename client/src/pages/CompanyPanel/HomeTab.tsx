@@ -123,7 +123,7 @@ export function BookingQRTab({ ctx }: { ctx: Ctx }) {
                                 </div>
 
                                 <p className="text-slate-500 text-sm mb-6 max-w-xs mx-auto">
-                                    Bu QR kodu müşterilerinize gösterin veya yazdırıp dükkanınıza asın. Taratarak doğrudan randevu alabilirler.
+                                    Bu QR kodu müşterilerinize gösterin veya yazdırıp dükkanınıza asın. Taratınca firma tanıtım sayfası açılır; oradan randevu alınır.
                                 </p>
 
                                 {/* Real QR Code */}
@@ -135,7 +135,7 @@ export function BookingQRTab({ ctx }: { ctx: Ctx }) {
                                     />
                                 </div>
 
-                                <p className="text-xs text-slate-400 mb-2">Müşterileriniz bu QR'ı taratarak randevu alabilir</p>
+                                <p className="text-xs text-slate-400 mb-2">Müşterileriniz bu QR'ı taratarak tanıtım sayfasını açar</p>
                                 <p className="text-[10px] text-slate-300 font-mono break-all px-4">{bookingUrl}</p>
 
                                 <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6">

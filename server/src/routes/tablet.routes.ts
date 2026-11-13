@@ -270,22 +270,55 @@ router.post('/tablet/setup/finalize', async (req: Request, res: Response) => {
         try {
             await client.query('BEGIN');
 
+            const webPage =
+                companyIn.webPage && typeof companyIn.webPage === 'object' ? companyIn.webPage : {};
+            const description = String(
+                companyIn.description || webPage.about || '',
+            ).trim() || null;
+            const phone = String(companyIn.phone || webPage.phone || '').trim() || null;
+            const email = String(companyIn.email || webPage.email || '').trim() || null;
+            const website = String(companyIn.website || webPage.website || '').trim() || null;
+            const addressLine =
+                String(companyIn.address_line || webPage.address || '').trim() || null;
+            const city = String(companyIn.city || webPage.city || '').trim() || null;
+            const district = String(companyIn.district || webPage.district || '').trim() || null;
+            const webTemplateId = String(
+                companyIn.web_template_id || webPage.templateId || '',
+            )
+                .trim()
+                .slice(0, 64) || null;
+
+            await client.query(
+                `ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_template_id VARCHAR(64)`,
+            );
+
             const ins = await client.query(
                 `INSERT INTO companies (
-                    name, latitude, longitude,
+                    name, description, phone, email, website,
+                    address_line, city, district, latitude, longitude,
                     is_active, is_verified, board_key, admin_key,
                     work_start_time, work_end_time, slot_interval,
                     genders, company_type, booking_flow, verification_code,
-                    license_status, license_end_date, sms_enabled, payment_enabled, commission_rate
+                    license_status, license_end_date, sms_enabled, payment_enabled, commission_rate,
+                    web_template_id
                  ) VALUES (
-                    $1, $2, $3,
-                    true, true, $4, $5,
-                    $6, $7, $8,
-                    $9::text[], 'ASIL', 'SPDT', $10,
-                    'active', $11, true, false, 0
+                    $1, $2, $3, $4, $5,
+                    $6, $7, $8, $9, $10,
+                    true, true, $11, $12,
+                    $13, $14, $15,
+                    $16::text[], 'ASIL', 'SPDT', $17,
+                    'active', $18, true, false, 0,
+                    $19
                  ) RETURNING id`,
                 [
                     companyName,
+                    description,
+                    phone,
+                    email,
+                    website,
+                    addressLine,
+                    city,
+                    district,
                     lat,
                     lng,
                     boardKey,
@@ -296,6 +329,7 @@ router.post('/tablet/setup/finalize', async (req: Request, res: Response) => {
                     [],
                     verificationCode,
                     licenseEnd.toISOString(),
+                    webTemplateId,
                 ],
             );
             companyId = ins.rows[0].id;
@@ -505,6 +539,165 @@ async function assertTabletCompanyAccess(
     }
     return { ok: true };
 }
+
+/** Hakkında metni — OPENAI_API_KEY varsa GPT, yoksa yerel şablon */
+router.post('/tablet/ai/about', async (req: Request, res: Response) => {
+    try {
+        const prompt = String(req.body?.prompt || '').trim().slice(0, 800);
+        const companyName = String(req.body?.companyName || 'İşletme').trim().slice(0, 120);
+        const sectorName = String(req.body?.sectorName || 'hizmet').trim().slice(0, 80);
+        const hours = String(req.body?.hours || '').trim().slice(0, 40);
+        const city = String(req.body?.city || '').trim().slice(0, 80);
+        const district = String(req.body?.district || '').trim().slice(0, 80);
+
+        const openaiKey = String(process.env.OPENAI_API_KEY || '').trim();
+        if (openaiKey) {
+            const system =
+                'Türkçe, kısa (2-4 cümle) firma “Hakkında” metni yaz. Abartısız, samimi, profesyonel. Sadece metni döndür.';
+            const user = [
+                `Firma: ${companyName}`,
+                `Sektör: ${sectorName}`,
+                hours ? `Mesai: ${hours}` : '',
+                city || district ? `Konum: ${[district, city].filter(Boolean).join(', ')}` : '',
+                `İpuçları: ${prompt || 'hijyen, randevu, kaliteli hizmet'}`,
+            ]
+                .filter(Boolean)
+                .join('\n');
+
+            const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${openaiKey}`,
+                },
+                body: JSON.stringify({
+                    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+                    temperature: 0.7,
+                    max_tokens: 280,
+                    messages: [
+                        { role: 'system', content: system },
+                        { role: 'user', content: user },
+                    ],
+                }),
+            });
+            const aiData = (await aiRes.json().catch(() => ({}))) as {
+                choices?: { message?: { content?: string } }[];
+                error?: { message?: string };
+            };
+            const text = aiData?.choices?.[0]?.message?.content?.trim();
+            if (aiRes.ok && text) {
+                return res.json({ success: true, message: 'AI metin hazır', data: { text } });
+            }
+            console.warn('[tablet/ai/about] openai fallback', aiData?.error?.message || aiRes.status);
+        }
+
+        const bits = (prompt || 'hijyen, randevu, kaliteli hizmet')
+            .split(/[,;|/]+/)
+            .map((s: string) => s.trim())
+            .filter(Boolean);
+        const lead = `${companyName}, ${sectorName.toLocaleLowerCase('tr')} alanında ${
+            bits.slice(0, 3).join(', ') || 'güvenilir hizmet'
+        } odaklı çalışır.`;
+        const mid =
+            bits.length > 3
+                ? ` ${bits.slice(3).join(', ')} ile misafirlerine özenli bir deneyim sunar.`
+                : ' Hijyen, randevu düzeni ve samimi iletişim önceliğidir.';
+        const loc =
+            city || district
+                ? ` ${[district, city].filter(Boolean).join(', ')} bölgesinde hizmet verir.`
+                : '';
+        const hourBit = hours ? ` Çalışma saatleri ${hours}.` : '';
+        const text = `${lead}${mid}${loc}${hourBit}`.replace(/\s+/g, ' ').trim();
+        res.json({ success: true, message: 'Metin üretildi', data: { text } });
+    } catch (error) {
+        console.error('[tablet/ai/about]', error);
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Metin üretilemedi',
+        });
+    }
+});
+
+/** Tablet → firma web sayfası alanları (hakkında / iletişim) */
+router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
+    try {
+        const deviceId = String(req.header('X-Device-Id') || req.body?.deviceId || '').slice(0, 80);
+        const activationKey = String(req.header('X-Activation-Key') || req.body?.activationKey || '');
+        const companyId = Number(req.body?.companyId);
+        const access = await assertTabletCompanyAccess(deviceId, activationKey, companyId);
+        if (!access.ok) {
+            return res.status(access.status).json({ success: false, error: access.error });
+        }
+
+        const profile = req.body?.profile && typeof req.body.profile === 'object' ? req.body.profile : {};
+        const description =
+            profile.description != null ? String(profile.description).trim().slice(0, 4000) : null;
+        const phone = profile.phone != null ? String(profile.phone).replace(/\D/g, '').slice(0, 20) : null;
+        const email = profile.email != null ? String(profile.email).trim().slice(0, 200) : null;
+        const website = profile.website != null ? String(profile.website).trim().slice(0, 300) : null;
+        const addressLine =
+            profile.address_line != null ? String(profile.address_line).trim().slice(0, 300) : null;
+        const city = profile.city != null ? String(profile.city).trim().slice(0, 100) : null;
+        const district = profile.district != null ? String(profile.district).trim().slice(0, 100) : null;
+        const webTemplateId =
+            profile.web_template_id != null
+                ? String(profile.web_template_id).trim().slice(0, 64)
+                : null;
+        const sectorSlugs: string[] = Array.isArray(profile.sector_slugs)
+            ? profile.sector_slugs.map((s: unknown) => String(s).trim()).filter(Boolean)
+            : [];
+
+        await pool.query(
+            `ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_template_id VARCHAR(64)`,
+        );
+
+        await pool.query(
+            `UPDATE companies SET
+                description = COALESCE($2, description),
+                phone = COALESCE(NULLIF($3, ''), phone),
+                email = COALESCE(NULLIF($4, ''), email),
+                website = COALESCE(NULLIF($5, ''), website),
+                address_line = COALESCE(NULLIF($6, ''), address_line),
+                city = COALESCE(NULLIF($7, ''), city),
+                district = COALESCE(NULLIF($8, ''), district),
+                web_template_id = COALESCE(NULLIF($9, ''), web_template_id),
+                updated_at = NOW()
+             WHERE id = $1`,
+            [
+                companyId,
+                description,
+                phone || null,
+                email || null,
+                website || null,
+                addressLine || null,
+                city || null,
+                district || null,
+                webTemplateId || null,
+            ],
+        );
+
+        if (sectorSlugs.length) {
+            await pool.query(`DELETE FROM company_sectors WHERE company_id = $1`, [companyId]);
+            for (let i = 0; i < sectorSlugs.length; i += 1) {
+                const slug = sectorSlugs[i];
+                await pool.query(
+                    `INSERT INTO company_sectors (company_id, sector_id, is_primary)
+                     SELECT $1, id, $3 FROM sectors WHERE slug = $2 AND is_active
+                     ON CONFLICT DO NOTHING`,
+                    [companyId, slug, i === 0],
+                );
+            }
+        }
+
+        res.json({ success: true, message: 'Web sayfası profili güncellendi', data: { company_id: companyId } });
+    } catch (error) {
+        console.error('[tablet/company/profile]', error);
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Profil güncellenemedi',
+        });
+    }
+});
 
 /** Onay bekleyen web randevuları */
 router.get('/tablet/appointments/pending', async (req: Request, res: Response) => {

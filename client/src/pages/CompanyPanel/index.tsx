@@ -941,7 +941,9 @@ const copyText = (text: string, field: string) => {
     setTimeout(() => setCopiedField(''), 2000);
 };
 
-const bookingUrl = company ? `${window.location.origin}/#/book/${company.id}?ref=qr` : '';
+const bookingUrl = company
+    ? `${window.location.origin}${window.location.pathname}#/firma/${company.id}?ref=qr`
+    : '';
 const qrApiUrl = (data: string, size = 200) =>
     `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}&color=1e1b4b&bgcolor=ffffff`;
 
