@@ -384,15 +384,58 @@ router.get('/:id', optionalCompanyAuth, async (req: Request, res: Response) => {
         const isOwnerOrAdmin = req.user?.role === 'super_admin'
             || (req.user?.role === 'company_admin' && canAccessCompany(req, id));
 
-        const extra = await pool.query(
-            `SELECT
-                COALESCE((SELECT json_agg(json_build_object('slug', sx.slug, 'name', sx.name_tr, 'icon', sx.icon, 'color', sx.color)
-                          ORDER BY cs.is_primary DESC, sx.display_order)
-                          FROM company_sectors cs JOIN sectors sx ON sx.id = cs.sector_id WHERE cs.company_id = $1), '[]'::json) AS sectors,
-                EXISTS (SELECT 1 FROM services s WHERE s.company_id = $1 AND s.is_active IS NOT FALSE) AS is_bookable`,
-            [id]
-        );
-        const { sectors, is_bookable } = extra.rows[0];
+        const loadSectors = async () => {
+            const extra = await pool.query(
+                `SELECT
+                    COALESCE((SELECT json_agg(json_build_object('slug', sx.slug, 'name', sx.name_tr, 'icon', sx.icon, 'color', sx.color)
+                              ORDER BY cs.is_primary DESC, sx.display_order)
+                              FROM company_sectors cs JOIN sectors sx ON sx.id = cs.sector_id WHERE cs.company_id = $1), '[]'::json) AS sectors,
+                    EXISTS (SELECT 1 FROM services s WHERE s.company_id = $1 AND s.is_active IS NOT FALSE) AS is_bookable`,
+                [id]
+            );
+            return extra.rows[0] as { sectors: any[]; is_bookable: boolean };
+        };
+
+        let { sectors, is_bookable } = await loadSectors();
+
+        // Sektörsüz firmalar (tablet demo / eski kayıt): ada göre berber/kuaför bağla
+        if (!Array.isArray(sectors) || sectors.length === 0) {
+            const name = String((company as any).name || '').toLocaleLowerCase('tr-TR');
+            let slug = 'barber';
+            if (/nail|tırnak|tirnak/.test(name)) slug = 'nails';
+            else if (/diş|dental/.test(name)) slug = 'dental';
+            else if (/pilates|yoga/.test(name)) slug = 'pilates_yoga';
+            else if (/berber|barber|kuaför|kuafor|saç|sac /.test(name)) slug = 'barber';
+            try {
+                await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_template_id VARCHAR(64)`);
+                await pool.query(
+                    `INSERT INTO company_sectors (company_id, sector_id, is_primary)
+                     SELECT $1, id, true FROM sectors WHERE slug = $2 AND is_active
+                     ON CONFLICT DO NOTHING`,
+                    [id, slug],
+                );
+                await pool.query(
+                    `UPDATE companies SET
+                        web_template_id = COALESCE(NULLIF(web_template_id, ''), $2),
+                        description = COALESCE(NULLIF(description, ''), $3),
+                        updated_at = NOW()
+                     WHERE id = $1`,
+                    [
+                        id,
+                        `${slug}-01`,
+                        slug === 'barber'
+                            ? 'Erkek kuaförümüzde saç kesimi, sakal tasarımı ve klasik tıraşı steril ekipmanla sunuyoruz. Online randevu ile size uygun saati seçin, beklemeden gelin.'
+                            : null,
+                    ],
+                );
+                const refreshed = await pool.query(`SELECT * FROM companies WHERE id = $1`, [id]);
+                if (refreshed.rows[0]) Object.assign(company as object, refreshed.rows[0]);
+                ({ sectors, is_bookable } = await loadSectors());
+            } catch (healErr) {
+                console.error('[companies/:id] sector heal failed', healErr);
+            }
+        }
+
         const enriched = { ...company, sectors, primary_sector: sectors[0] ?? null, is_bookable };
 
         res.json({

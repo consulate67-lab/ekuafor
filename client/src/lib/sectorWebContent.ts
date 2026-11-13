@@ -99,30 +99,31 @@ const BY_GROUP: Record<SectorLayoutGroup, SectorWebPack> = {
         ],
     },
     default: {
-        tagline: 'Randevu ve hizmet için yanınızdayız',
+        // Ofis görseli yok — varsayılan erkek kuaför / berber atmosferi
+        tagline: 'Zamansız stil, kusursuz bakım',
         aboutFallback:
-            'İşletmemiz, seçtiğiniz sektörde kaliteli hizmet ve kolay randevu deneyimi sunmak için buradayız.',
+            'Erkek bakımında saç kesimi, sakal ve klasik tıraş hizmetlerini hijyenik ortamda sunuyoruz. Online randevu ile size uygun saati seçin.',
         gallery: [
-            img('photo-1497366216548-37526070297c', 'İşletme alanı'),
-            img('photo-1497366754035-f200968a6e72', 'Karşılama'),
-            img('photo-1600880292203-757bb62b4baf', 'Ekip'),
-            img('photo-1556761175-5973dc0f32e7', 'Hizmet'),
+            img('photo-1585747860715-2ba37e788b70', 'Berber koltukları'),
+            img('photo-1503951914875-452162b0f3f1', 'Berber salonu'),
+            img('photo-1621605815971-fbc98d665033', 'Saç kesimi'),
+            img('photo-1599351431202-1e0f0137899a', 'Sakal bakımı'),
         ],
         news: [
             {
-                tag: 'Duyuru',
-                title: 'Online randevu kolaylığı',
-                summary: 'QR ile sayfamıza gelip uygun saati hızlıca seçebilirsiniz.',
+                tag: 'Stil',
+                title: 'Fade nasıl seçilir?',
+                summary: 'Saç tipine göre soft veya sharp fade ile yüz hatlarınızı dengeleyin.',
             },
             {
-                tag: 'İpuçu',
-                title: 'Zamanında gelmenin önemi',
-                summary: 'Randevuya 5–10 dakika erken gelmek hizmet süresini korur.',
+                tag: 'Bakım',
+                title: 'Tıraş sonrası rahatlık',
+                summary: 'Alkolsüz aftershave tahrişi azaltır; cildiniz ferah kalır.',
             },
             {
-                tag: 'Hizmet',
-                title: 'Size özel paketler',
-                summary: 'Kampanya ve abonelik seçenekleri için işletmeyle iletişime geçebilirsiniz.',
+                tag: 'Randevu',
+                title: 'Beklemeden gelin',
+                summary: 'Online randevu ile koltuk sizi bekler — yoğunluğa takılmazsınız.',
             },
         ],
     },
@@ -140,12 +141,31 @@ const BY_SLUG: Partial<Record<string, Partial<SectorWebPack>>> = {
         ],
     },
     barber: {
-        tagline: 'Klasik berberlik, modern dokunuş',
+        tagline: 'Zamansız stil, kusursuz bakım',
+        aboutFallback:
+            'Erkek kuaförümüzde saç kesimi, sakal tasarımı ve klasik ustura tıraşını steril ekipmanla sunuyoruz. Online randevu ile beklemeden gelin.',
         gallery: [
-            img('photo-1503951914875-452162b0f3f1', 'Berber'),
-            img('photo-1621605815971-fbc98d665033', 'Sakal'),
-            img('photo-1599351431202-1e0f0137899a', 'Kesim'),
-            img('photo-1622286342621-4bd786c2447c', 'Detay'),
+            img('photo-1585747860715-2ba37e788b70', 'Berber salonu'),
+            img('photo-1503951914875-452162b0f3f1', 'Erkek kuaförü'),
+            img('photo-1621605815971-fbc98d665033', 'Saç kesimi'),
+            img('photo-1605497788044-5a32c7078486', 'Fade kesim'),
+        ],
+        news: [
+            {
+                tag: 'Stil',
+                title: 'Fade seçimi',
+                summary: 'Saç tipine göre soft veya sharp fade öneriyoruz.',
+            },
+            {
+                tag: 'Sakal',
+                title: 'Kontür farkı',
+                summary: 'Düzenli sakal kontürü yüzü toparlar.',
+            },
+            {
+                tag: 'Randevu',
+                title: '2 dakikada yer ayırtın',
+                summary: 'Online randevu ile size uygun saati seçin, gelin.',
+            },
         ],
     },
     nails: {

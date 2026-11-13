@@ -9,6 +9,7 @@ import { labelsFor } from '../../lib/labels';
 import { dialNumber } from '../../lib/phone';
 import { LAYOUT_THEME, sectorLayoutGroup } from '../../lib/sectorLayout';
 import { sectorWebPack } from '../../lib/sectorWebContent';
+import { resolveSectorSlug } from '../../lib/resolveSectorSlug';
 import { loadVisitorProfile, saveVisitorProfile, type VisitorProfile } from '../../lib/visitorProfile';
 import { setPinnedCompanyId } from '../../lib/pinnedCompany';
 import { ShortcutPrompt } from '../../components/customer/ShortcutPrompt';
@@ -89,14 +90,25 @@ function CompanyPage({ id }: { id: number }) {
         companiesApi.reviews(id, reviewSort).then(setSortedReviews).catch(() => setSortedReviews([]));
     }, [id, reviewsOpen, reviewSort]);
 
-    const labels = useMemo(() => labelsFor(company?.primary_sector?.slug, company || undefined), [company]);
-    const layoutGroup = sectorLayoutGroup(company?.primary_sector?.slug);
+    const sectorSlug = useMemo(
+        () =>
+            company
+                ? resolveSectorSlug({
+                      primarySlug: company.primary_sector?.slug,
+                      sectorSlugs: company.sectors?.map(s => s.slug),
+                      webTemplateId: company.web_template_id,
+                      name: company.name,
+                  })
+                : 'barber',
+        [company],
+    );
+    const labels = useMemo(() => labelsFor(sectorSlug, company || undefined), [company, sectorSlug]);
+    const layoutGroup = sectorLayoutGroup(sectorSlug);
     const selectedTemplate = useMemo(() => {
-        const slug = company?.primary_sector?.slug;
-        const id = company?.web_template_id || defaultWebTemplateId(slug);
-        return getWebTemplate(id) || getWebTemplate(defaultWebTemplateId(slug));
-    }, [company?.web_template_id, company?.primary_sector?.slug]);
-    const fallbackPack = useMemo(() => sectorWebPack(company?.primary_sector?.slug), [company?.primary_sector?.slug]);
+        const id = company?.web_template_id || defaultWebTemplateId(sectorSlug);
+        return getWebTemplate(id) || getWebTemplate(defaultWebTemplateId(sectorSlug));
+    }, [company?.web_template_id, sectorSlug]);
+    const fallbackPack = useMemo(() => sectorWebPack(sectorSlug), [sectorSlug]);
     const theme = selectedTemplate?.theme
         ? {
               heroFrom: selectedTemplate.theme.heroFrom,
@@ -114,6 +126,7 @@ function CompanyPage({ id }: { id: number }) {
               news: selectedTemplate.news,
           }
         : fallbackPack;
+    const heroImage = company?.photo || webPack.gallery[0]?.src || null;
 
     const saveVisitor = (): boolean => {
         const firstName = vf.firstName.trim();
@@ -140,7 +153,7 @@ function CompanyPage({ id }: { id: number }) {
         );
     }
 
-    const sector = company.primary_sector;
+    const sector = company.primary_sector || company.sectors?.[0] || null;
     const bookable = !!company.is_bookable && services.length > 0;
     const phone = dialNumber(company.phone);
     const rating = ratingText(company);
@@ -187,22 +200,23 @@ function CompanyPage({ id }: { id: number }) {
         }
     };
 
-    const heroH = introMode ? 'min-h-[70vh]' : layoutGroup === 'sport' ? 'h-56' : layoutGroup === 'clinic' ? 'h-44' : 'h-52';
+    /** Gerçek berber siteleri gibi kompakt hero — isim alanı şişirilmez */
+    const heroH = introMode ? 'h-[42vw] max-h-56 min-h-[11.5rem]' : layoutGroup === 'sport' ? 'h-48' : 'h-44';
 
     return (
         <div className="min-h-screen pb-32" style={{ ['--sector-accent' as string]: theme.accent, background: selectedTemplate?.theme.surface || '#f8fafc' }}>
             <div
-                className={`relative ${heroH} bg-slate-200 overflow-hidden`}
-                style={{ background: `linear-gradient(145deg, ${sector?.color || theme.heroFrom}, ${theme.heroTo})` }}
+                className={`relative ${heroH} overflow-hidden bg-slate-900`}
+                style={{ background: `linear-gradient(145deg, ${theme.heroFrom}, ${theme.heroTo})` }}
             >
-                {company.photo && (
-                    <img src={company.photo} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35" />
+                {heroImage && (
+                    <img src={heroImage} alt="" className="absolute inset-0 h-full w-full object-cover" />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/20 to-black/10" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-black/20" />
                 <div className="absolute inset-x-0 top-0 safe-top z-10">
-                    <div className="max-w-lg mx-auto flex justify-between p-4">
+                    <div className="max-w-lg mx-auto flex justify-between p-3">
                         {introMode ? (
-                            <span className="w-10" aria-hidden />
+                            <span className="w-9" aria-hidden />
                         ) : (
                             <RoundButton label="Geri" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/app'))}>←</RoundButton>
                         )}
@@ -216,21 +230,16 @@ function CompanyPage({ id }: { id: number }) {
                         </div>
                     </div>
                 </div>
-                <div className={`relative z-10 flex h-full max-w-lg mx-auto flex-col justify-end px-5 ${introMode ? 'pb-16 pt-24' : 'pb-10 pt-16'}`}>
-                    {(company.sectors?.length ? company.sectors : sector ? [sector] : []).slice(0, 2).map(s => (
-                        <span key={s.slug} className="mb-3 inline-flex w-fit items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur">
-                            {s.icon} {s.name}
-                        </span>
-                    ))}
-                    <p className="text-[11px] font-black uppercase tracking-[0.28em] text-white/70">
-                        {selectedTemplate?.styleName || 'Salon'}
+                <div className="relative z-10 flex h-full max-w-lg mx-auto flex-col justify-end px-4 pb-5 pt-12">
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/75">
+                        {sector?.name || selectedTemplate?.styleName || 'Erkek kuaförü'}
                     </p>
-                    <h1 className={`mt-2 font-black leading-[1.05] text-white drop-shadow ${introMode ? 'text-4xl sm:text-5xl' : 'text-3xl'}`}>
+                    <h1 className="mt-1 text-2xl font-black leading-tight text-white drop-shadow sm:text-[1.65rem]">
                         {company.name}
                     </h1>
-                    <p className="mt-3 max-w-md text-sm font-semibold text-white/85">{webPack.tagline}</p>
+                    <p className="mt-1.5 max-w-sm text-xs font-semibold text-white/85 sm:text-sm">{webPack.tagline}</p>
                     {rating && (
-                        <button type="button" onClick={() => setReviewsOpen(true)} className="mt-3 w-fit text-sm font-bold text-amber-300">
+                        <button type="button" onClick={() => setReviewsOpen(true)} className="mt-2 w-fit text-xs font-bold text-amber-300">
                             {rating} · yorumları gör
                         </button>
                     )}
@@ -263,7 +272,7 @@ function CompanyPage({ id }: { id: number }) {
 
                 <section>
                     <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
-                        {sector?.name || 'Sektör'} görselleri
+                        {layoutGroup === 'beauty' || sectorSlug === 'barber' || sectorSlug === 'hair' ? 'Salonumuz' : 'Galeri'}
                     </h2>
                     <div className="grid grid-cols-2 gap-2">
                         {webPack.gallery.map(g => (
@@ -275,7 +284,9 @@ function CompanyPage({ id }: { id: number }) {
                 </section>
 
                 <section>
-                    <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Sektörden notlar</h2>
+                    <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                        {sectorSlug === 'barber' ? 'Bakım notları' : 'Sektörden notlar'}
+                    </h2>
                     <div className="space-y-2">
                         {webPack.news.map(n => (
                             <article key={n.title} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
