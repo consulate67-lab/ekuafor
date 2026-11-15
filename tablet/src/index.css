@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* Tablet: her zaman yatay kullanım */
+@media (orientation: portrait) {
+  body::before {
+    content: "Cihazı yatay çevirin";
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0f172a;
+    color: #fff;
+    font-weight: 900;
+    font-size: 1.25rem;
+    text-align: center;
+    padding: 2rem;
+  }
+  #root {
+    visibility: hidden;
+  }
+}
+
+body {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.board-scroll {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center rounded-2xl border-2 px-5 py-2.5 text-sm font-black shadow-sm transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply border-brand-600 bg-brand-600 text-white;
+  }
+  .btn-secondary {
+    @apply border-slate-200 bg-white text-slate-800;
+  }
+  .btn-dark {
+    @apply border-slate-900 bg-slate-900 text-white;
+  }
+  .btn-danger {
+    @apply border-rose-600 bg-rose-500 text-white;
+  }
+  .btn-danger-soft {
+    @apply border-rose-200 bg-rose-50 text-rose-700;
+  }
+  .btn-block {
+    @apply w-full;
+  }
+  .btn-icon {
+    @apply !h-11 !w-11 !min-h-11 !shrink-0 !rounded-2xl !p-0;
+  }
+}

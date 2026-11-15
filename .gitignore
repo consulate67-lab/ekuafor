@@ -66,6 +66,9 @@ model-tr/
 release/
 release_apk/
 client/android/
+tablet/android/
+tablet/dist/
+tablet/SaloonTablet.apk
 
 # DB dump'ları ve tek seferlik taşıma artıkları (müşteri verisi içerir — repoya girmemeli)
 db-dump*.json

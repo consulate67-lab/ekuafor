@@ -1,14 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { IconBack, IconReport } from '../components/Icons';
 import { useAppStore } from '../store/appStore';
-import { STAFF_TITLES, SLOT_OPTIONS, type Staff, type StaffTitle, type WebPageProfile } from '../types';
+import { SLOT_OPTIONS, type Staff, type WebPageProfile } from '../types';
 import { uid } from '../lib/id';
 import { EXAMPLE_PROMPT, EXAMPLE_PROMPT_HINT, generateAboutAi } from '../lib/generateAbout';
 import { pushWebProfile } from '../lib/pushWebProfile';
 import { pushStaffPhotos } from '../lib/pushStaffPhotos';
 import { reverseGeocode } from '../lib/reverseGeocode';
 import { companyPublicUrl, companyWebsiteDisplay } from '../lib/webUrl';
-import { getSector, sectorsByGroup } from '../lib/sectorCatalog';
+import { getSector, mergeCatalogServices, sectorsByGroup } from '../lib/sectorCatalog';
+import { sectorSupportsGroupSessions } from '../lib/sectorSubscriberProfile';
+import {
+  defaultStaffTitle,
+  departmentNamesForSectors,
+  staffTitlesForSectors,
+  titleLabel,
+} from '../lib/staffRoles';
 import {
   defaultWebTemplateId,
   getWebTemplate,
@@ -26,7 +33,9 @@ export function Settings() {
   const updateCompany = useAppStore(s => s.updateCompany);
   const upsertStaff = useAppStore(s => s.upsertStaff);
   const removeStaff = useAppStore(s => s.removeStaff);
+  const upsertDepartment = useAppStore(s => s.upsertDepartment);
   const upsertService = useAppStore(s => s.upsertService);
+  const replaceServices = useAppStore(s => s.replaceServices);
   const removeService = useAppStore(s => s.removeService);
   const setScreen = useAppStore(s => s.setScreen);
   const resetAll = useAppStore(s => s.resetAll);
@@ -37,6 +46,9 @@ export function Settings() {
   const [svcName, setSvcName] = useState('');
   const [svcDuration, setSvcDuration] = useState(30);
   const [svcPrice, setSvcPrice] = useState(0);
+  const [svcProcessing, setSvcProcessing] = useState(0);
+  const [svcMode, setSvcMode] = useState<'staff' | 'class' | 'resource'>('staff');
+  const [svcCapacity, setSvcCapacity] = useState(8);
   const sectorSlugs = useMemo(
     () =>
       company.sectorSlugs?.length
@@ -47,13 +59,27 @@ export function Settings() {
     [company.sectorSlugs, company.sectorSlug],
   );
   const sectorTemplates = useMemo(() => listWebTemplatesForSectors(sectorSlugs), [sectorSlugs]);
+  const sectorTitles = useMemo(() => staffTitlesForSectors(sectorSlugs), [sectorSlugs]);
+  const sectorDeptNames = useMemo(() => departmentNamesForSectors(sectorSlugs), [sectorSlugs]);
+  const staffDeptOptions = useMemo(() => {
+    const byName = new Map(departments.map(d => [d.name.toLocaleLowerCase('tr-TR'), d]));
+    const opts: { id: string; name: string }[] = [...departments];
+    for (const name of sectorDeptNames) {
+      const key = name.toLocaleLowerCase('tr-TR');
+      if (byName.has(key)) continue;
+      opts.push({ id: `__new__:${name}`, name });
+    }
+    return opts;
+  }, [departments, sectorDeptNames]);
 
   const defaultPhone = useMemo(() => {
     const fromWeb = company.webPage?.phone?.replace(/\D/g, '');
     if (fromWeb) return fromWeb.slice(0, 11);
-    const usta = staff.find(s => s.title === 'usta' && s.phone);
+    const preferred = staff.find(
+      s => s.phone && (s.title === 'usta' || s.title === 'is_yeri_ortagi' || s.title === 'doktor'),
+    );
     const any = staff.find(s => s.phone);
-    return (usta || any)?.phone?.replace(/\D/g, '').slice(0, 11) || '';
+    return (preferred || any)?.phone?.replace(/\D/g, '').slice(0, 11) || '';
   }, [company.webPage?.phone, staff]);
 
   const defaultWebsite = useMemo(
@@ -211,7 +237,14 @@ export function Settings() {
 
   const saveStaff = () => {
     if (!draftStaff || !draftStaff.firstName.trim() || !draftStaff.lastName.trim()) return;
-    upsertStaff(draftStaff);
+    let next = draftStaff;
+    if (next.departmentId.startsWith('__new__:')) {
+      const name = next.departmentId.slice('__new__:'.length);
+      const dept = { id: uid('dept'), name };
+      upsertDepartment(dept);
+      next = { ...next, departmentId: dept.id };
+    }
+    upsertStaff(next);
     setDraftStaff(null);
     void pushStaffPhotos(useAppStore.getState());
   };
@@ -223,15 +256,33 @@ export function Settings() {
       name: svcName.trim(),
       durationMinutes: svcDuration,
       price: svcPrice,
+      bookingMode: svcMode,
+      ...(svcProcessing > 0 ? { processingMinutes: svcProcessing } : {}),
+      ...(svcMode !== 'staff'
+        ? { capacity: Math.max(1, svcCapacity || (svcMode === 'resource' ? 1 : 8)) }
+        : { capacity: undefined }),
     });
     setSvcName('');
     setSvcDuration(30);
     setSvcPrice(0);
+    setSvcProcessing(0);
+    setSvcMode('staff');
+    setSvcCapacity(8);
   };
 
   const hub: { key: string; label: string; hint: string; onClick: () => void }[] = [
     { key: 'campaigns', label: 'Kampanyalar', hint: 'Paket / fiyat / hizmet seti', onClick: () => setScreen('campaigns') },
     { key: 'subscribers', label: 'Aboneler', hint: 'Müşteri kartı · hak takibi', onClick: () => setScreen('subscribers') },
+    ...(sectorSupportsGroupSessions(sectorSlugs)
+      ? [
+          {
+            key: 'groupClasses',
+            label: 'Grup dersleri',
+            hint: 'Tarih · yaş sınırı · katılımcı',
+            onClick: () => setScreen('groupClasses'),
+          },
+        ]
+      : []),
     {
       key: 'webpage',
       label: 'Web sayfası',
@@ -352,7 +403,7 @@ export function Settings() {
                 <div className="min-w-0 flex-1">
                   <p className="text-lg font-black">{s.firstName} {s.lastName}</p>
                   <p className="text-sm font-semibold text-slate-500">
-                    {STAFF_TITLES.find(t => t.key === s.title)?.label} · {s.phone}
+                    {titleLabel(s.title, sectorSlugs)} · {s.phone}
                   </p>
                 </div>
                 <button type="button" onClick={() => setDraftStaff(s)} className="btn btn-secondary !min-h-11 !px-4">Düzenle</button>
@@ -361,18 +412,24 @@ export function Settings() {
             ))}
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
+                const defaultDept =
+                  departments[0] ||
+                  (sectorDeptNames[0]
+                    ? { id: `__new__:${sectorDeptNames[0]}`, name: sectorDeptNames[0] }
+                    : { id: uid('dept'), name: 'Genel' });
                 setDraftStaff({
                   id: uid('stf'),
                   firstName: '',
                   lastName: '',
                   phone: '',
-                  title: 'kalfa',
-                  departmentId: departments[0]?.id || uid('dept'),
+                  title: defaultStaffTitle(sectorSlugs),
+                  departmentId: defaultDept.id,
                   workStart: company.workStart,
                   workEnd: company.workEnd,
-                })
-              }
+                  serviceIds: services.map(s => s.id),
+                });
+              }}
               className="btn btn-dark btn-block !min-h-12 !text-base"
             >
               + Çalışan ekle
@@ -597,8 +654,46 @@ export function Settings() {
 
         {tab === 'services' && (
           <section className="space-y-3">
-            {company.sectorName && (
-              <p className="text-sm font-bold text-slate-500">Sektör: {company.sectorName}</p>
+            {(company.sectorNames?.length || company.sectorName) && (
+              <p className="text-sm font-bold text-slate-500">
+                Sektör: {(company.sectorNames || [company.sectorName]).filter(Boolean).join(' · ')}
+              </p>
+            )}
+            {sectorSlugs.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const { services: next, added, updated } = mergeCatalogServices(services, sectorSlugs);
+                  if (!added && !updated) {
+                    alert('Katalog zaten güncel — eklenecek hizmet yok.');
+                    return;
+                  }
+                  replaceServices(next);
+                  if (added > 0) {
+                    const newIds = next
+                      .filter(s => !services.some(e => e.id === s.id))
+                      .map(s => s.id);
+                    for (const person of staff) {
+                      if (!person.serviceIds?.length) continue;
+                      upsertStaff({
+                        ...person,
+                        serviceIds: [...new Set([...person.serviceIds, ...newIds])],
+                      });
+                    }
+                  }
+                  alert(
+                    [
+                      added ? `${added} yeni hizmet eklendi` : null,
+                      updated ? `${updated} hizmete bekleme/onam aktarıldı` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · '),
+                  );
+                }}
+                className="btn btn-secondary btn-block !min-h-11"
+              >
+                Sektör katalogundan eksik işlemleri ekle
+              </button>
             )}
             {services.map(s => (
               <article key={s.id} className="rounded-3xl bg-white p-5 shadow-sm">
@@ -626,6 +721,69 @@ export function Settings() {
                         className="w-28 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold text-slate-800"
                       />
                     </label>
+                    <label className="mt-2 flex flex-wrap items-center gap-2 text-sm font-bold text-slate-500">
+                      Bekleme (dk)
+                      <input
+                        type="number"
+                        min={0}
+                        max={Math.max(0, s.durationMinutes - 10)}
+                        value={s.processingMinutes ?? 0}
+                        onChange={e => {
+                          const v = Math.max(0, Number(e.target.value) || 0);
+                          upsertService({
+                            ...s,
+                            processingMinutes: v > 0 ? v : undefined,
+                          });
+                        }}
+                        className="w-24 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold text-slate-800"
+                      />
+                      <span className="text-xs font-semibold text-slate-400">
+                        boya/maske vb. — bu sürede başka müşteri alınabilir
+                      </span>
+                    </label>
+                    <label className="mt-2 flex flex-wrap items-center gap-2 text-sm font-bold text-slate-600">
+                      Rezervasyon
+                      <select
+                        value={s.bookingMode || 'staff'}
+                        onChange={e => {
+                          const mode = e.target.value as 'staff' | 'class' | 'resource';
+                          upsertService({
+                            ...s,
+                            bookingMode: mode,
+                            capacity:
+                              mode === 'staff'
+                                ? undefined
+                                : s.capacity ?? (mode === 'resource' ? 1 : 8),
+                          });
+                        }}
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold text-slate-800"
+                      >
+                        <option value="staff">Personel</option>
+                        <option value="class">Grup dersi</option>
+                        <option value="resource">Alan / cihaz</option>
+                      </select>
+                      {(s.bookingMode === 'class' || s.bookingMode === 'resource') && (
+                        <>
+                          <span className="text-slate-400">Kapasite</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={500}
+                            value={s.capacity ?? (s.bookingMode === 'resource' ? 1 : 8)}
+                            onChange={e =>
+                              upsertService({
+                                ...s,
+                                capacity: Math.max(1, Number(e.target.value) || 1),
+                              })
+                            }
+                            className="w-20 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold text-slate-800"
+                          />
+                        </>
+                      )}
+                      {s.requiresConsent && (
+                        <span className="rounded-lg bg-amber-50 px-2 py-0.5 text-xs font-black text-amber-800">onam</span>
+                      )}
+                    </label>
                     {!!s.resources?.length && (
                       <ul className="mt-2 space-y-0.5 text-xs font-semibold text-slate-500">
                         {s.resources.map(r => (
@@ -647,7 +805,7 @@ export function Settings() {
             <div className="space-y-3 rounded-3xl bg-white p-5 shadow-sm">
               <h2 className="text-lg font-black">Yeni hizmet</h2>
               <input value={svcName} onChange={e => setSvcName(e.target.value)} placeholder="Hizmet adı" className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base font-bold" />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <label className="text-xs font-black uppercase text-slate-400">
                   Süre (dk)
                   <input type="number" value={svcDuration} onChange={e => setSvcDuration(Number(e.target.value) || 30)} className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold" />
@@ -656,7 +814,36 @@ export function Settings() {
                   Fiyat
                   <input type="number" value={svcPrice} onChange={e => setSvcPrice(Number(e.target.value) || 0)} className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold" />
                 </label>
+                <label className="text-xs font-black uppercase text-slate-400">
+                  Bekleme (dk)
+                  <input type="number" min={0} value={svcProcessing} onChange={e => setSvcProcessing(Math.max(0, Number(e.target.value) || 0))} className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold" />
+                </label>
               </div>
+              <label className="flex flex-wrap items-center gap-2 text-sm font-bold text-slate-700">
+                Rezervasyon
+                <select
+                  value={svcMode}
+                  onChange={e => setSvcMode(e.target.value as 'staff' | 'class' | 'resource')}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold"
+                >
+                  <option value="staff">Personel</option>
+                  <option value="class">Grup dersi</option>
+                  <option value="resource">Alan / cihaz</option>
+                </select>
+                {svcMode !== 'staff' && (
+                  <>
+                    <span className="text-xs font-black uppercase text-slate-400">Kapasite</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={500}
+                      value={svcCapacity}
+                      onChange={e => setSvcCapacity(Math.max(1, Number(e.target.value) || 1))}
+                      className="w-20 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold"
+                    />
+                  </>
+                )}
+              </label>
               <button type="button" onClick={addService} className="btn btn-primary btn-block !min-h-12">Kaydet</button>
             </div>
           </section>
@@ -682,12 +869,72 @@ export function Settings() {
               <input value={draftStaff.lastName} onChange={e => setDraftStaff({ ...draftStaff, lastName: e.target.value })} placeholder="Soyad" className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold" />
             </div>
             <input value={draftStaff.phone} onChange={e => setDraftStaff({ ...draftStaff, phone: e.target.value.replace(/\D/g, '').slice(0, 11) })} placeholder="Telefon" className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold" />
-            <select value={draftStaff.title} onChange={e => setDraftStaff({ ...draftStaff, title: e.target.value as StaffTitle })} className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold">
-              {STAFF_TITLES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
-            </select>
+            <label className="block text-xs font-black uppercase text-slate-400">
+              Hitap / unvan
+              <select
+                value={draftStaff.title}
+                onChange={e => setDraftStaff({ ...draftStaff, title: e.target.value })}
+                className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold"
+              >
+                {!sectorTitles.some(t => t.key === draftStaff.title) && draftStaff.title ? (
+                  <option value={draftStaff.title}>{titleLabel(draftStaff.title, sectorSlugs)}</option>
+                ) : null}
+                {sectorTitles.map(t => (
+                  <option key={t.key} value={t.key}>{t.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-xs font-black uppercase text-slate-400">
+              Bölüm
+              <select
+                value={draftStaff.departmentId}
+                onChange={e => setDraftStaff({ ...draftStaff, departmentId: e.target.value })}
+                className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold"
+              >
+                {!staffDeptOptions.some(d => d.id === draftStaff.departmentId) ? (
+                  <option value={draftStaff.departmentId}>
+                    {departments.find(d => d.id === draftStaff.departmentId)?.name || 'Bölüm'}
+                  </option>
+                ) : null}
+                {staffDeptOptions.map(d => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </label>
             <div className="grid grid-cols-2 gap-2">
               <input type="time" value={draftStaff.workStart} onChange={e => setDraftStaff({ ...draftStaff, workStart: e.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold" />
               <input type="time" value={draftStaff.workEnd} onChange={e => setDraftStaff({ ...draftStaff, workEnd: e.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold" />
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase text-slate-400">Hizmetler (grup dahil)</p>
+              <div className="mt-2 flex max-h-36 flex-wrap gap-2 overflow-y-auto">
+                {services.map(s => {
+                  const on = (draftStaff.serviceIds || []).includes(s.id);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => {
+                        const cur = draftStaff.serviceIds || [];
+                        const next = on ? cur.filter(id => id !== s.id) : [...cur, s.id];
+                        setDraftStaff({ ...draftStaff, serviceIds: next });
+                      }}
+                      className={`rounded-xl px-3 py-1.5 text-xs font-black ring-1 ${
+                        on
+                          ? s.bookingMode === 'class'
+                            ? 'bg-emerald-600 text-white ring-emerald-700'
+                            : 'bg-brand-600 text-white ring-brand-700'
+                          : 'bg-slate-50 text-slate-600 ring-slate-200'
+                      }`}
+                    >
+                      {s.name}{s.bookingMode === 'class' ? ' · grup' : ''}
+                    </button>
+                  );
+                })}
+                {services.length === 0 && (
+                  <p className="text-sm font-semibold text-slate-400">Önce Hizmet sekmesinden ekleyin</p>
+                )}
+              </div>
             </div>
             <label className="block text-xs font-black uppercase text-slate-400">
               Fotoğraf
