@@ -7,6 +7,7 @@ import api from './lib/api';
 import { useAppointmentSync } from './hooks/useAppointmentSync';
 import { FullScreenLoader } from './components/ui';
 import { homePathFor } from './lib/routes';
+import { addScannedCompanyId, extractCompanyIdFromAppUrl } from './lib/scannedCompanies';
 
 /** QR kısa yol: /#/42 → /#/firma/42?ref=qr */
 function CompanyIdRedirect() {
@@ -123,8 +124,10 @@ function App() {
                 }
             }
 
+            // Müşteri uygulaması giriş gerektirmez; token yoksa hemen aç
             const token = localStorage.getItem('token');
             if (!token) {
+                setUser(null);
                 setInitialized(true);
                 return;
             }
@@ -153,12 +156,18 @@ function App() {
         checkAuth();
     }, [setUser, setInitialized, isNative]);
 
-    // Native deep link login (?code=...)
+    // Native deep link: işletme QR veya yönetim ?code=...
     useEffect(() => {
         if (!isNative) return;
 
-        const listener = CapApp.addListener('appUrlOpen', async (data) => {
-            const url = data.url;
+        const listener = CapApp.addListener('appUrlOpen', async (event) => {
+            const url = event.url;
+            const companyId = extractCompanyIdFromAppUrl(url);
+            if (companyId && !url.includes('code=')) {
+                addScannedCompanyId(companyId);
+                window.location.hash = `#/firma/${companyId}?ref=qr`;
+                return;
+            }
             if (!url.includes('code=')) return;
             try {
                 const code = new URL(url).searchParams.get('code');
@@ -187,7 +196,7 @@ function App() {
     }, [isNative, setInitialized]);
 
     if (!initialized) {
-        return <FullScreenLoader text="Oturum kontrol ediliyor…" />;
+        return <FullScreenLoader text={isNative ? 'Yükleniyor…' : 'Oturum kontrol ediliyor…'} />;
     }
 
     return (

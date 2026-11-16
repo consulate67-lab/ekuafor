@@ -68,17 +68,20 @@ export function isIosDevice(): boolean {
   return /iphone|ipad|ipod/i.test(navigator.userAgent);
 }
 
-/** Firma sayfası için dinamik manifest (start_url bu firmaya) */
+/**
+ * Ana ekrana ekleme manifest’i.
+ * start_url firma listesine gider; QR ile eklenen firmalar /app’de listelenir.
+ */
 export function applyCompanyManifest(input: {
   companyId: number;
   name: string;
   themeColor?: string;
 }) {
   try {
-    const start = `./#/firma/${input.companyId}?ref=qr&home=1`;
+    const start = './#/app';
     const manifest = {
-      short_name: input.name.slice(0, 12) || 'Saloon',
-      name: input.name || 'Saloon',
+      short_name: 'Saloon',
+      name: 'Saloon',
       icons: [{ src: 'app-icon.png', sizes: '512x512', type: 'image/png' }],
       start_url: start,
       scope: './',
@@ -99,9 +102,10 @@ export function applyCompanyManifest(input: {
     const prev = link.href;
     link.href = url;
     if (prev.startsWith('blob:')) URL.revokeObjectURL(prev);
-    document.title = input.name;
+    document.title = 'Saloon';
     const appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
-    if (appleTitle) appleTitle.setAttribute('content', input.name.slice(0, 12));
+    if (appleTitle) appleTitle.setAttribute('content', 'Saloon');
+    void input;
   } catch {
     /* ignore */
   }

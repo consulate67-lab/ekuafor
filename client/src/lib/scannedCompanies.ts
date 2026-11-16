@@ -1,0 +1,81 @@
+/** QR ile okutulan / ziyaret edilen işletmeler (çoklu). */
+
+const SCANNED_KEY = 'saloon_scanned_company_ids_v1';
+const LEGACY_PIN_KEY = 'saloon_pinned_company_v1';
+
+function readIds(): number[] {
+  try {
+    const raw = localStorage.getItem(SCANNED_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map(n => Number(n))
+          .filter(n => Number.isFinite(n) && n > 0);
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return migrateLegacyPin();
+}
+
+function migrateLegacyPin(): number[] {
+  try {
+    const n = Number(localStorage.getItem(LEGACY_PIN_KEY));
+    if (Number.isFinite(n) && n > 0) {
+      writeIds([n]);
+      return [n];
+    }
+  } catch {
+    /* ignore */
+  }
+  return [];
+}
+
+function writeIds(ids: number[]) {
+  try {
+    localStorage.setItem(SCANNED_KEY, JSON.stringify(ids));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** En son okutulan başta. */
+export function getScannedCompanyIds(): number[] {
+  return readIds();
+}
+
+export function addScannedCompanyId(id: number): number[] {
+  const n = Number(id);
+  if (!Number.isFinite(n) || n <= 0) return readIds();
+  const next = [n, ...readIds().filter(x => x !== n)];
+  writeIds(next);
+  try {
+    localStorage.setItem(LEGACY_PIN_KEY, String(n));
+  } catch {
+    /* ignore */
+  }
+  return next;
+}
+
+export function removeScannedCompanyId(id: number): number[] {
+  const next = readIds().filter(x => x !== Number(id));
+  writeIds(next);
+  return next;
+}
+
+/** Deep link / QR URL’sinden firma id çıkarır. */
+export function extractCompanyIdFromAppUrl(url: string): number | null {
+  const hashMatch = url.match(/#\/(?:firma\/)?(\d+)/i);
+  if (hashMatch) {
+    const n = Number(hashMatch[1]);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  const pathMatch = url.match(/\/(?:firma\/)?(\d+)(?:[/?#]|$)/i);
+  if (pathMatch) {
+    const n = Number(pathMatch[1]);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  return null;
+}

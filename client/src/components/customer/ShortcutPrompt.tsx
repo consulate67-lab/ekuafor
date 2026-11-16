@@ -5,9 +5,9 @@ import {
   getShortcutPromptState,
   isIosDevice,
   isStandaloneDisplay,
-  setPinnedCompanyId,
   setShortcutPromptState,
 } from '../../lib/pinnedCompany';
+import { addScannedCompanyId } from '../../lib/scannedCompanies';
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -38,10 +38,10 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
 
   useEffect(() => {
     if (!enabled || !companyId) return;
+    addScannedCompanyId(companyId);
     applyCompanyManifest({ companyId, name: companyName, themeColor });
 
     if (isStandaloneDisplay()) {
-      setPinnedCompanyId(companyId);
       setShortcutPromptState(companyId, 'accepted');
       return;
     }
@@ -59,8 +59,8 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
 
   const accept = async () => {
     setBusy(true);
+    addScannedCompanyId(companyId);
     applyCompanyManifest({ companyId, name: companyName, themeColor });
-    setPinnedCompanyId(companyId);
 
     try {
       if (deferredInstall) {
@@ -95,8 +95,9 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
       {!iosHelp ? (
         <div className="space-y-4">
           <p className="text-sm font-semibold text-slate-600 leading-relaxed">
-            <strong className="text-slate-900">{companyName}</strong> sayfasını telefonunuzun ana ekranına
-            kısayol olarak eklemek ister misiniz? Sonraki girişlerde doğrudan bu işletme açılır.
+            <strong className="text-slate-900">{companyName}</strong> uygulamasını telefonunuzun ana
+            ekranına eklemek ister misiniz? Açıldığında QR okuttuğunuz işletmeler listelenir; tıklayınca
+            web sayfasından randevu alırsınız.
           </p>
           <div className="grid grid-cols-2 gap-2">
             <Button block variant="secondary" onClick={dismiss}>
@@ -113,12 +114,12 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
             {isIosDevice() ? (
               <>
                 Safari’de alt menüden <strong>Paylaş</strong> → <strong>Ana Ekrana Ekle</strong> seçin.
-                Kısayol adı işletme adınız olacak.
+                Uygulama açılınca işletmeleriniz listelenir.
               </>
             ) : (
               <>
                 Tarayıcı menüsünden <strong>Ana ekrana ekle</strong> / <strong>Uygulamayı yükle</strong> seçin.
-                Bu işletme bundan sonra randevu ekranında tek başına görünecek.
+                Uygulama açılınca QR okuttuğunuz işletmeler listelenir.
               </>
             )}
           </p>

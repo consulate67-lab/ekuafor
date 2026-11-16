@@ -12,7 +12,7 @@ import { sectorWebPack } from '../../lib/sectorWebContent';
 import { resolveSectorSlug } from '../../lib/resolveSectorSlug';
 import { assignServiceImages } from '../../lib/serviceImage';
 import { loadVisitorProfile, saveVisitorProfile, type VisitorProfile } from '../../lib/visitorProfile';
-import { setPinnedCompanyId } from '../../lib/pinnedCompany';
+import { addScannedCompanyId } from '../../lib/scannedCompanies';
 import { ShortcutPrompt } from '../../components/customer/ShortcutPrompt';
 import {
     bookingCtaLabel,
@@ -66,7 +66,7 @@ function CompanyPage({ id }: { id: number }) {
     }, []);
 
     useEffect(() => {
-        if ((fromQr || searchParams.get('home') === '1') && id) setPinnedCompanyId(id);
+        if ((fromQr || searchParams.get('home') === '1') && id) addScannedCompanyId(id);
     }, [fromQr, id, searchParams]);
 
     useEffect(() => {
@@ -156,7 +156,7 @@ function CompanyPage({ id }: { id: number }) {
     if (notFound || !company) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <EmptyState icon="🏚️" title="İşletme bulunamadı" action={<Button onClick={() => navigate('/app')}>Keşfet'e dön</Button>} />
+                <EmptyState icon="🏚️" title="İşletme bulunamadı" action={<Button onClick={() => navigate('/app')}>Firmalarıma dön</Button>} />
             </div>
         );
     }
@@ -189,7 +189,7 @@ function CompanyPage({ id }: { id: number }) {
     };
 
     const book = (query = '') => {
-        setPinnedCompanyId(company.id);
+        addScannedCompanyId(company.id);
         if (visitor || loadVisitorProfile()) {
             goBook(query);
             return;
