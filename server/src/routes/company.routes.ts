@@ -78,6 +78,14 @@ const companySchema = z.object({
     door_number: nullableString,
     nace_code: nullableString,
     fax_number: nullableString,
+    web_template_id: nullableString,
+    hide_prices: z.preprocess(v => (v === "" || v === null) ? null : v, z.boolean().nullable().optional()),
+    instagram_url: nullableString,
+    facebook_url: nullableString,
+    tiktok_url: nullableString,
+    contact_note: nullableString,
+    show_phone: z.preprocess(v => (v === "" || v === null) ? null : v, z.boolean().nullable().optional()),
+    show_address: z.preprocess(v => (v === "" || v === null) ? null : v, z.boolean().nullable().optional()),
 });
 
 const SUPER_ADMIN_ONLY_FIELDS = [

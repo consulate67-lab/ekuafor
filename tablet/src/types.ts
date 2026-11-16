@@ -215,6 +215,13 @@ export interface WebPageProfile {
   website?: string;
   /** true ise müşteri web sayfasında fiyatlar gizlenir */
   hidePrices?: boolean;
+  instagram?: string;
+  facebook?: string;
+  tiktok?: string;
+  /** false ise müşteri sayfasında telefon gizlenir (varsayılan: göster) */
+  showPhone?: boolean;
+  /** false ise müşteri sayfasında adres gizlenir (varsayılan: göster) */
+  showAddress?: boolean;
 }
 
 export interface CompanySetup {

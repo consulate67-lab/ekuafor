@@ -71,6 +71,14 @@ export interface Company {
     nace_code?: string | null;
     fax_number?: string | null;
     verification_code?: string | null;
+    web_template_id?: string | null;
+    hide_prices?: boolean | null;
+    instagram_url?: string | null;
+    facebook_url?: string | null;
+    tiktok_url?: string | null;
+    contact_note?: string | null;
+    show_phone?: boolean | null;
+    show_address?: boolean | null;
 }
 
 /**
@@ -225,40 +233,87 @@ class CompanyService {
      */
     async getCompanyById(id: number): Promise<Company | null> {
         const cacheKey = `company:detail:${id}`;
+        let company: any = null;
         if (redis) {
             try {
                 const cached = await redis.get(cacheKey);
-                if (cached) return JSON.parse(cached);
-            } catch (err) { }
+                if (cached) company = JSON.parse(cached);
+            } catch (err) { /* ignore */ }
         }
 
-        const result = await db.execute(sql`SELECT * FROM companies WHERE id = ${id}`);
-        const rows = (result as any).rows as any[];
-        let company = rows[0] || null;
+        if (!company) {
+            const result = await db.execute(sql`SELECT * FROM companies WHERE id = ${id}`);
+            const rows = (result as any).rows as any[];
+            company = rows[0] || null;
+        }
 
-        // Cache’ten gelse bile hide_prices / web_template_id taze oku
+        // Cache olsa bile web profil alanlarını taze oku (hakkında / sosyal / görünürlük)
         if (company) {
             try {
-                const fresh = await db.execute(
-                    sql`SELECT hide_prices, web_template_id FROM companies WHERE id = ${id}`,
-                );
+                await db.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS hide_prices BOOLEAN DEFAULT false`);
+                await db.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_template_id VARCHAR(64)`);
+                await db.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS instagram_url VARCHAR(255)`);
+                await db.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS facebook_url VARCHAR(255)`);
+                await db.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS tiktok_url VARCHAR(255)`);
+                await db.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS contact_note TEXT`);
+                await db.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS show_phone BOOLEAN DEFAULT true`);
+                await db.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS show_address BOOLEAN DEFAULT true`);
+            } catch {
+                /* alter yetkisi yoksa devam */
+            }
+            try {
+                const fresh = await db.execute(sql`
+                    SELECT description, hide_prices, web_template_id,
+                           instagram_url, facebook_url, tiktok_url, contact_note,
+                           show_phone, show_address, phone, email, website,
+                           address_line, city, district
+                    FROM companies WHERE id = ${id}
+                `);
                 const fr = (fresh as any).rows?.[0];
                 if (fr) {
                     company = {
                         ...company,
+                        description: fr.description ?? company.description ?? null,
                         hide_prices: fr.hide_prices === true,
                         web_template_id: fr.web_template_id ?? company.web_template_id ?? null,
+                        instagram_url: fr.instagram_url ?? null,
+                        facebook_url: fr.facebook_url ?? null,
+                        tiktok_url: fr.tiktok_url ?? null,
+                        contact_note: fr.contact_note ?? null,
+                        show_phone: fr.show_phone !== false,
+                        show_address: fr.show_address !== false,
+                        phone: fr.phone ?? company.phone ?? null,
+                        email: fr.email ?? company.email ?? null,
+                        website: fr.website ?? company.website ?? null,
+                        address_line: fr.address_line ?? company.address_line ?? null,
+                        city: fr.city ?? company.city ?? null,
+                        district: fr.district ?? company.district ?? null,
                     };
                 }
             } catch {
-                /* kolon henüz yoksa yok say */
+                try {
+                    const fresh = await db.execute(
+                        sql`SELECT description, hide_prices, web_template_id FROM companies WHERE id = ${id}`,
+                    );
+                    const fr = (fresh as any).rows?.[0];
+                    if (fr) {
+                        company = {
+                            ...company,
+                            description: fr.description ?? company.description ?? null,
+                            hide_prices: fr.hide_prices === true,
+                            web_template_id: fr.web_template_id ?? company.web_template_id ?? null,
+                        };
+                    }
+                } catch {
+                    /* yok say */
+                }
             }
         }
 
         if (redis && company) {
             try {
                 await redis.setex(cacheKey, 60, JSON.stringify(company));
-            } catch (err) { }
+            } catch (err) { /* ignore */ }
         }
 
         return company;
@@ -637,6 +692,12 @@ const PUBLIC_COMPANY_FIELDS = [
     'service_count', 'staff_count', 'license_end_date', 'is_bookable', 'distance_km', 'primary_sector', 'sectors',
     'web_template_id',
     'hide_prices',
+    'instagram_url',
+    'facebook_url',
+    'tiktok_url',
+    'contact_note',
+    'show_phone',
+    'show_address',
 ] as const;
 
 export const isLicenseExpired = (company: { license_end_date?: string | Date | null }) =>

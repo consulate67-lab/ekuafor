@@ -40,6 +40,14 @@ export interface PublicCompany {
     web_template_id?: string | null;
     /** true ise web sayfasında fiyatlar gizlenir */
     hide_prices?: boolean | null;
+    instagram_url?: string | null;
+    facebook_url?: string | null;
+    tiktok_url?: string | null;
+    contact_note?: string | null;
+    /** false ise telefona gizle (varsayılan true) */
+    show_phone?: boolean | null;
+    /** false ise adresi gizle (varsayılan true) */
+    show_address?: boolean | null;
 }
 
 export interface CompanyListParams {

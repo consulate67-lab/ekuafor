@@ -99,6 +99,8 @@ export function Settings() {
       website: base.website || defaultWebsite,
       // Varsayılan: web’de fiyat gizli (açıkça false yapılmadıysa)
       hidePrices: base.hidePrices !== false,
+      showPhone: base.showPhone !== false,
+      showAddress: base.showAddress !== false,
     };
   });
   const [webBusy, setWebBusy] = useState(false);
@@ -583,6 +585,37 @@ export function Settings() {
               </span>
             </label>
 
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
+                <input
+                  type="checkbox"
+                  checked={webDraft.showPhone !== false}
+                  onChange={e => patchWeb({ showPhone: e.target.checked })}
+                  className="mt-1 h-5 w-5 rounded border-slate-300 text-brand-600"
+                />
+                <span>
+                  <span className="block text-sm font-black text-slate-900">Telefonu göster</span>
+                  <span className="mt-0.5 block text-xs font-semibold text-slate-500">
+                    Kapalıysa müşteri sayfasında telefon ve Ara butonu gizlenir.
+                  </span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
+                <input
+                  type="checkbox"
+                  checked={webDraft.showAddress !== false}
+                  onChange={e => patchWeb({ showAddress: e.target.checked })}
+                  className="mt-1 h-5 w-5 rounded border-slate-300 text-brand-600"
+                />
+                <span>
+                  <span className="block text-sm font-black text-slate-900">Adresi göster</span>
+                  <span className="mt-0.5 block text-xs font-semibold text-slate-500">
+                    Kapalıysa müşteri sayfasında adres satırı gizlenir (yol tarifi isteğe bağlı kalır).
+                  </span>
+                </span>
+              </label>
+            </div>
+
             <label className="block text-xs font-black uppercase text-slate-400">
               Hakkında
               <textarea
@@ -610,6 +643,36 @@ export function Settings() {
                   onChange={e => patchWeb({ email: e.target.value })}
                   placeholder="info@…"
                   className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-bold"
+                />
+              </label>
+            </div>
+            <div className="space-y-3 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
+              <p className="text-xs font-black uppercase text-slate-500">Sosyal ağlar</p>
+              <label className="block text-xs font-black uppercase text-slate-400">
+                Instagram
+                <input
+                  value={webDraft.instagram || ''}
+                  onChange={e => patchWeb({ instagram: e.target.value })}
+                  placeholder="@kullanici veya https://instagram.com/…"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-bold"
+                />
+              </label>
+              <label className="block text-xs font-black uppercase text-slate-400">
+                Facebook
+                <input
+                  value={webDraft.facebook || ''}
+                  onChange={e => patchWeb({ facebook: e.target.value })}
+                  placeholder="sayfa adı veya https://facebook.com/…"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-bold"
+                />
+              </label>
+              <label className="block text-xs font-black uppercase text-slate-400">
+                TikTok
+                <input
+                  value={webDraft.tiktok || ''}
+                  onChange={e => patchWeb({ tiktok: e.target.value })}
+                  placeholder="@kullanici veya https://tiktok.com/@…"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-bold"
                 />
               </label>
             </div>

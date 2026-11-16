@@ -122,6 +122,14 @@ export const companies = pgTable('companies', {
     webTemplateId: varchar('web_template_id', { length: 64 }),
     /** true ise public web’de fiyatlar gizlenir */
     hidePrices: boolean('hide_prices').default(false),
+    instagramUrl: varchar('instagram_url', { length: 255 }),
+    facebookUrl: varchar('facebook_url', { length: 255 }),
+    tiktokUrl: varchar('tiktok_url', { length: 255 }),
+    contactNote: text('contact_note'),
+    /** Müşteri sayfasında telefon göster */
+    showPhone: boolean('show_phone').default(true),
+    /** Müşteri sayfasında adres göster */
+    showAddress: boolean('show_address').default(true),
 }, (table) => {
     return {
         idxCompaniesActive: index('idx_companies_active').using('btree', table.isActive.asc().nullsLast().op('bool_ops')),

@@ -31,7 +31,7 @@ export async function pushWebProfile(state: TabletState): Promise<{ ok: boolean;
         companyId: company.serverCompanyId,
         profile: {
           web_template_id: web.templateId || null,
-          description: web.about || null,
+          description: (web.about || '').trim(),
           phone: web.phone || null,
           email: web.email || null,
           website: web.website || null,
@@ -40,6 +40,11 @@ export async function pushWebProfile(state: TabletState): Promise<{ ok: boolean;
           district: web.district || null,
           contact_note: web.contactNote || null,
           hide_prices: web.hidePrices === true,
+          instagram_url: web.instagram || null,
+          facebook_url: web.facebook || null,
+          tiktok_url: web.tiktok || null,
+          show_phone: web.showPhone !== false,
+          show_address: web.showAddress !== false,
           sector_slugs:
             company.sectorSlugs?.length
               ? company.sectorSlugs

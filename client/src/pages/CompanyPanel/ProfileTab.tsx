@@ -70,6 +70,89 @@ export function ProfileTab({ ctx }: { ctx: Ctx }) {
                                             placeholder="İşletmenizi müşterilerinize tanıtın..."
                                         />
                                     </div>
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                        <label className="flex items-start gap-3 rounded-2xl bg-slate-50 p-4">
+                                            <input
+                                                type="checkbox"
+                                                className="mt-1"
+                                                checked={company.show_phone !== false}
+                                                onChange={e => setCompany({ ...company, show_phone: e.target.checked })}
+                                            />
+                                            <span>
+                                                <span className="block text-sm font-black text-slate-900">Telefonu göster</span>
+                                                <span className="text-[10px] font-bold text-slate-400">Müşteri web sayfasında</span>
+                                            </span>
+                                        </label>
+                                        <label className="flex items-start gap-3 rounded-2xl bg-slate-50 p-4">
+                                            <input
+                                                type="checkbox"
+                                                className="mt-1"
+                                                checked={company.show_address !== false}
+                                                onChange={e => setCompany({ ...company, show_address: e.target.checked })}
+                                            />
+                                            <span>
+                                                <span className="block text-sm font-black text-slate-900">Adresi göster</span>
+                                                <span className="text-[10px] font-bold text-slate-400">Müşteri web sayfasında</span>
+                                            </span>
+                                        </label>
+                                        <label className="flex items-start gap-3 rounded-2xl bg-slate-50 p-4">
+                                            <input
+                                                type="checkbox"
+                                                className="mt-1"
+                                                checked={!!company.hide_prices}
+                                                onChange={e => setCompany({ ...company, hide_prices: e.target.checked })}
+                                            />
+                                            <span>
+                                                <span className="block text-sm font-black text-slate-900">Fiyatları gizle</span>
+                                                <span className="text-[10px] font-bold text-slate-400">Web’de tutar gösterme</span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                    <div className="rounded-2xl border border-slate-100 p-4 space-y-3">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sosyal ağlar</p>
+                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Instagram</label>
+                                                <input
+                                                    type="text"
+                                                    className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                    value={company.instagram_url || ''}
+                                                    onChange={e => setCompany({ ...company, instagram_url: e.target.value })}
+                                                    placeholder="@kullanici"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Facebook</label>
+                                                <input
+                                                    type="text"
+                                                    className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                    value={company.facebook_url || ''}
+                                                    onChange={e => setCompany({ ...company, facebook_url: e.target.value })}
+                                                    placeholder="sayfa / URL"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">TikTok</label>
+                                                <input
+                                                    type="text"
+                                                    className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                    value={company.tiktok_url || ''}
+                                                    onChange={e => setCompany({ ...company, tiktok_url: e.target.value })}
+                                                    placeholder="@kullanici"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">İletişim notu</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold text-slate-900"
+                                                value={company.contact_note || ''}
+                                                onChange={e => setCompany({ ...company, contact_note: e.target.value })}
+                                                placeholder="Örn. WhatsApp tercih edilir"
+                                            />
+                                        </div>
+                                    </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Vergi Numarası / TCKN</label>

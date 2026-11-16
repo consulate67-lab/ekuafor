@@ -31,6 +31,17 @@ const REVIEW_SORTS: { key: ReviewSort; label: string }[] = [
 const durationText = (s: Service) =>
     s.booking_mode === 'resource' && s.duration_options?.length ? `${s.duration_options.join(' / ')} dk` : `${s.duration_minutes} dk`;
 
+function socialHref(kind: 'instagram' | 'facebook' | 'tiktok', raw?: string | null): string | null {
+    const v = (raw || '').trim();
+    if (!v) return null;
+    if (/^https?:\/\//i.test(v)) return v;
+    const handle = v.replace(/^@/, '').replace(/\/+$/, '');
+    if (!handle) return null;
+    if (kind === 'instagram') return `https://instagram.com/${handle.replace(/^instagram\.com\//i, '')}`;
+    if (kind === 'facebook') return `https://facebook.com/${handle.replace(/^facebook\.com\//i, '')}`;
+    return `https://tiktok.com/@${handle.replace(/^tiktok\.com\/@?/i, '')}`;
+}
+
 export default function CompanyPageRoute() {
     const { id } = useParams<{ id: string }>();
     return <CompanyPage key={id} id={Number(id)} />;
@@ -163,13 +174,27 @@ function CompanyPage({ id }: { id: number }) {
 
     const sector = company.primary_sector || company.sectors?.[0] || null;
     const bookable = !!company.is_bookable && services.length > 0;
-    const phone = dialNumber(company.phone);
+    const showPhone = company.show_phone !== false;
+    const showAddress = company.show_address !== false;
+    const phone = showPhone ? dialNumber(company.phone) : '';
     const rating = ratingText(company);
-    const address = [company.address_line, company.neighborhood, company.district, company.city].filter(Boolean).join(', ');
+    const address = showAddress
+        ? [company.address_line, company.neighborhood, company.district, company.city].filter(Boolean).join(', ')
+        : '';
     const hours = company.work_start_time && company.work_end_time ? `${company.work_start_time.slice(0, 5)} – ${company.work_end_time.slice(0, 5)}` : null;
     const showTeam = team.length > 0 && services.some(s => (s.booking_mode || 'staff') === 'staff');
     const favorite = favorites.isFavorite(company.id);
-    const aboutText = (company.description || '').trim() || webPack.aboutFallback;
+    const aboutText =
+        (company.description || '').trim() ||
+        (selectedTemplate?.about || '').trim() ||
+        webPack.aboutFallback ||
+        'Profesyonel ekibimizle randevu ve bakım hizmetlerinde yanınızdayız.';
+    const contactNote = (company.contact_note || '').trim();
+    const socialLinks = [
+        { label: 'Instagram', href: socialHref('instagram', company.instagram_url) },
+        { label: 'Facebook', href: socialHref('facebook', company.facebook_url) },
+        { label: 'TikTok', href: socialHref('tiktok', company.tiktok_url) },
+    ].filter((s): s is { label: string; href: string } => !!s.href);
     const contactBits = [
         phone ? { label: 'Telefon', value: company.phone || phone, href: `tel:${phone}` } : null,
         company.email ? { label: 'E-posta', value: company.email, href: `mailto:${company.email}` } : null,
@@ -180,6 +205,7 @@ function CompanyPage({ id }: { id: number }) {
                   href: company.website.startsWith('http') ? company.website : `https://${company.website}`,
               }
             : null,
+        ...socialLinks.map(s => ({ label: s.label, value: s.href.replace(/^https?:\/\//, ''), href: s.href })),
     ].filter(Boolean) as { label: string; value: string; href: string }[];
     const introMode = fromQr || searchParams.get('home') === '1';
 
@@ -365,22 +391,45 @@ function CompanyPage({ id }: { id: number }) {
                         Merhaba {visitor.firstName} — sonraki girişlerde bilginiz hatırlanır
                     </p>
                 )}
+                {(address || hours || phone || showAddress) && (
                 <section className={`bg-white border border-slate-100 shadow-sm p-5 ${layoutGroup === 'clinic' ? 'rounded-2xl' : 'rounded-3xl'}`}>
                     <dl className="space-y-2 text-sm">
                         {address && <InfoRow icon="📍" text={address} />}
                         {hours && <InfoRow icon="🕘" text={`Çalışma saatleri ${hours}`} />}
                     </dl>
-                    <div className="mt-4 grid grid-cols-2 gap-2">
+                    <div className={`mt-4 grid gap-2 ${phone ? 'grid-cols-2' : 'grid-cols-1'}`}>
                         {phone ? (
                             <a href={`tel:${phone}`} className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-emerald-50 text-emerald-700 text-sm font-black">📞 Ara</a>
-                        ) : <span />}
-                        <a href={directionsUrl(company)} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-sky-50 text-sky-700 text-sm font-black">🧭 Yol tarifi</a>
+                        ) : null}
+                        {showAddress ? (
+                            <a href={directionsUrl(company)} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-2xl bg-sky-50 text-sky-700 text-sm font-black">🧭 Yol tarifi</a>
+                        ) : null}
                     </div>
                 </section>
+                )}
 
                 <section className={`bg-white border border-slate-100 shadow-sm p-5 ${layoutGroup === 'clinic' ? 'rounded-2xl' : 'rounded-3xl'}`}>
                     <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest">Hakkında</h2>
-                    <p className="mt-2 text-sm text-slate-600 leading-relaxed">{aboutText}</p>
+                    <p className="mt-2 text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{aboutText}</p>
+                    {contactNote ? (
+                        <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">{contactNote}</p>
+                    ) : null}
+                    {socialLinks.length > 0 && (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                            {socialLinks.map(s => (
+                                <a
+                                    key={s.label}
+                                    href={s.href}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="rounded-full px-3 py-1.5 text-xs font-black text-white"
+                                    style={{ backgroundColor: theme.accent }}
+                                >
+                                    {s.label}
+                                </a>
+                            ))}
+                        </div>
+                    )}
                 </section>
 
                 <section>

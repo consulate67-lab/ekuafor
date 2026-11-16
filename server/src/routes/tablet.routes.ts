@@ -658,6 +658,20 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
             profile.hide_prices === true || profile.hide_prices === false
                 ? !!profile.hide_prices
                 : null;
+        const instagramUrl =
+            profile.instagram_url != null ? String(profile.instagram_url).trim().slice(0, 255) : null;
+        const facebookUrl =
+            profile.facebook_url != null ? String(profile.facebook_url).trim().slice(0, 255) : null;
+        const tiktokUrl =
+            profile.tiktok_url != null ? String(profile.tiktok_url).trim().slice(0, 255) : null;
+        const contactNote =
+            profile.contact_note != null ? String(profile.contact_note).trim().slice(0, 500) : null;
+        const showPhone =
+            profile.show_phone === true || profile.show_phone === false ? !!profile.show_phone : null;
+        const showAddress =
+            profile.show_address === true || profile.show_address === false
+                ? !!profile.show_address
+                : null;
         const sectorSlugs: string[] = Array.isArray(profile.sector_slugs)
             ? profile.sector_slugs.map((s: unknown) => String(s).trim()).filter(Boolean)
             : [];
@@ -668,10 +682,20 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
         await pool.query(
             `ALTER TABLE companies ADD COLUMN IF NOT EXISTS hide_prices BOOLEAN DEFAULT false`,
         );
+        await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS instagram_url VARCHAR(255)`);
+        await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS facebook_url VARCHAR(255)`);
+        await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS tiktok_url VARCHAR(255)`);
+        await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS contact_note TEXT`);
+        await pool.query(
+            `ALTER TABLE companies ADD COLUMN IF NOT EXISTS show_phone BOOLEAN DEFAULT true`,
+        );
+        await pool.query(
+            `ALTER TABLE companies ADD COLUMN IF NOT EXISTS show_address BOOLEAN DEFAULT true`,
+        );
 
         await pool.query(
             `UPDATE companies SET
-                description = COALESCE($2, description),
+                description = CASE WHEN $2::text IS NULL THEN description ELSE $2 END,
                 phone = COALESCE(NULLIF($3, ''), phone),
                 email = COALESCE(NULLIF($4, ''), email),
                 website = COALESCE(NULLIF($5, ''), website),
@@ -680,6 +704,12 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
                 district = COALESCE(NULLIF($8, ''), district),
                 web_template_id = COALESCE(NULLIF($9, ''), web_template_id),
                 hide_prices = CASE WHEN $10::boolean IS NULL THEN hide_prices ELSE $10::boolean END,
+                instagram_url = CASE WHEN $11::text IS NULL THEN instagram_url ELSE NULLIF($11, '') END,
+                facebook_url = CASE WHEN $12::text IS NULL THEN facebook_url ELSE NULLIF($12, '') END,
+                tiktok_url = CASE WHEN $13::text IS NULL THEN tiktok_url ELSE NULLIF($13, '') END,
+                contact_note = CASE WHEN $14::text IS NULL THEN contact_note ELSE NULLIF($14, '') END,
+                show_phone = CASE WHEN $15::boolean IS NULL THEN show_phone ELSE $15::boolean END,
+                show_address = CASE WHEN $16::boolean IS NULL THEN show_address ELSE $16::boolean END,
                 updated_at = NOW()
              WHERE id = $1`,
             [
@@ -693,6 +723,12 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
                 district || null,
                 webTemplateId || null,
                 hidePrices,
+                instagramUrl,
+                facebookUrl,
+                tiktokUrl,
+                contactNote,
+                showPhone,
+                showAddress,
             ],
         );
 
