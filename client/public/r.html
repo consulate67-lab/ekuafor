@@ -2,8 +2,9 @@
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="robots" content="noindex" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Saloon</title>
   <script>
     (function () {
@@ -11,18 +12,45 @@
       var c = q.get('c') || q.get('firma') || q.get('company') || '';
       if (!/^\d+$/.test(c)) {
         document.title = 'Geçersiz QR';
+        window.__saloonDest = '';
         return;
       }
-      // Kameranın tanıdığı .io/.com köprüsü → canlı uygulama
-      var dest =
-        'https://web-production-db847.up.railway.app/?c=' +
-        encodeURIComponent(c) +
-        '&ref=qr&install=1';
+      // /c/5 → sunucu 302 → /?c=5 (iOS kamera + Safari için güvenilir)
+      var dest = 'https://web-production-db847.up.railway.app/c/' + encodeURIComponent(c);
+      window.__saloonDest = dest;
+      // Hemen dene; meta refresh / buton yedek
       location.replace(dest);
     })();
   </script>
+  <script>
+    (function () {
+      var dest = window.__saloonDest || '';
+      if (!dest) return;
+      var meta = document.createElement('meta');
+      meta.httpEquiv = 'refresh';
+      meta.content = '0;url=' + dest;
+      document.head.appendChild(meta);
+    })();
+  </script>
+  <style>
+    body { margin: 0; font-family: -apple-system, system-ui, sans-serif; background: #0f172a; color: #fff; min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; text-align: center; }
+    a.btn { display: inline-block; margin-top: 1.25rem; padding: 1rem 1.5rem; border-radius: 1rem; background: #fff; color: #0f172a; font-weight: 800; text-decoration: none; font-size: 1.05rem; }
+    p { opacity: .75; line-height: 1.45; }
+  </style>
 </head>
-<body style="font-family:system-ui;padding:2rem;text-align:center">
-  <p>Yönlendiriliyor…</p>
+<body>
+  <div>
+    <p id="msg">Saloon açılıyor…</p>
+    <p style="font-size:.85rem">Açılmazsa aşağıdaki düğmeye dokunun.</p>
+    <a class="btn" id="go" href="https://web-production-db847.up.railway.app/">Devam et</a>
+  </div>
+  <script>
+    (function () {
+      var dest = window.__saloonDest;
+      var a = document.getElementById('go');
+      if (dest && a) a.href = dest;
+      else document.getElementById('msg').textContent = 'Geçersiz QR kodu';
+    })();
+  </script>
 </body>
 </html>

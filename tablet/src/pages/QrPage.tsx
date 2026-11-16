@@ -77,7 +77,8 @@ export function QrPage() {
         </button>
         <h1 className="mt-3 text-2xl font-black">QR · Web sayfası</h1>
         <p className="text-sm font-semibold text-slate-500">
-          Müşteri barkodu okutunca firma tanıtımına gider, ardından randevu ister
+          Müşteri kamerayla okutunca site açılır (iPhone’da üstteki sarı şeride dokunun). Safari’de
+          Paylaş → Ana Ekrana Ekle ile uygulama gibi kalır.
         </p>
       </header>
 

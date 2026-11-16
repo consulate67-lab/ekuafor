@@ -118,14 +118,17 @@ export const createApp = (): Express => {
     // === Request logging (pino-http) ===
     app.use(requestLogger);
 
-    // QR kısa yol: /c/5 → /?c=5&ref=qr&install=1 (kamera hash’i metin sanmasın)
+    // QR kısa yol: /c/5 → /?c=5&ref=qr&install=1 (mutlak URL — iOS/in-app tarayıcı)
     app.get('/c/:id', (req, res) => {
         const id = String(req.params.id || '');
         if (!/^\d+$/.test(id)) {
             res.status(404).send('Not found');
             return;
         }
-        res.redirect(302, `/?c=${id}&ref=qr&install=1`);
+        const host = String(req.get('x-forwarded-host') || req.get('host') || '').split(',')[0].trim();
+        const proto = String(req.get('x-forwarded-proto') || req.protocol || 'https').split(',')[0].trim();
+        const base = host ? `${proto}://${host}` : '';
+        res.redirect(302, `${base}/?c=${id}&ref=qr&install=1`);
     });
 
     // === Static client bundle (Railway web service serves SPA from /public) ===

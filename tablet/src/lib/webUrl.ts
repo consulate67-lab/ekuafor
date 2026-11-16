@@ -25,15 +25,14 @@ export function qrLandingOrigin(): string {
 
 /**
  * Firma QR hedefi.
- * Köprü: …/r.html?c=5 → uygulama /?c=5&ref=qr&install=1
+ * Köprü: …/r.html?c=5 → /c/5 → firma (kamera .app’i metin sanmasın)
  */
 export function companyPublicUrl(companyId: number): string {
   const bridge = qrLandingOrigin();
-  // Tam r.html köprüsü veya domain kökü (?c=)
   if (/r\.html$/i.test(bridge) || /\/r$/i.test(bridge)) {
     return `${bridge}?c=${companyId}`;
   }
-  return `${bridge}/?c=${companyId}&ref=qr&install=1`;
+  return `${bridge.replace(/\/$/, '')}/c/${companyId}`;
 }
 
 /** Web sitesi alanında gösterilen adres (tıklanabilir tam URL) */
