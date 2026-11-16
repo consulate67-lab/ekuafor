@@ -53,7 +53,13 @@ export async function pushWebProfile(state: TabletState): Promise<{ ok: boolean;
     if (!res.ok || !data?.success) {
       return { ok: false, message: data?.error || `Kayıt başarısız (${res.status})` };
     }
-    return { ok: true, message: data?.message || 'Web sayfası güncellendi' };
+    const hidden = data?.data?.hide_prices === true;
+    return {
+      ok: true,
+      message: hidden
+        ? 'Web kaydedildi · fiyatlar gizli'
+        : data?.message || 'Web sayfası güncellendi',
+    };
   } catch {
     return { ok: false, message: 'Sunucuya bağlanılamadı' };
   }

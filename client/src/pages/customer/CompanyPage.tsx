@@ -562,55 +562,55 @@ function CompanyPage({ id }: { id: number }) {
                 )}
             </main>
 
-            {/* Profesyonel alt randevu çubuğu */}
+            {/* Sağ kenar — her zaman görünür randevu */}
+            {bookable && (
+                <button
+                    type="button"
+                    onClick={() => book()}
+                    className="fixed right-0 top-1/2 z-40 -translate-y-1/2 rounded-l-2xl px-3 py-6 text-[11px] font-black uppercase tracking-[0.2em] text-white shadow-xl"
+                    style={{
+                        backgroundColor:
+                            theme.accent === '#e5e7eb' || theme.accent === '#ffffff' ? '#111827' : theme.accent,
+                        writingMode: 'vertical-rl',
+                    }}
+                    aria-label={ctaLabel}
+                >
+                    {ctaLabel}
+                </button>
+            )}
+
+            {/* Alt çubuk — buton sağda */}
             <div
                 className="pointer-events-none fixed inset-x-0 bottom-0 z-50"
                 style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
             >
-                <div className="pointer-events-auto mx-auto max-w-lg px-4">
-                    <div
-                        className={`flex items-center gap-3 rounded-2xl border p-2.5 shadow-2xl backdrop-blur-md ${
-                            isDark ? 'border-white/10 bg-black/80' : 'border-slate-200/80 bg-white/95'
-                        }`}
-                    >
-                        <div className="min-w-0 flex-1 pl-2">
-                            <p className={`truncate text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                                {company.name}
-                            </p>
-                            <p className={`truncate text-[11px] font-semibold ${isDark ? 'text-white/60' : 'text-slate-500'}`}>
-                                {bookable ? 'Online uygun saatleri gör · hemen ayırt' : phone ? 'Telefonla iletişime geçin' : 'Konum ve yol tarifi'}
-                            </p>
-                        </div>
-                        {bookable ? (
-                            <button
-                                type="button"
-                                onClick={() => book()}
-                                className="shrink-0 rounded-xl px-5 py-3.5 text-sm font-black text-white shadow-lg transition active:scale-[0.98]"
-                                style={{
-                                    backgroundColor:
-                                        theme.accent === '#e5e7eb' || theme.accent === '#ffffff' ? '#111827' : theme.accent,
-                                }}
-                            >
-                                {ctaLabel}
-                            </button>
-                        ) : phone ? (
-                            <a
-                                href={`tel:${phone}`}
-                                className="shrink-0 rounded-xl bg-emerald-600 px-5 py-3.5 text-sm font-black text-white shadow-lg"
-                            >
-                                Ara
-                            </a>
-                        ) : (
-                            <a
-                                href={directionsUrl(company)}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="shrink-0 rounded-xl bg-slate-900 px-5 py-3.5 text-sm font-black text-white shadow-lg"
-                            >
-                                Yol tarifi
-                            </a>
-                        )}
-                    </div>
+                <div className="pointer-events-auto mx-auto flex max-w-lg justify-end gap-2 px-4">
+                    {bookable ? (
+                        <button
+                            type="button"
+                            onClick={() => book()}
+                            className="rounded-2xl px-6 py-4 text-sm font-black text-white shadow-2xl shadow-black/30 transition active:scale-[0.98]"
+                            style={{
+                                backgroundColor:
+                                    theme.accent === '#e5e7eb' || theme.accent === '#ffffff' ? '#111827' : theme.accent,
+                            }}
+                        >
+                            {ctaLabel}
+                        </button>
+                    ) : phone ? (
+                        <a href={`tel:${phone}`} className="rounded-2xl bg-emerald-600 px-6 py-4 text-sm font-black text-white shadow-2xl">
+                            Ara
+                        </a>
+                    ) : (
+                        <a
+                            href={directionsUrl(company)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-2xl bg-slate-900 px-6 py-4 text-sm font-black text-white shadow-2xl"
+                        >
+                            Yol tarifi
+                        </a>
+                    )}
                 </div>
             </div>
 

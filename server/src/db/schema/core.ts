@@ -118,6 +118,10 @@ export const companies = pgTable('companies', {
     reviewCount: integer('review_count').default(0),
     staffCount: integer('staff_count').default(0),
     serviceCount: integer('service_count').default(0),
+    /** QR / müşteri web şablonu */
+    webTemplateId: varchar('web_template_id', { length: 64 }),
+    /** true ise public web’de fiyatlar gizlenir */
+    hidePrices: boolean('hide_prices').default(false),
 }, (table) => {
     return {
         idxCompaniesActive: index('idx_companies_active').using('btree', table.isActive.asc().nullsLast().op('bool_ops')),

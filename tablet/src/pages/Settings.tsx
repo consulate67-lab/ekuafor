@@ -228,10 +228,11 @@ export function Settings() {
     const result = await pushWebProfile(state);
     const photos = await pushStaffPhotos(state);
     setWebBusy(false);
+    const priceNote = next.hidePrices ? 'Fiyatlar web’de gizli.' : 'Fiyatlar web’de görünür.';
     setWebMsg(
       photos.ok
-        ? `${result.message} · ${photos.message}`
-        : result.message,
+        ? `${result.message} · ${priceNote} · ${photos.message}`
+        : `${result.message} · ${priceNote}`,
     );
   };
 

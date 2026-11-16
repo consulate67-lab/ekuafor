@@ -234,11 +234,30 @@ class CompanyService {
 
         const result = await db.execute(sql`SELECT * FROM companies WHERE id = ${id}`);
         const rows = (result as any).rows as any[];
-        const company = rows[0] || null;
+        let company = rows[0] || null;
+
+        // Cache’ten gelse bile hide_prices / web_template_id taze oku
+        if (company) {
+            try {
+                const fresh = await db.execute(
+                    sql`SELECT hide_prices, web_template_id FROM companies WHERE id = ${id}`,
+                );
+                const fr = (fresh as any).rows?.[0];
+                if (fr) {
+                    company = {
+                        ...company,
+                        hide_prices: fr.hide_prices === true,
+                        web_template_id: fr.web_template_id ?? company.web_template_id ?? null,
+                    };
+                }
+            } catch {
+                /* kolon henüz yoksa yok say */
+            }
+        }
 
         if (redis && company) {
             try {
-                await redis.setex(cacheKey, 3600, JSON.stringify(company)); // 1 hour cache
+                await redis.setex(cacheKey, 60, JSON.stringify(company));
             } catch (err) { }
         }
 

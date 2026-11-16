@@ -709,7 +709,24 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
             }
         }
 
-        res.json({ success: true, message: 'Web sayfası profili güncellendi', data: { company_id: companyId } });
+        // Redis firma detay cache — hide_prices / şablon hemen yansısin
+        try {
+            const redis = (await import('../config/redis')).default;
+            if (redis) await redis.del(`company:detail:${companyId}`);
+        } catch {
+            /* redis yoksa devam */
+        }
+
+        const check = await pool.query(`SELECT hide_prices, web_template_id FROM companies WHERE id = $1`, [companyId]);
+        res.json({
+            success: true,
+            message: 'Web sayfası profili güncellendi',
+            data: {
+                company_id: companyId,
+                hide_prices: check.rows[0]?.hide_prices === true,
+                web_template_id: check.rows[0]?.web_template_id || null,
+            },
+        });
     } catch (error) {
         console.error('[tablet/company/profile]', error);
         res.status(500).json({
