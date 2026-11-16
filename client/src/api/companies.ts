@@ -79,8 +79,13 @@ export const companiesApi = {
 
     get: async (id: number): Promise<PublicCompany> => (await client.get(`/companies/${id}`)).data.data,
 
-    services: async (id: number): Promise<Service[]> =>
-        ((await client.get('/services', { params: { company_id: id } })).data.data || []).filter((s: Service) => s.is_active !== false),
+    services: async (id: number): Promise<Service[]> => {
+        const res = await client.get('/services', { params: { company_id: id } });
+        const hide = res.data?.hide_prices === true;
+        return (res.data?.data || [])
+            .filter((s: Service) => s.is_active !== false)
+            .map((s: Service) => (hide || s.price_hidden ? { ...s, price: 0, price_hidden: true } : s));
+    },
 
     employees: async (id: number): Promise<PublicEmployee[]> => (await client.get(`/companies/${id}/employees`)).data.data || [],
 

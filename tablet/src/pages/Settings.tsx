@@ -97,6 +97,8 @@ export function Settings() {
       templateId: base.templateId || defaultWebTemplateId(sectorSlugs[0]),
       phone: base.phone || defaultPhone,
       website: base.website || defaultWebsite,
+      // Varsayılan: web’de fiyat gizli (açıkça false yapılmadıysa)
+      hidePrices: base.hidePrices !== false,
     };
   });
   const [webBusy, setWebBusy] = useState(false);

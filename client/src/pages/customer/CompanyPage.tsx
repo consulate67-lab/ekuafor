@@ -77,8 +77,9 @@ function CompanyPage({ id }: { id: number }) {
             companiesApi.reviews(id).catch(() => []),
         ])
             .then(([c, s, t, r]) => {
-                setCompany(c);
-                setServices(s);
+                const hide = c.hide_prices === true || s.some(x => x.price_hidden === true);
+                setCompany({ ...c, hide_prices: hide });
+                setServices(hide ? s.map(x => ({ ...x, price: 0, price_hidden: true })) : s);
                 setTeam(t);
                 setReviews(r);
             })
@@ -130,10 +131,7 @@ function CompanyPage({ id }: { id: number }) {
         : fallbackPack;
     const heroImage = company?.photo || webPack.gallery[0]?.src || null;
     const serviceImages = useMemo(() => assignServiceImages(services), [services]);
-    const hidePrices = useMemo(
-        () => company?.hide_prices === true || services.some(s => s.price_hidden === true),
-        [company?.hide_prices, services],
-    );
+    const hidePrices = !!(company?.hide_prices || services.some(s => s.price_hidden));
 
     const saveVisitor = (): boolean => {
         const firstName = vf.firstName.trim();
@@ -567,7 +565,7 @@ function CompanyPage({ id }: { id: number }) {
                 <button
                     type="button"
                     onClick={() => book()}
-                    className="fixed right-0 top-1/2 z-40 -translate-y-1/2 rounded-l-2xl px-3 py-6 text-[11px] font-black uppercase tracking-[0.2em] text-white shadow-xl"
+                    className="fixed right-0 top-[42%] z-[60] -translate-y-1/2 rounded-l-2xl px-3.5 py-8 text-xs font-black uppercase tracking-[0.22em] text-white shadow-2xl"
                     style={{
                         backgroundColor:
                             theme.accent === '#e5e7eb' || theme.accent === '#ffffff' ? '#111827' : theme.accent,
