@@ -95,14 +95,55 @@ export function Board() {
   const deviceId = useAppStore(s => s.deviceId);
   const ingestApprovedWebAppointment = useAppStore(s => s.ingestApprovedWebAppointment);
 
+  type Sheet =
+    | {
+        mode: 'appointment';
+        staffId: string;
+        startTime: string;
+        step: 'service' | 'name';
+        /** Bekleme aralığında araya iş — bitiş sınırı HH:mm */
+        insertUntil?: string;
+        insertFromEventId?: string;
+      }
+    | { mode: 'groupClass'; staffId: string; startTime: string; serviceId: string }
+    | { mode: 'leave'; staffId: string; startTime: string }
+    | { mode: 'complete'; event: DayEvent }
+    | { mode: 'expense'; staffId: string }
+    | { mode: 'detail'; event: DayEvent }
+    | { mode: 'pending' };
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
-  const [tick, setTick] = useState(0);
+  const scrolledToNowForDate = useRef<string | null>(null);
+  const knownPendingIdsRef = useRef<Set<number>>(new Set());
+  const lastPendingReminderRef = useRef(0);
 
-  useEffect(() => {
-    const id = window.setInterval(() => setTick(t => t + 1), 60_000);
-    return () => clearInterval(id);
-  }, []);
+  const [tick, setTick] = useState(0);
+  const [sheet, setSheet] = useState<Sheet | null>(null);
+  const [pendingList, setPendingList] = useState<PendingAppointment[]>([]);
+  const [pendingBusyId, setPendingBusyId] = useState<number | null>(null);
+  const [pendingMsg, setPendingMsg] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [subscriberId, setSubscriberId] = useState('');
+  const [campaignId, setCampaignId] = useState('');
+  const [bookMsg, setBookMsg] = useState('');
+  const [groupQuery, setGroupQuery] = useState('');
+  const [groupSelected, setGroupSelected] = useState<string[]>([]);
+  const [collected, setCollected] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
+  /** Abone tamamlamada: ödeme alındı mı? */
+  const [subscriberPaid, setSubscriberPaid] = useState(false);
+  const [consentOk, setConsentOk] = useState(false);
+  const [leaveDuration, setLeaveDuration] = useState(60);
+  const [note, setNote] = useState('');
+  const [expAmount, setExpAmount] = useState('');
+  const [expDesc, setExpDesc] = useState('');
+  const [listening, setListening] = useState(false);
+  const [voiceError, setVoiceError] = useState('');
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calYear, setCalYear] = useState(() => parseKey(selectedDate).y);
+  const [calMonth, setCalMonth] = useState(() => parseKey(selectedDate).m);
 
   const dayHours = useMemo(
     () => companyHoursForDate(company, selectedDate),
@@ -138,7 +179,6 @@ export function Board() {
   const STAFF_COL_W = Math.round(BASE_STAFF_COL_W * Math.min(1.1, scale + 0.05));
   const ROW_H = Math.round(80 * scale);
   const PHOTO = Math.round(80 * scale);
-  const scrolledToNowForDate = useRef<string | null>(null);
 
   const scrollBoardToNow = (behavior: ScrollBehavior = 'smooth') => {
     if (!scrollRef.current || !slots.length) return;
@@ -146,42 +186,6 @@ export function Board() {
     const target = Math.max(0, idx * COL_W - 24);
     scrollRef.current.scrollTo({ left: target, behavior });
   };
-
-  useEffect(() => {
-    if (!isToday || !slots.length) {
-      scrolledToNowForDate.current = null;
-      return;
-    }
-    if (scrolledToNowForDate.current === selectedDate) return;
-    scrolledToNowForDate.current = selectedDate;
-    const t = window.setTimeout(() => scrollBoardToNow('smooth'), 50);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isToday, selectedDate, slots.length, COL_W, company.slotInterval]);
-
-  type Sheet =
-    | {
-        mode: 'appointment';
-        staffId: string;
-        startTime: string;
-        step: 'service' | 'name';
-        /** Bekleme aralığında araya iş — bitiş sınırı HH:mm */
-        insertUntil?: string;
-        insertFromEventId?: string;
-      }
-    | { mode: 'groupClass'; staffId: string; startTime: string; serviceId: string }
-    | { mode: 'leave'; staffId: string; startTime: string }
-    | { mode: 'complete'; event: DayEvent }
-    | { mode: 'expense'; staffId: string }
-    | { mode: 'detail'; event: DayEvent }
-    | { mode: 'pending' };
-
-  const [sheet, setSheet] = useState<Sheet | null>(null);
-  const [pendingList, setPendingList] = useState<PendingAppointment[]>([]);
-  const [pendingBusyId, setPendingBusyId] = useState<number | null>(null);
-  const [pendingMsg, setPendingMsg] = useState('');
-  const knownPendingIdsRef = useRef<Set<number>>(new Set());
-  const lastPendingReminderRef = useRef(0);
 
   const refreshPending = async () => {
     const companyId = company.serverCompanyId;
@@ -209,6 +213,23 @@ export function Board() {
   };
 
   useEffect(() => {
+    const id = window.setInterval(() => setTick(t => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (!isToday || !slots.length) {
+      scrolledToNowForDate.current = null;
+      return;
+    }
+    if (scrolledToNowForDate.current === selectedDate) return;
+    scrolledToNowForDate.current = selectedDate;
+    const t = window.setTimeout(() => scrollBoardToNow('smooth'), 50);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isToday, selectedDate, slots.length, COL_W, company.slotInterval]);
+
+  useEffect(() => {
     void refreshPending();
     const id = window.setInterval(() => void refreshPending(), 20_000);
     return () => clearInterval(id);
@@ -225,28 +246,6 @@ export function Board() {
     }, 30_000);
     return () => clearInterval(id);
   }, [pendingList.length]);
-
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [subscriberId, setSubscriberId] = useState('');
-  const [campaignId, setCampaignId] = useState('');
-  const [bookMsg, setBookMsg] = useState('');
-  const [groupQuery, setGroupQuery] = useState('');
-  const [groupSelected, setGroupSelected] = useState<string[]>([]);
-  const [collected, setCollected] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
-  /** Abone tamamlamada: ödeme alındı mı? */
-  const [subscriberPaid, setSubscriberPaid] = useState(false);
-  const [consentOk, setConsentOk] = useState(false);
-  const [leaveDuration, setLeaveDuration] = useState(60);
-  const [note, setNote] = useState('');
-  const [expAmount, setExpAmount] = useState('');
-  const [expDesc, setExpDesc] = useState('');
-  const [listening, setListening] = useState(false);
-  const [voiceError, setVoiceError] = useState('');
-  const [calendarOpen, setCalendarOpen] = useState(false);
-  const [calYear, setCalYear] = useState(() => parseKey(selectedDate).y);
-  const [calMonth, setCalMonth] = useState(() => parseKey(selectedDate).m);
 
   const openAppointment = (
     staffId: string,
