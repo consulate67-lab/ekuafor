@@ -220,16 +220,27 @@ describe('HTTP API', () => {
         await request(app).get('/api/appointments').query({ company_id: ids.salon }).expect(403);
     });
 
+    const seedOtp = async (phone10: string, code = '123456') => {
+        await pool.query(
+            `INSERT INTO otp_codes (phone, code, expires_at, is_used)
+             VALUES ($1, $2, CURRENT_TIMESTAMP + interval '10 minutes', false)`,
+            [`90${phone10.replace(/\D/g, '').slice(-10)}`, code],
+        );
+        return code;
+    };
+
     it('public rezervasyon: durum ve fiyat istemciden alınmaz, aynı slot ikinci kez 409 döner', async () => {
         const date = day(9);
         const availability = await request(app).get('/api/availability')
             .query({ company_id: ids.salon, service_ids: `${ids.haircut}`, date }).expect(200);
         expect(availability.body.data.slots.find((s: any) => s.time === '12:00').available).toBe(true);
 
+        const otp = await seedOtp('5551112233');
         const body = {
             company_id: ids.salon, services: [{ service_id: ids.haircut, staff_id: ids.ayse }], staff_id: ids.ayse,
             appointment_date: date, start_time: '12:00', price: 1, status: 'approved',
             customer_name: 'Web Müşteri', customer_phone: '5551112233', device_id: 'dev-1', client_request_id: 'http-1',
+            otp_code: otp,
         };
         const created = await request(app).post('/api/appointments').send(body).expect(201);
         expect(created.body.data).toMatchObject({ status: 'pending', staff_id: ids.ayse });
@@ -237,14 +248,16 @@ describe('HTTP API', () => {
 
         const retry = await request(app).post('/api/appointments').send(body).expect(201);
         expect(retry.body.data.id).toBe(created.body.data.id);
-        await request(app).post('/api/appointments').send({ ...body, client_request_id: 'http-2' }).expect(409);
+        const otp2 = await seedOtp('5551112233', '654321');
+        await request(app).post('/api/appointments').send({ ...body, client_request_id: 'http-2', otp_code: otp2 }).expect(409);
     });
 
     it('puanlama: sadece randevu sahibi, sadece tamamlanan randevu', async () => {
         const date = day(9);
+        const otp = await seedOtp('5559998877');
         const created = await request(app).post('/api/appointments').send({
             company_id: ids.salon, services: [{ service_id: ids.haircut }], appointment_date: date, start_time: '13:00',
-            customer_phone: '0555 999 88 77', device_id: 'dev-rate',
+            customer_phone: '0555 999 88 77', device_id: 'dev-rate', otp_code: otp,
         }).expect(201);
         const id = created.body.data.id;
 

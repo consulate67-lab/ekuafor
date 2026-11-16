@@ -18,8 +18,12 @@ const client = axios.create({
 client.interceptors.request.use(config => {
     const token = storage.get(StorageKey.token);
     if (token) config.headers.Authorization = `Bearer ${token}`;
+    // Müşteri web randevusuna board anahtarı yapışmasın — aksi halde pending yerine approved yazılıyordu
+    const url = String(config.url || '');
+    const method = String(config.method || 'get').toLowerCase();
+    const isPublicBookingPost = method === 'post' && (/\/appointments\/?$/.test(url) || url === 'appointments');
     const boardKey = storage.get(StorageKey.boardKey);
-    if (boardKey) config.headers['X-Board-Key'] = boardKey;
+    if (boardKey && !isPublicBookingPost) config.headers['X-Board-Key'] = boardKey;
     return config;
 });
 

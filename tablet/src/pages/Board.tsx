@@ -42,6 +42,7 @@ import {
   setPendingAppointmentStatus,
   type PendingAppointment,
 } from '../lib/pendingAppointments';
+import { PENDING_REMINDER_MS, playPendingAlert } from '../lib/pendingAlert';
 import { titleLabel } from '../lib/staffRoles';
 import {
   eligibleSubscribers,
@@ -108,6 +109,7 @@ export function Board() {
     const key = company.activationKey;
     if (!companyId || !key || !navigator.onLine) {
       setPendingList([]);
+      knownPendingIdsRef.current = new Set();
       return;
     }
     const res = await fetchPendingAppointments({
@@ -115,7 +117,17 @@ export function Board() {
       activationKey: key,
       companyId,
     });
-    if (res.ok) setPendingList(res.data);
+    if (!res.ok) return;
+    const next = res.data;
+    const prevIds = knownPendingIdsRef.current;
+    const hasNew = next.some(row => !prevIds.has(row.id));
+    knownPendingIdsRef.current = new Set(next.map(row => row.id));
+    setPendingList(next);
+    // Yeni onay talebi geldiğinde hemen ses
+    if (hasNew && next.length > 0) {
+      lastPendingReminderRef.current = Date.now();
+      void playPendingAlert();
+    }
   };
 
   useEffect(() => {
@@ -124,6 +136,18 @@ export function Board() {
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [company.serverCompanyId, company.activationKey, deviceId]);
+
+  // Cevaplanmayan pending varken 15 dk'da bir uyarı sesi
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (pendingList.length === 0) return;
+      const now = Date.now();
+      if (now - lastPendingReminderRef.current < PENDING_REMINDER_MS) return;
+      lastPendingReminderRef.current = now;
+      void playPendingAlert();
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [pendingList.length]);
 
   const dayHours = useMemo(
     () => companyHoursForDate(company, selectedDate),
@@ -201,6 +225,8 @@ export function Board() {
   const [pendingList, setPendingList] = useState<PendingAppointment[]>([]);
   const [pendingBusyId, setPendingBusyId] = useState<number | null>(null);
   const [pendingMsg, setPendingMsg] = useState('');
+  const knownPendingIdsRef = useRef<Set<number>>(new Set());
+  const lastPendingReminderRef = useRef(0);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [subscriberId, setSubscriberId] = useState('');
@@ -721,6 +747,8 @@ export function Board() {
                   setPendingMsg('');
                   void refreshPending();
                   setSheet({ mode: 'pending' });
+                  // Tarayıcı ses kilidini aç (ilk tıklamada)
+                  void playPendingAlert().catch(() => undefined);
                 }}
                 className="relative btn btn-secondary !min-h-11 !px-3 !text-xs font-black"
               >
@@ -1970,7 +1998,7 @@ export function Board() {
         <Modal onClose={() => setSheet(null)}>
           <h3 className="text-lg font-black">Onay bekleyen randevular</h3>
           <p className="mt-1 text-sm font-semibold text-slate-500">
-            Web / QR talepleri · onayda müşteriye SMS gider
+            Web / QR talepleri · onayda müşteriye SMS gider · cevaplanmazsa 15 dk’da bir uyarı sesi
           </p>
           <div className="mt-4 max-h-[55vh] space-y-3 overflow-y-auto">
             {pendingList.length === 0 ? (

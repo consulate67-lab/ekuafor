@@ -71,6 +71,8 @@ function BookingPage({ id }: { id: string }) {
     const companyId = Number(id);
     /** İşletme kullanıcısı kendi firmasına müşteri adına randevu giriyor. */
     const isBusiness = !!user && ['company_admin', 'staff'].includes(user.role) && Number(user.company_id) === companyId;
+    /** Misafir (telefonla) randevu: SMS OTP zorunlu */
+    const needsPhoneOtp = !isBusiness && !isAuthenticated;
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const initialStaffId = searchParams.get('staff') ? Number(searchParams.get('staff')) : null;
@@ -79,6 +81,10 @@ function BookingPage({ id }: { id: string }) {
     const [services, setServices] = useState<Service[]>([]);
     const [staff, setStaff] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(true);
+    const [otpCode, setOtpCode] = useState('');
+    const [otpSent, setOtpSent] = useState(false);
+    const [otpTimer, setOtpTimer] = useState(0);
+    const [otpBusy, setOtpBusy] = useState(false);
 
     const [stepIndex, setStepIndex] = useState(0);
     const [selection, setSelection] = useState<SelectionState>(() => {
@@ -276,6 +282,32 @@ function BookingPage({ id }: { id: string }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loading, services]);
 
+    useEffect(() => {
+        if (otpTimer <= 0) return;
+        const id = window.setInterval(() => setOtpTimer(t => Math.max(0, t - 1)), 1000);
+        return () => clearInterval(id);
+    }, [otpTimer]);
+
+    const sendBookingOtp = async () => {
+        const phone = selection.customerPhone.replace(/\D/g, '');
+        if (phone.length < 10) {
+            setError('Geçerli bir telefon numarası girin');
+            return;
+        }
+        setOtpBusy(true);
+        setError(null);
+        try {
+            await api.post('/auth/send-otp', { phone });
+            setOtpSent(true);
+            setOtpTimer(60);
+            setOtpCode('');
+        } catch (err: any) {
+            setError(err.response?.data?.error || 'Doğrulama kodu gönderilemedi');
+        } finally {
+            setOtpBusy(false);
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (submitting) return;
@@ -284,13 +316,28 @@ function BookingPage({ id }: { id: string }) {
         try {
             const deviceId = isBusiness ? null : await getDeviceId();
             const cachedPhone = isBusiness ? null : localStorage.getItem('customer_phone');
-            const phone = isBusiness ? selection.customerPhone : (user?.phone || cachedPhone || selection.customerPhone);
+            const phone = isBusiness
+                ? selection.customerPhone
+                : (user?.phone || selection.customerPhone || cachedPhone || '');
+            if (needsPhoneOtp) {
+                if (!phone || String(phone).replace(/\D/g, '').length < 10) {
+                    setError('Geçerli bir telefon numarası gerekli');
+                    setSubmitting(false);
+                    return;
+                }
+                if (!/^\d{6}$/.test(otpCode)) {
+                    setError('6 haneli SMS doğrulama kodunu girin');
+                    setSubmitting(false);
+                    return;
+                }
+            }
             const base = {
                 company_id: companyId,
                 customer_name: selection.customerName.trim() || undefined,
                 customer_phone: phone || undefined,
                 device_id: deviceId || undefined,
                 client_request_id: requestIdRef.current,
+                ...(needsPhoneOtp ? { otp_code: otpCode } : {}),
             };
             const body = mode === 'class'
                 ? { ...base, class_session_id: selection.sessionId, party_size: selection.partySize }
@@ -617,9 +664,50 @@ function BookingPage({ id }: { id: string }) {
                             <input type="text" value={selection.customerName} onChange={e => update({ customerName: e.target.value })} className="w-full p-4 bg-white rounded-2xl border-2 border-slate-100 font-bold" placeholder={isBusiness ? 'Müşteri adı soyadı' : 'Adınız Soyadınız'} autoComplete={isBusiness ? 'off' : 'name'} required />
                             {isBusiness ? (
                                 <input type="tel" inputMode="numeric" value={selection.customerPhone} onChange={e => update({ customerPhone: e.target.value.replace(/\D/g, '').slice(0, 11) })} className="w-full p-4 bg-white rounded-2xl border-2 border-slate-100 font-bold" placeholder="Müşteri telefonu (isteğe bağlı)" autoComplete="off" minLength={10} />
-                            ) : !isAuthenticated && !localStorage.getItem('customer_phone') && (
-                                <input type="tel" inputMode="numeric" value={selection.customerPhone} onChange={e => update({ customerPhone: e.target.value.replace(/\D/g, '').slice(0, 11) })} className="w-full p-4 bg-white rounded-2xl border-2 border-slate-100 font-bold" placeholder="5XX XXX XX XX" autoComplete="tel" required minLength={10} />
-                            )}
+                            ) : needsPhoneOtp ? (
+                                <>
+                                    <input
+                                        type="tel"
+                                        inputMode="numeric"
+                                        value={selection.customerPhone}
+                                        onChange={e => {
+                                            update({ customerPhone: e.target.value.replace(/\D/g, '').slice(0, 11) });
+                                            setOtpSent(false);
+                                            setOtpCode('');
+                                        }}
+                                        className="w-full p-4 bg-white rounded-2xl border-2 border-slate-100 font-bold"
+                                        placeholder="5XX XXX XX XX"
+                                        autoComplete="tel"
+                                        required
+                                        minLength={10}
+                                    />
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            disabled={otpBusy || otpTimer > 0 || selection.customerPhone.replace(/\D/g, '').length < 10}
+                                            onClick={() => void sendBookingOtp()}
+                                            className="shrink-0 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white disabled:opacity-40"
+                                        >
+                                            {otpTimer > 0 ? `Tekrar (${otpTimer})` : otpSent ? 'Kodu tekrar gönder' : 'SMS kodu gönder'}
+                                        </button>
+                                        <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            value={otpCode}
+                                            onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                            className="w-full p-4 bg-white rounded-2xl border-2 border-amber-200 font-bold tracking-widest"
+                                            placeholder="6 haneli kod"
+                                            autoComplete="one-time-code"
+                                            required
+                                            minLength={6}
+                                            maxLength={6}
+                                        />
+                                    </div>
+                                    <p className="text-xs font-semibold text-slate-500">
+                                        Numaranızı SMS kodu ile doğruluyoruz; sahte randevu engellenir.
+                                    </p>
+                                </>
+                            ) : null}
                         </form>
                     </section>
                 )}
@@ -634,8 +722,13 @@ function BookingPage({ id }: { id: string }) {
             )}
             {step === 'confirm' && (
                 <footer className="fixed bottom-0 inset-x-0 p-5 bg-gradient-to-t from-white via-white to-transparent z-40" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.25rem)' }}>
-                    <button type="submit" form="booking-form" disabled={submitting} className="w-full max-w-md mx-auto block bg-gradient-to-r from-amber-500 to-amber-600 text-white py-5 rounded-3xl font-black uppercase shadow-2xl disabled:opacity-50">
-                        {submitting ? 'Gönderiliyor…' : 'Rezervasyonu Onayla'}
+                    <button
+                        type="submit"
+                        form="booking-form"
+                        disabled={submitting || (needsPhoneOtp && (!otpSent || otpCode.length !== 6))}
+                        className="w-full max-w-md mx-auto block bg-gradient-to-r from-amber-500 to-amber-600 text-white py-5 rounded-3xl font-black uppercase shadow-2xl disabled:opacity-50"
+                    >
+                        {submitting ? 'Gönderiliyor…' : needsPhoneOtp && !otpSent ? 'Önce SMS kodu alın' : 'Rezervasyonu Onayla'}
                     </button>
                 </footer>
             )}

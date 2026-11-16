@@ -36,6 +36,8 @@ const bookingSchema = z.object({
     notes: z.string().max(1000).optional().nullable(),
     customer_name: z.string().max(255).optional().nullable(),
     customer_phone: z.string().max(20).optional().nullable(),
+    /** Misafir web randevusunda SMS OTP kodu (firma / girişli müşteri hariç zorunlu) */
+    otp_code: z.string().regex(/^\d{6}$/).optional().nullable(),
     device_id: z.string().max(255).optional().nullable(),
     client_request_id: z.string().max(64).optional().nullable(),
 });
@@ -153,20 +155,49 @@ router.get('/company/:companyId/completed', authMiddleware, async (req: Request,
 
 /**
  * POST /api/appointments
- * Müşteri (anonim veya müşteri hesabı) → `pending`. Firma kullanıcısı / board → varsayılan `approved`,
- * çalışma saati ve fiyat kısıtı yok. Çakışma ve kapasite kontrolü her durumda sunucuda yapılır.
+ * Müşteri (anonim veya müşteri hesabı) → her zaman `pending` (tablet Onay kuyruğu).
+ * Firma paneli (company_admin / staff / super_admin) → varsayılan `approved`.
+ * Board anahtarı müşteri web randevusunu onaylı saymaz (yanlışlıkla X-Board-Key taşısa bile pending kalır).
  */
 router.post('/', optionalCompanyAuth, async (req: Request, res: Response) => {
     try {
         const body = bookingSchema.parse(req.body);
         const user = req.user;
-        const byCompany = !!user && user.role !== 'customer' && canAccessCompany(req, body.company_id);
+        const companyRoles = new Set(['company_admin', 'staff', 'super_admin']);
+        const byCompany = !!user && companyRoles.has(user.role) && canAccessCompany(req, body.company_id);
 
         const items = body.services?.length
             ? body.services.map(s => ({ serviceId: Number(s.service_id ?? s.id), staffId: s.staff_id, durationMinutes: s.duration_minutes, price: s.price }))
             : (body.service_ids?.length ? body.service_ids : body.service_id ? [body.service_id] : []).map(serviceId => ({ serviceId }));
         if (!body.class_session_id && (items.length === 0 || items.some(i => !i.serviceId))) {
             return res.status(400).json({ success: false, error: 'En az bir hizmet seçilmelidir' });
+        }
+
+        // Idempotent tekrar: OTP yeniden istenmez
+        if (body.client_request_id && !byCompany) {
+            const existing = await pool.query(
+                'SELECT * FROM appointments WHERE company_id = $1 AND client_request_id = $2 LIMIT 1',
+                [body.company_id, body.client_request_id],
+            );
+            if (existing.rows[0]) {
+                return res.status(201).json({ success: true, data: existing.rows[0] });
+            }
+        }
+
+        const phoneNorm = body.customer_phone ? normalizePhone(body.customer_phone) : null;
+        const guestNeedsOtp = !byCompany && user?.role !== 'customer';
+        if (guestNeedsOtp) {
+            if (!phoneNorm || phoneNorm.length < 10) {
+                return res.status(400).json({ success: false, error: 'Geçerli bir telefon numarası gerekli' });
+            }
+            if (!body.otp_code) {
+                return res.status(400).json({ success: false, error: 'Telefon doğrulama kodu gerekli' });
+            }
+            const otpService = (await import('../services/otp.service')).default;
+            const ok = await otpService.verifyOtp(phoneNorm, body.otp_code);
+            if (!ok) {
+                return res.status(400).json({ success: false, error: 'Doğrulama kodu hatalı veya süresi dolmuş' });
+            }
         }
 
         const appointment = await createBooking({
@@ -184,7 +215,7 @@ router.post('/', optionalCompanyAuth, async (req: Request, res: Response) => {
             notes: body.notes,
             customerId: user?.role === 'customer' ? user.userId : null,
             customerName: body.customer_name,
-            customerPhone: body.customer_phone,
+            customerPhone: phoneNorm || body.customer_phone,
             deviceId: body.device_id,
             clientRequestId: body.client_request_id,
             byCompany,
