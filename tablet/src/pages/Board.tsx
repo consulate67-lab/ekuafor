@@ -104,51 +104,6 @@ export function Board() {
     return () => clearInterval(id);
   }, []);
 
-  const refreshPending = async () => {
-    const companyId = company.serverCompanyId;
-    const key = company.activationKey;
-    if (!companyId || !key || !navigator.onLine) {
-      setPendingList([]);
-      knownPendingIdsRef.current = new Set();
-      return;
-    }
-    const res = await fetchPendingAppointments({
-      deviceId,
-      activationKey: key,
-      companyId,
-    });
-    if (!res.ok) return;
-    const next = res.data;
-    const prevIds = knownPendingIdsRef.current;
-    const hasNew = next.some(row => !prevIds.has(row.id));
-    knownPendingIdsRef.current = new Set(next.map(row => row.id));
-    setPendingList(next);
-    // Yeni onay talebi geldiğinde hemen ses
-    if (hasNew && next.length > 0) {
-      lastPendingReminderRef.current = Date.now();
-      void playPendingAlert();
-    }
-  };
-
-  useEffect(() => {
-    void refreshPending();
-    const id = window.setInterval(() => void refreshPending(), 20_000);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [company.serverCompanyId, company.activationKey, deviceId]);
-
-  // Cevaplanmayan pending varken 15 dk'da bir uyarı sesi
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      if (pendingList.length === 0) return;
-      const now = Date.now();
-      if (now - lastPendingReminderRef.current < PENDING_REMINDER_MS) return;
-      lastPendingReminderRef.current = now;
-      void playPendingAlert();
-    }, 30_000);
-    return () => clearInterval(id);
-  }, [pendingList.length]);
-
   const dayHours = useMemo(
     () => companyHoursForDate(company, selectedDate),
     [
@@ -227,6 +182,50 @@ export function Board() {
   const [pendingMsg, setPendingMsg] = useState('');
   const knownPendingIdsRef = useRef<Set<number>>(new Set());
   const lastPendingReminderRef = useRef(0);
+
+  const refreshPending = async () => {
+    const companyId = company.serverCompanyId;
+    const key = company.activationKey;
+    if (!companyId || !key || !navigator.onLine) {
+      setPendingList([]);
+      knownPendingIdsRef.current = new Set();
+      return;
+    }
+    const res = await fetchPendingAppointments({
+      deviceId,
+      activationKey: key,
+      companyId,
+    });
+    if (!res.ok) return;
+    const next = res.data;
+    const prevIds = knownPendingIdsRef.current;
+    const hasNew = next.some(row => !prevIds.has(row.id));
+    knownPendingIdsRef.current = new Set(next.map(row => row.id));
+    setPendingList(next);
+    if (hasNew && next.length > 0) {
+      lastPendingReminderRef.current = Date.now();
+      void playPendingAlert();
+    }
+  };
+
+  useEffect(() => {
+    void refreshPending();
+    const id = window.setInterval(() => void refreshPending(), 20_000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [company.serverCompanyId, company.activationKey, deviceId]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (pendingList.length === 0) return;
+      const now = Date.now();
+      if (now - lastPendingReminderRef.current < PENDING_REMINDER_MS) return;
+      lastPendingReminderRef.current = now;
+      void playPendingAlert();
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [pendingList.length]);
+
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [subscriberId, setSubscriberId] = useState('');
