@@ -6,73 +6,49 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const sectors = JSON.parse(fs.readFileSync(path.join(process.env.TEMP, 'all-services.json'), 'utf8'));
 const img = (id) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=700&q=80`;
 
+/**
+ * Sadece görsel olarak doğrulanmış Unsplash ID'leri.
+ * (çocuk oyuncağı / manzara / tişört / spor vb. ASLA buraya girmez)
+ */
 const POOLS = {
   nails: [
-    'photo-1604654894610-df63bc536371',
-    'photo-1632345031435-8727f6897d53',
-    'photo-1519014816548-bf5fe059798b',
-    'photo-1515488042361-ee00e0ddd4e4',
-    'photo-1596464716127-f2a82984de30',
-    'photo-1596755094514-f87e34085b2c',
-    'photo-1522338140262-f46f5913618a',
+    'photo-1519014816548-bf5fe059798b', // protez / nail art
+    'photo-1604654894610-df63bc536371', // manikür
+    'photo-1632345031435-8727f6897d53', // UV lamba + teknisyen
+    'photo-1522337660859-02fbefca4702', // oje / glitter
   ],
   skin: [
-    'photo-1552693673-1bf958298935',
-    'photo-1515377905703-c4788e51af15',
-    'photo-1540555700478-4be289fbecef',
-    'photo-1512290923902-8a9f81dc236c',
-    'photo-1516975080664-ed2fc6a32937',
-    'photo-1596755389378-c31d21fd1273',
-    'photo-1616394584738-fc6e612e71b9',
-    'photo-1507652313519-d4e9174996dd',
-    'photo-1558591710-4b4a1ae0f04d',
-    'photo-1470071459604-3b5ec3a7fe05',
-    'photo-1515372039744-b8f02a3ae446',
-    'photo-1598440947619-2c35fc9aa908',
-    'photo-1576091160399-112ba8d25d1d',
-    'photo-1576091160550-2173dba999ef',
-    'photo-1666214280557-f1b5022eb634',
+    'photo-1552693673-1bf958298935', // cihazla cilt bakımı
+    'photo-1616394584738-fc6e612e71b9', // maske uygulaması
+    'photo-1512290923902-8a9f81dc236c', // yüz bakımı / masaj
+    'photo-1596755389378-c31d21fd1273', // yüz maskesi
+    'photo-1598440947619-2c35fc9aa908', // cilt ürünleri
   ],
   makeup: [
-    'photo-1487412947147-5cebf100ffc2',
-    'photo-1522335789203-aabd1fc54bc9',
-    'photo-1519741497674-611481863552',
-    'photo-1522337660859-02fbefca4702',
-    'photo-1595476108010-b4d1f102b1b1',
+    'photo-1487412947147-5cebf100ffc2', // makyaj uygulaması
+    'photo-1522335789203-aabd1fc54bc9', // makyaj ürünleri
+    'photo-1516975080664-ed2fc6a32937', // fırçalar
+    'photo-1519741497674-611481863552', // gelin
   ],
   lash: [
-    'photo-1522337660859-02fbefca4702',
-    'photo-1487412947147-5cebf100ffc2',
-    'photo-1560066984-138dadb4c035',
-    'photo-1522337360788-8b13dee7a37e',
-    'photo-1492106087820-71f1a00d2b11',
-    'photo-1522338140262-f46f5913618a',
-    'photo-1598440947619-2c35fc9aa908',
+    'photo-1487412947147-5cebf100ffc2', // eyeliner / kirpik yakın
+    'photo-1522335789203-aabd1fc54bc9', // mascara dahil ürünler
+    'photo-1516975080664-ed2fc6a32937', // güzellik araçları
+    'photo-1616394584738-fc6e612e71b9', // yüz / kaş hattı
   ],
   wax: [
-    'photo-1616394584738-fc6e612e71b9',
-    'photo-1507652313519-d4e9174996dd',
-    'photo-1600334129128-685c5582fd35',
-    'photo-1544161515-4ab6ce6db874',
-    'photo-1540555700478-4be289fbecef',
-    'photo-1515377905703-c4788e51af15',
+    'photo-1519823551278-64ac92734fb1', // vücut bakımı / masaj
+    'photo-1600334129128-685c5582fd35', // hot stone / vücut
+    'photo-1544161515-4ab6ce6db874', // yağ / vücut
+    'photo-1616394584738-fc6e612e71b9', // yüz ağda için cilt
+    'photo-1552693673-1bf958298935', // klinik güzellik
   ],
   hair: [
-    'photo-1562322140-8baeececf3df',
-    'photo-1522337360788-8b13dee7a37e',
-    'photo-1560066984-138dadb4c035',
-    'photo-1595476108010-b4d1f102b1b1',
-    'photo-1492106087820-71f1a00d2b11',
-    'photo-1522337660859-02fbefca4702',
-    'photo-1605497788044-5a32c7078486',
-    'photo-1516975080664-ed2fc6a32937',
-    'photo-1512290923902-8a9f81dc236c',
-    'photo-1596755389378-c31d21fd1273',
-    'photo-1558591710-4b4a1ae0f04d',
-    'photo-1470071459604-3b5ec3a7fe05',
-    'photo-1519741497674-611481863552',
-    'photo-1522335789203-aabd1fc54bc9',
-    'photo-1487412947147-5cebf100ffc2',
+    'photo-1595476108010-b4d1f102b1b1', // saç yıkama
+    'photo-1522337360788-8b13dee7a37e', // dalgalı saç
+    'photo-1492106087820-71f1a00d2b11', // boyalı saç
+    'photo-1560066984-138dadb4c035', // salon içi
+    'photo-1522338140262-f46f5913618a', // fön
   ],
   barber: [
     'photo-1585747860715-2ba37e788b70',
@@ -82,15 +58,11 @@ const POOLS = {
     'photo-1622286342621-4bd786c2447c',
     'photo-1493256338651-d82f7acb2b38',
     'photo-1559599101-f09722fb4948',
-    'photo-1611501275019-9b5cda994e8d',
-    'photo-1541534741688-6078c6bfb5c5',
-    'photo-1605497788044-5a32c7078486',
   ],
   spa: [
-    'photo-1544161515-4ab6ce6db874',
+    'photo-1519823551278-64ac92734fb1',
     'photo-1600334129128-685c5582fd35',
-    'photo-1540555700478-4be289fbecef',
-    'photo-1515377905703-c4788e51af15',
+    'photo-1544161515-4ab6ce6db874',
     'photo-1507652313519-d4e9174996dd',
   ],
   fitness: [
@@ -145,8 +117,31 @@ const POOLS = {
   music: ['photo-1511379938547-c1f69419868d', 'photo-1507838153414-b4b713384a76', 'photo-1510915361894-db8b60106cb1'],
   education: ['photo-1503676260728-1c00da094a0b', 'photo-1427504494785-3a9ca7044f45', 'photo-1509062522246-3755977927d7'],
   tattoo: ['photo-1611501275019-9b5cda994e8d', 'photo-1541534741688-6078c6bfb5c5', 'photo-1599351431202-1e0f0137899a'],
-  solarium: ['photo-1507652313519-d4e9174996dd', 'photo-1515372039744-b8f02a3ae446', 'photo-1558591710-4b4a1ae0f04d'],
+  solarium: ['photo-1616394584738-fc6e612e71b9', 'photo-1552693673-1bf958298935', 'photo-1596755389378-c31d21fd1273'],
   optic: ['photo-1577803645773-f96470509666', 'photo-1473496169904-658ba7c44d8a', 'photo-1511499767150-a48a237f0083'],
+};
+
+/** Kritik güzellik hizmetleri — kesin pin (doğrulanmış) */
+const PIN = {
+  'Protez tırnak': 'photo-1519014816548-bf5fe059798b',
+  Manikür: 'photo-1604654894610-df63bc536371',
+  Pedikür: 'photo-1632345031435-8727f6897d53',
+  'Kalıcı oje (gel)': 'photo-1522337660859-02fbefca4702',
+  'Protez / gel söküm': 'photo-1632345031435-8727f6897d53',
+  'İpek kirpik (full set)': 'photo-1487412947147-5cebf100ffc2',
+  'İpek kirpik dolgu': 'photo-1522335789203-aabd1fc54bc9',
+  'İpek kirpik söküm': 'photo-1516975080664-ed2fc6a32937',
+  'Kirpik lifting': 'photo-1487412947147-5cebf100ffc2',
+  'Kirpik boyama': 'photo-1522335789203-aabd1fc54bc9',
+  'Tüm vücut ağda': 'photo-1519823551278-64ac92734fb1',
+  'Tam bacak ağda': 'photo-1600334129128-685c5582fd35',
+  'Yarım bacak ağda': 'photo-1544161515-4ab6ce6db874',
+  'Yüz ağda': 'photo-1616394584738-fc6e612e71b9',
+  'Ağda (bölgesel)': 'photo-1552693673-1bf958298935',
+  'Klasik cilt bakımı': 'photo-1552693673-1bf958298935',
+  'Günlük makyaj': 'photo-1487412947147-5cebf100ffc2',
+  'Profesyonel / gece makyajı': 'photo-1522335789203-aabd1fc54bc9',
+  'Gelin makyajı': 'photo-1519741497674-611481863552',
 };
 
 const SECTOR_CAT = {
@@ -191,7 +186,7 @@ const SECTOR_CAT = {
 
 function catFor(name, sector) {
   const n = name.toLocaleLowerCase('tr-TR');
-  if (/protez tırnak|manikür|pedikür|oje|nail art|tırnak kesimi/.test(n)) return 'nails';
+  if (/protez tırnak|manikür|pedikür|oje|nail art|tırnak kesimi|gel söküm/.test(n)) return 'nails';
   if (/kirpik|ipek|kaş|microblading|eyeliner|laminasyon|lifting/.test(n) && !/saç/.test(n)) return 'lash';
   if (/makyaj|gelin makyaj/.test(n)) return 'makeup';
   if (/ağda|epilasyon|lazer/.test(n)) return 'wax';
@@ -226,9 +221,23 @@ function catFor(name, sector) {
   return SECTOR_CAT[sector] || 'skin';
 }
 
+const FORBIDDEN_IN_BEAUTY = new Set(
+  [...POOLS.fitness, ...POOLS.yoga, ...POOLS.field, ...POOLS.pool, 'photo-1515488042361-ee00e0ddd4e4', 'photo-1596464716127-f2a82984de30', 'photo-1596755094514-f87e34085b2c', 'photo-1470071459604-3b5ec3a7fe05', 'photo-1515372039744-b8f02a3ae446', 'photo-1558591710-4b4a1ae0f04d'].map(
+    (id) => img(id),
+  ),
+);
+
 const catUsed = {};
 const exact = {};
 const meta = {};
+
+for (const [name, id] of Object.entries(PIN)) {
+  exact[name] = img(id);
+  meta[name] = catFor(name, 'beauty');
+  const cat = meta[name];
+  if (!catUsed[cat]) catUsed[cat] = new Set();
+  catUsed[cat].add(exact[name]);
+}
 
 for (const sec of sectors) {
   for (const name of sec.services) {
@@ -255,24 +264,21 @@ for (const sec of sectors) {
   }
 }
 
-const SPORT = new Set([...POOLS.fitness, ...POOLS.yoga, ...POOLS.field, ...POOLS.pool].map(img));
 const beautySlugs = new Set(['beauty', 'nails', 'hair', 'lash_brow', 'pmu', 'laser', 'barber']);
 let bad = 0;
 for (const sec of sectors.filter((s) => beautySlugs.has(s.slug))) {
   for (const n of sec.services) {
     const base = exact[n].split('&svc=')[0];
     const cat = meta[n];
-    if (SPORT.has(base) || ['fitness', 'yoga', 'field', 'pool'].includes(cat)) {
-      console.log('BAD', n, cat);
+    if (FORBIDDEN_IN_BEAUTY.has(base) || ['fitness', 'yoga', 'field', 'pool'].includes(cat)) {
+      console.log('BAD', n, cat, base);
       bad += 1;
     }
   }
 }
 
 console.log('mapped', Object.keys(exact).length, 'badBeauty', bad);
-for (const k of ['Protez tırnak', 'İpek kirpik (full set)', 'Tüm vücut ağda', 'Manikür', 'Pedikür']) {
-  console.log(k, '=>', meta[k], exact[k]);
-}
+for (const k of Object.keys(PIN)) console.log('PIN', k, '=>', exact[k]);
 
 const exactLines = Object.entries(exact)
   .sort(([a], [b]) => a.localeCompare(b, 'tr'))
@@ -288,9 +294,8 @@ const DL = '$';
 
 const parts = [];
 parts.push(`/**
- * Hizmet görselleri — kategori havuzları (güzellik asla spor/yoga görmez).
- * EXACT: katalogdaki her hizmet adı için kategoriye uygun görsel.
- * assignServiceImages: sayfa içinde aynı URL tekrarını engeller (kategori içinde kalır).
+ * Hizmet görselleri — sadece görsel doğrulanmış kategori havuzları.
+ * Güzellik asla spor/yoga/manzara/çocuk görseli görmez.
  */
 
 const img = (id: string) =>
@@ -311,7 +316,7 @@ ${exactLines}
 
 parts.push(`
 const NAME_RULES: { test: RegExp; cat: ServiceImageCategory }[] = [
-  { test: /protez tırnak|manikür|pedikür|oje|nail/i, cat: 'nails' },
+  { test: /protez tırnak|manikür|pedikür|oje|nail|gel söküm/i, cat: 'nails' },
   { test: /kirpik|ipek|kaş|microblading|eyeliner|laminasyon|lifting/i, cat: 'lash' },
   { test: /makyaj/i, cat: 'makeup' },
   { test: /ağda|epilasyon|lazer/i, cat: 'wax' },
@@ -361,7 +366,6 @@ function pickFromCategory(cat: ServiceImageCategory, used: Set<string>, seed: nu
     const src = pool[(seed + i) % pool.length];
     if (!used.has(src)) return src;
   }
-  // Sadece kendi kategorisinde kal — başka sektöre kaçma
   return ${BT}${DL}{pool[seed % pool.length]}&svc=${DL}{encodeURIComponent(label)}${BT};
 }
 
