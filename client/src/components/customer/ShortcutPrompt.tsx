@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Button, Sheet } from '../ui';
+import { Capacitor } from '@capacitor/core';
+import { Button } from '../ui';
 import {
   applyCompanyManifest,
   getShortcutPromptState,
@@ -27,34 +28,70 @@ type Props = {
   companyId: number;
   companyName: string;
   themeColor?: string;
-  /** true: sayfa açılışında sor */
+  /** true: QR / ana ekran akışında göster */
   enabled?: boolean;
+  /** QR’da install=1: daha önce “hayır” dese bile kapıyı yeniden aç */
+  force?: boolean;
 };
 
-export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = true }: Props) {
+/**
+ * QR tarayınca tarayıcı “site” hissi yerine uygulama ekleme kapısı.
+ * Not: OS sessizce ana ekrana eklemeyi engeller; kullanıcı onayı şart.
+ * Android: native install prompt; iOS: Paylaş → Ana Ekrana Ekle rehberi.
+ */
+export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = true, force = false }: Props) {
   const [open, setOpen] = useState(false);
-  const [iosHelp, setIosHelp] = useState(false);
+  const [step, setStep] = useState<'ask' | 'ios' | 'android-help'>('ask');
   const [busy, setBusy] = useState(false);
+  const [canNativeInstall, setCanNativeInstall] = useState(!!deferredInstall);
+
+  useEffect(() => {
+    const onBip = (e: Event) => {
+      e.preventDefault();
+      deferredInstall = e as BeforeInstallPromptEvent;
+      setCanNativeInstall(true);
+    };
+    window.addEventListener('beforeinstallprompt', onBip);
+    return () => window.removeEventListener('beforeinstallprompt', onBip);
+  }, []);
 
   useEffect(() => {
     if (!enabled || !companyId) return;
     addScannedCompanyId(companyId);
     applyCompanyManifest({ companyId, name: companyName, themeColor });
 
-    if (isStandaloneDisplay()) {
+    // Zaten uygulama / PWA / Capacitor içindeyse kapı yok
+    if (isStandaloneDisplay() || Capacitor.isNativePlatform()) {
       setShortcutPromptState(companyId, 'accepted');
+      setOpen(false);
       return;
     }
-    if (getShortcutPromptState(companyId) !== 'pending') return;
+    const prev = getShortcutPromptState(companyId);
+    if (force && prev === 'dismissed') {
+      setShortcutPromptState(companyId, 'pending');
+    } else if (prev === 'accepted' && !force) {
+      setOpen(false);
+      return;
+    } else if (prev === 'dismissed' && !force) {
+      setOpen(false);
+      return;
+    }
 
-    const t = window.setTimeout(() => setOpen(true), 900);
+    setStep(isIosDevice() ? 'ios' : 'ask');
+    const t = window.setTimeout(() => setOpen(true), 200);
     return () => window.clearTimeout(t);
-  }, [companyId, companyName, themeColor, enabled]);
+  }, [companyId, companyName, themeColor, enabled, force]);
 
-  const dismiss = () => {
+  if (!enabled || !open) return null;
+
+  const continueToSite = () => {
     setShortcutPromptState(companyId, 'dismissed');
     setOpen(false);
-    setIosHelp(false);
+  };
+
+  const markInstalled = () => {
+    setShortcutPromptState(companyId, 'accepted');
+    setOpen(false);
   };
 
   const accept = async () => {
@@ -67,75 +104,203 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
         await deferredInstall.prompt();
         const choice = await deferredInstall.userChoice;
         deferredInstall = null;
+        setCanNativeInstall(false);
         if (choice.outcome === 'accepted') {
-          setShortcutPromptState(companyId, 'accepted');
-          setOpen(false);
+          markInstalled();
           setBusy(false);
           return;
         }
       }
     } catch {
-      /* native prompt kapandı */
+      /* kullanıcı kapattı */
     }
 
     if (isIosDevice()) {
-      setIosHelp(true);
+      setStep('ios');
       setBusy(false);
       return;
     }
 
-    // Android / masaüstü: talimat + pin
-    setShortcutPromptState(companyId, 'accepted');
-    setIosHelp(true);
+    setStep('android-help');
     setBusy(false);
   };
 
+  const accent = themeColor || '#4f46e5';
+
   return (
-    <Sheet open={open} onClose={dismiss} title="Ana ekrana ekle">
-      {!iosHelp ? (
-        <div className="space-y-4">
-          <p className="text-sm font-semibold text-slate-600 leading-relaxed">
-            <strong className="text-slate-900">{companyName}</strong> uygulamasını telefonunuzun ana
-            ekranına eklemek ister misiniz? Açıldığında QR okuttuğunuz işletmeler listelenir; tıklayınca
-            web sayfasından randevu alırsınız.
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <Button block variant="secondary" onClick={dismiss}>
-              Hayır
-            </Button>
-            <Button block size="lg" disabled={busy} onClick={() => void accept()}>
-              {busy ? 'Hazırlanıyor…' : 'Evet, ekle'}
-            </Button>
+    <div className="fixed inset-0 z-[80] flex flex-col bg-slate-950 text-white">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-40"
+        style={{
+          background: `radial-gradient(ellipse at 50% 0%, ${accent} 0%, transparent 55%)`,
+        }}
+      />
+      <div className="relative flex flex-1 flex-col px-6 pb-8 pt-[max(2rem,env(safe-area-inset-top))]">
+        <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center">
+          <div className="mb-8 flex justify-center">
+            <img
+              src="./app-icon.png"
+              alt=""
+              className="h-24 w-24 rounded-[1.75rem] shadow-2xl shadow-black/40 ring-2 ring-white/20"
+            />
           </div>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <p className="text-sm font-semibold text-slate-600 leading-relaxed">
-            {isIosDevice() ? (
-              <>
-                Safari’de alt menüden <strong>Paylaş</strong> → <strong>Ana Ekrana Ekle</strong> seçin.
-                Uygulama açılınca işletmeleriniz listelenir.
-              </>
-            ) : (
-              <>
-                Tarayıcı menüsünden <strong>Ana ekrana ekle</strong> / <strong>Uygulamayı yükle</strong> seçin.
-                Uygulama açılınca QR okuttuğunuz işletmeler listelenir.
-              </>
-            )}
+          <p className="text-center text-[11px] font-black uppercase tracking-[0.2em] text-white/50">
+            Saloon uygulaması
           </p>
-          <Button
-            block
-            size="lg"
-            onClick={() => {
-              setShortcutPromptState(companyId, 'accepted');
-              setOpen(false);
-              setIosHelp(false);
-            }}
-          >
-            Tamam
-          </Button>
+          <h1 className="mt-3 text-center text-2xl font-black leading-tight tracking-tight">
+            {companyName}
+          </h1>
+          <p className="mt-3 text-center text-sm font-semibold leading-relaxed text-white/70">
+            QR okutuldu. Tarayıcı sekmesi yerine ana ekrandan uygulama gibi açılsın — randevu ve
+            işletmeleriniz tek dokunuşta.
+          </p>
+
+          {step === 'ask' && (
+            <div className="mt-10 space-y-3">
+              <Button
+                block
+                size="lg"
+                disabled={busy}
+                onClick={() => void accept()}
+                className="!min-h-14 !rounded-2xl !bg-white !text-slate-950 !font-black"
+              >
+                {busy
+                  ? 'Hazırlanıyor…'
+                  : canNativeInstall
+                    ? 'Uygulamayı ana ekrana ekle'
+                    : 'Ana ekrana ekle'}
+              </Button>
+              <button
+                type="button"
+                onClick={continueToSite}
+                className="w-full py-3 text-sm font-bold text-white/55 hover:text-white/80"
+              >
+                Şimdilik tarayıcıda devam et
+              </button>
+              {!canNativeInstall && (
+                <p className="text-center text-[11px] font-semibold text-white/40">
+                  Chrome / Edge’de “Yükle” penceresi açılır. Açılmazsa bir sonraki adımda menü yolu
+                  gösterilir.
+                </p>
+              )}
+            </div>
+          )}
+
+          {step === 'ios' && (
+            <div className="mt-8 space-y-4 rounded-3xl bg-white/10 p-5 ring-1 ring-white/15">
+              <p className="text-sm font-black text-white">iPhone — 3 adım</p>
+              <ol className="space-y-3 text-sm font-semibold text-white/80">
+                <li className="flex gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-black text-slate-900">
+                    1
+                  </span>
+                  <span>
+                    Alttaki <strong className="text-white">Paylaş</strong> (kare + ok) düğmesine
+                    dokunun
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-black text-slate-900">
+                    2
+                  </span>
+                  <span>
+                    <strong className="text-white">Ana Ekrana Ekle</strong> seçin
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-black text-slate-900">
+                    3
+                  </span>
+                  <span>
+                    <strong className="text-white">Ekle</strong> deyin — ikon ana ekranda uygulama
+                    gibi açılır
+                  </span>
+                </li>
+              </ol>
+              <p className="text-xs font-semibold text-amber-200/90">
+                Not: Safari dışında (Instagram / WhatsApp içi tarayıcı) bu seçenek çıkmayabilir.
+                Sağ alttan “Safari’de Aç” deyin.
+              </p>
+              <div className="grid grid-cols-1 gap-2 pt-2">
+                <Button
+                  block
+                  size="lg"
+                  onClick={markInstalled}
+                  className="!rounded-2xl !bg-white !text-slate-950 !font-black"
+                >
+                  Ana ekrana ekledim
+                </Button>
+                <button
+                  type="button"
+                  onClick={continueToSite}
+                  className="w-full py-3 text-sm font-bold text-white/55"
+                >
+                  Şimdilik devam et
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 'android-help' && (
+            <div className="mt-8 space-y-4 rounded-3xl bg-white/10 p-5 ring-1 ring-white/15">
+              <p className="text-sm font-black text-white">Android — ana ekrana ekle</p>
+              <ol className="space-y-3 text-sm font-semibold text-white/80">
+                <li className="flex gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-black text-slate-900">
+                    1
+                  </span>
+                  <span>
+                    Sağ üst <strong className="text-white">⋮</strong> menüyü açın
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-black text-slate-900">
+                    2
+                  </span>
+                  <span>
+                    <strong className="text-white">Ana ekrana ekle</strong> /{' '}
+                    <strong className="text-white">Uygulamayı yükle</strong>
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-black text-slate-900">
+                    3
+                  </span>
+                  <span>Onaylayın — sonraki açılışlar uygulama gibi olur</span>
+                </li>
+              </ol>
+              <div className="grid grid-cols-1 gap-2 pt-2">
+                {canNativeInstall && (
+                  <Button
+                    block
+                    size="lg"
+                    disabled={busy}
+                    onClick={() => void accept()}
+                    className="!rounded-2xl !bg-white !text-slate-950 !font-black"
+                  >
+                    Tekrar dene
+                  </Button>
+                )}
+                <Button
+                  block
+                  size="lg"
+                  onClick={markInstalled}
+                  className="!rounded-2xl !bg-white/20 !text-white !font-black"
+                >
+                  Ana ekrana ekledim
+                </Button>
+                <button
+                  type="button"
+                  onClick={continueToSite}
+                  className="w-full py-3 text-sm font-bold text-white/55"
+                >
+                  Şimdilik devam et
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
-    </Sheet>
+      </div>
+    </div>
   );
 }

@@ -1,19 +1,29 @@
 {
-    "short_name": "Saloon",
-    "name": "Saloon - Online Randevu",
-    "icons": [
-        {
-            "src": "app-icon.png",
-            "sizes": "512x512",
-            "type": "image/png"
-        }
-    ],
-    "start_url": "/",
-    "scope": "/",
-    "display": "standalone",
-    "theme_color": "#4f46e5",
-    "background_color": "#f8fafc",
-    "orientation": "portrait",
-    "description": "Kuaför, güzellik, pilates, halı saha, havuz, masaj ve klinikler için online randevu",
-    "lang": "tr"
+  "short_name": "Saloon",
+  "name": "Saloon",
+  "icons": [
+    {
+      "src": "app-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "app-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "start_url": "./#/app",
+  "scope": "./",
+  "id": "./#/app",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
+  "orientation": "portrait",
+  "description": "QR ile eklediğiniz işletmelerden online randevu",
+  "lang": "tr",
+  "categories": ["lifestyle", "business"]
 }

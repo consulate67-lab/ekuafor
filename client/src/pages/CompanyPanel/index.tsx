@@ -942,7 +942,7 @@ const copyText = (text: string, field: string) => {
 };
 
 const bookingUrl = company
-    ? `${window.location.origin}${window.location.pathname}#/firma/${company.id}?ref=qr`
+    ? `${window.location.origin}${window.location.pathname}#/firma/${company.id}?ref=qr&install=1`
     : '';
 const qrApiUrl = (data: string, size = 200) =>
     `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}&color=1e1b4b&bgcolor=ffffff`;

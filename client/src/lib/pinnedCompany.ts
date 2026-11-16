@@ -82,14 +82,20 @@ export function applyCompanyManifest(input: {
     const manifest = {
       short_name: 'Saloon',
       name: 'Saloon',
-      icons: [{ src: 'app-icon.png', sizes: '512x512', type: 'image/png' }],
+      icons: [
+        { src: 'app-icon.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: 'app-icon.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      ],
       start_url: start,
       scope: './',
+      id: './#/app',
       display: 'standalone',
-      theme_color: input.themeColor || '#4f46e5',
-      background_color: '#f8fafc',
+      display_override: ['standalone', 'minimal-ui'],
+      theme_color: input.themeColor || '#0f172a',
+      background_color: '#0f172a',
       orientation: 'portrait',
       lang: 'tr',
+      categories: ['lifestyle', 'business'],
     };
     const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);

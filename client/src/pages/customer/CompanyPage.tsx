@@ -247,7 +247,7 @@ function CompanyPage({ id }: { id: number }) {
     };
 
     const share = async () => {
-        const url = `${window.location.origin}${window.location.pathname}#/firma/${company.id}?ref=qr`;
+        const url = `${window.location.origin}${window.location.pathname}#/firma/${company.id}?ref=qr&install=1`;
         try {
             if (navigator.share) await navigator.share({ title: company.name, url });
             else await navigator.clipboard.writeText(url);
@@ -691,6 +691,7 @@ function CompanyPage({ id }: { id: number }) {
                 companyName={company.name}
                 themeColor={theme.accent}
                 enabled={fromQr || searchParams.get('home') === '1'}
+                force={searchParams.get('install') === '1'}
             />
 
             <Sheet open={visitorGate} onClose={() => setVisitorGate(false)} title="Bilgileriniz">

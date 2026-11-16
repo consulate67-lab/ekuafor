@@ -10,9 +10,9 @@ export function webAppOrigin(): string {
   return (import.meta.env.VITE_WEB_URL || DEFAULT_WEB).replace(/\/$/, '');
 }
 
-/** Firma tanıtım sayfası — QR buraya gider */
+/** Firma tanıtım sayfası — QR buraya gider (ref=qr → uygulama/ana ekran ekleme kapısı) */
 export function companyPublicUrl(companyId: number): string {
-  return `${webAppOrigin()}/#/firma/${companyId}?ref=qr`;
+  return `${webAppOrigin()}/#/firma/${companyId}?ref=qr&install=1`;
 }
 
 /** Web sitesi alanında gösterilen adres (tıklanabilir tam URL) */

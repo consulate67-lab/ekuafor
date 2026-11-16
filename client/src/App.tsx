@@ -13,7 +13,7 @@ import { addScannedCompanyId, extractCompanyIdFromAppUrl } from './lib/scannedCo
 function CompanyIdRedirect() {
     const { id } = useParams<{ id: string }>();
     if (!id || !/^\d+$/.test(id)) return <Navigate to="/app" replace />;
-    return <Navigate to={`/firma/${id}?ref=qr`} replace />;
+    return <Navigate to={`/firma/${id}?ref=qr&install=1`} replace />;
 }
 
 /**
@@ -33,7 +33,7 @@ function BookingEntry() {
         (location.state as { fromCompany?: boolean } | null)?.fromCompany === true;
     const deepLink = !!(params.get('staff') || params.get('service'));
     if (!isBusiness && !fromCompany && !deepLink) {
-        return <Navigate to={`/firma/${id}?ref=qr`} replace />;
+        return <Navigate to={`/firma/${id}?ref=qr&install=1`} replace />;
     }
     return <BookingPage />;
 }
@@ -165,7 +165,7 @@ function App() {
             const companyId = extractCompanyIdFromAppUrl(url);
             if (companyId && !url.includes('code=')) {
                 addScannedCompanyId(companyId);
-                window.location.hash = `#/firma/${companyId}?ref=qr`;
+                window.location.hash = `#/firma/${companyId}?ref=qr&install=1`;
                 return;
             }
             if (!url.includes('code=')) return;
