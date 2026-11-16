@@ -7,6 +7,7 @@ import { App } from '@capacitor/app';
 import { getDeviceId } from '../lib/device';
 import { loadVisitorProfile, visitorFullName } from '../lib/visitorProfile';
 import { assignServiceImages } from '../lib/serviceImage';
+import { resolveSectorSlug } from '../lib/resolveSectorSlug';
 
 type StepKey = 'service' | 'staff' | 'duration' | 'date' | 'time' | 'session' | 'confirm';
 
@@ -144,7 +145,22 @@ function BookingPage({ id }: { id: string }) {
     const staffOptions = staffAfterTime && selectedSlot?.staff_ids ? staff.filter(s => selectedSlot.staff_ids!.includes(s.id)) : staff;
 
     const hidePrices = !!(company?.hide_prices || selectedServices.some(s => s.price_hidden) || services.some(s => s.price_hidden));
-    const serviceImages = useMemo(() => assignServiceImages(services), [services]);
+    const sectorSlug = useMemo(
+        () =>
+            company
+                ? resolveSectorSlug({
+                      primarySlug: company.primary_sector?.slug,
+                      sectorSlugs: company.sectors?.map(s => s.slug),
+                      webTemplateId: company.web_template_id,
+                      name: company.name,
+                  })
+                : 'barber',
+        [company],
+    );
+    const serviceImages = useMemo(
+        () => assignServiceImages(services, { sectorSlug }),
+        [services, sectorSlug],
+    );
     const totalPrice = useMemo(() => {
         if (hidePrices) return 0;
         if (mode === 'class') return Number(selectedSession?.price ?? selectedServices[0]?.price ?? 0) * selection.partySize;

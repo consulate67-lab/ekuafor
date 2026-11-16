@@ -66,6 +66,9 @@ export interface Company {
     sms_enabled?: boolean;
     /** Web / public: fiyatları gizle */
     hide_prices?: boolean;
+    web_template_id?: string | null;
+    primary_sector?: { slug: string; name?: string; icon?: string; color?: string } | null;
+    sectors?: Array<{ slug: string; name?: string; icon?: string; color?: string }>;
 }
 
 export interface Province {

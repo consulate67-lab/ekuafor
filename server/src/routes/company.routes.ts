@@ -410,7 +410,8 @@ router.get('/:id', optionalCompanyAuth, async (req: Request, res: Response) => {
             if (/nail|tırnak|tirnak/.test(name)) slug = 'nails';
             else if (/diş|dental/.test(name)) slug = 'dental';
             else if (/pilates|yoga/.test(name)) slug = 'pilates_yoga';
-            else if (/berber|barber|kuaför|kuafor|saç|sac /.test(name)) slug = 'barber';
+            else if (/berber|barber|sakal|fade|tıraş|tiras/.test(name)) slug = 'barber';
+            else if (/kuaför|kuafor|saç|sac |salon|güzellik|guzellik/.test(name)) slug = 'hair';
             try {
                 await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_template_id VARCHAR(64)`);
                 await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS hide_prices BOOLEAN DEFAULT false`);
@@ -420,19 +421,19 @@ router.get('/:id', optionalCompanyAuth, async (req: Request, res: Response) => {
                      ON CONFLICT DO NOTHING`,
                     [id, slug],
                 );
+                const healDesc =
+                    slug === 'barber'
+                        ? 'Erkek kuaförümüzde saç kesimi, sakal tasarımı ve klasik tıraşı steril ekipmanla sunuyoruz. Online randevu ile size uygun saati seçin, beklemeden gelin.'
+                        : slug === 'hair'
+                          ? 'Kuaför salonumuzda kesim, boya, fön ve bakım hizmetlerini steril ekipmanla sunuyoruz. Online randevu ile size uygun saati seçin.'
+                          : null;
                 await pool.query(
                     `UPDATE companies SET
                         web_template_id = COALESCE(NULLIF(web_template_id, ''), $2),
                         description = COALESCE(NULLIF(description, ''), $3),
                         updated_at = NOW()
                      WHERE id = $1`,
-                    [
-                        id,
-                        `${slug}-01`,
-                        slug === 'barber'
-                            ? 'Erkek kuaförümüzde saç kesimi, sakal tasarımı ve klasik tıraşı steril ekipmanla sunuyoruz. Online randevu ile size uygun saati seçin, beklemeden gelin.'
-                            : null,
-                    ],
+                    [id, `${slug}-01`, healDesc],
                 );
                 const refreshed = await pool.query(`SELECT * FROM companies WHERE id = $1`, [id]);
                 if (refreshed.rows[0]) Object.assign(company as object, refreshed.rows[0]);

@@ -130,7 +130,10 @@ function CompanyPage({ id }: { id: number }) {
           }
         : fallbackPack;
     const heroImage = company?.photo || webPack.gallery[0]?.src || null;
-    const serviceImages = useMemo(() => assignServiceImages(services), [services]);
+    const serviceImages = useMemo(
+        () => assignServiceImages(services, { sectorSlug }),
+        [services, sectorSlug],
+    );
     const hidePrices = !!(company?.hide_prices || services.some(s => s.price_hidden));
 
     const saveVisitor = (): boolean => {

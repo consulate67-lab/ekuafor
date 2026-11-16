@@ -16,12 +16,13 @@ export function resolveSectorSlug(input: {
   }
   const n = (input.name || '').toLocaleLowerCase('tr-TR');
   if (/berber|barber|sakal|fade|tıraş|tiras/.test(n)) return 'barber';
-  if (/kuaför|kuafor|saç|sac |salon/.test(n)) return 'barber';
+  if (/kuaför|kuafor|kuaförü|kadın saç/.test(n)) return 'hair';
   if (/nail|tırnak|tirnak|protez/.test(n)) return 'nails';
   if (/diş|dis |dental|ortodont/.test(n)) return 'dental';
   if (/pilates|yoga/.test(n)) return 'pilates_yoga';
   if (/fitness|gym|spor/.test(n)) return 'fitness';
   if (/masaj|spa|wellness/.test(n)) return 'spa';
   if (/güzellik|guzellik|beauty|makyaj/.test(n)) return 'beauty';
+  if (/saç|sac |salon/.test(n)) return 'hair';
   return 'barber';
 }
