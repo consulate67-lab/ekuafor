@@ -8,6 +8,7 @@ import { getDeviceId } from '../lib/device';
 import { loadVisitorProfile, visitorFullName } from '../lib/visitorProfile';
 import { assignServiceImages } from '../lib/serviceImage';
 import { resolveSectorSlug } from '../lib/resolveSectorSlug';
+import { canRequestDevicePhone, normalizeTrMobile, requestDevicePhoneNumber } from '../lib/devicePhone';
 
 type StepKey = 'service' | 'staff' | 'duration' | 'date' | 'time' | 'session' | 'confirm';
 
@@ -86,6 +87,8 @@ function BookingPage({ id }: { id: string }) {
     const [otpSent, setOtpSent] = useState(false);
     const [otpTimer, setOtpTimer] = useState(0);
     const [otpBusy, setOtpBusy] = useState(false);
+    const [phoneHintBusy, setPhoneHintBusy] = useState(false);
+    const phoneHintTried = useRef(false);
 
     const [stepIndex, setStepIndex] = useState(0);
     const [selection, setSelection] = useState<SelectionState>(() => {
@@ -303,6 +306,31 @@ function BookingPage({ id }: { id: string }) {
         const id = window.setInterval(() => setOtpTimer(t => Math.max(0, t - 1)), 1000);
         return () => clearInterval(id);
     }, [otpTimer]);
+
+    const pickPhoneFromDevice = useCallback(async () => {
+        if (!canRequestDevicePhone() || phoneHintBusy) return;
+        setPhoneHintBusy(true);
+        setError(null);
+        try {
+            const phone = await requestDevicePhoneNumber();
+            if (phone) {
+                update({ customerPhone: phone });
+                setOtpSent(false);
+                setOtpCode('');
+            }
+        } finally {
+            setPhoneHintBusy(false);
+        }
+    }, [phoneHintBusy]);
+
+    useEffect(() => {
+        if (step !== 'confirm' || isBusiness || !needsPhoneOtp) return;
+        if (phoneHintTried.current) return;
+        if (selection.customerPhone.replace(/\D/g, '').length >= 10) return;
+        if (!canRequestDevicePhone()) return;
+        phoneHintTried.current = true;
+        void pickPhoneFromDevice();
+    }, [step, isBusiness, needsPhoneOtp, selection.customerPhone, pickPhoneFromDevice]);
 
     const sendBookingOtp = async () => {
         const phone = selection.customerPhone.replace(/\D/g, '');
@@ -682,21 +710,35 @@ function BookingPage({ id }: { id: string }) {
                                 <input type="tel" inputMode="numeric" value={selection.customerPhone} onChange={e => update({ customerPhone: e.target.value.replace(/\D/g, '').slice(0, 11) })} className="w-full p-4 bg-white rounded-2xl border-2 border-slate-100 font-bold" placeholder="Müşteri telefonu (isteğe bağlı)" autoComplete="off" minLength={10} />
                             ) : needsPhoneOtp ? (
                                 <>
-                                    <input
-                                        type="tel"
-                                        inputMode="numeric"
-                                        value={selection.customerPhone}
-                                        onChange={e => {
-                                            update({ customerPhone: e.target.value.replace(/\D/g, '').slice(0, 11) });
-                                            setOtpSent(false);
-                                            setOtpCode('');
-                                        }}
-                                        className="w-full p-4 bg-white rounded-2xl border-2 border-slate-100 font-bold"
-                                        placeholder="5XX XXX XX XX"
-                                        autoComplete="tel"
-                                        required
-                                        minLength={10}
-                                    />
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="tel"
+                                            inputMode="numeric"
+                                            name="tel"
+                                            value={selection.customerPhone}
+                                            onChange={e => {
+                                                update({ customerPhone: normalizeTrMobile(e.target.value) });
+                                                setOtpSent(false);
+                                                setOtpCode('');
+                                            }}
+                                            className="w-full p-4 bg-white rounded-2xl border-2 border-slate-100 font-bold"
+                                            placeholder="05XX XXX XX XX"
+                                            autoComplete="tel"
+                                            autoCorrect="off"
+                                            required
+                                            minLength={10}
+                                        />
+                                        {canRequestDevicePhone() && (
+                                            <button
+                                                type="button"
+                                                disabled={phoneHintBusy}
+                                                onClick={() => void pickPhoneFromDevice()}
+                                                className="shrink-0 rounded-2xl bg-emerald-600 px-3 py-3 text-xs font-black text-white disabled:opacity-40"
+                                            >
+                                                {phoneHintBusy ? '…' : 'SIM’den seç'}
+                                            </button>
+                                        )}
+                                    </div>
                                     <div className="flex gap-2">
                                         <button
                                             type="button"
@@ -720,7 +762,9 @@ function BookingPage({ id }: { id: string }) {
                                         />
                                     </div>
                                     <p className="text-xs font-semibold text-slate-500">
-                                        Numaranızı SMS kodu ile doğruluyoruz; sahte randevu engellenir.
+                                        {canRequestDevicePhone()
+                                            ? 'Android’de SIM numaranızı seçebilirsiniz; ardından SMS kodu ile doğrularız.'
+                                            : 'Numaranızı SMS kodu ile doğruluyoruz; sahte randevu engellenir. iPhone’da klavye üstündeki kayıtlı numarayı kullanabilirsiniz.'}
                                     </p>
                                 </>
                             ) : null}

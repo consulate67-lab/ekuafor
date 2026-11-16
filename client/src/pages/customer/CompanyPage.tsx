@@ -7,6 +7,7 @@ import { useFavorites } from '../../hooks/useFavorites';
 import { directionsUrl } from '../../lib/geo';
 import { labelsFor } from '../../lib/labels';
 import { dialNumber } from '../../lib/phone';
+import { canRequestDevicePhone, normalizeTrMobile, requestDevicePhoneNumber } from '../../lib/devicePhone';
 import { LAYOUT_THEME, sectorLayoutGroup } from '../../lib/sectorLayout';
 import { sectorWebPack } from '../../lib/sectorWebContent';
 import { resolveSectorSlug } from '../../lib/resolveSectorSlug';
@@ -65,16 +66,32 @@ function CompanyPage({ id }: { id: number }) {
     const [visitorGate, setVisitorGate] = useState(false);
     const [vf, setVf] = useState({ firstName: '', lastName: '', phone: '' });
     const [visitorError, setVisitorError] = useState('');
+    const [phoneHintBusy, setPhoneHintBusy] = useState(false);
     const pendingBookRef = useRef('');
+    const visitorPhoneHintTried = useRef(false);
 
     useEffect(() => {
         const existing = loadVisitorProfile();
         if (existing) {
             setVisitor(existing);
             setVisitorGate(false);
+            setVf({ firstName: existing.firstName, lastName: existing.lastName, phone: existing.phone });
         }
         // QR ile açılışta önce tanıtım; ziyaretçi formu yalnızca randevu anında
     }, []);
+
+    useEffect(() => {
+        if (!visitorGate || visitorPhoneHintTried.current) return;
+        if (vf.phone.replace(/\D/g, '').length >= 10) return;
+        if (!canRequestDevicePhone()) return;
+        visitorPhoneHintTried.current = true;
+        setPhoneHintBusy(true);
+        void requestDevicePhoneNumber()
+            .then(phone => {
+                if (phone) setVf(v => ({ ...v, phone }));
+            })
+            .finally(() => setPhoneHintBusy(false));
+    }, [visitorGate, vf.phone]);
 
     useEffect(() => {
         if ((fromQr || searchParams.get('home') === '1') && id) addScannedCompanyId(id);
@@ -678,7 +695,35 @@ function CompanyPage({ id }: { id: number }) {
                 <div className="space-y-3">
                     <input value={vf.firstName} onChange={e => setVf(v => ({ ...v, firstName: e.target.value }))} placeholder="Ad" className="w-full rounded-2xl border-2 border-slate-100 bg-white px-4 py-3 font-bold" autoComplete="given-name" />
                     <input value={vf.lastName} onChange={e => setVf(v => ({ ...v, lastName: e.target.value }))} placeholder="Soyad" className="w-full rounded-2xl border-2 border-slate-100 bg-white px-4 py-3 font-bold" autoComplete="family-name" />
-                    <input value={vf.phone} onChange={e => setVf(v => ({ ...v, phone: e.target.value.replace(/\D/g, '').slice(0, 11) }))} placeholder="Telefon" inputMode="tel" className="w-full rounded-2xl border-2 border-slate-100 bg-white px-4 py-3 font-bold" autoComplete="tel" />
+                    <div className="flex gap-2">
+                        <input
+                            value={vf.phone}
+                            onChange={e => setVf(v => ({ ...v, phone: normalizeTrMobile(e.target.value) }))}
+                            placeholder="05XX XXX XX XX"
+                            type="tel"
+                            inputMode="tel"
+                            name="tel"
+                            className="w-full rounded-2xl border-2 border-slate-100 bg-white px-4 py-3 font-bold"
+                            autoComplete="tel"
+                        />
+                        {canRequestDevicePhone() && (
+                            <button
+                                type="button"
+                                disabled={phoneHintBusy}
+                                onClick={() => {
+                                    setPhoneHintBusy(true);
+                                    void requestDevicePhoneNumber()
+                                        .then(phone => {
+                                            if (phone) setVf(v => ({ ...v, phone }));
+                                        })
+                                        .finally(() => setPhoneHintBusy(false));
+                                }}
+                                className="shrink-0 rounded-2xl bg-emerald-600 px-3 py-3 text-xs font-black text-white disabled:opacity-40"
+                            >
+                                {phoneHintBusy ? '…' : 'SIM’den seç'}
+                            </button>
+                        )}
+                    </div>
                     {visitorError && <p className="text-sm font-bold text-rose-600">{visitorError}</p>}
                     <Button
                         block
