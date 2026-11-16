@@ -42,7 +42,7 @@ import {
   setPendingAppointmentStatus,
   type PendingAppointment,
 } from '../lib/pendingAppointments';
-import { PENDING_REMINDER_MS, playPendingAlert } from '../lib/pendingAlert';
+import { PENDING_REMINDER_MS, playPendingAlert, unlockPendingAlertAudio } from '../lib/pendingAlert';
 import { titleLabel } from '../lib/staffRoles';
 import {
   eligibleSubscribers,
@@ -747,8 +747,7 @@ export function Board() {
                   setPendingMsg('');
                   void refreshPending();
                   setSheet({ mode: 'pending' });
-                  // Tarayıcı ses kilidini aç (ilk tıklamada)
-                  void playPendingAlert().catch(() => undefined);
+                  void unlockPendingAlertAudio();
                 }}
                 className="relative btn btn-secondary !min-h-11 !px-3 !text-xs font-black"
               >

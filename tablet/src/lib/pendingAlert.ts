@@ -10,6 +10,17 @@ function audioCtx(): AudioContext | null {
   return ctx;
 }
 
+/** İlk kullanıcı tıklamasında ses motorunu açar (sessiz). */
+export async function unlockPendingAlertAudio(): Promise<void> {
+  const ac = audioCtx();
+  if (!ac) return;
+  try {
+    if (ac.state === 'suspended') await ac.resume();
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Kısa çift bip — yeni talep / tekrar hatırlatma */
 export async function playPendingAlert(): Promise<void> {
   const ac = audioCtx();
