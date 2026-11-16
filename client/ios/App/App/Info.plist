@@ -47,5 +47,7 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSContactsUsageDescription</key>
+	<string>Randevu için telefon numaranızı rehberinizden seçebilmeniz amacıyla kullanılır.</string>
 </dict>
 </plist>

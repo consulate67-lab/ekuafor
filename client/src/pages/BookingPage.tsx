@@ -8,7 +8,13 @@ import { getDeviceId } from '../lib/device';
 import { loadVisitorProfile, visitorFullName } from '../lib/visitorProfile';
 import { assignServiceImages } from '../lib/serviceImage';
 import { resolveSectorSlug } from '../lib/resolveSectorSlug';
-import { canRequestDevicePhone, normalizeTrMobile, requestDevicePhoneNumber } from '../lib/devicePhone';
+import {
+    canRequestDevicePhone,
+    normalizeTrMobile,
+    phonePickButtonLabel,
+    phonePickHelpText,
+    requestDevicePhoneNumber,
+} from '../lib/devicePhone';
 
 type StepKey = 'service' | 'staff' | 'duration' | 'date' | 'time' | 'session' | 'confirm';
 
@@ -735,7 +741,7 @@ function BookingPage({ id }: { id: string }) {
                                                 onClick={() => void pickPhoneFromDevice()}
                                                 className="shrink-0 rounded-2xl bg-emerald-600 px-3 py-3 text-xs font-black text-white disabled:opacity-40"
                                             >
-                                                {phoneHintBusy ? '…' : 'SIM’den seç'}
+                                                {phoneHintBusy ? '…' : phonePickButtonLabel()}
                                             </button>
                                         )}
                                     </div>
@@ -761,11 +767,7 @@ function BookingPage({ id }: { id: string }) {
                                             maxLength={6}
                                         />
                                     </div>
-                                    <p className="text-xs font-semibold text-slate-500">
-                                        {canRequestDevicePhone()
-                                            ? 'Android’de SIM numaranızı seçebilirsiniz; ardından SMS kodu ile doğrularız.'
-                                            : 'Numaranızı SMS kodu ile doğruluyoruz; sahte randevu engellenir. iPhone’da klavye üstündeki kayıtlı numarayı kullanabilirsiniz.'}
-                                    </p>
+                                    <p className="text-xs font-semibold text-slate-500">{phonePickHelpText()}</p>
                                 </>
                             ) : null}
                         </form>

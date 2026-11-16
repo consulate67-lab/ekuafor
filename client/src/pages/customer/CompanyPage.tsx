@@ -7,7 +7,12 @@ import { useFavorites } from '../../hooks/useFavorites';
 import { directionsUrl } from '../../lib/geo';
 import { labelsFor } from '../../lib/labels';
 import { dialNumber } from '../../lib/phone';
-import { canRequestDevicePhone, normalizeTrMobile, requestDevicePhoneNumber } from '../../lib/devicePhone';
+import {
+    canRequestDevicePhone,
+    normalizeTrMobile,
+    phonePickButtonLabel,
+    requestDevicePhoneNumber,
+} from '../../lib/devicePhone';
 import { LAYOUT_THEME, sectorLayoutGroup } from '../../lib/sectorLayout';
 import { sectorWebPack } from '../../lib/sectorWebContent';
 import { resolveSectorSlug } from '../../lib/resolveSectorSlug';
@@ -720,7 +725,7 @@ function CompanyPage({ id }: { id: number }) {
                                 }}
                                 className="shrink-0 rounded-2xl bg-emerald-600 px-3 py-3 text-xs font-black text-white disabled:opacity-40"
                             >
-                                {phoneHintBusy ? '…' : 'SIM’den seç'}
+                                {phoneHintBusy ? '…' : phonePickButtonLabel()}
                             </button>
                         )}
                     </div>
