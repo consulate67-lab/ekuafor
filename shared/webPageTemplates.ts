@@ -3,6 +3,8 @@
  * Tablet parametrelerinde firmanın sektörüne göre listelenir; seçilen id sunucuya yazılır.
  */
 
+export type WebTemplateLayout = 'overlay' | 'split' | 'editorial' | 'card' | 'dark-full';
+
 export type WebTemplateTheme = {
   heroFrom: string;
   heroTo: string;
@@ -19,6 +21,10 @@ export type WebPageTemplate = {
   sectorSlug: string;
   name: string;
   styleName: string;
+  /** Sayfa yerleşimi — yalnızca renk değil, kompozisyon da değişir */
+  layout: WebTemplateLayout;
+  /** Randevu CTA metni (sektöre özel) */
+  ctaLabel: string;
   theme: WebTemplateTheme;
   tagline: string;
   about: string;
@@ -35,128 +41,176 @@ type SectorSeed = {
   news: WebTemplateNews[];
 };
 
-const STYLES: { key: string; name: string; theme: WebTemplateTheme }[] = [
-  {
-    key: '01',
-    name: 'Klasik',
-    theme: {
-      heroFrom: '#1e293b',
-      heroTo: '#0f172a',
-      accent: '#334155',
-      accentSoft: '#f1f5f9',
-      cta: 'bg-slate-800',
-      surface: '#ffffff',
-    },
-  },
-  {
-    key: '02',
-    name: 'Modern',
-    theme: {
-      heroFrom: '#4f46e5',
-      heroTo: '#0f172a',
-      accent: '#4f46e5',
-      accentSoft: '#eef2ff',
-      cta: 'bg-indigo-600',
-      surface: '#ffffff',
-    },
-  },
-  {
-    key: '03',
-    name: 'Yumuşak',
-    theme: {
-      heroFrom: '#9d174d',
-      heroTo: '#4c0519',
-      accent: '#be185d',
-      accentSoft: '#fdf2f8',
-      cta: 'bg-rose-600',
-      surface: '#fff7fb',
-    },
-  },
-  {
-    key: '04',
-    name: 'Canlı',
-    theme: {
-      heroFrom: '#047857',
-      heroTo: '#064e3b',
-      accent: '#059669',
-      accentSoft: '#ecfdf5',
-      cta: 'bg-emerald-600',
-      surface: '#ffffff',
-    },
-  },
-  {
-    key: '05',
-    name: 'Minimal',
-    theme: {
-      heroFrom: '#78716c',
-      heroTo: '#292524',
-      accent: '#57534e',
-      accentSoft: '#f5f5f4',
-      cta: 'bg-stone-700',
-      surface: '#fafaf9',
-    },
-  },
-  {
-    key: '06',
-    name: 'Lüks',
-    theme: {
-      heroFrom: '#a16207',
-      heroTo: '#1c1917',
-      accent: '#ca8a04',
-      accentSoft: '#fefce8',
-      cta: 'bg-amber-700',
-      surface: '#fffbeb',
-    },
-  },
-  {
-    key: '07',
-    name: 'Taze',
-    theme: {
-      heroFrom: '#0e7490',
-      heroTo: '#083344',
-      accent: '#0891b2',
-      accentSoft: '#ecfeff',
-      cta: 'bg-cyan-600',
-      surface: '#ffffff',
-    },
-  },
-  {
-    key: '08',
-    name: 'Koyu',
-    theme: {
-      heroFrom: '#111827',
-      heroTo: '#030712',
-      accent: '#e5e7eb',
-      accentSoft: '#1f2937',
-      cta: 'bg-gray-900',
-      surface: '#111827',
-    },
-  },
-  {
-    key: '09',
-    name: 'Sıcak',
-    theme: {
-      heroFrom: '#c2410c',
-      heroTo: '#7c2d12',
-      accent: '#ea580c',
-      accentSoft: '#fff7ed',
-      cta: 'bg-orange-600',
-      surface: '#fffaf5',
-    },
-  },
-  {
-    key: '10',
-    name: 'Stüdyo',
-    theme: {
-      heroFrom: '#0369a1',
-      heroTo: '#0c4a6e',
-      accent: '#0284c7',
-      accentSoft: '#f0f9ff',
-      cta: 'bg-sky-600',
-      surface: '#ffffff',
-    },
-  },
+/** Stil anahtarları — layout + nötr tema iskeleti (sektör paletiyle boyanır) */
+const STYLES: {
+  key: string;
+  name: string;
+  layout: WebTemplateLayout;
+  /** 0 = sektör ana rengi, 1 = daha koyu/kontrast varyasyon */
+  tint: number;
+  surface: string;
+  dark?: boolean;
+}[] = [
+  { key: '01', name: 'Klasik', layout: 'overlay', tint: 0, surface: '#ffffff' },
+  { key: '02', name: 'Modern', layout: 'split', tint: 1, surface: '#ffffff' },
+  { key: '03', name: 'Yumuşak', layout: 'editorial', tint: 2, surface: '#fffaf8' },
+  { key: '04', name: 'Canlı', layout: 'card', tint: 3, surface: '#ffffff' },
+  { key: '05', name: 'Minimal', layout: 'overlay', tint: 4, surface: '#fafaf9' },
+  { key: '06', name: 'Lüks', layout: 'editorial', tint: 5, surface: '#fffbeb' },
+  { key: '07', name: 'Taze', layout: 'split', tint: 6, surface: '#ffffff' },
+  { key: '08', name: 'Koyu', layout: 'dark-full', tint: 7, surface: '#111827', dark: true },
+  { key: '09', name: 'Sıcak', layout: 'card', tint: 8, surface: '#fffaf5' },
+  { key: '10', name: 'Stüdyo', layout: 'split', tint: 9, surface: '#ffffff' },
 ];
+
+/** Sektöre özgü ana palet — şablonlar buradan türetilir (aynı 10 rengi kopyalamaz) */
+type SectorPalette = {
+  tones: [string, string, string, string, string, string, string, string, string, string];
+  soft: string;
+  cta: string;
+  ctaLabel: string;
+};
+
+const DEFAULT_PALETTE: SectorPalette = {
+  tones: ['#334155', '#4f46e5', '#be185d', '#059669', '#57534e', '#ca8a04', '#0891b2', '#111827', '#ea580c', '#0284c7'],
+  soft: '#f1f5f9',
+  cta: 'bg-slate-800',
+  ctaLabel: 'Randevu al',
+};
+
+const SECTOR_PALETTES: Record<string, SectorPalette> = {
+  hair: {
+    tones: ['#4a1942', '#7c3aed', '#db2777', '#c026d3', '#6b7280', '#a16207', '#e11d48', '#1f1220', '#f43f5e', '#9333ea'],
+    soft: '#fdf4ff',
+    cta: 'bg-fuchsia-700',
+    ctaLabel: 'Randevu al',
+  },
+  barber: {
+    tones: ['#1c1917', '#292524', '#44403c', '#0f766e', '#57534e', '#a16207', '#334155', '#0a0a0a', '#b45309', '#1e3a5f'],
+    soft: '#f5f5f4',
+    cta: 'bg-stone-900',
+    ctaLabel: 'Randevu al',
+  },
+  beauty: {
+    tones: ['#9d174d', '#be185d', '#ec4899', '#db2777', '#a21caf', '#c026d3', '#e11d48', '#4c0519', '#f472b6', '#831843'],
+    soft: '#fdf2f8',
+    cta: 'bg-rose-600',
+    ctaLabel: 'Randevu al',
+  },
+  nails: {
+    tones: ['#7e22ce', '#a855f7', '#c084fc', '#db2777', '#6366f1', '#d946ef', '#8b5cf6', '#2e1065', '#e879f9', '#6d28d9'],
+    soft: '#faf5ff',
+    cta: 'bg-violet-600',
+    ctaLabel: 'Randevu al',
+  },
+  laser: {
+    tones: ['#0e7490', '#0891b2', '#06b6d4', '#0284c7', '#64748b', '#0f766e', '#155e75', '#083344', '#22d3ee', '#0369a1'],
+    soft: '#ecfeff',
+    cta: 'bg-cyan-700',
+    ctaLabel: 'Seans ayırt',
+  },
+  pmu: {
+    tones: ['#9f1239', '#be123c', '#e11d48', '#881337', '#a21caf', '#c2410c', '#fb7185', '#4c0519', '#f43f5e', '#9d174d'],
+    soft: '#fff1f2',
+    cta: 'bg-rose-700',
+    ctaLabel: 'Randevu al',
+  },
+  tattoo: {
+    tones: ['#18181b', '#27272a', '#3f3f46', '#52525b', '#71717a', '#a1a1aa', '#09090b', '#000000', '#e4e4e7', '#52525b'],
+    soft: '#f4f4f5',
+    cta: 'bg-zinc-900',
+    ctaLabel: 'Randevu al',
+  },
+  solarium: {
+    tones: ['#c2410c', '#ea580c', '#f97316', '#fb923c', '#d97706', '#b45309', '#fdba74', '#7c2d12', '#f59e0b', '#ea580c'],
+    soft: '#fff7ed',
+    cta: 'bg-orange-600',
+    ctaLabel: 'Seans ayırt',
+  },
+  massage: {
+    tones: ['#0f766e', '#0d9488', '#14b8a6', '#2dd4bf', '#115e59', '#134e4a', '#5eead4', '#042f2e', '#0f766e', '#14b8a6'],
+    soft: '#f0fdfa',
+    cta: 'bg-teal-700',
+    ctaLabel: 'Seans ayırt',
+  },
+  spa: {
+    tones: ['#115e59', '#0f766e', '#0d9488', '#5b21b6', '#6d28d9', '#134e4a', '#2dd4bf', '#042f2e', '#7c3aed', '#0e7490'],
+    soft: '#f5f3ff',
+    cta: 'bg-teal-800',
+    ctaLabel: 'Spa randevusu',
+  },
+  wellness: {
+    tones: ['#166534', '#15803d', '#16a34a', '#4ade80', '#065f46', '#047857', '#86efac', '#052e16', '#22c55e', '#15803d'],
+    soft: '#f0fdf4',
+    cta: 'bg-green-700',
+    ctaLabel: 'Randevu al',
+  },
+  pilates_yoga: {
+    tones: ['#5b21b6', '#7c3aed', '#8b5cf6', '#a78bfa', '#6d28d9', '#4c1d95', '#c4b5fd', '#2e1065', '#7c3aed', '#6366f1'],
+    soft: '#f5f3ff',
+    cta: 'bg-violet-700',
+    ctaLabel: 'Ders ayırt',
+  },
+  fitness: {
+    tones: ['#b91c1c', '#dc2626', '#ef4444', '#f87171', '#991b1b', '#7f1d1d', '#fca5a5', '#450a0a', '#ea580c', '#dc2626'],
+    soft: '#fef2f2',
+    cta: 'bg-red-700',
+    ctaLabel: 'Antrenman ayırt',
+  },
+  dental: {
+    tones: ['#0369a1', '#0284c7', '#0ea5e9', '#38bdf8', '#075985', '#0c4a6e', '#7dd3fc', '#082f49', '#06b6d4', '#0284c7'],
+    soft: '#f0f9ff',
+    cta: 'bg-sky-700',
+    ctaLabel: 'Muayene randevusu',
+  },
+  medical: {
+    tones: ['#1d4ed8', '#2563eb', '#3b82f6', '#60a5fa', '#1e40af', '#1e3a8a', '#93c5fd', '#172554', '#0ea5e9', '#2563eb'],
+    soft: '#eff6ff',
+    cta: 'bg-blue-700',
+    ctaLabel: 'Muayene randevusu',
+  },
+  physio: {
+    tones: ['#0f766e', '#0d9488', '#14b8a6', '#0284c7', '#115e59', '#155e75', '#5eead4', '#042f2e', '#0891b2', '#0f766e'],
+    soft: '#f0fdfa',
+    cta: 'bg-teal-700',
+    ctaLabel: 'Seans ayırt',
+  },
+};
+
+function paletteFor(slug: string): SectorPalette {
+  return SECTOR_PALETTES[slug] || DEFAULT_PALETTE;
+}
+
+function themeFromPalette(p: SectorPalette, tint: number, surface: string, dark?: boolean): WebTemplateTheme {
+  const accent = p.tones[tint % p.tones.length];
+  const heroTo = dark ? '#030712' : shadeHex(accent, -0.45);
+  const heroFrom = dark ? '#111827' : shadeHex(accent, -0.15);
+  return {
+    heroFrom,
+    heroTo,
+    accent: dark ? '#e5e7eb' : accent,
+    accentSoft: dark ? '#1f2937' : p.soft,
+    cta: p.cta,
+    surface: dark ? '#111827' : surface,
+  };
+}
+
+/** Basit hex karartma/açma (−1…1) */
+function shadeHex(hex: string, amount: number): string {
+  const raw = hex.replace('#', '');
+  if (raw.length !== 6) return hex;
+  const n = parseInt(raw, 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  const t = (c: number) => Math.max(0, Math.min(255, Math.round(c + 255 * amount)));
+  return `#${[t(r), t(g), t(b)].map(x => x.toString(16).padStart(2, '0')).join('')}`;
+}
+
+export function bookingCtaLabel(sectorSlug?: string | null): string {
+  if (!sectorSlug) return DEFAULT_PALETTE.ctaLabel;
+  return paletteFor(sectorSlug).ctaLabel;
+}
 
 const img = (id: string, alt: string) => ({
   src: `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=80`,
@@ -208,7 +262,7 @@ const SEEDS: SectorSeed[] = [
       'photo-1560066984-138dadb4c035',
       'photo-1522337660859-02fbefca4702',
       'photo-1595476108010-b4d1f102b1b1',
-      'photo-1634449573010-33df40a4151e',
+      'photo-1522337360788-8b13dee7a37e',
       'photo-1522337360788-8b13dee7a37e',
       'photo-1562322140-8baeececf3df',
       'photo-1516975080664-ed2fc6a32937',
@@ -265,8 +319,8 @@ const SEEDS: SectorSeed[] = [
       'photo-1622286342621-4bd786c2447c',
       'photo-1605497788044-5a32c7078486',
       'photo-1493256338651-d82f7acb2b38',
-      'photo-1521590832167-7bcbfaaae1b0',
-      'photo-1517832594197-ce79fcf82ce3',
+      'photo-1622286342621-4bd786c2447c',
+      'photo-1559599101-f09722fb4948',
       'photo-1559599101-f09722fb4948',
     ],
     [
@@ -314,11 +368,11 @@ const SEEDS: SectorSeed[] = [
     [
       'photo-1487412947147-5cebf100ffc2',
       'photo-1516975080664-ed2fc6a32937',
-      'photo-1570172619604-894f5d4d2d1d',
+      'photo-1552693673-1bf958298935',
       'photo-1512290923902-8a9f81dc236c',
       'photo-1596755389378-c31d21fd1273',
       'photo-1522335789203-aabd1fc54bc9',
-      'photo-1560750588-73207b1ef5b2',
+      'photo-1515377905703-c4788e51af15',
       'photo-1616394584738-fc6e612e71b9',
     ],
     [
@@ -367,11 +421,11 @@ const SEEDS: SectorSeed[] = [
       'photo-1604654894610-df63bc536371',
       'photo-1519014816548-bf5fe059798b',
       'photo-1632345031435-8727f6897d53',
-      'photo-1607779097040-26e80aa78e09',
+      'photo-1519014816548-bf5fe059798b',
       'photo-1604654894610-df63bc536371',
       'photo-1522335789203-aabd1fc54bc9',
       'photo-1596462502278-27bfdc403348',
-      'photo-1519415518172-75d1d2c0c0c0',
+      'photo-1604654894610-df63bc536371',
     ],
     [
       'Tırnak tasarımı ve bakım',
@@ -417,9 +471,9 @@ const SEEDS: SectorSeed[] = [
     'Lazer',
     [
       'photo-1616394584738-fc6e612e71b9',
-      'photo-1570172619604-894f5d4d2d1d',
+      'photo-1552693673-1bf958298935',
       'photo-1512290923902-8a9f81dc236c',
-      'photo-1560750588-73207b1ef5b2',
+      'photo-1515377905703-c4788e51af15',
       'photo-1552693673-1bf958298935',
       'photo-1515377905703-c4788e51af15',
       'photo-1540555700478-4be289fbecef',
@@ -473,9 +527,9 @@ const SEEDS: SectorSeed[] = [
       'photo-1516975080664-ed2fc6a32937',
       'photo-1596462502278-27bfdc403348',
       'photo-1512290923902-8a9f81dc236c',
-      'photo-1570172619604-894f5d4d2d1d',
+      'photo-1552693673-1bf958298935',
       'photo-1616394584738-fc6e612e71b9',
-      'photo-1560750588-73207b1ef5b2',
+      'photo-1515377905703-c4788e51af15',
     ],
     [
       'Doğal kalıcı makyaj çizgileri',
@@ -521,11 +575,11 @@ const SEEDS: SectorSeed[] = [
     'Dövme',
     [
       'photo-1611501275019-9b5cda994e8d',
-      'photo-1562967035-7493c8d4d4e7',
-      'photo-1590246814883-57c511ad5e49',
+      'photo-1611501275019-9b5cda994e8d',
       'photo-1541534741688-6078c6bfb5c5',
-      'photo-1611162617474-5b21e3e9e0e0',
-      'photo-1605497788044-5a5a7e3e0a0a',
+      'photo-1541534741688-6078c6bfb5c5',
+      'photo-1470071459604-3b5ec3a7fe05',
+      'photo-1605497788044-5a32c7078486',
       'photo-1470071459604-3b5ec3a7fe05',
       'photo-1558591710-4b4a1ae0f04d',
     ],
@@ -575,9 +629,9 @@ const SEEDS: SectorSeed[] = [
       'photo-1540555700478-4be289fbecef',
       'photo-1515377905703-c4788e51af15',
       'photo-1552693673-1bf958298935',
-      'photo-1570172619604-894f5d4d2d1d',
+      'photo-1552693673-1bf958298935',
       'photo-1512290923902-8a9f81dc236c',
-      'photo-1560750588-73207b1ef5b2',
+      'photo-1515377905703-c4788e51af15',
       'photo-1487412947147-5cebf100ffc2',
       'photo-1544161515-4ab6ce6db874',
     ],
@@ -625,11 +679,11 @@ const SEEDS: SectorSeed[] = [
     'Masaj',
     [
       'photo-1544161515-4ab6ce6db874',
-      'photo-1519823551278-64ac92781db1',
+      'photo-1544161515-4ab6ce6db874',
       'photo-1600334129128-685c5582fd35',
       'photo-1540555700478-4be289fbecef',
       'photo-1515377905703-c4788e51af15',
-      'photo-1570172619604-894f5d4d2d1d',
+      'photo-1552693673-1bf958298935',
       'photo-1512290923902-8a9f81dc236c',
       'photo-1545205597-3d9d02c29597',
     ],
@@ -678,10 +732,10 @@ const SEEDS: SectorSeed[] = [
     [
       'photo-1540555700478-4be289fbecef',
       'photo-1544161515-4ab6ce6db874',
-      'photo-1519823551278-64ac92781db1',
+      'photo-1544161515-4ab6ce6db874',
       'photo-1600334129128-685c5582fd35',
       'photo-1515377905703-c4788e51af15',
-      'photo-1570172619604-894f5d4d2d1d',
+      'photo-1552693673-1bf958298935',
       'photo-1545205597-3d9d02c29597',
       'photo-1507652313519-d4e9174996dd',
     ],
@@ -732,7 +786,7 @@ const SEEDS: SectorSeed[] = [
       'photo-1544367567-0f2fcb009e0b',
       'photo-1518611012118-696072aa579a',
       'photo-1544161515-4ab6ce6db874',
-      'photo-1519823551278-64ac92781db1',
+      'photo-1544161515-4ab6ce6db874',
       'photo-1571019614242-c5c5dee9f50b',
       'photo-1506126613408-eca07ce68773',
       'photo-1515377905703-c4788e51af15',
@@ -807,30 +861,36 @@ function quick(
 }
 
 SEEDS.push(
-  quick('pilates_yoga', 'Pilates / Yoga', ['photo-1544367567-0f2fcb009e0b', 'photo-1518611012118-696072aa579a', 'photo-1571019614242-c5c5dee9f50b', 'photo-1599901860904-17e6ede5256c', 'photo-1506126613408-eca07ce68773', 'photo-1545205597-3d9d02c29597', 'photo-1518310383802-640c2de311b2', 'photo-1593811167562-9cef47bfc4d7'], 'Nefes, denge ve güç'),
-  quick('fitness', 'Fitness', ['photo-1534438327276-14e5300c3a48', 'photo-1571902943202-507ec2618e8f', 'photo-1540497077202-7c8a3999166f', 'photo-1517836357463-d25dfeac3438', 'photo-1581009146145-b5ef638e54ff', 'photo-1434682881908-b43d0467b798', 'photo-1518611012118-696072aa579a', 'photo-1571019613454-1cb2f99b2d8b'], 'Güç ve kondisyon'),
-  quick('dance', 'Dans', ['photo-1508700929628-666bc8bd84ea', 'photo-1518834107812-67b0b7c58434', 'photo-1547153760-18fc86302685', 'photo-1504609813442-a8924e83f76e', 'photo-1518611012118-696072aa579a', 'photo-1535525153412-5a42439a210d', 'photo-1508807526345-15e9b5f4eaff', 'photo-1524594152303-9fd13543fe6e'], 'Ritim ve ifade'),
-  quick('martial', 'Dövüş sporları', ['photo-1555597673-b21f3b5d1e0e', 'photo-1549719386-90fe8c0b0b0a', 'photo-1599058917212-d750089bc07e', 'photo-1517438322456-0e4f0f0f0f0f', 'photo-1571019613454-1cb2f99b2d8b', 'photo-1517836357463-d25dfeac3438', 'photo-1540497077202-7c8a3999166f', 'photo-1534438327276-14e5300c3a48'], 'Disiplin ve teknik'),
-  quick('pool', 'Havuz', ['photo-1576013551627-0cc20b96c2a7', 'photo-1519315901367-f34ff9154487', 'photo-1575429198097-0414ec08e8cd', 'photo-1560095632-28688788f81b', 'photo-1530549387789-4c1017266635', 'photo-1576610616655-1596e8e0b0a0', 'photo-1600965962102-9d260a71890d', 'photo-1571902943202-507ec2618e8f'], 'Yüzme ve su sporu'),
-  quick('sports_facility', 'Spor tesisi', ['photo-1461896836934-ffe607ba6851', 'photo-1574629810360-7efbbe195018', 'photo-1529900748604-07564a03e7a6', 'photo-1552674605-db6ffd4facb5', 'photo-1431324155629-1a6deb1dec8d', 'photo-1571902943202-507ec2618e8f', 'photo-1540497077202-7c8a3999166f', 'photo-1534438327276-14e5300c3a48'], 'Saha ve tesis'),
-  quick('dental', 'Diş', ['photo-1606811841689-23dfddce3e95', 'photo-1588776814546-1ffcf47267a5', 'photo-1629909613654-28e377c37b09', 'photo-1609840114035-3c981b782dfe', 'photo-1598256989800-fe5f95da9787', 'photo-1607613009820-a29f7bb45147', 'photo-1519494026892-80bbd2d6fd0d', 'photo-1579684385127-1ef15d508118'], 'Ağız ve diş sağlığı'),
-  quick('physio', 'Fizyoterapi', ['photo-1576091160399-112ba8d25d1d', 'photo-1571019613454-1cb2f99b2d8b', 'photo-1519823551278-64ac92781db1', 'photo-1579684385127-1ef15d508118', 'photo-1576091160550-2173dba999ef', 'photo-1666214280557-f1b5022eb634', 'photo-1519494026892-80bbd2d6fd0d', 'photo-1581595220892-b2452a0e0b0a'], 'Hareket ve rehabilitasyon'),
-  quick('podiatry', 'Ayak sağlığı', ['photo-1519494026892-80bbd2d6fd0d', 'photo-1579684385127-1ef15d508118', 'photo-1666214280557-f1b5022eb634', 'photo-1576091160399-112ba8d25d1d', 'photo-1581595220892-b2452a0e0b0a', 'photo-1576091160550-2173dba999ef', 'photo-1629909613654-28e377c37b09', 'photo-1606811841689-23dfddce3e95'], 'Ayak bakımı ve tedavi'),
-  quick('dietitian', 'Diyetisyen', ['photo-1490645935967-10de6ba17061', 'photo-1512621776951-a57141f2eefd', 'photo-1498837167922-ddd27525d352', 'photo-1546069901-ba9599a7e63c', 'photo-1511690656952-34342bb7c2f2', 'photo-1466636134816-3a3c1c0c0c0c', 'photo-1505576633757-0ac1084af824', 'photo-1493770348161-369560ae357d'], 'Beslenme danışmanlığı'),
-  quick('psychology', 'Psikoloji', ['photo-1573497019940-1c28c88b4f3e', 'photo-1527613426441-4da1747100b1', 'photo-1516302752623-ebb182653a0a', 'photo-1497366216548-37526070297c', 'photo-1497366754035-f200968a6e72', 'photo-1486312338219-ce68d2c6f44d', 'photo-1454165804606-c3d57bc86b40', 'photo-1516321318423-f06f85e504b3'], 'Görüşme ve destek'),
-  quick('dermatology', 'Dermatoloji', ['photo-1552693673-1bf958298935', 'photo-1570172619604-894f5d4d2d1d', 'photo-1512290923902-8a9f81dc236c', 'photo-1616394584738-fc6e612e71b9', 'photo-1560750588-73207b1ef5b2', 'photo-1519494026892-80bbd2d6fd0d', 'photo-1579684385127-1ef15d508118', 'photo-1666214280557-f1b5022eb634'], 'Cilt sağlığı'),
-  quick('medical', 'Klinik', ['photo-1519494026892-80bbd2d6fd0d', 'photo-1579684385127-1ef15d508118', 'photo-1666214280557-f1b5022eb634', 'photo-1581595220892-b2452a0e0b0a', 'photo-1576091160399-112ba8d25d1d', 'photo-1576091160550-2173dba999ef', 'photo-1538108865647-ec6a291b0f0a', 'photo-1582750433449-648ed127bb54'], 'Muayene ve takip'),
-  quick('plastic_surgery', 'Estetik', ['photo-1512290923902-8a9f81dc236c', 'photo-1570172619604-894f5d4d2d1d', 'photo-1616394584738-fc6e612e71b9', 'photo-1552693673-1bf958298935', 'photo-1519494026892-80bbd2d6fd0d', 'photo-1579684385127-1ef15d508118', 'photo-1487412947147-5cebf100ffc2', 'photo-1522335789203-aabd1fc54bc9'], 'Estetik danışmanlık'),
-  quick('veterinary', 'Veteriner', ['photo-1628009367841-40313a0b0c0c', 'photo-1548199973-03cce0bbc87b', 'photo-1583511655857-d19b40a7a54e', 'photo-1450778869180-41d0601e046e', 'photo-1583337130417-3346a1be7dee', 'photo-1544568100-847a948585b9', 'photo-1530281700549-e82e7bf110d6', 'photo-1516734212186-a967f81ad0d7'], 'Evcil hayvan sağlığı'),
-  quick('optic', 'Optik', ['photo-1574258495973-f010dfbb7141', 'photo-1509695507497-903c140c43f0', 'photo-1473496169904-658ba7c44d8a', 'photo-1511499767150-a48a237f0083', 'photo-1577803645773-f96470509666', 'photo-1556306535-0f09a5378a45', 'photo-1591079400694-0f0b0b0b0b0b', 'photo-1483412033650-1015ddeb83d1'], 'Gözlük ve göz bakımı'),
-  quick('photo', 'Fotoğraf', ['photo-1452587925148-ce544e77e282', 'photo-1492691527719-9d1e07e534b4', 'photo-1554048612-b6a482bc67e5', 'photo-1516035069371-29a1b244cc32', 'photo-1542038784456-1ea8e935640e', 'photo-1471341971476-ae15ff8dd5e0', 'photo-1493863641943-9b68992a8d07', 'photo-1454165804606-c3d57bc86b40'], 'Çekim ve stüdyo'),
+  quick('pilates_yoga', 'Pilates / Yoga', ['photo-1544367567-0f2fcb009e0b', 'photo-1518611012118-696072aa579a', 'photo-1571019614242-c5c5dee9f50b', 'photo-1506126613408-eca07ce68773', 'photo-1506126613408-eca07ce68773', 'photo-1545205597-3d9d02c29597', 'photo-1518310383802-640c2de311b2', 'photo-1593811167562-9cef47bfc4d7'], 'Nefes, denge ve güç'),
+  quick('fitness', 'Fitness', ['photo-1534438327276-14e5300c3a48', 'photo-1571902943202-507ec2618e8f', 'photo-1540497077202-7c8a3999166f', 'photo-1517836357463-d25dfeac3438', 'photo-1534438327276-14e5300c3a48', 'photo-1434682881908-b43d0467b798', 'photo-1518611012118-696072aa579a', 'photo-1571019613454-1cb2f99b2d8b'], 'Güç ve kondisyon'),
+  quick('dance', 'Dans', ['photo-1508700929628-666bc8bd84ea', 'photo-1518834107812-67b0b7c58434', 'photo-1508700929628-666bc8bd84ea', 'photo-1504609813442-a8924e83f76e', 'photo-1518611012118-696072aa579a', 'photo-1535525153412-5a42439a210d', 'photo-1508807526345-15e9b5f4eaff', 'photo-1524594152303-9fd13543fe6e'], 'Ritim ve ifade'),
+  quick('martial', 'Dövüş sporları', ['photo-1540497077202-7c8a3999166f', 'photo-1599058917212-d750089bc07e', 'photo-1599058917212-d750089bc07e', 'photo-1517836357463-d25dfeac3438', 'photo-1571019613454-1cb2f99b2d8b', 'photo-1517836357463-d25dfeac3438', 'photo-1540497077202-7c8a3999166f', 'photo-1534438327276-14e5300c3a48'], 'Disiplin ve teknik'),
+  quick('pool', 'Havuz', ['photo-1576013551627-0cc20b96c2a7', 'photo-1519315901367-f34ff9154487', 'photo-1575429198097-0414ec08e8cd', 'photo-1576013551627-0cc20b96c2a7', 'photo-1530549387789-4c1017266635', 'photo-1519315901367-f34ff9154487', 'photo-1600965962102-9d260a71890d', 'photo-1571902943202-507ec2618e8f'], 'Yüzme ve su sporu'),
+  quick('sports_facility', 'Spor tesisi', ['photo-1574629810360-7efbbe195018', 'photo-1574629810360-7efbbe195018', 'photo-1529900748604-07564a03e7a6', 'photo-1552674605-db6ffd4facb5', 'photo-1431324155629-1a6deb1dec8d', 'photo-1571902943202-507ec2618e8f', 'photo-1540497077202-7c8a3999166f', 'photo-1534438327276-14e5300c3a48'], 'Saha ve tesis'),
+  quick('dental', 'Diş', ['photo-1606811841689-23dfddce3e95', 'photo-1588776814546-1ffcf47267a5', 'photo-1629909613654-28e377c37b09', 'photo-1609840114035-3c981b782dfe', 'photo-1598256989800-fe5f95da9787', 'photo-1629909613654-28e377c37b09', 'photo-1519494026892-80bbd2d6fd0d', 'photo-1579684385127-1ef15d508118'], 'Ağız ve diş sağlığı'),
+  quick('physio', 'Fizyoterapi', ['photo-1576091160399-112ba8d25d1d', 'photo-1571019613454-1cb2f99b2d8b', 'photo-1544161515-4ab6ce6db874', 'photo-1579684385127-1ef15d508118', 'photo-1576091160550-2173dba999ef', 'photo-1666214280557-f1b5022eb634', 'photo-1519494026892-80bbd2d6fd0d', 'photo-1579684385127-1ef15d508118'], 'Hareket ve rehabilitasyon'),
+  quick('podiatry', 'Ayak sağlığı', ['photo-1519494026892-80bbd2d6fd0d', 'photo-1579684385127-1ef15d508118', 'photo-1666214280557-f1b5022eb634', 'photo-1576091160399-112ba8d25d1d', 'photo-1579684385127-1ef15d508118', 'photo-1576091160550-2173dba999ef', 'photo-1629909613654-28e377c37b09', 'photo-1606811841689-23dfddce3e95'], 'Ayak bakımı ve tedavi'),
+  quick('dietitian', 'Diyetisyen', ['photo-1490645935967-10de6ba17061', 'photo-1512621776951-a57141f2eefd', 'photo-1498837167922-ddd27525d352', 'photo-1546069901-ba9599a7e63c', 'photo-1511690656952-34342bb7c2f2', 'photo-1498837167922-ddd27525d352', 'photo-1505576633757-0ac1084af824', 'photo-1493770348161-369560ae357d'], 'Beslenme danışmanlığı'),
+  quick('psychology', 'Psikoloji', ['photo-1573497019940-1c28c88b4f3e', 'photo-1573497019940-1c28c88b4f3e', 'photo-1497366216548-37526070297c', 'photo-1497366216548-37526070297c', 'photo-1497366754035-f200968a6e72', 'photo-1486312338219-ce68d2c6f44d', 'photo-1454165804606-c3d57bc86b40', 'photo-1516321318423-f06f85e504b3'], 'Görüşme ve destek'),
+  quick('dermatology', 'Dermatoloji', ['photo-1552693673-1bf958298935', 'photo-1552693673-1bf958298935', 'photo-1512290923902-8a9f81dc236c', 'photo-1616394584738-fc6e612e71b9', 'photo-1515377905703-c4788e51af15', 'photo-1519494026892-80bbd2d6fd0d', 'photo-1579684385127-1ef15d508118', 'photo-1666214280557-f1b5022eb634'], 'Cilt sağlığı'),
+  quick('medical', 'Klinik', ['photo-1519494026892-80bbd2d6fd0d', 'photo-1579684385127-1ef15d508118', 'photo-1666214280557-f1b5022eb634', 'photo-1579684385127-1ef15d508118', 'photo-1576091160399-112ba8d25d1d', 'photo-1576091160550-2173dba999ef', 'photo-1576091160399-112ba8d25d1d', 'photo-1582750433449-648ed127bb54'], 'Muayene ve takip'),
+  quick('plastic_surgery', 'Estetik', ['photo-1512290923902-8a9f81dc236c', 'photo-1552693673-1bf958298935', 'photo-1616394584738-fc6e612e71b9', 'photo-1552693673-1bf958298935', 'photo-1519494026892-80bbd2d6fd0d', 'photo-1579684385127-1ef15d508118', 'photo-1487412947147-5cebf100ffc2', 'photo-1522335789203-aabd1fc54bc9'], 'Estetik danışmanlık'),
+  quick('veterinary', 'Veteriner', ['photo-1548199973-03cce0bbc87b', 'photo-1548199973-03cce0bbc87b', 'photo-1583511655857-d19b40a7a54e', 'photo-1450778869180-41d0601e046e', 'photo-1583337130417-3346a1be7dee', 'photo-1544568100-847a948585b9', 'photo-1530281700549-e82e7bf110d6', 'photo-1516734212186-a967f81ad0d7'], 'Evcil hayvan sağlığı'),
+  quick('optic', 'Optik', ['photo-1577803645773-f96470509666', 'photo-1511499767150-a48a237f0083', 'photo-1473496169904-658ba7c44d8a', 'photo-1511499767150-a48a237f0083', 'photo-1577803645773-f96470509666', 'photo-1473496169904-658ba7c44d8a', 'photo-1511499767150-a48a237f0083', 'photo-1483412033650-1015ddeb83d1'], 'Gözlük ve göz bakımı'),
+  quick('photo', 'Fotoğraf', ['photo-1492691527719-9d1e07e534b4', 'photo-1492691527719-9d1e07e534b4', 'photo-1554048612-b6a482bc67e5', 'photo-1516035069371-29a1b244cc32', 'photo-1542038784456-1ea8e935640e', 'photo-1554048612-b6a482bc67e5', 'photo-1493863641943-9b68992a8d07', 'photo-1454165804606-c3d57bc86b40'], 'Çekim ve stüdyo'),
   quick('pet_grooming', 'Pet kuaför', ['photo-1548199973-03cce0bbc87b', 'photo-1583511655857-d19b40a7a54e', 'photo-1450778869180-41d0601e046e', 'photo-1583337130417-3346a1be7dee', 'photo-1544568100-847a948585b9', 'photo-1530281700549-e82e7bf110d6', 'photo-1516734212186-a967f81ad0d7', 'photo-1601758228041-f3b2795255f1'], 'Tüy bakım ve yıkama'),
-  quick('car_detail', 'Oto detay', ['photo-1601362840469-51e4d8d58785', 'photo-1492144534655-ae79c964c9d7', 'photo-1503376780353-7e6692767b70', 'photo-1552519507-da3b142c6e3d', 'photo-1542362567-b066e952541b', 'photo-1619642751034-765dfdf7c58e', 'photo-1609521263047-f8f205293f24', 'photo-1485291571150-772bcfc10da5'], 'Araç temizlik ve bakım'),
+  quick('car_detail', 'Oto detay', ['photo-1601362840469-51e4d8d58785', 'photo-1492144534655-ae79c964c9d7', 'photo-1503376780353-7e6692767b70', 'photo-1552519507-da3b142c6e3d', 'photo-1492144534655-ae79c964c9d7', 'photo-1619642751034-765dfdf7c58e', 'photo-1609521263047-f8f205293f24', 'photo-1485291571150-772bcfc10da5'], 'Araç temizlik ve bakım'),
   quick('coaching', 'Koçluk', ['photo-1552664730-d307ca884978', 'photo-1516321318423-f06f85e504b3', 'photo-1454165804606-c3d57bc86b40', 'photo-1486312338219-ce68d2c6f44d', 'photo-1497366216548-37526070297c', 'photo-1522202176988-66273c2fd55f', 'photo-1600880292203-757bb62b4baf', 'photo-1519389950473-47ba0277781c'], 'Hedef ve gelişim'),
-  quick('tutoring', 'Özel ders', ['photo-1503676260728-1c00da094a0b', 'photo-1427504494785-3a9ca7044f45', 'photo-1509062522246-3755977927d7', 'photo-1456513080800-7d93acfdaec9', 'photo-1434030216411-0b793f4b4173', 'photo-1523240795612-9a054b0db644', 'photo-1524178232363-1fb2b075b655', 'photo-1497633762265-9d179a990aa6'], 'Ders ve sınav hazırlığı'),
+  quick('tutoring', 'Özel ders', ['photo-1503676260728-1c00da094a0b', 'photo-1427504494785-3a9ca7044f45', 'photo-1509062522246-3755977927d7', 'photo-1434030216411-0b793f4b4173', 'photo-1434030216411-0b793f4b4173', 'photo-1523240795612-9a054b0db644', 'photo-1524178232363-1fb2b075b655', 'photo-1497633762265-9d179a990aa6'], 'Ders ve sınav hazırlığı'),
+  quick('lash_brow', 'Kaş & kirpik', ['photo-1522337660859-02fbefca4702', 'photo-1516975080664-ed2fc6a32937', 'photo-1487412947147-5cebf100ffc2', 'photo-1596755389378-c31d21fd1273', 'photo-1522335789203-aabd1fc54bc9', 'photo-1515377905703-c4788e51af15', 'photo-1616394584738-fc6e612e71b9', 'photo-1512290923902-8a9f81dc236c'], 'Kaş ve kirpik tasarımı'),
+  quick('hair_transplant', 'Saç ekimi', ['photo-1622286342621-4bd786c2447c', 'photo-1599351431202-1e0f0137899a', 'photo-1585747860715-2ba37e788b70', 'photo-1621605815971-fbc98d665033', 'photo-1493256338651-d82f7acb2b38', 'photo-1622286342621-4bd786c2447c', 'photo-1559599101-f09722fb4948', 'photo-1605497788044-5a32c7078486'], 'Saç ekimi danışmanlığı'),
+  quick('crossfit', 'CrossFit', ['photo-1534438327276-14e5300c3a48', 'photo-1517836357463-d25dfeac3438', 'photo-1571902943202-507ec2618e8f', 'photo-1540497077202-7c8a3999166f', 'photo-1534438327276-14e5300c3a48', 'photo-1434682881908-b43d0467b798', 'photo-1571019613454-1cb2f99b2d8b', 'photo-1518611012118-696072aa579a'], 'Yüksek yoğunluk antrenman'),
+  quick('music', 'Müzik', ['photo-1511379938547-c1f69419868d', 'photo-1507838153414-b4b713384a76', 'photo-1507838153414-b4b713384a76', 'photo-1510915361894-db8b60106cb1', 'photo-1493225457124-a3eb161ffa5f', 'photo-1493225457124-a3eb161ffa5f', 'photo-1511379938547-c1f69419868d', 'photo-1510915361894-db8b60106cb1'], 'Ders ve stüdyo'),
+  quick('osteopathy', 'Osteopati', ['photo-1571019613454-1cb2f99b2d8b', 'photo-1544161515-4ab6ce6db874', 'photo-1576091160399-112ba8d25d1d', 'photo-1579684385127-1ef15d508118', 'photo-1576091160550-2173dba999ef', 'photo-1666214280557-f1b5022eb634', 'photo-1519494026892-80bbd2d6fd0d', 'photo-1579684385127-1ef15d508118'], 'Manuel terapi'),
 );
 
 function buildTemplates(seedRow: SectorSeed): WebPageTemplate[] {
+  const palette = paletteFor(seedRow.slug);
   return STYLES.map((style, i) => {
     const photos = rotate(seedRow.photos, i);
     const gallery = photos.slice(0, 4).map((id, gi) => img(id, `${seedRow.label} ${gi + 1}`));
@@ -839,7 +899,9 @@ function buildTemplates(seedRow: SectorSeed): WebPageTemplate[] {
       sectorSlug: seedRow.slug,
       name: `${seedRow.label} · ${style.name}`,
       styleName: style.name,
-      theme: style.theme,
+      layout: style.layout,
+      ctaLabel: palette.ctaLabel,
+      theme: themeFromPalette(palette, style.tint, style.surface, style.dark),
       tagline: seedRow.taglines[i],
       about: seedRow.abouts[i],
       gallery,

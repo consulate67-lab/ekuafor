@@ -76,3 +76,32 @@ export function visibleSlotsFromNow(
 
   return allSlots.slice(startIdx);
 }
+
+/** Slot diliminin [start, start+interval) penceresi */
+export function slotWindow(slot: string, slotInterval: number): { start: string; end: string } {
+  const step = slotInterval > 0 ? slotInterval : 30;
+  return { start: slot, end: slotEnd(slot, step) };
+}
+
+/** Etkinlik bu slot dilimiyle zaman olarak çakışıyor mu? */
+export function overlapsSlotWindow(
+  start: string,
+  end: string,
+  slot: string,
+  slotInterval: number,
+): boolean {
+  const w = slotWindow(slot, slotInterval);
+  return overlaps(start, end, w.start, w.end);
+}
+
+/** Bugün görünümünde “şimdi” slotunun indeksi (yoksa en yakın sonraki). */
+export function nowSlotIndex(
+  allSlots: string[],
+  currentMinutes: number,
+  slotInterval: number,
+): number {
+  if (!allSlots.length) return 0;
+  const step = slotInterval > 0 ? slotInterval : 30;
+  const idx = allSlots.findIndex(s => toMinutes(s) + step > currentMinutes);
+  return idx < 0 ? Math.max(0, allSlots.length - 1) : idx;
+}

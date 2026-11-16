@@ -10,6 +10,7 @@ import {
 } from '../lib/staffRoles';
 import { uid } from '../lib/id';
 import { useAppStore } from '../store/appStore';
+import { ServiceTransfer } from '../components/ServiceTransfer';
 
 type Step = 'welcome' | 'key' | 'company' | 'sector' | 'hours' | 'staff' | 'review';
 
@@ -38,6 +39,9 @@ export function SetupWizard() {
   const [name, setName] = useState('');
   const [workStart, setWorkStart] = useState('09:00');
   const [workEnd, setWorkEnd] = useState('20:00');
+  const [weekendWorkStart, setWeekendWorkStart] = useState('10:00');
+  const [weekendWorkEnd, setWeekendWorkEnd] = useState('18:00');
+  const [weekendClosed, setWeekendClosed] = useState(false);
   const [slotInterval, setSlotInterval] = useState(30);
   const [location, setLocation] = useState<GeoLocation | null>(null);
   const [locError, setLocError] = useState('');
@@ -118,7 +122,11 @@ export function SetupWizard() {
 
   const prepareStaff = () => {
     if (workStart >= workEnd) {
-      setError('Bitiş saati başlangıçtan sonra olmalı.');
+      setError('Hafta içi: bitiş saati başlangıçtan sonra olmalı.');
+      return;
+    }
+    if (!weekendClosed && weekendWorkStart >= weekendWorkEnd) {
+      setError('Hafta sonu: bitiş saati başlangıçtan sonra olmalı.');
       return;
     }
     setError('');
@@ -131,24 +139,22 @@ export function SetupWizard() {
     const defaultTitle = defaultStaffTitle(sectorSlugs);
     const svcs = servicesFromSectors(sectorSlugs);
     setDraftServices(svcs);
-    const allIds = svcs.map(s => s.id);
     const count = Math.min(30, Math.max(1, staffCount));
     setStaff(
-      Array.from({ length: count }, () =>
-        emptyStaff(workStart, workEnd, defaultDeptId, defaultTitle, [...allIds]),
-      ),
+      Array.from({ length: count }, () => {
+        const row = emptyStaff(workStart, workEnd, defaultDeptId, defaultTitle, []);
+        if (!weekendClosed) {
+          row.weekendWorkStart = weekendWorkStart;
+          row.weekendWorkEnd = weekendWorkEnd;
+        }
+        return row;
+      }),
     );
     setStep('staff');
   };
 
   const updateStaff = (index: number, patch: Partial<Staff>) => {
     setStaff(prev => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)));
-  };
-
-  const toggleStaffService = (index: number, serviceId: string) => {
-    const cur = staff[index]?.serviceIds || [];
-    const next = cur.includes(serviceId) ? cur.filter(id => id !== serviceId) : [...cur, serviceId];
-    updateStaff(index, { serviceIds: next });
   };
 
   const readPhoto = (index: number, file?: File | null) => {
@@ -195,6 +201,9 @@ export function SetupWizard() {
         name: name.trim(),
         workStart,
         workEnd,
+        weekendWorkStart: weekendClosed ? undefined : weekendWorkStart,
+        weekendWorkEnd: weekendClosed ? undefined : weekendWorkEnd,
+        weekendClosed: weekendClosed || undefined,
         slotInterval,
         location,
         sectorSlugs,
@@ -355,15 +364,44 @@ export function SetupWizard() {
         {step === 'hours' && (
           <section className="mt-8 space-y-5 rounded-3xl border border-slate-100 bg-white p-8 shadow-sm">
             <h2 className="text-xl font-black">5. Mesai ve slot</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <label className="block">
-                <span className="text-xs font-black uppercase tracking-widest text-slate-400">Açılış</span>
-                <input type="time" value={workStart} onChange={e => setWorkStart(e.target.value)} className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-bold" />
-              </label>
-              <label className="block">
-                <span className="text-xs font-black uppercase tracking-widest text-slate-400">Kapanış</span>
-                <input type="time" value={workEnd} onChange={e => setWorkEnd(e.target.value)} className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-bold" />
-              </label>
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-slate-400">Hafta içi (Pzt–Cum)</p>
+              <div className="mt-2 grid grid-cols-2 gap-4">
+                <label className="block">
+                  <span className="text-xs font-black uppercase tracking-widest text-slate-400">Açılış</span>
+                  <input type="time" value={workStart} onChange={e => setWorkStart(e.target.value)} className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-bold" />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-black uppercase tracking-widest text-slate-400">Kapanış</span>
+                  <input type="time" value={workEnd} onChange={e => setWorkEnd(e.target.value)} className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-bold" />
+                </label>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs font-black uppercase tracking-widest text-slate-400">Hafta sonu (Cmt–Paz)</p>
+                <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={weekendClosed}
+                    onChange={e => setWeekendClosed(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300"
+                  />
+                  Kapalı
+                </label>
+              </div>
+              {!weekendClosed && (
+                <div className="mt-3 grid grid-cols-2 gap-4">
+                  <label className="block">
+                    <span className="text-xs font-black uppercase tracking-widest text-slate-400">Açılış</span>
+                    <input type="time" value={weekendWorkStart} onChange={e => setWeekendWorkStart(e.target.value)} className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-bold" />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-black uppercase tracking-widest text-slate-400">Kapanış</span>
+                    <input type="time" value={weekendWorkEnd} onChange={e => setWeekendWorkEnd(e.target.value)} className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-bold" />
+                  </label>
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               {SLOT_OPTIONS.map(n => (
@@ -384,7 +422,9 @@ export function SetupWizard() {
           <section className="mt-8 space-y-4">
             <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
               <h2 className="text-xl font-black">6. Çalışanlar + hizmet eşlemesi</h2>
-              <p className="mt-1 text-sm text-slate-500">Her çalışanın hangi hizmetleri vereceğini işaretleyin.</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Soldan seçip sağa aktarın — Ctrl ile çoklu, Tümü ile hepsi.
+              </p>
             </div>
             {staff.map((s, i) => (
               <article key={s.id} className="space-y-4 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
@@ -425,31 +465,43 @@ export function SetupWizard() {
                     </select>
                   </label>
                   <label className="block">
-                    <span className="text-[10px] font-black uppercase text-slate-400">Mesai başı</span>
+                    <span className="text-[10px] font-black uppercase text-slate-400">Hafta içi başı</span>
                     <input type="time" value={s.workStart} onChange={e => updateStaff(i, { workStart: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold" />
                   </label>
                   <label className="block">
-                    <span className="text-[10px] font-black uppercase text-slate-400">Mesai sonu</span>
+                    <span className="text-[10px] font-black uppercase text-slate-400">Hafta içi sonu</span>
                     <input type="time" value={s.workEnd} onChange={e => updateStaff(i, { workEnd: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold" />
                   </label>
+                  {!weekendClosed && (
+                    <>
+                      <label className="block">
+                        <span className="text-[10px] font-black uppercase text-slate-400">Hafta sonu başı</span>
+                        <input
+                          type="time"
+                          value={s.weekendWorkStart || weekendWorkStart}
+                          onChange={e => updateStaff(i, { weekendWorkStart: e.target.value })}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-[10px] font-black uppercase text-slate-400">Hafta sonu sonu</span>
+                        <input
+                          type="time"
+                          value={s.weekendWorkEnd || weekendWorkEnd}
+                          onChange={e => updateStaff(i, { weekendWorkEnd: e.target.value })}
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-bold"
+                        />
+                      </label>
+                    </>
+                  )}
                 </div>
                 <div>
-                  <p className="text-[10px] font-black uppercase text-slate-400">Hizmetler</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {draftServices.map(svc => {
-                      const on = (s.serviceIds || []).includes(svc.id);
-                      return (
-                        <button
-                          key={svc.id}
-                          type="button"
-                          onClick={() => toggleStaffService(i, svc.id)}
-                          className={`rounded-xl px-3 py-1.5 text-xs font-black ${on ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'}`}
-                        >
-                          {on ? '✓ ' : ''}{svc.name}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <p className="mb-2 text-[10px] font-black uppercase text-slate-400">Hizmetler</p>
+                  <ServiceTransfer
+                    services={draftServices}
+                    selectedIds={s.serviceIds || []}
+                    onChange={ids => updateStaff(i, { serviceIds: ids })}
+                  />
                 </div>
               </article>
             ))}
@@ -491,7 +543,13 @@ export function SetupWizard() {
               <li>Firma: {name}</li>
               <li>Sektörler: {selectedNames.join(', ')}</li>
               <li>Hizmet: {draftServices.length}</li>
-              <li>Mesai: {workStart} – {workEnd} · {slotInterval} dk</li>
+              <li>
+                Mesai hafta içi: {workStart}–{workEnd}
+                {weekendClosed
+                  ? ' · hafta sonu kapalı'
+                  : ` · hafta sonu: ${weekendWorkStart}–${weekendWorkEnd}`}
+                {' · '}{slotInterval} dk
+              </li>
               <li>Çalışan: {staff.length}</li>
             </ul>
             {!navigator.onLine && (

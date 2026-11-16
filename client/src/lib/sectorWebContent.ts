@@ -137,7 +137,7 @@ const BY_SLUG: Partial<Record<string, Partial<SectorWebPack>>> = {
             img('photo-1560066984-138dadb4c035', 'Kuaför salonu'),
             img('photo-1522337660859-02fbefca4702', 'Saç kesimi'),
             img('photo-1595476108010-b4d1f102b1b1', 'Fön'),
-            img('photo-1634449573010-33df40a4151e', 'Renk'),
+            img('photo-1522337360788-8b13dee7a37e', 'Renk'),
         ],
     },
     barber: {
@@ -174,7 +174,7 @@ const BY_SLUG: Partial<Record<string, Partial<SectorWebPack>>> = {
             img('photo-1604654894610-df63bc536371', 'Nail art'),
             img('photo-1519014816548-bf5fe059798b', 'Manikür'),
             img('photo-1632345031435-8727f6897d53', 'Pedikür'),
-            img('photo-1607779097040-26e80aa78e09', 'Tırnak'),
+            img('photo-1519014816548-bf5fe059798b', 'Tırnak'),
         ],
     },
     dental: {
@@ -192,7 +192,7 @@ const BY_SLUG: Partial<Record<string, Partial<SectorWebPack>>> = {
             img('photo-1544367567-0f2fcb009e0b', 'Yoga'),
             img('photo-1518611012118-696072aa579a', 'Pilates'),
             img('photo-1571019614242-c5c5dee9f50b', 'Stüdyo'),
-            img('photo-1599901860904-17e6ede5256c', 'Mat'),
+            img('photo-1506126613408-eca07ce68773', 'Mat'),
         ],
     },
 };

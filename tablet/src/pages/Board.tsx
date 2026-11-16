@@ -12,18 +12,24 @@ import {
   toMinutes,
 } from '../lib/dates';
 import {
-  coversSlot,
   generateSlots,
   nowMinutes,
+  nowSlotIndex,
+  overlapsSlotWindow,
   slotEnd,
   spanSlots,
-  visibleSlotsFromNow,
 } from '../lib/slots';
 import {
+  appointmentTimeline,
   processingWindow,
-  slotInProcessingWindow,
-  slotIsStaffBusy,
+  staffBusyIntervals,
 } from '../lib/processingWindows';
+import { companyHoursForDate, hoursLabel, staffHoursForDate } from '../lib/workHours';
+import {
+  appointmentColorIndexMap,
+  colorForAppointment,
+} from '../lib/appointmentColors';
+import { AppointmentTimeline } from '../components/AppointmentTimeline';
 import {
   isEmbeddedBrowser,
   listenOnce,
@@ -119,9 +125,24 @@ export function Board() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [company.serverCompanyId, company.activationKey, deviceId]);
 
+  const dayHours = useMemo(
+    () => companyHoursForDate(company, selectedDate),
+    [
+      company.workStart,
+      company.workEnd,
+      company.weekendWorkStart,
+      company.weekendWorkEnd,
+      company.weekendClosed,
+      selectedDate,
+    ],
+  );
+
   const allSlots = useMemo(
-    () => generateSlots(company.workStart, company.workEnd, company.slotInterval),
-    [company.workStart, company.workEnd, company.slotInterval],
+    () =>
+      dayHours.closed
+        ? []
+        : generateSlots(dayHours.workStart, dayHours.workEnd, company.slotInterval),
+    [dayHours, company.slotInterval],
   );
 
   const dayEvents = useMemo(
@@ -131,33 +152,44 @@ export function Board() {
 
   const isToday = selectedDate === todayKey();
   const currentMin = nowMinutes();
+  /** Bugün: tüm gün saatleri (geçmiş + kalan); varsayılan kaydırma “şimdi”ye */
+  const slots = allSlots;
+  const scale = boardScale(staff.length);
+  const COL_W = Math.round(BASE_COL_W * scale);
+  const STAFF_COL_W = Math.round(BASE_STAFF_COL_W * Math.min(1.1, scale + 0.05));
+  const ROW_H = Math.round(80 * scale);
+  const PHOTO = Math.round(80 * scale);
+  const scrolledToNowForDate = useRef<string | null>(null);
 
-  const slots = useMemo(() => {
-    if (!isToday) return allSlots;
-    const ongoingStarts = dayEvents
-      .filter(e => {
-        const [sh, sm] = e.startTime.split(':').map(Number);
-        const [eh, em] = e.endTime.split(':').map(Number);
-        return sh * 60 + sm <= currentMin && currentMin < eh * 60 + em;
-      })
-      .map(e => e.startTime);
-    return visibleSlotsFromNow(allSlots, currentMin, company.slotInterval, ongoingStarts);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allSlots, isToday, dayEvents, company.slotInterval, tick, currentMin]);
+  const scrollBoardToNow = (behavior: ScrollBehavior = 'smooth') => {
+    if (!scrollRef.current || !slots.length) return;
+    const idx = nowSlotIndex(slots, nowMinutes(), company.slotInterval || 30);
+    const target = Math.max(0, idx * COL_W - 24);
+    scrollRef.current.scrollTo({ left: target, behavior });
+  };
 
   useEffect(() => {
-    if (!isToday || !scrollRef.current || slots.length === 0) return;
-    const step = company.slotInterval || 30;
-    const idx = slots.findIndex(s => {
-      const [h, m] = s.split(':').map(Number);
-      return h * 60 + m <= currentMin && currentMin < h * 60 + m + step;
-    });
-    const target = Math.max(0, (idx < 0 ? 0 : idx) * COL_W - 24);
-    scrollRef.current.scrollTo({ left: target, behavior: 'smooth' });
-  }, [isToday, slots, currentMin, company.slotInterval, tick]);
+    if (!isToday || !slots.length) {
+      scrolledToNowForDate.current = null;
+      return;
+    }
+    if (scrolledToNowForDate.current === selectedDate) return;
+    scrolledToNowForDate.current = selectedDate;
+    const t = window.setTimeout(() => scrollBoardToNow('smooth'), 50);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isToday, selectedDate, slots.length, COL_W, company.slotInterval]);
 
   type Sheet =
-    | { mode: 'appointment'; staffId: string; startTime: string; step: 'service' | 'name' }
+    | {
+        mode: 'appointment';
+        staffId: string;
+        startTime: string;
+        step: 'service' | 'name';
+        /** Bekleme aralığında araya iş — bitiş sınırı HH:mm */
+        insertUntil?: string;
+        insertFromEventId?: string;
+      }
     | { mode: 'groupClass'; staffId: string; startTime: string; serviceId: string }
     | { mode: 'leave'; staffId: string; startTime: string }
     | { mode: 'complete'; event: DayEvent }
@@ -182,11 +214,6 @@ export function Board() {
   const [subscriberPaid, setSubscriberPaid] = useState(false);
   const [consentOk, setConsentOk] = useState(false);
   const [leaveDuration, setLeaveDuration] = useState(60);
-  const scale = boardScale(staff.length);
-  const COL_W = Math.round(BASE_COL_W * scale);
-  const STAFF_COL_W = Math.round(BASE_STAFF_COL_W * Math.min(1.1, scale + 0.05));
-  const ROW_H = Math.round(80 * scale);
-  const PHOTO = Math.round(80 * scale);
   const [note, setNote] = useState('');
   const [expAmount, setExpAmount] = useState('');
   const [expDesc, setExpDesc] = useState('');
@@ -196,7 +223,11 @@ export function Board() {
   const [calYear, setCalYear] = useState(() => parseKey(selectedDate).y);
   const [calMonth, setCalMonth] = useState(() => parseKey(selectedDate).m);
 
-  const openAppointment = (staffId: string, startTime: string) => {
+  const openAppointment = (
+    staffId: string,
+    startTime: string,
+    opts?: { insertUntil?: string; insertFromEventId?: string },
+  ) => {
     setCustomerName('');
     setCustomerPhone('');
     setSubscriberId('');
@@ -207,7 +238,39 @@ export function Board() {
     setGroupQuery('');
     setGroupSelected([]);
     // Kapıdan gelen: doğrudan hizmet seç — isim zorunlu değil
-    setSheet({ mode: 'appointment', staffId, startTime, step: 'service' });
+    setSheet({
+      mode: 'appointment',
+      staffId,
+      startTime,
+      step: 'service',
+      ...(opts?.insertUntil ? { insertUntil: opts.insertUntil } : {}),
+      ...(opts?.insertFromEventId ? { insertFromEventId: opts.insertFromEventId } : {}),
+    });
+  };
+
+  /** Randevudaki bekleme penceresinde araya iş alma akışını açar */
+  const openInsertDuringWait = (event: DayEvent) => {
+    if (event.kind !== 'appointment' || event.status !== 'planned') return;
+    const svc = services.find(s => s.id === event.serviceId);
+    const win = processingWindow(event.startTime, event.endTime, svc?.processingMinutes);
+    if (!win) {
+      setBookMsg('Bu randevuda bekleme süresi yok');
+      return;
+    }
+    openAppointment(event.staffId, win.start, {
+      insertUntil: win.end,
+      insertFromEventId: event.id,
+    });
+  };
+
+  /** İş bitişinden hemen sonra yeni randevu (ör. 14:15 → devam) */
+  const openFollowOnAppointment = (event: DayEvent) => {
+    if (event.kind !== 'appointment') return;
+    if (toMinutes(event.endTime) >= toMinutes(dayHours.workEnd)) {
+      setBookMsg('Mesai bitişinden sonra slot yok');
+      return;
+    }
+    openAppointment(event.staffId, event.endTime);
   };
 
   const openGroupClass = (staffId: string, startTime: string, serviceId: string) => {
@@ -290,6 +353,11 @@ export function Board() {
     setCustomerPhone(sub.phone);
     setCampaignId(sub.campaignId || '');
     setBookMsg('');
+    // Araya iş: paket yerleşimi yok — kullanıcı sığan tek hizmeti seçer
+    if (sheet.insertUntil) {
+      setSheet({ ...sheet, step: 'service' });
+      return;
+    }
     const ids = remainingServiceIds(id);
     if (ids.length) {
       placeBlock({
@@ -333,7 +401,7 @@ export function Board() {
 
   const openLeave = (staffId: string, startTime: string) => {
     const step = company.slotInterval || 30;
-    const remaining = Math.max(step, toMinutes(company.workEnd) - toMinutes(startTime));
+    const remaining = Math.max(step, toMinutes(dayHours.workEnd) - toMinutes(startTime));
     setLeaveDuration(Math.min(step * 2, remaining));
     setNote('İzin');
     setSheet({ mode: 'leave', staffId, startTime });
@@ -417,8 +485,22 @@ export function Board() {
     setCampaignId('');
     const svc = services.find(s => s.id === id);
     if (isClassService(svc)) {
+      if (sheet.insertUntil) {
+        setBookMsg('Bekleme aralığında grup dersi eklenemez');
+        return;
+      }
       openGroupClass(sheet.staffId, sheet.startTime, id);
       return;
+    }
+    const duration = Math.max(1, svc?.durationMinutes || company.slotInterval || 30);
+    if (sheet.insertUntil) {
+      const end = slotEnd(sheet.startTime, duration);
+      if (toMinutes(end) > toMinutes(sheet.insertUntil)) {
+        setBookMsg(
+          `Bekleme ${sheet.startTime}–${sheet.insertUntil} · bu hizmet sığmıyor (${duration} dk)`,
+        );
+        return;
+      }
     }
     const isSub = !!subscriberId;
     addAppointment({
@@ -429,8 +511,10 @@ export function Board() {
       customerPhone: customerPhone || undefined,
       serviceId: id,
       durationMinutes: svc?.durationMinutes,
+      allowShort: !!sheet.insertUntil,
       price: isSub ? 0 : svc?.price || 0,
       subscriberId: subscriberId || undefined,
+      note: sheet.insertFromEventId ? 'Araya iş (bekleme)' : undefined,
     });
     setSheet(null);
   };
@@ -457,7 +541,7 @@ export function Board() {
   const leaveEndPreview = (() => {
     if (sheet?.mode !== 'leave') return '';
     const end = slotEnd(sheet.startTime, Math.max(company.slotInterval || 30, leaveDuration));
-    return toMinutes(end) > toMinutes(company.workEnd) ? company.workEnd : end;
+    return toMinutes(end) > toMinutes(dayHours.workEnd) ? dayHours.workEnd : end;
   })();
 
   const saveLeave = () => {
@@ -468,7 +552,7 @@ export function Board() {
       staffId: sheet.staffId,
       date: selectedDate,
       startTime: sheet.startTime,
-      endTime: toMinutes(end) > toMinutes(company.workEnd) ? company.workEnd : end,
+      endTime: toMinutes(end) > toMinutes(dayHours.workEnd) ? dayHours.workEnd : end,
       note: note || 'İzin',
     });
     setSheet(null);
@@ -556,11 +640,18 @@ export function Board() {
   };
   const serviceName = (id?: string) => services.find(s => s.id === id)?.name;
 
+  const slotStep = company.slotInterval || 30;
+
   const isNowSlot = (slot: string) => {
     if (!isToday) return false;
     const [h, m] = slot.split(':').map(Number);
     const start = h * 60 + m;
-    return currentMin >= start && currentMin < start + (company.slotInterval || 30);
+    return currentMin >= start && currentMin < start + slotStep;
+  };
+
+  const isPastSlot = (slot: string) => {
+    if (!isToday) return false;
+    return toMinutes(slot) + slotStep <= currentMin;
   };
 
   const dayExpenseTotal = (staffId: string) =>
@@ -586,8 +677,11 @@ export function Board() {
               >
                 <h1 className="text-lg font-black leading-tight">{dayLabel(selectedDate)}</h1>
                 <p className="text-xs font-semibold text-slate-500">
-                  {formatDateTr(selectedDate)} · {company.workStart}–{company.workEnd} · {company.slotInterval} dk
-                  {isToday && <span className="ml-2 text-brand-600">· geçmiş saatler gizli</span>}
+                  {formatDateTr(selectedDate)} · {hoursLabel(dayHours)}
+                  {dayHours.isWeekend ? ' · hafta sonu' : ''} · {company.slotInterval} dk
+                  {isToday && (
+                    <span className="ml-2 text-brand-600">· sola çek → geçmiş · varsayılan: şimdi</span>
+                  )}
                   {!isToday && selectedDate < todayKey() && (
                     <span className="ml-2 text-slate-600">· geçmiş gün · tüm saatler</span>
                   )}
@@ -598,7 +692,15 @@ export function Board() {
                 </p>
               </button>
               <button type="button" aria-label="Sonraki gün" onClick={() => setSelectedDate(addDays(selectedDate, 1))} className="h-9 w-9 rounded-xl bg-slate-100 font-black">›</button>
-              {selectedDate !== todayKey() && (
+              {selectedDate === todayKey() ? (
+                <button
+                  type="button"
+                  onClick={() => scrollBoardToNow('smooth')}
+                  className="min-h-9 rounded-xl border-2 border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-black text-brand-700"
+                >
+                  Şimdi
+                </button>
+              ) : (
                 <button
                   type="button"
                   onClick={() => setSelectedDate(todayKey())}
@@ -706,9 +808,15 @@ export function Board() {
                 <th
                   key={h}
                   style={{ minWidth: COL_W, width: COL_W }}
-                  className={`bg-slate-50 px-1 py-3 text-center text-[11px] font-black ${
+                  className={`px-1 py-3 text-center text-[11px] font-black ${
                     i === slots.length - 1 ? 'rounded-r-2xl' : ''
-                  } ${isNowSlot(h) ? 'bg-brand-600 text-white' : 'text-slate-500'}`}
+                  } ${
+                    isNowSlot(h)
+                      ? 'bg-brand-600 text-white'
+                      : isPastSlot(h)
+                        ? 'bg-slate-100 text-slate-400'
+                        : 'bg-slate-50 text-slate-500'
+                  }`}
                 >
                   {h}
                   {isNowSlot(h) && <div className="text-[8px] font-bold opacity-90">ŞİMDİ</div>}
@@ -719,22 +827,35 @@ export function Board() {
           <tbody>
             {staff.map(person => {
               const personEvents = dayEvents.filter(e => e.staffId === person.id);
+              const colorMap = appointmentColorIndexMap(personEvents, services);
               const cells: ReactElement[] = [];
+
+              const busyApptsAt = (s: string) =>
+                personEvents.filter(e => {
+                  if (e.kind !== 'appointment') return false;
+                  const svc = services.find(x => x.id === e.serviceId);
+                  if (isClassService(svc)) return false;
+                  return staffBusyIntervals(e.startTime, e.endTime, svc?.processingMinutes).some(b =>
+                    overlapsSlotWindow(b.start, b.end, s, slotStep),
+                  );
+                });
+
               for (let i = 0; i < slots.length; ) {
                 const slot = slots[i];
-                const covering = personEvents.filter(e => coversSlot(e.startTime, e.endTime, slot));
+                const past = isPastSlot(slot);
+                const covering = personEvents.filter(e =>
+                  overlapsSlotWindow(e.startTime, e.endTime, slot, slotStep),
+                );
                 const leaveEvt = covering.find(e => e.kind === 'leave');
-                const staffEvt = covering.find(e => {
-                  if (e.kind !== 'appointment') return false;
-                  const svc = services.find(s => s.id === e.serviceId);
-                  if (isClassService(svc)) return false;
-                  return slotIsStaffBusy(e.startTime, e.endTime, svc?.processingMinutes, slot);
-                });
+                const busyAppts = busyApptsAt(slot);
                 const processingEvt = covering.find(e => {
                   if (e.kind !== 'appointment') return false;
                   const svc = services.find(s => s.id === e.serviceId);
                   if (isClassService(svc)) return false;
-                  return slotInProcessingWindow(e.startTime, e.endTime, svc?.processingMinutes, slot);
+                  if (busyAppts.some(b => b.id === e.id)) return false;
+                  const win = processingWindow(e.startTime, e.endTime, svc?.processingMinutes);
+                  if (!win) return false;
+                  return overlapsSlotWindow(win.start, win.end, slot, slotStep);
                 });
                 const classEvts = covering.filter(e => {
                   if (e.kind !== 'appointment') return false;
@@ -749,92 +870,33 @@ export function Board() {
                   slotGroupSessions.find(s => classEvts.some(e => e.serviceId === s.serviceId)) ||
                   slotGroupSessions[0];
 
-                if (leaveEvt || staffEvt) {
-                  const active = leaveEvt || staffEvt!;
+                if (leaveEvt) {
                   let span = 0;
                   for (let j = i; j < slots.length; j++) {
-                    const s = slots[j];
-                    if (active.kind === 'leave') {
-                      if (!coversSlot(active.startTime, active.endTime, s)) break;
-                    } else {
-                      const svc = services.find(x => x.id === active.serviceId);
-                      if (!slotIsStaffBusy(active.startTime, active.endTime, svc?.processingMinutes, s)) {
-                        break;
-                      }
-                    }
+                    if (!overlapsSlotWindow(leaveEvt.startTime, leaveEvt.endTime, slots[j], slotStep)) break;
                     span += 1;
                   }
                   span = Math.max(1, span);
-                  const continuesFromPast = toMinutes(active.startTime) < toMinutes(slots[0]);
-                  const procWin =
-                    active.kind === 'appointment'
-                      ? processingWindow(
-                          active.startTime,
-                          active.endTime,
-                          services.find(x => x.id === active.serviceId)?.processingMinutes,
-                        )
-                      : null;
                   cells.push(
                     <td
-                      key={`${active.id}-${slot}`}
+                      key={`${leaveEvt.id}-${slot}`}
                       colSpan={span}
                       className="bg-white p-1 align-middle"
                       style={{ minWidth: COL_W * span }}
                     >
                       <button
                         type="button"
-                        onClick={() => setSheet({ mode: 'detail', event: active })}
+                        onClick={() => setSheet({ mode: 'detail', event: leaveEvt })}
                         style={{ height: ROW_H }}
-                        className={`flex w-full flex-col justify-center rounded-2xl px-3 py-2 text-left font-bold shadow-sm ${
+                        className={`flex w-full flex-col justify-center rounded-2xl bg-amber-100 px-3 py-2 text-left font-bold text-amber-900 shadow-sm ring-1 ring-amber-200 ${
                           scale < 0.9 ? 'text-xs' : 'text-sm'
-                        } ${
-                          active.kind === 'leave'
-                            ? 'bg-amber-100 text-amber-900 ring-1 ring-amber-200'
-                            : active.status === 'done'
-                              ? 'bg-slate-700 text-white ring-1 ring-slate-800'
-                              : 'bg-brand-100 text-brand-900 ring-1 ring-brand-200'
-                        }`}
+                        } ${past ? 'opacity-70' : ''}`}
                       >
-                        <div className="truncate">
-                          {active.kind === 'leave'
-                            ? 'İzin · kapalı'
-                            : active.status === 'done'
-                              ? `✓ ${active.customerName || serviceName(active.serviceId) || 'Tamamlandı'}`
-                              : active.customerName || serviceName(active.serviceId) || 'Misafir'}
+                        <div className="truncate">İzin · kapalı</div>
+                        <div className="text-xs opacity-70">
+                          {leaveEvt.startTime}–{leaveEvt.endTime} ·{' '}
+                          {toMinutes(leaveEvt.endTime) - toMinutes(leaveEvt.startTime)} dk
                         </div>
-                        <div className={`text-xs ${active.status === 'done' ? 'text-white/70' : 'opacity-70'}`}>
-                          {active.startTime}–{active.endTime}
-                          {active.kind === 'leave'
-                            ? ` · ${toMinutes(active.endTime) - toMinutes(active.startTime)} dk`
-                            : active.kind === 'appointment' && active.serviceId && active.customerName
-                              ? ` · ${serviceName(active.serviceId)}`
-                              : ''}
-                        </div>
-                        {active.kind === 'appointment' && (
-                          <div className={`text-[11px] ${active.status === 'done' ? 'text-white/80' : 'opacity-80'}`}>
-                            {active.subscriberId
-                              ? active.status === 'done'
-                                ? (active.collectedPrice ?? 0) > 0
-                                  ? `Abone · ödendi ₺${active.collectedPrice}`
-                                  : 'Abone · ödenmedi'
-                                : 'Abone'
-                              : active.status === 'done' && active.collectedPrice != null
-                                ? `Tahsil: ₺${active.collectedPrice}`
-                                : active.price != null
-                                  ? `₺${active.price}`
-                                  : null}
-                          </div>
-                        )}
-                        {procWin && active.status !== 'done' && (
-                          <div className="text-[10px] opacity-60">
-                            bekleme {procWin.start}–{procWin.end} · başka alınabilir
-                          </div>
-                        )}
-                        {continuesFromPast && (
-                          <div className={`text-[10px] ${active.status === 'done' ? 'text-white/50' : 'opacity-50'}`}>
-                            devam ediyor
-                          </div>
-                        )}
                       </button>
                     </td>,
                   );
@@ -842,21 +904,205 @@ export function Board() {
                   continue;
                 }
 
+                /** Üst üste / araya iş: aynı dilimde birden fazla randevu */
+                if (busyAppts.length > 1) {
+                  cells.push(
+                    <td
+                      key={`stack-${person.id}-${slot}`}
+                      className="bg-white p-1 align-middle"
+                      style={{ width: COL_W, minWidth: COL_W }}
+                    >
+                      <div
+                        className={`flex flex-col gap-0.5 ${isNowSlot(slot) ? 'bg-brand-50/30' : ''} ${past ? 'opacity-80' : ''}`}
+                        style={{ minHeight: ROW_H }}
+                      >
+                        {busyAppts.map(ev => {
+                          const c = colorForAppointment(ev.id, colorMap);
+                          const done = ev.status === 'done';
+                          const tl = appointmentTimeline(
+                            ev.startTime,
+                            ev.endTime,
+                            services.find(x => x.id === ev.serviceId)?.processingMinutes,
+                          );
+                          return (
+                            <button
+                              key={ev.id}
+                              type="button"
+                              onClick={() => setSheet({ mode: 'detail', event: ev })}
+                              className={`flex min-h-[2.1rem] flex-1 flex-col justify-center rounded-xl px-2 py-1 text-left font-bold shadow-sm ring-1 ${
+                                done ? `${c.doneBg} ${c.doneText} ring-black/20` : `${c.bg} ${c.text} ${c.ring}`
+                              }`}
+                            >
+                              <span className="truncate text-[10px] leading-tight">
+                                {done ? '✓ ' : ''}
+                                {ev.customerName || serviceName(ev.serviceId) || 'Misafir'}
+                              </span>
+                              <AppointmentTimeline segments={tl} compact inverted={done} />
+                              {ev.note?.includes('Araya') && (
+                                <span className="text-[8px] font-bold opacity-70">araya</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </td>,
+                  );
+                  i += 1;
+                  continue;
+                }
+
+                if (busyAppts.length === 1) {
+                  const active = busyAppts[0];
+                  let span = 0;
+                  let endsMidLast = false;
+                  for (let j = i; j < slots.length; j++) {
+                    const at = busyApptsAt(slots[j]);
+                    if (at.length !== 1 || at[0].id !== active.id) break;
+                    span += 1;
+                    const slotEndMin = toMinutes(slots[j]) + slotStep;
+                    // İş slot ortasında bitiyorsa (ör. 14:15) son dilimi ayır — sonrası için + kalsın
+                    if (toMinutes(active.endTime) > toMinutes(slots[j]) && toMinutes(active.endTime) < slotEndMin) {
+                      endsMidLast = true;
+                      break;
+                    }
+                  }
+                  span = Math.max(1, span);
+                  const c = colorForAppointment(active.id, colorMap);
+                  const done = active.status === 'done';
+                  const procMins = services.find(x => x.id === active.serviceId)?.processingMinutes;
+                  const timeline = appointmentTimeline(active.startTime, active.endTime, procMins);
+
+                  const renderApptBtn = (opts?: { compact?: boolean }) => (
+                    <button
+                      type="button"
+                      onClick={() => setSheet({ mode: 'detail', event: active })}
+                      style={opts?.compact ? { minHeight: Math.round(ROW_H * 0.55) } : { minHeight: ROW_H }}
+                      className={`flex w-full flex-col justify-center rounded-2xl px-3 py-1.5 text-left font-bold shadow-sm ring-1 ${
+                        scale < 0.9 || opts?.compact ? 'text-xs' : 'text-sm'
+                      } ${done ? `${c.doneBg} ${c.doneText} ring-black/20` : `${c.bg} ${c.text} ${c.ring}`} ${
+                        past ? 'opacity-80' : ''
+                      }`}
+                    >
+                      <div className="truncate">
+                        {done
+                          ? `✓ ${active.customerName || serviceName(active.serviceId) || 'Tamamlandı'}`
+                          : active.customerName || serviceName(active.serviceId) || 'Misafir'}
+                      </div>
+                      <div className="text-xs opacity-70">
+                        {active.serviceId && active.customerName
+                          ? serviceName(active.serviceId)
+                          : `${active.startTime}–${active.endTime}`}
+                        {active.note?.includes('Araya') ? ' · araya' : ''}
+                      </div>
+                      {!opts?.compact && (
+                        <>
+                          <div className="mt-0.5">
+                            <AppointmentTimeline segments={timeline} inverted={done} />
+                          </div>
+                          <div className="text-[11px] opacity-80">
+                            {active.subscriberId
+                              ? done
+                                ? (active.collectedPrice ?? 0) > 0
+                                  ? `Abone · ödendi ₺${active.collectedPrice}`
+                                  : 'Abone · ödenmedi'
+                                : 'Abone'
+                              : done && active.collectedPrice != null
+                                ? `Tahsil: ₺${active.collectedPrice}`
+                                : active.price != null
+                                  ? `₺${active.price}`
+                                  : null}
+                          </div>
+                          {timeline.some(s => s.kind === 'wait') && !done && (
+                            <div className="text-[9px] font-bold opacity-55">işlem arasında başka alınabilir</div>
+                          )}
+                        </>
+                      )}
+                      {opts?.compact && (
+                        <AppointmentTimeline segments={timeline} compact inverted={done} />
+                      )}
+                    </button>
+                  );
+
+                  if (endsMidLast && span === 1) {
+                    // Tek dilim, iş ortada bitiyor → üstte randevu, altta sonrası +
+                    cells.push(
+                      <td
+                        key={`${active.id}-tail-${slot}`}
+                        className="bg-white p-1 align-middle"
+                        style={{ width: COL_W, minWidth: COL_W }}
+                      >
+                        <div className="flex flex-col gap-0.5" style={{ minHeight: ROW_H }}>
+                          {renderApptBtn({ compact: true })}
+                          <button
+                            type="button"
+                            title={`${active.endTime} sonrası randevu`}
+                            onClick={() => openFollowOnAppointment(active)}
+                            className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-[10px] font-black text-slate-500 hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700"
+                          >
+                            + {active.endTime} sonrası
+                          </button>
+                        </div>
+                      </td>,
+                    );
+                    i += 1;
+                    continue;
+                  }
+
+                  const mainSpan = endsMidLast ? span - 1 : span;
+                  if (mainSpan > 0) {
+                    cells.push(
+                      <td
+                        key={`${active.id}-${slot}`}
+                        colSpan={mainSpan}
+                        className="bg-white p-1 align-middle"
+                        style={{ minWidth: COL_W * mainSpan }}
+                      >
+                        {renderApptBtn()}
+                      </td>,
+                    );
+                  }
+                  if (endsMidLast) {
+                    const tailSlot = slots[i + mainSpan];
+                    cells.push(
+                      <td
+                        key={`${active.id}-tail-${tailSlot}`}
+                        className="bg-white p-1 align-middle"
+                        style={{ width: COL_W, minWidth: COL_W }}
+                      >
+                        <div className="flex flex-col gap-0.5" style={{ minHeight: ROW_H }}>
+                          {renderApptBtn({ compact: true })}
+                          <button
+                            type="button"
+                            title={`${active.endTime} sonrası randevu`}
+                            onClick={() => openFollowOnAppointment(active)}
+                            className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-[10px] font-black text-slate-500 hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700"
+                          >
+                            + {active.endTime} sonrası
+                          </button>
+                        </div>
+                      </td>,
+                    );
+                  }
+                  i += span;
+                  continue;
+                }
+
                 if (processingEvt && !gs && classEvts.length === 0) {
+                  const pc = colorForAppointment(processingEvt.id, colorMap);
                   cells.push(
                     <td key={`proc-${processingEvt.id}-${slot}`} className="bg-white p-1 align-middle" style={{ width: COL_W, minWidth: COL_W }}>
-                      <div className={`flex flex-col gap-1 ${isNowSlot(slot) ? 'bg-brand-50/40' : ''}`} style={{ height: ROW_H }}>
+                      <div className={`flex flex-col gap-1 ${isNowSlot(slot) ? 'bg-brand-50/40' : ''} ${past ? 'opacity-70' : ''}`} style={{ height: ROW_H }}>
                         <button
                           type="button"
                           title="Bekleme süresinde randevu ekle"
                           onClick={() => openAppointment(person.id, slot)}
-                          className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-brand-300 bg-brand-50/70 px-1 text-brand-700 hover:bg-brand-100"
+                          className={`flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed px-1 ${pc.bg} ${pc.text} border-current/30 hover:brightness-95`}
                         >
                           <span className="text-sm font-black">+</span>
                           <span className="max-w-full truncate text-[9px] font-bold leading-tight">
                             bekleme
                           </span>
-                          <span className="max-w-full truncate text-[8px] font-semibold text-brand-600/80">
+                          <span className="max-w-full truncate text-[8px] font-semibold opacity-80">
                             {processingEvt.customerName || serviceName(processingEvt.serviceId) || 'işlem'}
                           </span>
                         </button>
@@ -936,12 +1182,19 @@ export function Board() {
 
                 cells.push(
                   <td key={slot} className="bg-white p-1 align-middle" style={{ width: COL_W, minWidth: COL_W }}>
-                    <div className={`flex flex-col gap-1 ${isNowSlot(slot) ? 'bg-brand-50/40' : ''}`} style={{ height: ROW_H }}>
+                    <div
+                      className={`flex flex-col gap-1 ${isNowSlot(slot) ? 'bg-brand-50/40' : ''} ${past ? 'opacity-45' : ''}`}
+                      style={{ height: ROW_H }}
+                    >
                       <button
                         type="button"
-                        title="Randevu ekle"
+                        title={past ? 'Geçmiş saat' : 'Randevu ekle'}
                         onClick={() => openAppointment(person.id, slot)}
-                        className="flex-1 rounded-xl bg-slate-50 text-sm font-black text-slate-300 hover:bg-brand-50 hover:text-brand-600"
+                        className={`flex-1 rounded-xl text-sm font-black ${
+                          past
+                            ? 'bg-slate-100 text-slate-300'
+                            : 'bg-slate-50 text-slate-300 hover:bg-brand-50 hover:text-brand-600'
+                        }`}
                       >
                         +
                       </button>
@@ -984,7 +1237,12 @@ export function Board() {
                         <p className={`truncate font-semibold text-slate-500 ${scale < 0.9 ? 'text-xs' : 'text-sm'}`}>
                           {titleOf(person.title)} · {deptName(person.departmentId)}
                         </p>
-                        <p className="text-xs font-bold text-slate-400">{person.workStart}–{person.workEnd}</p>
+                        <p className="text-xs font-bold text-slate-400">
+                          {(() => {
+                            const h = staffHoursForDate(person, company, selectedDate);
+                            return `${h.workStart}–${h.workEnd}`;
+                          })()}
+                        </p>
                         <button
                           type="button"
                           title={expSum > 0 ? `Masraf gir · ₺${expSum}` : 'Masraf gir'}
@@ -1009,7 +1267,11 @@ export function Board() {
           </tbody>
         </table>
         {slots.length === 0 && (
-          <p className="p-8 text-center text-sm font-bold text-slate-400">Bu gün için gösterilecek saat dilimi yok.</p>
+          <p className="p-8 text-center text-sm font-bold text-slate-400">
+            {dayHours.closed
+              ? 'Hafta sonu kapalı — Parametreler → Mesai’den açabilirsiniz.'
+              : 'Bu gün için gösterilecek saat dilimi yok.'}
+          </p>
         )}
       </div>
 
@@ -1242,10 +1504,19 @@ export function Board() {
       {/* Hızlı randevu: saat → hizmet (isim zorunlu değil) */}
       {sheet?.mode === 'appointment' && (
         <Modal onClose={() => setSheet(null)}>
-          <h3 className="text-lg font-black">Hızlı randevu</h3>
+          <h3 className="text-lg font-black">
+            {sheet.insertUntil ? 'Araya iş al' : 'Hızlı randevu'}
+          </h3>
           <p className="mt-1 text-sm font-semibold text-slate-500">
-            {formatDateTr(selectedDate)} · {sheet.startTime} · hizmete dokunun, eklensin
+            {formatDateTr(selectedDate)} · {sheet.startTime}
+            {sheet.insertUntil ? `–${sheet.insertUntil} bekleme` : ''}
+            {' · '}hizmete dokunun, eklensin
           </p>
+          {sheet.insertUntil && (
+            <p className="mt-2 rounded-2xl bg-brand-50 px-3 py-2 text-xs font-bold text-brand-900">
+              Mevcut işlemin bekleme süresi — yalnızca bu aralığa sığan hizmetler listelenir.
+            </p>
+          )}
 
           {sheet.step === 'service' && (
             <div className="mt-4 space-y-3">
@@ -1289,7 +1560,7 @@ export function Board() {
                 </p>
               )}
 
-              {activeCampaigns.length > 0 && !subscriberId && (
+              {activeCampaigns.length > 0 && !subscriberId && !sheet.insertUntil && (
                 <div>
                   <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Kampanya</p>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -1310,32 +1581,48 @@ export function Board() {
               )}
 
               {(() => {
-                const staffSvcs = servicesForStaff(sheet.staffId).filter(s => !isClassService(s));
-                const slotGroups = groupSessions.filter(
-                  gs =>
-                    gs.staffId === sheet.staffId &&
-                    gs.date === selectedDate &&
-                    gs.startTime === sheet.startTime,
-                );
+                const insertCap = sheet.insertUntil
+                  ? toMinutes(sheet.insertUntil) - toMinutes(sheet.startTime)
+                  : null;
+                const staffSvcs = servicesForStaff(sheet.staffId).filter(s => {
+                  if (isClassService(s)) return false;
+                  if (insertCap == null) return true;
+                  const dur = Math.max(1, s.durationMinutes || 0);
+                  return dur > 0 && dur <= insertCap;
+                });
+                const slotGroups = sheet.insertUntil
+                  ? []
+                  : groupSessions.filter(
+                      gs =>
+                        gs.staffId === sheet.staffId &&
+                        gs.date === selectedDate &&
+                        gs.startTime === sheet.startTime,
+                    );
                 return (
                   <div className="space-y-3">
-                    <p className="rounded-2xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-900">
-                      Grup dersleri Parametre → Grup dersleri ekranından tanımlanır (tarih, çalışan, öğrenciler).
-                      {slotGroups.length > 0
-                        ? ` Bu saatte ${slotGroups.length} tanımlı seans var — paneldaki yeşil kutuya dokunun.`
-                        : ''}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setScreen('groupClasses')}
-                      className="btn btn-secondary btn-block !min-h-11"
-                    >
-                      Grup dersi tanımla
-                    </button>
+                    {!sheet.insertUntil && (
+                      <>
+                        <p className="rounded-2xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-900">
+                          Grup dersleri Parametre → Grup dersleri ekranından tanımlanır (tarih, çalışan, öğrenciler).
+                          {slotGroups.length > 0
+                            ? ` Bu saatte ${slotGroups.length} tanımlı seans var — paneldaki yeşil kutuya dokunun.`
+                            : ''}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setScreen('groupClasses')}
+                          className="btn btn-secondary btn-block !min-h-11"
+                        >
+                          Grup dersi tanımla
+                        </button>
+                      </>
+                    )}
                     <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Hizmet seç</p>
                     {staffSvcs.length === 0 ? (
                       <p className="text-sm font-semibold text-amber-700">
-                        Bu çalışana atanmış bireysel hizmet yok.
+                        {insertCap != null
+                          ? `Bekleme ${insertCap} dk — sığan bireysel hizmet yok.`
+                          : 'Bu çalışana atanmış bireysel hizmet yok.'}
                       </p>
                     ) : (
                       <div className="grid max-h-40 grid-cols-1 gap-2 overflow-y-auto">
@@ -1464,7 +1751,7 @@ export function Board() {
                 onClick={() => {
                   const rem = Math.max(
                     company.slotInterval || 30,
-                    toMinutes(company.workEnd) - toMinutes(sheet.startTime),
+                    toMinutes(dayHours.workEnd) - toMinutes(sheet.startTime),
                   );
                   setLeaveDuration(rem);
                 }}
@@ -1728,84 +2015,201 @@ export function Board() {
         </Modal>
       )}
 
-      {sheet?.mode === 'detail' && (
-        <Modal onClose={() => setSheet(null)}>
-          <h3 className="text-lg font-black">
-            {sheet.event.kind === 'leave' ? 'İzin ayrıntısı' : 'Randevu ayrıntısı'}
-          </h3>
-          <dl className="mt-4 space-y-2 text-sm">
-            <Row label="Çalışan" value={staffName(sheet.event.staffId)} />
-            <Row label="Tarih" value={formatDateTr(sheet.event.date)} />
-            <Row label="Saat" value={`${sheet.event.startTime} – ${sheet.event.endTime}`} />
-            {sheet.event.kind === 'appointment' && (
-              <>
-                <Row label="Müşteri" value={sheet.event.customerName || 'Misafir'} />
-                <Row label="Telefon" value={sheet.event.customerPhone || '—'} />
-                <Row label="Hizmet" value={serviceName(sheet.event.serviceId) || '—'} />
-                {sheet.event.subscriberId ? (
-                  <>
-                    <Row label="Tür" value="Abone" />
-                    <Row
-                      label="Ödeme durumu"
-                      value={
-                        sheet.event.status !== 'done'
-                          ? 'Henüz tamamlanmadı'
-                          : (sheet.event.collectedPrice ?? 0) > 0
-                            ? `Ödendi · ₺${sheet.event.collectedPrice}${
-                                sheet.event.paymentMethod === 'card'
-                                  ? ' · Kart'
-                                  : sheet.event.paymentMethod === 'cash'
-                                    ? ' · Nakit'
-                                    : ''
-                              }`
-                            : 'Ödenmedi (abone hakkı)'
-                      }
-                    />
-                  </>
-                ) : (
-                  <>
-                    <Row label="Liste tutarı" value={sheet.event.price != null ? `₺${sheet.event.price}` : '—'} />
-                    <Row label="Tahsil" value={sheet.event.collectedPrice != null ? `₺${sheet.event.collectedPrice}` : '—'} />
-                    <Row
-                      label="Ödeme"
-                      value={
-                        sheet.event.paymentMethod === 'cash'
-                          ? 'Nakit'
-                          : sheet.event.paymentMethod === 'card'
-                            ? 'Kart'
-                            : '—'
-                      }
-                    />
-                  </>
+      {sheet?.mode === 'detail' && (() => {
+        const detailSvc =
+          sheet.event.kind === 'appointment'
+            ? services.find(s => s.id === sheet.event.serviceId)
+            : undefined;
+        const waitWin =
+          sheet.event.kind === 'appointment' && sheet.event.status === 'planned'
+            ? processingWindow(
+                sheet.event.startTime,
+                sheet.event.endTime,
+                detailSvc?.processingMinutes,
+              )
+            : null;
+        const waitMins = waitWin
+          ? toMinutes(waitWin.end) - toMinutes(waitWin.start)
+          : 0;
+
+        return (
+          <Modal onClose={() => setSheet(null)}>
+            <h3 className="text-lg font-black">
+              {sheet.event.kind === 'leave' ? 'İzin ayrıntısı' : 'Randevu ayrıntısı'}
+            </h3>
+            <dl className="mt-4 space-y-2 text-sm">
+              <Row label="Çalışan" value={staffName(sheet.event.staffId)} />
+              <Row label="Tarih" value={formatDateTr(sheet.event.date)} />
+              <Row label="Saat" value={`${sheet.event.startTime} – ${sheet.event.endTime}`} />
+              {sheet.event.kind === 'appointment' && (
+                <>
+                  <Row label="Müşteri" value={sheet.event.customerName || 'Misafir'} />
+                  <Row label="Telefon" value={sheet.event.customerPhone || '—'} />
+                  <Row label="Hizmet" value={serviceName(sheet.event.serviceId) || '—'} />
+                  <div className={`rounded-2xl px-3 py-3 ring-1 ${waitWin ? 'bg-amber-50 ring-amber-100' : 'bg-slate-50 ring-slate-100'}`}>
+                    <p className={`text-[10px] font-black uppercase tracking-widest ${waitWin ? 'text-amber-800' : 'text-slate-500'}`}>
+                      Randevu alan kişi · zaman çizelgesi
+                    </p>
+                    <ul className="mt-2 space-y-1.5 text-sm font-bold text-slate-800">
+                      {appointmentTimeline(
+                        sheet.event.startTime,
+                        sheet.event.endTime,
+                        detailSvc?.processingMinutes,
+                      ).map(seg => (
+                        <li key={`${seg.kind}-${seg.start}`} className="flex justify-between gap-2">
+                          <span
+                            className={
+                              seg.kind === 'wait'
+                                ? 'text-amber-800'
+                                : seg.kind === 'continue'
+                                  ? 'text-sky-800'
+                                  : 'text-slate-600'
+                            }
+                          >
+                            {seg.label}
+                          </span>
+                          <span className="tabular-nums">
+                            {seg.start}–{seg.end}
+                            {seg.kind === 'wait' ? ` · ${waitMins} dk` : ''}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    {waitWin ? (
+                      <p className="mt-2 text-[11px] font-semibold text-amber-900/80">
+                        İşlem arasında araya randevu · bitişten sonra devam bağlanabilir
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-[11px] font-semibold text-slate-500">
+                        Randevu alan kişi: başlangıçtan bitişe saat devamı
+                      </p>
+                    )}
+                  </div>
+                  {sheet.event.subscriberId ? (
+                    <>
+                      <Row label="Tür" value="Abone" />
+                      <Row
+                        label="Ödeme durumu"
+                        value={
+                          sheet.event.status !== 'done'
+                            ? 'Henüz tamamlanmadı'
+                            : (sheet.event.collectedPrice ?? 0) > 0
+                              ? `Ödendi · ₺${sheet.event.collectedPrice}${
+                                  sheet.event.paymentMethod === 'card'
+                                    ? ' · Kart'
+                                    : sheet.event.paymentMethod === 'cash'
+                                      ? ' · Nakit'
+                                      : ''
+                                }`
+                              : 'Ödenmedi (abone hakkı)'
+                        }
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Row label="Liste tutarı" value={sheet.event.price != null ? `₺${sheet.event.price}` : '—'} />
+                      <Row label="Tahsil" value={sheet.event.collectedPrice != null ? `₺${sheet.event.collectedPrice}` : '—'} />
+                      <Row
+                        label="Ödeme"
+                        value={
+                          sheet.event.paymentMethod === 'cash'
+                            ? 'Nakit'
+                            : sheet.event.paymentMethod === 'card'
+                              ? 'Kart'
+                              : '—'
+                        }
+                      />
+                    </>
+                  )}
+                </>
+              )}
+              <Row label="Durum" value={sheet.event.status === 'done' ? 'Tamamlandı' : sheet.event.status === 'cancelled' ? 'İptal' : 'Planlandı'} />
+              <Row label="Not" value={sheet.event.note || '—'} />
+            </dl>
+            <div className="mt-5 space-y-2">
+              {sheet.event.kind === 'appointment' && sheet.event.status === 'planned' && (
+                <>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Randevu işlemleri
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openComplete(sheet.event)}
+                      className="rounded-2xl bg-emerald-600 py-3.5 text-sm font-black text-white"
+                    >
+                      Tamamla
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openComplete(sheet.event)}
+                      className="rounded-2xl bg-teal-600 py-3.5 text-sm font-black text-white"
+                    >
+                      Tahsilat
+                    </button>
+                  </div>
+                  <p className="pt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Yeni iş
+                  </p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {waitWin && (
+                      <button
+                        type="button"
+                        onClick={() => openInsertDuringWait(sheet.event)}
+                        className="rounded-2xl bg-brand-600 py-3.5 text-sm font-black text-white"
+                      >
+                        Araya randevu al
+                        <span className="mt-0.5 block text-[10px] font-bold opacity-80">
+                          {waitWin.start}–{waitWin.end} bekleme
+                        </span>
+                      </button>
+                    )}
+                    {toMinutes(sheet.event.endTime) < toMinutes(dayHours.workEnd) && (
+                      <button
+                        type="button"
+                        onClick={() => openFollowOnAppointment(sheet.event)}
+                        className={`rounded-2xl bg-violet-600 py-3.5 text-sm font-black text-white ${
+                          waitWin ? '' : 'sm:col-span-2'
+                        }`}
+                      >
+                        Sonrasına randevu
+                        <span className="mt-0.5 block text-[10px] font-bold opacity-80">
+                          {sheet.event.endTime} itibarıyla bağla
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                {sheet.event.status !== 'cancelled' && sheet.event.status !== 'done' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEventStatus(sheet.event.id, 'cancelled');
+                      setSheet(null);
+                    }}
+                    className="rounded-2xl bg-rose-50 py-3 text-sm font-black text-rose-700 ring-1 ring-rose-100"
+                  >
+                    İptal et
+                  </button>
                 )}
-              </>
-            )}
-            <Row label="Durum" value={sheet.event.status === 'done' ? 'Tamamlandı' : sheet.event.status === 'cancelled' ? 'İptal' : 'Planlandı'} />
-            <Row label="Not" value={sheet.event.note || '—'} />
-          </dl>
-          <div className="mt-5 flex flex-wrap gap-2">
-            <button type="button" onClick={() => setSheet(null)} className="flex-1 rounded-2xl bg-slate-100 py-3 font-black">Kapat</button>
-            {sheet.event.kind === 'appointment' && sheet.event.status === 'planned' && (
-              <button
-                type="button"
-                onClick={() => openComplete(sheet.event)}
-                className="flex-1 rounded-2xl bg-emerald-600 py-3 font-black text-white"
-              >
-                Tamamla / tahsilat
-              </button>
-            )}
-            {sheet.event.status !== 'cancelled' && (
-              <button
-                type="button"
-                onClick={() => { setEventStatus(sheet.event.id, 'cancelled'); setSheet(null); }}
-                className="flex-1 rounded-2xl bg-rose-50 py-3 font-black text-rose-700"
-              >
-                İptal et
-              </button>
-            )}
-          </div>
-        </Modal>
-      )}
+                <button
+                  type="button"
+                  onClick={() => setSheet(null)}
+                  className={`rounded-2xl bg-slate-100 py-3 text-sm font-black text-slate-700 ${
+                    sheet.event.status === 'cancelled' || sheet.event.status === 'done'
+                      ? 'col-span-2'
+                      : ''
+                  }`}
+                >
+                  Kapat
+                </button>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
     </div>
   );
 }

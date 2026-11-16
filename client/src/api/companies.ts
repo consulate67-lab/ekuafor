@@ -38,6 +38,8 @@ export interface PublicCompany {
     sectors?: SectorBadge[];
     /** Sektör web şablonu — örn. hair-03 */
     web_template_id?: string | null;
+    /** true ise web sayfasında fiyatlar gizlenir */
+    hide_prices?: boolean | null;
 }
 
 export interface CompanyListParams {

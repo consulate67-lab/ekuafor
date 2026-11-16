@@ -77,3 +77,34 @@ export function slotIsStaffBusy(
     coversSlot(b.start, b.end, slot),
   );
 }
+
+export type TimelineSegment = {
+  kind: 'work' | 'wait' | 'continue';
+  label: string;
+  start: string;
+  end: string;
+};
+
+/**
+ * Randevu alan kişi için zaman çizelgesi:
+ * uygulama → işlem arası → devam (bekleme yoksa tek blok).
+ */
+export function appointmentTimeline(
+  startTime: string,
+  endTime: string,
+  processingMinutes?: number,
+): TimelineSegment[] {
+  const win = processingWindow(startTime, endTime, processingMinutes);
+  if (!win) {
+    return [{ kind: 'work', label: 'İşlem', start: startTime, end: endTime }];
+  }
+  const out: TimelineSegment[] = [];
+  if (toMinutes(startTime) < toMinutes(win.start)) {
+    out.push({ kind: 'work', label: 'Uygulama', start: startTime, end: win.start });
+  }
+  out.push({ kind: 'wait', label: 'İşlem arası', start: win.start, end: win.end });
+  if (toMinutes(win.end) < toMinutes(endTime)) {
+    out.push({ kind: 'continue', label: 'Saat devamı', start: win.end, end: endTime });
+  }
+  return out;
+}

@@ -287,9 +287,13 @@ router.post('/tablet/setup/finalize', async (req: Request, res: Response) => {
             )
                 .trim()
                 .slice(0, 64) || null;
+            const hidePrices = !!(webPage as { hidePrices?: boolean }).hidePrices;
 
             await client.query(
                 `ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_template_id VARCHAR(64)`,
+            );
+            await client.query(
+                `ALTER TABLE companies ADD COLUMN IF NOT EXISTS hide_prices BOOLEAN DEFAULT false`,
             );
 
             const ins = await client.query(
@@ -300,7 +304,7 @@ router.post('/tablet/setup/finalize', async (req: Request, res: Response) => {
                     work_start_time, work_end_time, slot_interval,
                     genders, company_type, booking_flow, verification_code,
                     license_status, license_end_date, sms_enabled, payment_enabled, commission_rate,
-                    web_template_id
+                    web_template_id, hide_prices
                  ) VALUES (
                     $1, $2, $3, $4, $5,
                     $6, $7, $8, $9, $10,
@@ -308,7 +312,7 @@ router.post('/tablet/setup/finalize', async (req: Request, res: Response) => {
                     $13, $14, $15,
                     $16::text[], 'ASIL', 'SPDT', $17,
                     'active', $18, true, false, 0,
-                    $19
+                    $19, $20
                  ) RETURNING id`,
                 [
                     companyName,
@@ -330,6 +334,7 @@ router.post('/tablet/setup/finalize', async (req: Request, res: Response) => {
                     verificationCode,
                     licenseEnd.toISOString(),
                     webTemplateId,
+                    hidePrices,
                 ],
             );
             companyId = ins.rows[0].id;
@@ -649,12 +654,19 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
             profile.web_template_id != null
                 ? String(profile.web_template_id).trim().slice(0, 64)
                 : null;
+        const hidePrices =
+            profile.hide_prices === true || profile.hide_prices === false
+                ? !!profile.hide_prices
+                : null;
         const sectorSlugs: string[] = Array.isArray(profile.sector_slugs)
             ? profile.sector_slugs.map((s: unknown) => String(s).trim()).filter(Boolean)
             : [];
 
         await pool.query(
             `ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_template_id VARCHAR(64)`,
+        );
+        await pool.query(
+            `ALTER TABLE companies ADD COLUMN IF NOT EXISTS hide_prices BOOLEAN DEFAULT false`,
         );
 
         await pool.query(
@@ -667,6 +679,7 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
                 city = COALESCE(NULLIF($7, ''), city),
                 district = COALESCE(NULLIF($8, ''), district),
                 web_template_id = COALESCE(NULLIF($9, ''), web_template_id),
+                hide_prices = COALESCE($10, hide_prices),
                 updated_at = NOW()
              WHERE id = $1`,
             [
@@ -679,6 +692,7 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
                 city || null,
                 district || null,
                 webTemplateId || null,
+                hidePrices,
             ],
         );
 

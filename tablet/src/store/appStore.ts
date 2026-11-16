@@ -5,6 +5,7 @@ import { buildSnapshot, pushSnapshot } from '../lib/sync';
 import { slotEnd } from '../lib/slots';
 import { finalizeCompanyOnServer } from '../lib/finalizeSetup';
 import { placeServicesOnDay } from '../lib/scheduleCampaign';
+import { companyHoursForDate } from '../lib/workHours';
 import {
   findGroupSession,
   isClassService,
@@ -92,6 +93,11 @@ interface AppStore extends TabletState {
     customerPhone?: string;
     serviceId?: string;
     durationMinutes?: number;
+    /**
+     * true: slot süresine yuvarlama — bekleme aralığına kısa iş sığdırmak için.
+     * Süre doğrudan durationMinutes / hizmet süresi kullanılır.
+     */
+    allowShort?: boolean;
     price?: number;
     note?: string;
     subscriberId?: string;
@@ -449,9 +455,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       services: get().services,
       staff: get().staff,
       events: get().events.filter(e => e.status !== 'cancelled'),
-      workStart: company.workStart,
-      workEnd: company.workEnd,
-      slotInterval: company.slotInterval || 30,
+      company,
     });
 
     if (!visits.length) {
@@ -503,10 +507,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   addAppointment: input => {
     const interval = get().company?.slotInterval || 30;
     const service = get().services.find(s => s.id === input.serviceId);
-    const duration = Math.max(
-      interval,
-      input.durationMinutes || service?.durationMinutes || interval,
-    );
+    const raw = input.durationMinutes || service?.durationMinutes || interval;
+    const duration = input.allowShort ? Math.max(1, raw) : Math.max(interval, raw);
     const price = input.price ?? service?.price ?? 0;
     const now = new Date().toISOString();
     const id = uid('evt');
@@ -551,6 +553,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const company = get().company;
     if (!company) return { ok: false, message: 'Firma yok', eventIds: [] };
 
+    const day = companyHoursForDate(company, input.date);
+    if (day.closed) {
+      return { ok: false, message: 'Bu gün (hafta sonu) kapalı', eventIds: [] };
+    }
+
     const placements = placeServicesOnDay({
       date: input.date,
       fromTime: input.fromTime,
@@ -559,8 +566,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       services: get().services,
       staff: get().staff,
       events: get().events,
-      workStart: company.workStart,
-      workEnd: company.workEnd,
+      workStart: day.workStart,
+      workEnd: day.workEnd,
       slotInterval: company.slotInterval || 30,
     });
 

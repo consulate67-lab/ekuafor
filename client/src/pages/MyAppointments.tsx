@@ -229,12 +229,15 @@ export default function MyAppointments() {
                             </p>
                         </div>
                         <div className="flex-1 bg-slate-50 rounded-2xl p-3">
-                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">🕐 Saat</p>
+                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">🕐 Zaman çizelgesi</p>
                             <p className="text-lg font-black text-indigo-600">
                                 {app.start_time?.substring(0, 5)}
+                                {app.end_time ? (
+                                    <span className="text-sm font-bold text-slate-500"> → {app.end_time.substring(0, 5)}</span>
+                                ) : null}
                             </p>
                             <p className="text-[9px] text-slate-400 font-bold">
-                                {app.end_time?.substring(0, 5)}'e kadar
+                                {app.end_time ? `Başlangıç–devam / bitiş` : 'Başlangıç'}
                             </p>
                         </div>
                     </div>

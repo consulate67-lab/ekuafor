@@ -44,10 +44,19 @@ export function generateAboutLocal(input: {
         ? ` ${tpl.about}`
         : ' Hijyen, randevu düzeni ve samimi iletişim önceliğimizdir.';
 
-  const hours =
-    input.company.workStart && input.company.workEnd
-      ? ` Çalışma saatlerimiz ${input.company.workStart}–${input.company.workEnd} arasındadır.`
-      : '';
+  const hours = (() => {
+    if (!input.company.workStart || !input.company.workEnd) return '';
+    const weekday = `${input.company.workStart}–${input.company.workEnd}`;
+    if (input.company.weekendClosed) {
+      return ` Hafta içi ${weekday}; hafta sonu kapalıyız.`;
+    }
+    const weStart = input.company.weekendWorkStart || input.company.workStart;
+    const weEnd = input.company.weekendWorkEnd || input.company.workEnd;
+    if (weStart === input.company.workStart && weEnd === input.company.workEnd) {
+      return ` Çalışma saatlerimiz ${weekday} arasındadır.`;
+    }
+    return ` Hafta içi ${weekday}, hafta sonu ${weStart}–${weEnd} arasındayız.`;
+  })();
 
   const loc =
     input.company.webPage?.district || input.company.webPage?.city
@@ -90,7 +99,9 @@ export async function generateAboutAi(input: {
         companyName: input.company.name,
         sectorName: input.company.sectorName || input.company.sectorNames?.[0],
         templateId: input.templateId,
-        hours: `${input.company.workStart}–${input.company.workEnd}`,
+        hours: input.company.weekendClosed
+          ? `hafta içi ${input.company.workStart}–${input.company.workEnd}, hafta sonu kapalı`
+          : `hafta içi ${input.company.workStart}–${input.company.workEnd}, hafta sonu ${input.company.weekendWorkStart || input.company.workStart}–${input.company.weekendWorkEnd || input.company.workEnd}`,
         city: input.company.webPage?.city,
         district: input.company.webPage?.district,
       }),

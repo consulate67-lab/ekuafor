@@ -1,6 +1,7 @@
 import { addDays, toMinutes } from './dates';
 import { placeServicesOnDay, type Placement } from './scheduleCampaign';
-import type { DayEvent, Service, Staff } from '../types';
+import { companyHoursForDate } from './workHours';
+import type { CompanySetup, DayEvent, Service, Staff } from '../types';
 
 /** JS getDay: 0=Pazar … 6=Cumartesi */
 export const WEEKDAY_OPTIONS: { key: number; label: string }[] = [
@@ -29,9 +30,11 @@ type PlanInput = {
   services: Service[];
   staff: Staff[];
   events: DayEvent[];
-  workStart: string;
-  workEnd: string;
-  slotInterval: number;
+  /** Firma saatleri — her tarih için hafta içi/sonu ayrı çözülür */
+  company: Pick<
+    CompanySetup,
+    'workStart' | 'workEnd' | 'weekendWorkStart' | 'weekendWorkEnd' | 'weekendClosed' | 'slotInterval'
+  >;
 };
 
 function dateWeekday(key: string): number {
@@ -73,9 +76,7 @@ export function planSubscriberProgram(input: PlanInput): ProgramVisit[] {
     services,
     staff,
     events,
-    workStart,
-    workEnd,
-    slotInterval,
+    company,
   } = input;
 
   if (!weekdays.length || !serviceIds.length) return [];
@@ -83,6 +84,8 @@ export function planSubscriberProgram(input: PlanInput): ProgramVisit[] {
   const windowStart = toMinutes(timeStart);
   const windowEnd = toMinutes(timeEnd);
   if (windowEnd <= windowStart) return [];
+
+  const slotInterval = company.slotInterval || 30;
 
   const scheduleDays = enumerateDays(startDate, endDate)
     .filter(d => weekdays.includes(dateWeekday(d)))
@@ -92,9 +95,13 @@ export function planSubscriberProgram(input: PlanInput): ProgramVisit[] {
 
   const visits: ProgramVisit[] = [];
   let workingEvents = [...events];
-  const fromTime = toMinutes(timeStart) >= toMinutes(workStart) ? timeStart : workStart;
 
   for (const date of scheduleDays) {
+    const day = companyHoursForDate(company, date);
+    if (day.closed) continue;
+    const fromTime =
+      toMinutes(timeStart) >= toMinutes(day.workStart) ? timeStart : day.workStart;
+
     const placements = placeServicesOnDay({
       date,
       fromTime,
@@ -102,8 +109,8 @@ export function planSubscriberProgram(input: PlanInput): ProgramVisit[] {
       services,
       staff,
       events: workingEvents,
-      workStart,
-      workEnd,
+      workStart: day.workStart,
+      workEnd: day.workEnd,
       slotInterval,
     }).filter(p => {
       const sm = toMinutes(p.startTime);

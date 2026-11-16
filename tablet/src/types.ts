@@ -34,8 +34,11 @@ export interface Staff {
   photo?: string;
   title: StaffTitle;
   departmentId: string;
-  workStart: string; // HH:mm
+  workStart: string; // HH:mm — hafta içi
   workEnd: string;
+  /** Hafta sonu mesai — yoksa workStart/workEnd kullanılır */
+  weekendWorkStart?: string;
+  weekendWorkEnd?: string;
   /** Bu personelin verebileceği hizmet id listesi */
   serviceIds?: string[];
 }
@@ -210,12 +213,20 @@ export interface WebPageProfile {
   district?: string;
   contactNote?: string;
   website?: string;
+  /** true ise müşteri web sayfasında fiyatlar gizlenir */
+  hidePrices?: boolean;
 }
 
 export interface CompanySetup {
   name: string;
+  /** Hafta içi (Pzt–Cum) açılış / kapanış */
   workStart: string;
   workEnd: string;
+  /** Hafta sonu (Cmt–Paz) — yoksa hafta içi saatleri kullanılır */
+  weekendWorkStart?: string;
+  weekendWorkEnd?: string;
+  /** true ise Cumartesi–Pazar kapalı */
+  weekendClosed?: boolean;
   /** Günün kaç dakikalık parçalara bölüneceği — companies.slot_interval */
   slotInterval: number;
   location: GeoLocation | null;

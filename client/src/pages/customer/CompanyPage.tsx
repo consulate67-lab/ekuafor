@@ -10,10 +10,12 @@ import { dialNumber } from '../../lib/phone';
 import { LAYOUT_THEME, sectorLayoutGroup } from '../../lib/sectorLayout';
 import { sectorWebPack } from '../../lib/sectorWebContent';
 import { resolveSectorSlug } from '../../lib/resolveSectorSlug';
+import { serviceImageSrc } from '../../lib/serviceImage';
 import { loadVisitorProfile, saveVisitorProfile, type VisitorProfile } from '../../lib/visitorProfile';
 import { setPinnedCompanyId } from '../../lib/pinnedCompany';
 import { ShortcutPrompt } from '../../components/customer/ShortcutPrompt';
 import {
+    bookingCtaLabel,
     defaultWebTemplateId,
     getWebTemplate,
 } from '@shared/webPageTemplates';
@@ -200,53 +202,158 @@ function CompanyPage({ id }: { id: number }) {
         }
     };
 
-    /** Gerçek berber siteleri gibi kompakt hero — isim alanı şişirilmez */
-    const heroH = introMode ? 'h-[42vw] max-h-56 min-h-[11.5rem]' : layoutGroup === 'sport' ? 'h-48' : 'h-44';
+    const layout = selectedTemplate?.layout || 'overlay';
+    const ctaLabel = selectedTemplate?.ctaLabel || bookingCtaLabel(sectorSlug);
+    const isDark = layout === 'dark-full';
+    const heroH = introMode
+        ? layout === 'editorial'
+            ? 'h-[48vw] max-h-64 min-h-[13rem]'
+            : 'h-[42vw] max-h-56 min-h-[11.5rem]'
+        : layout === 'split'
+          ? 'h-52'
+          : layoutGroup === 'sport'
+            ? 'h-48'
+            : 'h-44';
+
+    const topBar = (
+        <div className="absolute inset-x-0 top-0 safe-top z-10">
+            <div className="max-w-lg mx-auto flex justify-between p-3">
+                {introMode ? (
+                    <span className="w-9" aria-hidden />
+                ) : (
+                    <RoundButton label="Geri" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/app'))}>←</RoundButton>
+                )}
+                <div className="flex gap-2">
+                    <RoundButton label="Paylaş" onClick={share}>⤴</RoundButton>
+                    {!introMode && (
+                        <RoundButton label={favorite ? 'Favorilerden çıkar' : 'Favorilere ekle'} pressed={favorite} onClick={() => favorites.toggle(company.id)}>
+                            <span className={favorite ? 'text-rose-500' : ''}>{favorite ? '♥' : '♡'}</span>
+                        </RoundButton>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+
+    const heroTitleBlock = (opts?: { onDark?: boolean; compact?: boolean }) => (
+        <div className={opts?.compact ? '' : 'relative z-10 flex h-full max-w-lg mx-auto flex-col justify-end px-4 pb-5 pt-12'}>
+            <p
+                className={`text-[10px] font-black uppercase tracking-[0.22em] ${
+                    opts?.onDark ? 'text-white/75' : 'text-slate-500'
+                }`}
+                style={!opts?.onDark ? { color: theme.accent } : undefined}
+            >
+                {sector?.name || selectedTemplate?.styleName || 'İşletme'}
+            </p>
+            <h1
+                className={`mt-1 font-black leading-tight drop-shadow ${
+                    opts?.onDark ? 'text-white' : 'text-slate-900'
+                } ${opts?.compact ? 'text-2xl' : 'text-2xl sm:text-[1.65rem]'}`}
+            >
+                {company.name}
+            </h1>
+            <p className={`mt-1.5 max-w-sm text-xs font-semibold sm:text-sm ${opts?.onDark ? 'text-white/85' : 'text-slate-600'}`}>
+                {webPack.tagline}
+            </p>
+            {rating && (
+                <button
+                    type="button"
+                    onClick={() => setReviewsOpen(true)}
+                    className={`mt-2 w-fit text-xs font-bold ${opts?.onDark ? 'text-amber-300' : 'text-amber-600'}`}
+                >
+                    {rating} · yorumları gör
+                </button>
+            )}
+        </div>
+    );
 
     return (
-        <div className="min-h-screen pb-32" style={{ ['--sector-accent' as string]: theme.accent, background: selectedTemplate?.theme.surface || '#f8fafc' }}>
-            <div
-                className={`relative ${heroH} overflow-hidden bg-slate-900`}
-                style={{ background: `linear-gradient(145deg, ${theme.heroFrom}, ${theme.heroTo})` }}
-            >
-                {heroImage && (
-                    <img src={heroImage} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-black/20" />
-                <div className="absolute inset-x-0 top-0 safe-top z-10">
-                    <div className="max-w-lg mx-auto flex justify-between p-3">
-                        {introMode ? (
-                            <span className="w-9" aria-hidden />
-                        ) : (
-                            <RoundButton label="Geri" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/app'))}>←</RoundButton>
+        <div
+            className="min-h-screen pb-36"
+            style={{
+                ['--sector-accent' as string]: theme.accent,
+                background: selectedTemplate?.theme.surface || (isDark ? '#111827' : '#f8fafc'),
+            }}
+        >
+            {layout === 'split' ? (
+                <div className={`relative grid overflow-hidden bg-slate-900 sm:grid-cols-2 ${heroH}`}>
+                    <div className="relative min-h-[11rem]" style={{ background: `linear-gradient(145deg, ${theme.heroFrom}, ${theme.heroTo})` }}>
+                        {heroImage && <img src={heroImage} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+                        <div className="absolute inset-0 bg-black/25" />
+                        {topBar}
+                    </div>
+                    <div className="relative flex flex-col justify-end px-4 py-5" style={{ background: theme.accentSoft }}>
+                        {heroTitleBlock({ compact: true })}
+                        {bookable && (
+                            <button
+                                type="button"
+                                onClick={() => book()}
+                                className="mt-4 w-full rounded-2xl py-3.5 text-sm font-black text-white shadow-lg"
+                                style={{ backgroundColor: theme.accent === '#e5e7eb' ? '#111827' : theme.accent }}
+                            >
+                                {ctaLabel}
+                            </button>
                         )}
-                        <div className="flex gap-2">
-                            <RoundButton label="Paylaş" onClick={share}>⤴</RoundButton>
-                            {!introMode && (
-                                <RoundButton label={favorite ? 'Favorilerden çıkar' : 'Favorilere ekle'} pressed={favorite} onClick={() => favorites.toggle(company.id)}>
-                                    <span className={favorite ? 'text-rose-500' : ''}>{favorite ? '♥' : '♡'}</span>
-                                </RoundButton>
+                    </div>
+                </div>
+            ) : layout === 'editorial' ? (
+                <div className="relative" style={{ background: selectedTemplate?.theme.surface || '#fffaf8' }}>
+                    {topBar}
+                    <div className="max-w-lg mx-auto px-4 pb-2 pt-16">
+                        {heroTitleBlock({ compact: true })}
+                    </div>
+                    <div className={`relative mx-4 mb-2 overflow-hidden rounded-3xl ${heroH}`} style={{ background: `linear-gradient(145deg, ${theme.heroFrom}, ${theme.heroTo})` }}>
+                        {heroImage && <img src={heroImage} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
+                        {bookable && (
+                            <div className="absolute inset-x-0 bottom-0 p-4">
+                                <button
+                                    type="button"
+                                    onClick={() => book()}
+                                    className="w-full rounded-2xl py-3.5 text-sm font-black text-white shadow-xl"
+                                    style={{ backgroundColor: theme.accent === '#e5e7eb' ? '#111827' : theme.accent }}
+                                >
+                                    {ctaLabel}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ) : layout === 'card' ? (
+                <div className="relative px-4 pb-2 pt-2" style={{ background: `linear-gradient(160deg, ${theme.heroFrom}, ${theme.heroTo})` }}>
+                    {topBar}
+                    <div className="mx-auto mt-14 max-w-lg overflow-hidden rounded-3xl bg-white shadow-xl">
+                        <div className={`relative ${heroH}`}>
+                            {heroImage && <img src={heroImage} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+                        </div>
+                        <div className="p-5">
+                            {heroTitleBlock({ compact: true })}
+                            {bookable && (
+                                <button
+                                    type="button"
+                                    onClick={() => book()}
+                                    className="mt-4 w-full rounded-2xl py-3.5 text-sm font-black text-white shadow-lg"
+                                    style={{ backgroundColor: theme.accent === '#e5e7eb' ? '#111827' : theme.accent }}
+                                >
+                                    {ctaLabel}
+                                </button>
                             )}
                         </div>
                     </div>
                 </div>
-                <div className="relative z-10 flex h-full max-w-lg mx-auto flex-col justify-end px-4 pb-5 pt-12">
-                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/75">
-                        {sector?.name || selectedTemplate?.styleName || 'Erkek kuaförü'}
-                    </p>
-                    <h1 className="mt-1 text-2xl font-black leading-tight text-white drop-shadow sm:text-[1.65rem]">
-                        {company.name}
-                    </h1>
-                    <p className="mt-1.5 max-w-sm text-xs font-semibold text-white/85 sm:text-sm">{webPack.tagline}</p>
-                    {rating && (
-                        <button type="button" onClick={() => setReviewsOpen(true)} className="mt-2 w-fit text-xs font-bold text-amber-300">
-                            {rating} · yorumları gör
-                        </button>
-                    )}
+            ) : (
+                <div
+                    className={`relative ${heroH} overflow-hidden bg-slate-900`}
+                    style={{ background: `linear-gradient(145deg, ${theme.heroFrom}, ${theme.heroTo})` }}
+                >
+                    {heroImage && <img src={heroImage} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+                    <div className={`absolute inset-0 ${isDark ? 'bg-gradient-to-t from-black via-black/55 to-black/25' : 'bg-gradient-to-t from-black/75 via-black/35 to-black/20'}`} />
+                    {topBar}
+                    {heroTitleBlock({ onDark: true })}
                 </div>
-            </div>
+            )}
 
-            <main className="max-w-lg mx-auto px-4 -mt-6 relative space-y-4">
+            <main className={`max-w-lg mx-auto px-4 relative space-y-4 ${layout === 'card' || layout === 'editorial' ? 'mt-2' : '-mt-6'}`}>
                 {visitor && !introMode && (
                     <p className="rounded-2xl px-3 py-2 text-xs font-bold text-slate-600" style={{ backgroundColor: theme.accentSoft }}>
                         Merhaba {visitor.firstName} — sonraki girişlerde bilginiz hatırlanır
@@ -327,32 +434,69 @@ function CompanyPage({ id }: { id: number }) {
 
                 {services.length > 0 && (
                     <section>
-                        <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">{labels.servicePlural}</h2>
-                        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm divide-y divide-slate-100">
-                            {services.map(s => (
-                                introMode ? (
-                                    <div key={s.id} className="flex items-center gap-3 p-4">
-                                        <div className="min-w-0 flex-1">
-                                            <p className="font-bold text-slate-800 truncate">{s.name}</p>
-                                            <p className="text-xs font-semibold text-slate-400">
-                                                {s.booking_mode === 'class' ? 'Grup dersi · ' : ''}{durationText(s)}
-                                            </p>
+                        <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">{labels.servicePlural}</h2>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            {services.map(s => {
+                                const imgSrc = serviceImageSrc(s.name, s.photo);
+                                const showPrice = !company.hide_prices && Number(s.price) > 0;
+                                const meta = `${s.booking_mode === 'class' ? 'Grup dersi · ' : ''}${durationText(s)}`;
+                                const body = (
+                                    <>
+                                        <div className="relative aspect-[16/10] overflow-hidden bg-slate-200">
+                                            <img
+                                                src={imgSrc}
+                                                alt=""
+                                                className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                                                loading="lazy"
+                                            />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+                                            {showPrice ? (
+                                                <span className="absolute bottom-2 right-2 rounded-full bg-white/95 px-2.5 py-1 text-xs font-black text-slate-900 shadow">
+                                                    {formatMoney(s.price)}
+                                                </span>
+                                            ) : company.hide_prices ? (
+                                                <span className="absolute bottom-2 right-2 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white">
+                                                    Fiyat sorun
+                                                </span>
+                                            ) : null}
                                         </div>
-                                        {Number(s.price) > 0 && <span className="font-black text-slate-900">{formatMoney(s.price)}</span>}
+                                        <div className="p-3.5">
+                                            <p className="font-black text-slate-900 leading-snug line-clamp-2">{s.name}</p>
+                                            <p className="mt-1 text-xs font-semibold text-slate-400">{meta}</p>
+                                            {!introMode && bookable && (
+                                                <span
+                                                    className="mt-3 inline-flex rounded-xl px-3 py-2 text-xs font-black text-white"
+                                                    style={{
+                                                        backgroundColor:
+                                                            theme.accent === '#e5e7eb' || theme.accent === '#ffffff'
+                                                                ? '#111827'
+                                                                : theme.accent,
+                                                    }}
+                                                >
+                                                    {ctaLabel}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </>
+                                );
+                                return introMode || !bookable ? (
+                                    <div
+                                        key={s.id}
+                                        className="group overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm"
+                                    >
+                                        {body}
                                     </div>
                                 ) : (
-                                    <button key={s.id} type="button" onClick={() => book(`?service=${s.id}`)} className="w-full flex items-center gap-3 p-4 text-left active:bg-slate-50">
-                                        <div className="min-w-0 flex-1">
-                                            <p className="font-bold text-slate-800 truncate">{s.name}</p>
-                                            <p className="text-xs font-semibold text-slate-400">
-                                                {s.booking_mode === 'class' ? 'Grup dersi · ' : ''}{durationText(s)}
-                                            </p>
-                                        </div>
-                                        {Number(s.price) > 0 && <span className="font-black text-slate-900">{formatMoney(s.price)}</span>}
-                                        <span className="text-slate-300" aria-hidden>›</span>
+                                    <button
+                                        key={s.id}
+                                        type="button"
+                                        onClick={() => book(`?service=${s.id}`)}
+                                        className="group overflow-hidden rounded-2xl border border-slate-100 bg-white text-left shadow-sm transition active:scale-[0.99]"
+                                    >
+                                        {body}
                                     </button>
-                                )
-                            ))}
+                                );
+                            })}
                         </div>
                     </section>
                 )}
@@ -413,52 +557,55 @@ function CompanyPage({ id }: { id: number }) {
                 )}
             </main>
 
-            {/* Sağ kenar dikey randevu şeridi */}
-            {bookable && (
-                <button
-                    type="button"
-                    onClick={() => book()}
-                    className="fixed right-0 top-1/2 z-40 -translate-y-1/2 rounded-l-2xl px-2.5 py-5 text-[11px] font-black uppercase tracking-widest text-white shadow-lg"
-                    style={{ backgroundColor: theme.accent, writingMode: 'vertical-rl' }}
-                    aria-label="Randevu al"
-                >
-                    Randevu
-                </button>
-            )}
-
-            {/* WhatsApp tarzı FAB — viewport ile birlikte altta kalır */}
-            <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50" style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom))' }}>
-                <div className="pointer-events-auto mx-auto flex max-w-lg justify-end px-4">
-                    {bookable ? (
-                        <button
-                            type="button"
-                            onClick={() => book()}
-                            className="flex h-14 w-14 items-center justify-center rounded-full text-2xl text-white shadow-xl shadow-black/25 transition active:scale-90"
-                            style={{ backgroundColor: theme.accent }}
-                            aria-label="Randevu al"
-                            title="Randevu al"
-                        >
-                            📅
-                        </button>
-                    ) : phone ? (
-                        <a
-                            href={`tel:${phone}`}
-                            className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-2xl text-white shadow-xl shadow-black/25"
-                            aria-label="Ara"
-                        >
-                            📞
-                        </a>
-                    ) : (
-                        <a
-                            href={directionsUrl(company)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-2xl text-white shadow-xl"
-                            aria-label="Yol tarifi"
-                        >
-                            🧭
-                        </a>
-                    )}
+            {/* Profesyonel alt randevu çubuğu */}
+            <div
+                className="pointer-events-none fixed inset-x-0 bottom-0 z-50"
+                style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+            >
+                <div className="pointer-events-auto mx-auto max-w-lg px-4">
+                    <div
+                        className={`flex items-center gap-3 rounded-2xl border p-2.5 shadow-2xl backdrop-blur-md ${
+                            isDark ? 'border-white/10 bg-black/80' : 'border-slate-200/80 bg-white/95'
+                        }`}
+                    >
+                        <div className="min-w-0 flex-1 pl-2">
+                            <p className={`truncate text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                                {company.name}
+                            </p>
+                            <p className={`truncate text-[11px] font-semibold ${isDark ? 'text-white/60' : 'text-slate-500'}`}>
+                                {bookable ? 'Online uygun saatleri gör · hemen ayırt' : phone ? 'Telefonla iletişime geçin' : 'Konum ve yol tarifi'}
+                            </p>
+                        </div>
+                        {bookable ? (
+                            <button
+                                type="button"
+                                onClick={() => book()}
+                                className="shrink-0 rounded-xl px-5 py-3.5 text-sm font-black text-white shadow-lg transition active:scale-[0.98]"
+                                style={{
+                                    backgroundColor:
+                                        theme.accent === '#e5e7eb' || theme.accent === '#ffffff' ? '#111827' : theme.accent,
+                                }}
+                            >
+                                {ctaLabel}
+                            </button>
+                        ) : phone ? (
+                            <a
+                                href={`tel:${phone}`}
+                                className="shrink-0 rounded-xl bg-emerald-600 px-5 py-3.5 text-sm font-black text-white shadow-lg"
+                            >
+                                Ara
+                            </a>
+                        ) : (
+                            <a
+                                href={directionsUrl(company)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="shrink-0 rounded-xl bg-slate-900 px-5 py-3.5 text-sm font-black text-white shadow-lg"
+                            >
+                                Yol tarifi
+                            </a>
+                        )}
+                    </div>
                 </div>
             </div>
 

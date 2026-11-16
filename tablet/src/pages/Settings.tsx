@@ -8,7 +8,9 @@ import { pushWebProfile } from '../lib/pushWebProfile';
 import { pushStaffPhotos } from '../lib/pushStaffPhotos';
 import { reverseGeocode } from '../lib/reverseGeocode';
 import { companyPublicUrl, companyWebsiteDisplay } from '../lib/webUrl';
-import { getSector, mergeCatalogServices, sectorsByGroup } from '../lib/sectorCatalog';
+import { getSector, mergeCatalogServices } from '../lib/sectorCatalog';
+import { ServiceTransfer } from '../components/ServiceTransfer';
+import { WebTemplatePreview } from '../components/WebTemplatePreview';
 import { sectorSupportsGroupSessions } from '../lib/sectorSubscriberProfile';
 import {
   defaultStaffTitle,
@@ -233,8 +235,6 @@ export function Settings() {
     );
   };
 
-  const sectorGroups = useMemo(() => sectorsByGroup(), []);
-
   const saveStaff = () => {
     if (!draftStaff || !draftStaff.firstName.trim() || !draftStaff.lastName.trim()) return;
     let next = draftStaff;
@@ -355,15 +355,57 @@ export function Settings() {
         {tab === 'hours' && (
           <section className="space-y-4 rounded-3xl bg-white p-6 shadow-sm">
             <h2 className="text-lg font-black">Firma çalışma saatleri</h2>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <label className="block text-xs font-black uppercase text-slate-400">
-                Açılış
-                <input type="time" value={company.workStart} onChange={e => updateCompany({ workStart: e.target.value })} className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base font-bold" />
-              </label>
-              <label className="block text-xs font-black uppercase text-slate-400">
-                Kapanış
-                <input type="time" value={company.workEnd} onChange={e => updateCompany({ workEnd: e.target.value })} className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base font-bold" />
-              </label>
+            <div>
+              <p className="text-xs font-black uppercase text-slate-400">Hafta içi (Pzt–Cum)</p>
+              <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label className="block text-xs font-black uppercase text-slate-400">
+                  Açılış
+                  <input type="time" value={company.workStart} onChange={e => updateCompany({ workStart: e.target.value })} className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base font-bold" />
+                </label>
+                <label className="block text-xs font-black uppercase text-slate-400">
+                  Kapanış
+                  <input type="time" value={company.workEnd} onChange={e => updateCompany({ workEnd: e.target.value })} className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-base font-bold" />
+                </label>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs font-black uppercase text-slate-400">Hafta sonu (Cmt–Paz)</p>
+                <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={!!company.weekendClosed}
+                    onChange={e => updateCompany({ weekendClosed: e.target.checked })}
+                    className="h-4 w-4 rounded border-slate-300"
+                  />
+                  Kapalı
+                </label>
+              </div>
+              {!company.weekendClosed && (
+                <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <label className="block text-xs font-black uppercase text-slate-400">
+                    Açılış
+                    <input
+                      type="time"
+                      value={company.weekendWorkStart || company.workStart}
+                      onChange={e => updateCompany({ weekendWorkStart: e.target.value })}
+                      className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-base font-bold"
+                    />
+                  </label>
+                  <label className="block text-xs font-black uppercase text-slate-400">
+                    Kapanış
+                    <input
+                      type="time"
+                      value={company.weekendWorkEnd || company.workEnd}
+                      onChange={e => updateCompany({ weekendWorkEnd: e.target.value })}
+                      className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-base font-bold"
+                    />
+                  </label>
+                </div>
+              )}
+              {company.weekendClosed && (
+                <p className="mt-2 text-sm font-semibold text-slate-500">Cumartesi ve Pazar panelde kapalı görünür.</p>
+              )}
             </div>
             <div>
               <p className="text-xs font-black uppercase text-slate-400">Slot süresi</p>
@@ -427,6 +469,12 @@ export function Settings() {
                   departmentId: defaultDept.id,
                   workStart: company.workStart,
                   workEnd: company.workEnd,
+                  weekendWorkStart: company.weekendClosed
+                    ? undefined
+                    : company.weekendWorkStart || company.workStart,
+                  weekendWorkEnd: company.weekendClosed
+                    ? undefined
+                    : company.weekendWorkEnd || company.workEnd,
                   serviceIds: services.map(s => s.id),
                 });
               }}
@@ -451,75 +499,45 @@ export function Settings() {
               ) : (
                 <p className="mt-2 text-sm font-bold text-amber-700">Firma henüz sisteme kayıtlı değil — önce QR ekranından kaydı tamamlayın.</p>
               )}
-              {sectorSlugs.length > 0 && (
-                <p className="mt-2 text-sm font-bold text-emerald-700">
-                  Sektör: {sectorSlugs.map(s => getSector(s)?.name || s).join(' · ')}
+              <div className="mt-3 rounded-2xl bg-emerald-50 px-3 py-3 ring-1 ring-emerald-100">
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">
+                  Firma sektörü (tanımlamada seçildi)
                 </p>
-              )}
-            </div>
-
-            <div>
-              <p className="text-xs font-black uppercase text-slate-400">Sektör seç</p>
-              <p className="mt-1 text-xs font-semibold text-slate-500">
-                Web şablonları seçilen sektöre göre gelir. Bu deneme firma için erkek berberi önerilir.
-              </p>
-              <div className="mt-2 max-h-56 space-y-3 overflow-y-auto rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                {sectorGroups.map(g => (
-                  <div key={g.group}>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{g.group}</p>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {g.sectors.map(s => {
-                        const on = sectorSlugs.includes(s.slug);
-                        return (
-                          <button
-                            key={s.slug}
-                            type="button"
-                            onClick={() => setCompanySector(s.slug)}
-                            className={`rounded-xl px-3 py-1.5 text-xs font-black ${
-                              on ? 'bg-brand-600 text-white' : 'bg-white text-slate-700 ring-1 ring-slate-200'
-                            }`}
-                          >
-                            {s.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
+                <p className="mt-1 text-sm font-black text-emerald-900">
+                  {sectorSlugs.length
+                    ? sectorSlugs.map(s => getSector(s)?.name || s).join(' · ')
+                    : 'Sektör tanımlı değil'}
+                </p>
+                <p className="mt-1 text-[11px] font-semibold text-emerald-800/80">
+                  Bu ekranda yalnızca firmanızın sektörüne ait web tasarımları listelenir. Sektör değiştirmek için kurulumu yeniden yapın.
+                </p>
               </div>
             </div>
 
-            {sectorTemplates.length > 0 && (
+            {sectorTemplates.length > 0 ? (
               <div>
                 <p className="text-xs font-black uppercase text-slate-400">
-                  Şablonlar ({sectorTemplates.length} · sektöre özel)
+                  Sayfa önizlemeleri ({sectorTemplates.length} · sektöre özel)
                 </p>
-                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {sectorTemplates.map(t => {
-                    const on = webDraft.templateId === t.id;
-                    return (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => selectTemplate(t.id)}
-                        className={`rounded-2xl p-3 text-left ring-2 transition ${
-                          on ? 'ring-brand-600 bg-brand-50' : 'ring-slate-100 bg-slate-50'
-                        }`}
-                      >
-                        <div
-                          className="mb-2 h-14 rounded-xl"
-                          style={{
-                            background: `linear-gradient(135deg, ${t.theme.heroFrom}, ${t.theme.heroTo})`,
-                          }}
-                        />
-                        <p className="text-sm font-black text-slate-900">{t.name}</p>
-                        <p className="mt-0.5 text-xs font-semibold text-slate-500 line-clamp-2">{t.tagline}</p>
-                        <p className="mt-1 font-mono text-[10px] font-bold text-slate-400">{t.id}</p>
-                      </button>
-                    );
-                  })}
+                <p className="mt-1 text-xs font-semibold text-slate-500">
+                  Renk şeridi değil — gerçek sayfa yerleşimi ve randevu butonu. Birini seçip kaydedin.
+                </p>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {sectorTemplates.map(t => (
+                    <WebTemplatePreview
+                      key={t.id}
+                      template={t}
+                      companyName={company.name}
+                      selected={webDraft.templateId === t.id}
+                      onSelect={() => selectTemplate(t.id)}
+                    />
+                  ))}
                 </div>
               </div>
+            ) : (
+              <p className="rounded-2xl bg-amber-50 px-3 py-3 text-sm font-bold text-amber-800 ring-1 ring-amber-100">
+                Firma sektörü tanımlı değil; şablon gösterilemiyor. Kurulumda sektör seçin.
+              </p>
             )}
 
             <div className="space-y-2 rounded-2xl bg-violet-50 p-4 ring-1 ring-violet-100">
@@ -546,6 +564,21 @@ export function Settings() {
                 {aiBusy ? 'Üretiliyor…' : 'AI ile doldur'}
               </button>
             </div>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
+              <input
+                type="checkbox"
+                checked={!!webDraft.hidePrices}
+                onChange={e => patchWeb({ hidePrices: e.target.checked })}
+                className="mt-1 h-5 w-5 rounded border-slate-300 text-brand-600"
+              />
+              <span>
+                <span className="block text-sm font-black text-slate-900">Web sayfasında fiyatları gizle</span>
+                <span className="mt-0.5 block text-xs font-semibold text-slate-500">
+                  Açıkken hizmet kartlarında tutar görünmez; müşteri randevu alırken veya salonda öğrenir.
+                </span>
+              </span>
+            </label>
 
             <label className="block text-xs font-black uppercase text-slate-400">
               Hakkında
@@ -901,40 +934,41 @@ export function Settings() {
                 ))}
               </select>
             </label>
-            <div className="grid grid-cols-2 gap-2">
-              <input type="time" value={draftStaff.workStart} onChange={e => setDraftStaff({ ...draftStaff, workStart: e.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold" />
-              <input type="time" value={draftStaff.workEnd} onChange={e => setDraftStaff({ ...draftStaff, workEnd: e.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold" />
-            </div>
             <div>
-              <p className="text-xs font-black uppercase text-slate-400">Hizmetler (grup dahil)</p>
-              <div className="mt-2 flex max-h-36 flex-wrap gap-2 overflow-y-auto">
-                {services.map(s => {
-                  const on = (draftStaff.serviceIds || []).includes(s.id);
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => {
-                        const cur = draftStaff.serviceIds || [];
-                        const next = on ? cur.filter(id => id !== s.id) : [...cur, s.id];
-                        setDraftStaff({ ...draftStaff, serviceIds: next });
-                      }}
-                      className={`rounded-xl px-3 py-1.5 text-xs font-black ring-1 ${
-                        on
-                          ? s.bookingMode === 'class'
-                            ? 'bg-emerald-600 text-white ring-emerald-700'
-                            : 'bg-brand-600 text-white ring-brand-700'
-                          : 'bg-slate-50 text-slate-600 ring-slate-200'
-                      }`}
-                    >
-                      {s.name}{s.bookingMode === 'class' ? ' · grup' : ''}
-                    </button>
-                  );
-                })}
-                {services.length === 0 && (
-                  <p className="text-sm font-semibold text-slate-400">Önce Hizmet sekmesinden ekleyin</p>
-                )}
+              <p className="mb-1 text-[10px] font-black uppercase text-slate-400">Hafta içi mesai</p>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="time" value={draftStaff.workStart} onChange={e => setDraftStaff({ ...draftStaff, workStart: e.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold" />
+                <input type="time" value={draftStaff.workEnd} onChange={e => setDraftStaff({ ...draftStaff, workEnd: e.target.value })} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold" />
               </div>
+            </div>
+            {!company.weekendClosed && (
+              <div>
+                <p className="mb-1 text-[10px] font-black uppercase text-slate-400">Hafta sonu mesai</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="time"
+                    value={draftStaff.weekendWorkStart || company.weekendWorkStart || draftStaff.workStart}
+                    onChange={e => setDraftStaff({ ...draftStaff, weekendWorkStart: e.target.value })}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold"
+                  />
+                  <input
+                    type="time"
+                    value={draftStaff.weekendWorkEnd || company.weekendWorkEnd || draftStaff.workEnd}
+                    onChange={e => setDraftStaff({ ...draftStaff, weekendWorkEnd: e.target.value })}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold"
+                  />
+                </div>
+              </div>
+            )}
+            <div>
+              <p className="mb-2 text-xs font-black uppercase text-slate-400">Hizmetler (grup dahil)</p>
+              <ServiceTransfer
+                services={services}
+                selectedIds={draftStaff.serviceIds || []}
+                onChange={ids => setDraftStaff({ ...draftStaff, serviceIds: ids })}
+                labelExtra={s => (s.bookingMode === 'class' ? 'grup' : '')}
+                emptyHint="Önce Hizmet sekmesinden ekleyin"
+              />
             </div>
             <label className="block text-xs font-black uppercase text-slate-400">
               Fotoğraf

@@ -45,6 +45,15 @@ const formatPrice = (n: number) => `₺${n.toLocaleString('tr-TR', { maximumFrac
 const newRequestId = () =>
     typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+/** HH:mm + dakika → HH:mm (gün aşımında 24+ gösterebilir; randevu gün içi) */
+const addMinutesToTime = (hhmm: string, minutes: number) => {
+    const [h, m] = hhmm.split(':').map(Number);
+    const total = (h || 0) * 60 + (m || 0) + Math.max(0, minutes);
+    const hh = Math.floor(total / 60) % 24;
+    const mm = total % 60;
+    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+};
+
 const formatDialNumber = (phone?: string) => {
     if (!phone) return '';
     const cleaned = phone.replace(/[^0-9]/g, '');
@@ -396,6 +405,7 @@ function BookingPage({ id }: { id: string }) {
                                             <p className="text-[11px] font-bold text-slate-400">
                                                 {sMode === 'class' ? 'Grup dersi · ' : ''}
                                                 {sMode === 'resource' && s.duration_options?.length ? s.duration_options.join(' / ') : s.duration_minutes} dk
+                                                {sMode !== 'class' && sMode !== 'resource' ? ' · seçtiğiniz saatten itibaren devam eder' : ''}
                                             </p>
                                         </div>
                                         <div className="font-black text-base text-amber-600 whitespace-nowrap">{formatPrice(Number(s.price))}</div>
@@ -472,7 +482,9 @@ function BookingPage({ id }: { id: string }) {
                 {step === 'time' && (
                     <section>
                         <h2 className="text-2xl font-black text-slate-900 mb-1">Saat seçin</h2>
-                        <p className="text-xs text-slate-400 font-bold mb-5">{selection.date && formatDay(selection.date)} · {totalDuration} dk</p>
+                        <p className="text-xs text-slate-400 font-bold mb-5">
+                            {selection.date && formatDay(selection.date)} · {totalDuration} dk işlem · bitiş saati kartlarda
+                        </p>
                         {fetching || (!error && (availability?.date !== selection.date || availability?.duration !== totalDuration)) ? (
                             <div className="py-16 flex justify-center"><div className="w-10 h-10 border-4 border-amber-100 border-t-amber-600 rounded-full animate-spin" /></div>
                         ) : !availability?.slots.some(s => s.available) ? (
@@ -483,11 +495,24 @@ function BookingPage({ id }: { id: string }) {
                             </div>
                         ) : (
                             <div className="grid grid-cols-3 gap-2">
-                                {availability.slots.map(slot => (
-                                    <button key={slot.time} disabled={!slot.available} onClick={() => { update({ time: slot.time }); goNext(); }} className={`py-4 rounded-2xl font-black text-sm ${slot.available ? 'bg-white text-slate-900 shadow-sm active:scale-95' : 'bg-slate-100 text-slate-300 line-through'}`}>
-                                        {slot.time}
-                                    </button>
-                                ))}
+                                {availability.slots.map(slot => {
+                                    const endAt = addMinutesToTime(slot.time, totalDuration);
+                                    return (
+                                        <button
+                                            key={slot.time}
+                                            disabled={!slot.available}
+                                            onClick={() => { update({ time: slot.time }); goNext(); }}
+                                            className={`rounded-2xl py-3 font-black text-sm ${slot.available ? 'bg-white text-slate-900 shadow-sm active:scale-95' : 'bg-slate-100 text-slate-300 line-through'}`}
+                                        >
+                                            <span className="block text-base">{slot.time}</span>
+                                            {slot.available && totalDuration > 0 && (
+                                                <span className="mt-0.5 block text-[10px] font-bold text-slate-400">
+                                                    → {endAt} devam
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         )}
                     </section>
@@ -540,7 +565,21 @@ function BookingPage({ id }: { id: string }) {
                             {mode === 'class' && selectedSession ? (
                                 <p className="text-sm font-bold text-slate-500">{formatDay(selectedSession.session_date)} · {selectedSession.start_time}–{selectedSession.end_time}{selectedSession.staff_name ? ` · ${selectedSession.staff_name}` : ''}</p>
                             ) : (
-                                <p className="text-sm font-bold text-slate-500">{selection.date && formatDay(selection.date)} · {selection.time} · {totalDuration} dk</p>
+                                <>
+                                    <p className="text-sm font-bold text-slate-500">{selection.date && formatDay(selection.date)}</p>
+                                    {selection.time && totalDuration > 0 && (
+                                        <div className="rounded-2xl bg-slate-50 px-3 py-3 ring-1 ring-slate-100">
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Zaman çizelgesi</p>
+                                            <p className="mt-1 text-sm font-black text-slate-900">
+                                                Başlangıç {selection.time}
+                                            </p>
+                                            <p className="text-sm font-bold text-slate-600">
+                                                Devam / bitiş {addMinutesToTime(selection.time, totalDuration)}
+                                                <span className="ml-1 font-semibold text-slate-400">· {totalDuration} dk</span>
+                                            </p>
+                                        </div>
+                                    )}
+                                </>
                             )}
                             {mode === 'staff' && staff.length > 0 && (
                                 <p className="text-sm font-bold text-slate-500">{staffLabel}: {selectedStaff ? `${selectedStaff.first_name} ${selectedStaff.last_name}` : 'ilk müsait'}</p>

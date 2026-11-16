@@ -617,6 +617,7 @@ const PUBLIC_COMPANY_FIELDS = [
     'staff_label', 'service_label', 'rating_avg', 'review_count', 'is_active', 'is_verified',
     'service_count', 'staff_count', 'license_end_date', 'is_bookable', 'distance_km', 'primary_sector', 'sectors',
     'web_template_id',
+    'hide_prices',
 ] as const;
 
 export const isLicenseExpired = (company: { license_end_date?: string | Date | null }) =>
