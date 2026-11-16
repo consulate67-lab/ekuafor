@@ -118,6 +118,16 @@ export const createApp = (): Express => {
     // === Request logging (pino-http) ===
     app.use(requestLogger);
 
+    // QR kısa yol: /c/5 → /?c=5&ref=qr&install=1 (kamera hash’i metin sanmasın)
+    app.get('/c/:id', (req, res) => {
+        const id = String(req.params.id || '');
+        if (!/^\d+$/.test(id)) {
+            res.status(404).send('Not found');
+            return;
+        }
+        res.redirect(302, `/?c=${id}&ref=qr&install=1`);
+    });
+
     // === Static client bundle (Railway web service serves SPA from /public) ===
     // Production: build sırasında client/dist/* → server/public/ kopyalanır.
     // SPA: index.html hash routing kullanır, fallback'e gerek yok.

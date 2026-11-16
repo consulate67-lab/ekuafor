@@ -720,7 +720,7 @@ export function Settings() {
               <input
                 value={webDraft.website || ''}
                 onChange={e => patchWeb({ website: e.target.value })}
-                placeholder="https://…/#/firma/…"
+                placeholder="https://…/?c=…"
                 className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-bold"
                 readOnly={!!company.serverCompanyId}
               />

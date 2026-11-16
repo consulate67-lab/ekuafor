@@ -67,12 +67,19 @@ export function removeScannedCompanyId(id: number): number[] {
 
 /** Deep link / QR URL’sinden firma id çıkarır. */
 export function extractCompanyIdFromAppUrl(url: string): number | null {
+  try {
+    const u = new URL(url);
+    const q = u.searchParams.get('c') || u.searchParams.get('firma') || u.searchParams.get('company');
+    if (q && /^\d+$/.test(q)) return Number(q);
+  } catch {
+    /* ignore */
+  }
   const hashMatch = url.match(/#\/(?:firma\/)?(\d+)/i);
   if (hashMatch) {
     const n = Number(hashMatch[1]);
     return Number.isFinite(n) && n > 0 ? n : null;
   }
-  const pathMatch = url.match(/\/(?:firma\/)?(\d+)(?:[/?#]|$)/i);
+  const pathMatch = url.match(/\/c\/(\d+)(?:[/?#]|$)/i) || url.match(/\/firma\/(\d+)(?:[/?#]|$)/i);
   if (pathMatch) {
     const n = Number(pathMatch[1]);
     return Number.isFinite(n) && n > 0 ? n : null;

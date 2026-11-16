@@ -247,7 +247,7 @@ function CompanyPage({ id }: { id: number }) {
     };
 
     const share = async () => {
-        const url = `${window.location.origin}${window.location.pathname}#/firma/${company.id}?ref=qr&install=1`;
+        const url = `${window.location.origin}/?c=${company.id}&ref=qr&install=1`;
         try {
             if (navigator.share) await navigator.share({ title: company.name, url });
             else await navigator.clipboard.writeText(url);

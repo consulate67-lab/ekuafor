@@ -37,6 +37,17 @@
         }
       } catch (_) { /* guvenli: en kotu durumda sessiz gec */ }
     })();
+    // QR kamera: ?c=5 hemen #/firma/5'e (bundle yuklenmeden)
+    (function () {
+      try {
+        var q = new URLSearchParams(location.search);
+        var c = q.get('c') || q.get('firma') || q.get('company');
+        if (!c || !/^\d+$/.test(c)) return;
+        var ref = q.get('ref') || 'qr';
+        var install = (q.get('install') === '1' || ref === 'qr') ? '&install=1' : '';
+        location.replace(location.pathname + '#/firma/' + c + '?ref=' + encodeURIComponent(ref) + install);
+      } catch (_) { /* ignore */ }
+    })();
   </script>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />

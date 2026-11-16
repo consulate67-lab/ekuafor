@@ -596,7 +596,7 @@ export function ProfileTab({ ctx }: { ctx: Ctx }) {
                                     </div>
                                 </div>
                                 <button
-                                    onClick={() => window.open(`${window.location.origin}${window.location.pathname}#/firma/${company.id}?ref=qr&install=1`, '_blank')}
+                                    onClick={() => window.open(`${window.location.origin}/?c=${company.id}&ref=qr&install=1`, '_blank')}
                                     className="mt-6 w-full py-4 bg-white text-indigo-900 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-indigo-50 transition-all"
                                 >
                                     Müşteri Sayfasını Görüntüle
