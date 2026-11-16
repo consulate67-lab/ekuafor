@@ -43,6 +43,16 @@ export function getShortcutPromptState(companyId: number): ShortcutPromptState {
   return promptMap()[String(companyId)] || 'pending';
 }
 
+/** Kullanıcı daha önce ana ekrana ekledi / PWA içinde — yeni QR sadece listeye eklenir */
+export function hasSaloonAppInstalled(): boolean {
+  if (isStandaloneDisplay()) return true;
+  try {
+    return Object.values(promptMap()).some(s => s === 'accepted');
+  } catch {
+    return false;
+  }
+}
+
 export function setShortcutPromptState(companyId: number, state: ShortcutPromptState) {
   try {
     const next = { ...promptMap(), [String(companyId)]: state };

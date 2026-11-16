@@ -3,17 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { companiesApi, type PublicCompany } from '../../api/companies';
 import CompanyCard from '../../components/customer/CompanyCard';
 import CustomerNav from '../../components/customer/CustomerNav';
+import { QrScanSheet } from '../../components/customer/QrScanSheet';
 import { Button, EmptyState, Spinner } from '../../components/ui';
 import { useFavorites } from '../../hooks/useFavorites';
 import { useAuthStore } from '../../store/authStore';
 import {
+    addScannedCompanyId,
+    getLastOpenedCompanyId,
     getScannedCompanyIds,
     removeScannedCompanyId,
+    setLastOpenedCompanyId,
 } from '../../lib/scannedCompanies';
 
 /**
- * QR ile okutulan işletmeler — giriş/keşif yok.
- * Ana ekrana eklenen / native uygulama açılışında bu liste gelir.
+ * QR ile eklenen işletmeler — açılışta firma seçimi.
+ * Yeni firma: uygulama içi QR veya dış kameradan gelen deep link.
  */
 export default function CustomerHome() {
     const navigate = useNavigate();
@@ -24,6 +28,9 @@ export default function CustomerHome() {
     const [companies, setCompanies] = useState<PublicCompany[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
+    const [scanOpen, setScanOpen] = useState(false);
+    const [lastOpened, setLastOpened] = useState<number | null>(() => getLastOpenedCompanyId());
+    const [toast, setToast] = useState('');
 
     useEffect(() => {
         if (isAuthenticated && user && user.role !== 'customer') {
@@ -33,6 +40,7 @@ export default function CustomerHome() {
 
     const reloadIds = useCallback(() => {
         setIds(getScannedCompanyIds());
+        setLastOpened(getLastOpenedCompanyId());
     }, []);
 
     useEffect(() => {
@@ -59,10 +67,8 @@ export default function CustomerHome() {
             .then(list => {
                 if (cancelled) return;
                 const found = list.filter((c): c is PublicCompany => !!c);
-                // Kaybolan / silinen firmaları listeden çıkar
                 const foundIds = new Set(found.map(c => c.id));
                 ids.filter(id => !foundIds.has(id)).forEach(id => removeScannedCompanyId(id));
-                // Okutulma sırasını koru
                 const byId = new Map(found.map(c => [c.id, c]));
                 setCompanies(ids.map(id => byId.get(id)).filter((c): c is PublicCompany => !!c));
             })
@@ -78,7 +84,11 @@ export default function CustomerHome() {
     }, [ids]);
 
     const openCompany = useCallback(
-        (c: PublicCompany) => navigate(`/firma/${c.id}?ref=qr`),
+        (c: PublicCompany) => {
+            setLastOpenedCompanyId(c.id);
+            setLastOpened(c.id);
+            navigate(`/firma/${c.id}`);
+        },
         [navigate],
     );
 
@@ -86,22 +96,52 @@ export default function CustomerHome() {
         setIds(removeScannedCompanyId(id));
     }, []);
 
+    const onScanned = useCallback(
+        (id: number) => {
+            const before = getScannedCompanyIds();
+            const wasNew = !before.includes(id);
+            addScannedCompanyId(id);
+            setLastOpenedCompanyId(id);
+            setIds(getScannedCompanyIds());
+            setLastOpened(id);
+            setToast(wasNew ? 'İşletme listenize eklendi' : 'İşletme zaten listenizde');
+            window.setTimeout(() => setToast(''), 2500);
+            navigate(`/firma/${id}`);
+        },
+        [navigate],
+    );
+
     return (
-        <div className="min-h-screen bg-slate-50 pb-24">
+        <div className="min-h-screen bg-slate-50 pb-28">
             <header className="bg-white border-b border-slate-100 safe-top">
                 <div className="max-w-lg mx-auto px-4 pt-4 pb-4">
-                    <div className="flex items-center gap-2">
-                        <img src="./app-icon.png" alt="" className="w-9 h-9 rounded-xl" />
-                        <span className="text-lg font-black text-slate-900 tracking-tight">Saloon</span>
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <img src="./app-icon.png" alt="" className="w-9 h-9 rounded-xl shrink-0" />
+                            <span className="text-lg font-black text-slate-900 tracking-tight">Saloon</span>
+                        </div>
+                        <Button size="sm" onClick={() => setScanOpen(true)} className="!rounded-xl shrink-0">
+                            QR okut
+                        </Button>
                     </div>
-                    <h1 className="mt-4 text-xl font-black text-slate-900">İşletmelerim</h1>
+                    <h1 className="mt-4 text-xl font-black text-slate-900">
+                        {companies.length > 1 ? 'Hangi işletmeye gideceksiniz?' : 'İşletmelerim'}
+                    </h1>
                     <p className="mt-1 text-sm font-semibold text-slate-500">
-                        QR kodunu okuttuğunuz işletmeler burada listelenir.
+                        {companies.length > 1
+                            ? 'Masaj, kuaför, güzellik… hepsi aynı uygulamada. Birini seçin.'
+                            : 'QR ile eklediğiniz işletmeler burada. Yenisini eklemek için QR okutun.'}
                     </p>
                 </div>
             </header>
 
             <main className="max-w-lg mx-auto px-4 py-4 space-y-3">
+                {toast && (
+                    <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800 ring-1 ring-emerald-100">
+                        {toast}
+                    </div>
+                )}
+
                 {loading ? (
                     <div className="flex justify-center py-16">
                         <Spinner />
@@ -117,11 +157,21 @@ export default function CustomerHome() {
                     <EmptyState
                         icon="📷"
                         title="Henüz işletme yok"
-                        description="Bir işletmenin duvarındaki veya masadaki QR barkodu telefonunuzun kamerasıyla okutun. Uygulama açıldığında burada görünecek."
+                        description="Uygulama içinden QR okutun veya telefon kamerasıyla barkodu açın — işletme buraya eklenir."
+                        action={
+                            <Button onClick={() => setScanOpen(true)} className="!min-h-12">
+                                QR okutarak ekle
+                            </Button>
+                        }
                     />
                 ) : (
                     companies.map(c => (
                         <div key={c.id} className="relative">
+                            {lastOpened === c.id && companies.length > 1 && (
+                                <span className="absolute top-3 left-3 z-10 rounded-full bg-slate-900 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-white">
+                                    Son açılan
+                                </span>
+                            )}
                             <CompanyCard
                                 company={c}
                                 favorite={favorites.isFavorite(c.id)}
@@ -139,8 +189,19 @@ export default function CustomerHome() {
                         </div>
                     ))
                 )}
+
+                {companies.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={() => setScanOpen(true)}
+                        className="w-full rounded-3xl border-2 border-dashed border-slate-200 bg-white px-4 py-5 text-sm font-black text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                    >
+                        + Başka işletme ekle (QR)
+                    </button>
+                )}
             </main>
 
+            <QrScanSheet open={scanOpen} onClose={() => setScanOpen(false)} onCompanyId={onScanned} />
             <CustomerNav />
         </div>
     );

@@ -2,6 +2,7 @@
 
 const SCANNED_KEY = 'saloon_scanned_company_ids_v1';
 const LEGACY_PIN_KEY = 'saloon_pinned_company_v1';
+const LAST_OPENED_KEY = 'saloon_last_opened_company_v1';
 
 function readIds(): number[] {
   try {
@@ -41,7 +42,7 @@ function writeIds(ids: number[]) {
   }
 }
 
-/** En son okutulan başta. */
+/** En son okutulan / eklenen başta. */
 export function getScannedCompanyIds(): number[] {
   return readIds();
 }
@@ -63,6 +64,23 @@ export function removeScannedCompanyId(id: number): number[] {
   const next = readIds().filter(x => x !== Number(id));
   writeIds(next);
   return next;
+}
+
+export function getLastOpenedCompanyId(): number | null {
+  try {
+    const n = Number(localStorage.getItem(LAST_OPENED_KEY));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setLastOpenedCompanyId(id: number) {
+  try {
+    localStorage.setItem(LAST_OPENED_KEY, String(id));
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Deep link / QR URL’sinden firma id çıkarır. */

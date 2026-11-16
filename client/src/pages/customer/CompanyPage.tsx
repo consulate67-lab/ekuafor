@@ -18,7 +18,7 @@ import { sectorWebPack } from '../../lib/sectorWebContent';
 import { resolveSectorSlug } from '../../lib/resolveSectorSlug';
 import { assignServiceImages } from '../../lib/serviceImage';
 import { loadVisitorProfile, saveVisitorProfile, type VisitorProfile } from '../../lib/visitorProfile';
-import { addScannedCompanyId } from '../../lib/scannedCompanies';
+import { addScannedCompanyId, getScannedCompanyIds, setLastOpenedCompanyId } from '../../lib/scannedCompanies';
 import { ShortcutPrompt } from '../../components/customer/ShortcutPrompt';
 import {
     bookingCtaLabel,
@@ -84,6 +84,10 @@ function CompanyPage({ id }: { id: number }) {
         }
         // QR ile açılışta önce tanıtım; ziyaretçi formu yalnızca randevu anında
     }, []);
+
+    useEffect(() => {
+        if (Number.isFinite(id) && id > 0) setLastOpenedCompanyId(id);
+    }, [id]);
 
     useEffect(() => {
         if (!visitorGate || visitorPhoneHintTried.current) return;
@@ -269,13 +273,19 @@ function CompanyPage({ id }: { id: number }) {
             ? 'h-48'
             : 'h-44';
 
+    const hasFirmList = getScannedCompanyIds().length > 0;
     const topBar = (
         <div className="absolute inset-x-0 top-0 safe-top z-10">
             <div className="max-w-lg mx-auto flex justify-between p-3">
-                {introMode ? (
+                {introMode && !hasFirmList ? (
                     <span className="w-9" aria-hidden />
                 ) : (
-                    <RoundButton label="Geri" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/app'))}>←</RoundButton>
+                    <RoundButton
+                        label="İşletmelerim"
+                        onClick={() => navigate('/app')}
+                    >
+                        ←
+                    </RoundButton>
                 )}
                 <div className="flex gap-2">
                     <RoundButton label="Paylaş" onClick={share}>⤴</RoundButton>

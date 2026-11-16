@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { Button } from '../ui';
 import {
   applyCompanyManifest,
   getShortcutPromptState,
+  hasSaloonAppInstalled,
   isIosDevice,
   isStandaloneDisplay,
   setShortcutPromptState,
 } from '../../lib/pinnedCompany';
-import { addScannedCompanyId } from '../../lib/scannedCompanies';
+import { addScannedCompanyId, getScannedCompanyIds } from '../../lib/scannedCompanies';
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -35,15 +37,17 @@ type Props = {
 };
 
 /**
- * QR tarayınca tarayıcı “site” hissi yerine uygulama ekleme kapısı.
- * Not: OS sessizce ana ekrana eklemeyi engeller; kullanıcı onayı şart.
- * Android: native install prompt; iOS: Paylaş → Ana Ekrana Ekle rehberi.
+ * QR → uygulama kapısı.
+ * Uygulama zaten yüklüyse: firmayı listeye ekle, seçim ekranına yönlendir.
+ * Değilse: Android install / iOS Ana Ekrana Ekle rehberi.
  */
 export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = true, force = false }: Props) {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<'ask' | 'ios' | 'android-help'>('ask');
+  const [step, setStep] = useState<'ask' | 'ios' | 'android-help' | 'added'>('ask');
   const [busy, setBusy] = useState(false);
   const [canNativeInstall, setCanNativeInstall] = useState(!!deferredInstall);
+  const [wasNew, setWasNew] = useState(true);
 
   useEffect(() => {
     const onBip = (e: Event) => {
@@ -57,20 +61,26 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
 
   useEffect(() => {
     if (!enabled || !companyId) return;
+    const before = getScannedCompanyIds();
+    const fresh = !before.includes(companyId);
+    setWasNew(fresh);
     addScannedCompanyId(companyId);
     applyCompanyManifest({ companyId, name: companyName, themeColor });
 
-    // Zaten uygulama / PWA / Capacitor içindeyse kapı yok
-    if (isStandaloneDisplay() || Capacitor.isNativePlatform()) {
+    // Native / PWA / daha önce yüklenmiş: install kapısı yok — “listeye eklendi”
+    if (isStandaloneDisplay() || Capacitor.isNativePlatform() || hasSaloonAppInstalled()) {
       setShortcutPromptState(companyId, 'accepted');
-      setOpen(false);
+      setStep('added');
+      setOpen(true);
       return;
     }
+
     const prev = getShortcutPromptState(companyId);
     if (force && prev === 'dismissed') {
       setShortcutPromptState(companyId, 'pending');
     } else if (prev === 'accepted' && !force) {
-      setOpen(false);
+      setStep('added');
+      setOpen(true);
       return;
     } else if (prev === 'dismissed' && !force) {
       setOpen(false);
@@ -90,6 +100,17 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
   };
 
   const markInstalled = () => {
+    setShortcutPromptState(companyId, 'accepted');
+    setOpen(false);
+  };
+
+  const goPicker = () => {
+    setShortcutPromptState(companyId, 'accepted');
+    setOpen(false);
+    navigate('/app', { replace: true });
+  };
+
+  const stayHere = () => {
     setShortcutPromptState(companyId, 'accepted');
     setOpen(false);
   };
@@ -126,6 +147,7 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
   };
 
   const accent = themeColor || '#4f46e5';
+  const firmCount = getScannedCompanyIds().length;
 
   return (
     <div className="fixed inset-0 z-[80] flex flex-col bg-slate-950 text-white">
@@ -150,40 +172,66 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
           <h1 className="mt-3 text-center text-2xl font-black leading-tight tracking-tight">
             {companyName}
           </h1>
-          <p className="mt-3 text-center text-sm font-semibold leading-relaxed text-white/70">
-            QR okutuldu. Tarayıcı sekmesi yerine ana ekrandan uygulama gibi açılsın — randevu ve
-            işletmeleriniz tek dokunuşta.
-          </p>
+
+          {step === 'added' && (
+            <div className="mt-8 space-y-4">
+              <p className="text-center text-sm font-semibold leading-relaxed text-white/75">
+                {wasNew
+                  ? 'Bu işletme uygulamanıza eklendi. Açılışta hangi firmaya gideceğinizi seçebilirsiniz.'
+                  : 'Bu işletme zaten listenizde. İsterseniz işletmeleriniz arasından seçin.'}
+              </p>
+              <p className="text-center text-xs font-bold text-white/45">
+                Listenizde {firmCount} işletme
+              </p>
+              <div className="space-y-3 pt-2">
+                <Button
+                  block
+                  size="lg"
+                  onClick={goPicker}
+                  className="!min-h-14 !rounded-2xl !bg-white !text-slate-950 !font-black"
+                >
+                  {firmCount > 1 ? 'İşletmelerimden seç' : 'İşletmelerim'}
+                </Button>
+                <button
+                  type="button"
+                  onClick={stayHere}
+                  className="w-full py-3 text-sm font-bold text-white/55 hover:text-white/80"
+                >
+                  Bu firmada kal
+                </button>
+              </div>
+            </div>
+          )}
 
           {step === 'ask' && (
-            <div className="mt-10 space-y-3">
-              <Button
-                block
-                size="lg"
-                disabled={busy}
-                onClick={() => void accept()}
-                className="!min-h-14 !rounded-2xl !bg-white !text-slate-950 !font-black"
-              >
-                {busy
-                  ? 'Hazırlanıyor…'
-                  : canNativeInstall
-                    ? 'Uygulamayı ana ekrana ekle'
-                    : 'Ana ekrana ekle'}
-              </Button>
-              <button
-                type="button"
-                onClick={continueToSite}
-                className="w-full py-3 text-sm font-bold text-white/55 hover:text-white/80"
-              >
-                Şimdilik tarayıcıda devam et
-              </button>
-              {!canNativeInstall && (
-                <p className="text-center text-[11px] font-semibold text-white/40">
-                  Chrome / Edge’de “Yükle” penceresi açılır. Açılmazsa bir sonraki adımda menü yolu
-                  gösterilir.
-                </p>
-              )}
-            </div>
+            <>
+              <p className="mt-3 text-center text-sm font-semibold leading-relaxed text-white/70">
+                QR okutuldu. Tarayıcı sekmesi yerine ana ekrandan uygulama gibi açılsın — birden fazla
+                işletmeyi aynı uygulamada tutabilirsiniz.
+              </p>
+              <div className="mt-10 space-y-3">
+                <Button
+                  block
+                  size="lg"
+                  disabled={busy}
+                  onClick={() => void accept()}
+                  className="!min-h-14 !rounded-2xl !bg-white !text-slate-950 !font-black"
+                >
+                  {busy
+                    ? 'Hazırlanıyor…'
+                    : canNativeInstall
+                      ? 'Uygulamayı ana ekrana ekle'
+                      : 'Ana ekrana ekle'}
+                </Button>
+                <button
+                  type="button"
+                  onClick={continueToSite}
+                  className="w-full py-3 text-sm font-bold text-white/55 hover:text-white/80"
+                >
+                  Şimdilik tarayıcıda devam et
+                </button>
+              </div>
+            </>
           )}
 
           {step === 'ios' && (
@@ -212,14 +260,13 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
                     3
                   </span>
                   <span>
-                    <strong className="text-white">Ekle</strong> deyin — ikon ana ekranda uygulama
-                    gibi açılır
+                    <strong className="text-white">Ekle</strong> — sonraki QR’lar aynı uygulamaya
+                    eklenir; açılışta firma seçersiniz
                   </span>
                 </li>
               </ol>
               <p className="text-xs font-semibold text-amber-200/90">
-                Not: Safari dışında (Instagram / WhatsApp içi tarayıcı) bu seçenek çıkmayabilir.
-                Sağ alttan “Safari’de Aç” deyin.
+                Not: Safari dışında bu seçenek çıkmayabilir. “Safari’de Aç” deyin.
               </p>
               <div className="grid grid-cols-1 gap-2 pt-2">
                 <Button
@@ -266,7 +313,7 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-black text-slate-900">
                     3
                   </span>
-                  <span>Onaylayın — sonraki açılışlar uygulama gibi olur</span>
+                  <span>Onaylayın — sonraki işletmeler aynı uygulamaya eklenir</span>
                 </li>
               </ol>
               <div className="grid grid-cols-1 gap-2 pt-2">
