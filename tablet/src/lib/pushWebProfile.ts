@@ -39,7 +39,7 @@ export async function pushWebProfile(state: TabletState): Promise<{ ok: boolean;
           city: web.city || null,
           district: web.district || null,
           contact_note: web.contactNote || null,
-          hide_prices: !!web.hidePrices,
+          hide_prices: web.hidePrices === true,
           sector_slugs:
             company.sectorSlugs?.length
               ? company.sectorSlugs

@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/authStore';
 import { App } from '@capacitor/app';
 import { getDeviceId } from '../lib/device';
 import { loadVisitorProfile, visitorFullName } from '../lib/visitorProfile';
+import { assignServiceImages } from '../lib/serviceImage';
 
 type StepKey = 'service' | 'staff' | 'duration' | 'date' | 'time' | 'session' | 'confirm';
 
@@ -136,14 +137,17 @@ function BookingPage({ id }: { id: string }) {
     const selectedStaff = staff.find(s => s.id === selection.staffId) || null;
     const staffOptions = staffAfterTime && selectedSlot?.staff_ids ? staff.filter(s => selectedSlot.staff_ids!.includes(s.id)) : staff;
 
+    const hidePrices = !!(company?.hide_prices || selectedServices.some(s => s.price_hidden) || services.some(s => s.price_hidden));
+    const serviceImages = useMemo(() => assignServiceImages(services), [services]);
     const totalPrice = useMemo(() => {
+        if (hidePrices) return 0;
         if (mode === 'class') return Number(selectedSession?.price ?? selectedServices[0]?.price ?? 0) * selection.partySize;
         if (mode === 'resource') {
             const s = selectedServices[0];
             return s ? Number(s.price) * (selection.duration || s.duration_minutes) / s.duration_minutes : 0;
         }
         return selectedServices.reduce((sum, s) => sum + Number(s.price), 0);
-    }, [mode, selectedServices, selectedSession, selection.partySize, selection.duration]);
+    }, [hidePrices, mode, selectedServices, selectedSession, selection.partySize, selection.duration]);
     const totalDuration = mode === 'resource'
         ? selection.duration || selectedServices[0]?.duration_minutes || 0
         : selectedServices.reduce((sum, s) => sum + s.duration_minutes, 0);
@@ -189,8 +193,16 @@ function BookingPage({ id }: { id: string }) {
                     api.get('/services', { params: { company_id: id } }),
                     api.get(`/companies/${id}/employees`),
                 ]);
-                setCompany(compRes.data.data);
-                setServices((servicesRes.data?.data || []).filter((s: Service) => s.is_active !== false));
+                const comp = compRes.data.data;
+                const hide = comp?.hide_prices === true || servicesRes.data?.hide_prices === true;
+                setCompany({ ...comp, hide_prices: hide });
+                setServices(
+                    (servicesRes.data?.data || [])
+                        .filter((s: Service) => s.is_active !== false)
+                        .map((s: Service) =>
+                            hide || s.price_hidden ? { ...s, price: 0, price_hidden: true } : s,
+                        ),
+                );
                 setStaff(staffRes.data?.data || []);
                 if (searchParams.get('ref') === 'qr') {
                     const favorites: number[] = JSON.parse(localStorage.getItem('saloon_favorites') || '[]');
@@ -395,10 +407,11 @@ function BookingPage({ id }: { id: string }) {
                             {services.map(s => {
                                 const isSelected = selection.serviceIds.includes(s.id!);
                                 const sMode = s.booking_mode || 'staff';
+                                const thumb = serviceImages.get(s.id ?? s.name);
                                 return (
                                     <button key={s.id} onClick={() => toggleService(s)} className={`w-full p-4 rounded-3xl border-2 flex items-center gap-4 text-left transition-all ${isSelected ? 'bg-amber-50 border-amber-500 shadow-md' : 'bg-white border-transparent shadow-sm'}`}>
                                         <div className="w-14 h-14 bg-slate-100 rounded-2xl flex-shrink-0 overflow-hidden flex items-center justify-center text-2xl">
-                                            {s.photo ? <img src={s.photo} alt={s.name} className="w-full h-full object-cover" /> : MODE_ICON[sMode]}
+                                            {thumb ? <img src={thumb} alt={s.name} className="w-full h-full object-cover" /> : MODE_ICON[sMode]}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <h3 className="font-black text-sm uppercase truncate">{s.name}</h3>
@@ -408,7 +421,9 @@ function BookingPage({ id }: { id: string }) {
                                                 {sMode !== 'class' && sMode !== 'resource' ? ' · seçtiğiniz saatten itibaren devam eder' : ''}
                                             </p>
                                         </div>
-                                        <div className="font-black text-base text-amber-600 whitespace-nowrap">{formatPrice(Number(s.price))}</div>
+                                        <div className="font-black text-base text-amber-600 whitespace-nowrap">
+                                            {hidePrices || s.price_hidden ? 'Fiyat sorun' : formatPrice(Number(s.price))}
+                                        </div>
                                     </button>
                                 );
                             })}
@@ -452,7 +467,7 @@ function BookingPage({ id }: { id: string }) {
                                 return (
                                     <button key={d} onClick={() => { update({ duration: d, time: null }); goNext(); }} className={`p-5 rounded-3xl border-2 bg-white shadow-sm text-center ${selection.duration === d ? 'border-amber-500' : 'border-transparent'}`}>
                                         <div className="text-2xl font-black text-slate-900">{d} dk</div>
-                                        <div className="text-sm font-bold text-amber-600 mt-1">{formatPrice(price)}</div>
+                                        {!hidePrices && <div className="text-sm font-bold text-amber-600 mt-1">{formatPrice(price)}</div>}
                                     </button>
                                 );
                             })}
@@ -594,7 +609,9 @@ function BookingPage({ id }: { id: string }) {
                                     </div>
                                 </div>
                             )}
-                            <p className="text-2xl font-black text-amber-600 pt-2">{formatPrice(totalPrice)}</p>
+                            <p className="text-2xl font-black text-amber-600 pt-2">
+                                {hidePrices ? 'Fiyat için salona sorun' : formatPrice(totalPrice)}
+                            </p>
                         </div>
                         <form id="booking-form" onSubmit={handleSubmit} className="space-y-3">
                             <input type="text" value={selection.customerName} onChange={e => update({ customerName: e.target.value })} className="w-full p-4 bg-white rounded-2xl border-2 border-slate-100 font-bold" placeholder={isBusiness ? 'Müşteri adı soyadı' : 'Adınız Soyadınız'} autoComplete={isBusiness ? 'off' : 'name'} required />
@@ -611,7 +628,7 @@ function BookingPage({ id }: { id: string }) {
             {(step === 'service' && selection.serviceIds.length > 0 && mode === 'staff') && (
                 <footer className="fixed bottom-0 inset-x-0 p-5 bg-gradient-to-t from-white via-white to-transparent z-40" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.25rem)' }}>
                     <button onClick={goNext} className="w-full max-w-md mx-auto block bg-slate-900 text-white py-5 rounded-3xl font-black uppercase shadow-2xl">
-                        Devam · {totalDuration} dk · {formatPrice(totalPrice)}
+                        Devam · {totalDuration} dk{hidePrices ? '' : ` · ${formatPrice(totalPrice)}`}
                     </button>
                 </footer>
             )}

@@ -10,7 +10,7 @@ import { dialNumber } from '../../lib/phone';
 import { LAYOUT_THEME, sectorLayoutGroup } from '../../lib/sectorLayout';
 import { sectorWebPack } from '../../lib/sectorWebContent';
 import { resolveSectorSlug } from '../../lib/resolveSectorSlug';
-import { serviceImageSrc } from '../../lib/serviceImage';
+import { assignServiceImages } from '../../lib/serviceImage';
 import { loadVisitorProfile, saveVisitorProfile, type VisitorProfile } from '../../lib/visitorProfile';
 import { setPinnedCompanyId } from '../../lib/pinnedCompany';
 import { ShortcutPrompt } from '../../components/customer/ShortcutPrompt';
@@ -129,6 +129,11 @@ function CompanyPage({ id }: { id: number }) {
           }
         : fallbackPack;
     const heroImage = company?.photo || webPack.gallery[0]?.src || null;
+    const serviceImages = useMemo(() => assignServiceImages(services), [services]);
+    const hidePrices = useMemo(
+        () => company?.hide_prices === true || services.some(s => s.price_hidden === true),
+        [company?.hide_prices, services],
+    );
 
     const saveVisitor = (): boolean => {
         const firstName = vf.firstName.trim();
@@ -437,15 +442,15 @@ function CompanyPage({ id }: { id: number }) {
                         <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">{labels.servicePlural}</h2>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             {services.map(s => {
-                                const imgSrc = serviceImageSrc(s.name, s.photo);
-                                const showPrice = !company.hide_prices && Number(s.price) > 0;
+                                const imgSrc = serviceImages.get(s.id ?? s.name) || '';
+                                const showPrice = !hidePrices && Number(s.price) > 0;
                                 const meta = `${s.booking_mode === 'class' ? 'Grup dersi · ' : ''}${durationText(s)}`;
                                 const body = (
                                     <>
                                         <div className="relative aspect-[16/10] overflow-hidden bg-slate-200">
                                             <img
                                                 src={imgSrc}
-                                                alt=""
+                                                alt={s.name}
                                                 className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                                                 loading="lazy"
                                             />
@@ -454,7 +459,7 @@ function CompanyPage({ id }: { id: number }) {
                                                 <span className="absolute bottom-2 right-2 rounded-full bg-white/95 px-2.5 py-1 text-xs font-black text-slate-900 shadow">
                                                     {formatMoney(s.price)}
                                                 </span>
-                                            ) : company.hide_prices ? (
+                                            ) : hidePrices ? (
                                                 <span className="absolute bottom-2 right-2 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white">
                                                     Fiyat sorun
                                                 </span>

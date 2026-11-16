@@ -372,6 +372,11 @@ router.get('/', optionalCompanyAuth, async (req: Request, res: Response) => {
 router.get('/:id', optionalCompanyAuth, async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
+        try {
+            await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS hide_prices BOOLEAN DEFAULT false`);
+        } catch {
+            /* kolon zaten var veya migration yetkisi yok */
+        }
         const company = await companyService.getCompanyById(id);
 
         if (!company) {
@@ -408,6 +413,7 @@ router.get('/:id', optionalCompanyAuth, async (req: Request, res: Response) => {
             else if (/berber|barber|kuaför|kuafor|saç|sac /.test(name)) slug = 'barber';
             try {
                 await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_template_id VARCHAR(64)`);
+                await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS hide_prices BOOLEAN DEFAULT false`);
                 await pool.query(
                     `INSERT INTO company_sectors (company_id, sector_id, is_primary)
                      SELECT $1, id, true FROM sectors WHERE slug = $2 AND is_active

@@ -62,7 +62,19 @@ const publicServiceHandler = async (req: Request, res: Response, next: any) => {
             }
             const services = await serviceService.getServicesByCompany(companyId);
             console.log(`[GET /services] Found ${services.length} services for Company=${companyId}`);
-            return res.json({ success: true, data: services });
+            // Fiyat gizleme: public listede tutarı düşür (web / randevu kartları)
+            let hidePrices = false;
+            try {
+                await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS hide_prices BOOLEAN DEFAULT false`);
+                const c = await pool.query(`SELECT hide_prices FROM companies WHERE id = $1`, [companyId]);
+                hidePrices = c.rows[0]?.hide_prices === true;
+            } catch {
+                hidePrices = false;
+            }
+            const data = hidePrices
+                ? services.map((s: { price?: number }) => ({ ...s, price: 0, price_hidden: true }))
+                : services;
+            return res.json({ success: true, data, hide_prices: hidePrices });
         } catch (error) {
             console.error('[GET /services] Public Error:', error);
             return next(error);

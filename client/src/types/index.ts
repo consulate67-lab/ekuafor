@@ -64,6 +64,8 @@ export interface Company {
     staff_label?: string;
     service_label?: string;
     sms_enabled?: boolean;
+    /** Web / public: fiyatları gizle */
+    hide_prices?: boolean;
 }
 
 export interface Province {
@@ -107,6 +109,8 @@ export interface Service {
     description?: string;
     duration_minutes: number;
     price: number;
+    /** Public API: firma hide_prices açıksa true */
+    price_hidden?: boolean;
     is_active?: boolean;
     department_id?: number | null;
     department_name?: string | null;

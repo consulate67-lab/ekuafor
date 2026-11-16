@@ -679,7 +679,7 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
                 city = COALESCE(NULLIF($7, ''), city),
                 district = COALESCE(NULLIF($8, ''), district),
                 web_template_id = COALESCE(NULLIF($9, ''), web_template_id),
-                hide_prices = COALESCE($10, hide_prices),
+                hide_prices = CASE WHEN $10::boolean IS NULL THEN hide_prices ELSE $10::boolean END,
                 updated_at = NOW()
              WHERE id = $1`,
             [
