@@ -1,21 +1,39 @@
 /**
- * Müşteri web uygulaması (QR hedefi).
- * www.saloncebinde.com şu an 89.19.30.85’e gidiyor ve SSL kırık —
- * canlı site Railway’de: web-production-db847.up.railway.app
- * Domain düzelince VITE_WEB_URL=https://www.saloncebinde.com verin.
+ * Müşteri web / QR hedefi.
+ *
+ * Telefon kameraları (özellikle Xiaomi/MIUI) `*.railway.app` adresini
+ * tıklanabilir link saymayıp düz metin gösteriyor (.app TLD).
+ * QR için kameranın tanıdığı köprü: GitHub Pages (.io) → Railway.
+ *
+ * www.saloncebinde.com DNS’i Railway’e (CNAME → h1cy29co.up.railway.app)
+ * bağlanınca VITE_WEB_URL / VITE_QR_URL ile .com’a geçin.
  */
-const DEFAULT_WEB = 'https://web-production-db847.up.railway.app';
+const APP_ORIGIN = 'https://web-production-db847.up.railway.app';
+/** Kamera dostu QR köprüsü (.io — metin değil link açılır) */
+const QR_BRIDGE = 'https://consulate67-lab.github.io/ekuafor/r.html';
 
 export function webAppOrigin(): string {
-  return (import.meta.env.VITE_WEB_URL || DEFAULT_WEB).replace(/\/$/, '');
+  return (import.meta.env.VITE_WEB_URL || APP_ORIGIN).replace(/\/$/, '');
+}
+
+/** QR barkoduna yazılan adres — kamera link olarak tanısın diye köprü */
+export function qrLandingOrigin(): string {
+  const custom = (import.meta.env.VITE_QR_URL || '').replace(/\/$/, '');
+  if (custom) return custom;
+  return QR_BRIDGE;
 }
 
 /**
- * Firma QR hedefi — query (?c=) kullanır.
- * Hash (#/firma/…) birçok kamerada tıklanmayan düz metin olur.
+ * Firma QR hedefi.
+ * Köprü: …/r.html?c=5 → uygulama /?c=5&ref=qr&install=1
  */
 export function companyPublicUrl(companyId: number): string {
-  return `${webAppOrigin()}/?c=${companyId}&ref=qr&install=1`;
+  const bridge = qrLandingOrigin();
+  // Tam r.html köprüsü veya domain kökü (?c=)
+  if (/r\.html$/i.test(bridge) || /\/r$/i.test(bridge)) {
+    return `${bridge}?c=${companyId}`;
+  }
+  return `${bridge}/?c=${companyId}&ref=qr&install=1`;
 }
 
 /** Web sitesi alanında gösterilen adres (tıklanabilir tam URL) */

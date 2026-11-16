@@ -1,17 +1,31 @@
 /**
  * Müşteri QR hedefi.
- * Hash (#/firma/…) birçok telefon kamerasında “metin” sayılır ve tarayıcı açılmaz.
- * Query (?c=5) standart URL olduğu için kamera doğrudan siteyi açar.
+ *
+ * Hash (#/firma/…) ve *.railway.app birçok telefonda “metin” kalır.
+ * QR köprüsü: github.io/r.html?c=5 → canlı /?c=5 (kamera link açar).
  */
-export function companyQrUrl(companyId: number, origin = typeof window !== 'undefined' ? window.location.origin : ''): string {
-  const id = Number(companyId);
-  if (!Number.isFinite(id) || id <= 0) return origin || '';
-  const base = (origin || '').replace(/\/$/, '');
-  return `${base}/?c=${id}&ref=qr&install=1`;
+const APP_ORIGIN = 'https://web-production-db847.up.railway.app';
+const QR_BRIDGE = 'https://consulate67-lab.github.io/ekuafor/r.html';
+
+export function qrPublicOrigin(): string {
+  const fromEnv =
+    (typeof import.meta !== 'undefined' && (import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_QR_URL) ||
+    '';
+  return (fromEnv || QR_BRIDGE).replace(/\/$/, '');
 }
 
-/** Kısa yol (sunucu /c/:id → ?c=) — basılı materyal için */
-export function companyQrShortUrl(companyId: number, origin = typeof window !== 'undefined' ? window.location.origin : ''): string {
+export function companyQrUrl(companyId: number): string {
+  const id = Number(companyId);
+  if (!Number.isFinite(id) || id <= 0) return '';
+  const bridge = qrPublicOrigin();
+  if (/r\.html$/i.test(bridge) || /\/r$/i.test(bridge)) {
+    return `${bridge}?c=${id}`;
+  }
+  return `${bridge}/?c=${id}&ref=qr&install=1`;
+}
+
+/** Kısa yol (sunucu /c/:id → ?c=) — basılı materyal; .app host’ta kamera dostu değil */
+export function companyQrShortUrl(companyId: number, origin = APP_ORIGIN): string {
   const id = Number(companyId);
   if (!Number.isFinite(id) || id <= 0) return origin || '';
   const base = (origin || '').replace(/\/$/, '');

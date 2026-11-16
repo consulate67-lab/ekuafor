@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../lib/api';
+import { companyQrUrl } from '../../lib/customerQrUrl';
 import { useAuthStore } from '../../store/authStore';
 import { Button, EmptyState, FullScreenLoader } from '../../components/ui';
 import {
@@ -941,9 +942,7 @@ const copyText = (text: string, field: string) => {
     setTimeout(() => setCopiedField(''), 2000);
 };
 
-const bookingUrl = company
-    ? `${window.location.origin}/?c=${company.id}&ref=qr&install=1`
-    : '';
+const bookingUrl = company ? companyQrUrl(company.id) : '';
 const qrApiUrl = (data: string, size = 200) =>
     `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}&color=1e1b4b&bgcolor=ffffff`;
 

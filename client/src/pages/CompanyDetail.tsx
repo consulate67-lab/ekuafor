@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../lib/api';
+import { companyQrUrl } from '../lib/customerQrUrl';
 import { Company } from '../types';
 
 export default function CompanyDetail() {
@@ -27,7 +28,7 @@ export default function CompanyDetail() {
 
     const handlePrint = () => {
         if (!company) return;
-        const publicUrl = `${window.location.origin}/?c=${company.id}&ref=qr&install=1`;
+        const publicUrl = companyQrUrl(company.id);
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(publicUrl)}`;
 
         const printWindow = window.open('', '_blank');
@@ -145,7 +146,7 @@ export default function CompanyDetail() {
 
                         <div className="bg-white p-6 rounded-[2rem] border-2 border-dashed border-pink-200 mb-8 shadow-xl shadow-pink-100/50 relative group">
                             <img
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`${window.location.origin}/?c=${company.id}&ref=qr&install=1`)}`}
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(companyQrUrl(company.id))}`}
                                 alt="Firma QR Kodu"
                                 className="w-48 h-48 transition-transform group-hover:scale-105 duration-500"
                             />
@@ -163,7 +164,7 @@ export default function CompanyDetail() {
                                 Şık QR Standı Yazdır
                             </button>
                             <a
-                                href={`https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(`${window.location.origin}/?c=${company.id}&ref=qr&install=1`)}`}
+                                href={`https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(companyQrUrl(company.id))}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="w-full py-3 text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors text-center border-2 border-gray-100 rounded-xl"

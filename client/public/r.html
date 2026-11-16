@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Saloon</title>
+  <script>
+    (function () {
+      var q = new URLSearchParams(location.search);
+      var c = q.get('c') || q.get('firma') || q.get('company') || '';
+      if (!/^\d+$/.test(c)) {
+        document.title = 'Geçersiz QR';
+        return;
+      }
+      // Kameranın tanıdığı .io/.com köprüsü → canlı uygulama
+      var dest =
+        'https://web-production-db847.up.railway.app/?c=' +
+        encodeURIComponent(c) +
+        '&ref=qr&install=1';
+      location.replace(dest);
+    })();
+  </script>
+</head>
+<body style="font-family:system-ui;padding:2rem;text-align:center">
+  <p>Yönlendiriliyor…</p>
+</body>
+</html>
