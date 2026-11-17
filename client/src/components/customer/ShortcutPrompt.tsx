@@ -27,6 +27,8 @@ if (typeof window !== 'undefined') {
   });
 }
 
+type Step = 'ask' | 'ios' | 'android-help' | 'confirm-add' | 'added';
+
 type Props = {
   companyId: number;
   companyName: string;
@@ -39,16 +41,17 @@ type Props = {
 
 /**
  * QR → uygulama kapısı.
- * Uygulama zaten yüklüyse: firmayı listeye ekle, seçim ekranına yönlendir.
- * Değilse: Android install / iOS Ana Ekrana Ekle rehberi.
+ * İlk kez: ana ekrana ekle.
+ * Uygulama zaten varsa: “Bu firmayı ekle” → listeye eklendi.
  */
 export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = true, force = false }: Props) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<'ask' | 'ios' | 'android-help' | 'added'>('ask');
+  const [step, setStep] = useState<Step>('ask');
   const [busy, setBusy] = useState(false);
   const [canNativeInstall, setCanNativeInstall] = useState(!!deferredInstall);
   const [wasNew, setWasNew] = useState(true);
+  const [firmCount, setFirmCount] = useState(() => getScannedCompanyIds().length);
 
   useEffect(() => {
     const onBip = (e: Event) => {
@@ -62,17 +65,17 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
 
   useEffect(() => {
     if (!enabled || !companyId) return;
-    const before = getScannedCompanyIds();
-    const fresh = !before.includes(companyId);
-    setWasNew(fresh);
-    addScannedCompanyId(companyId);
+
     applyCompanyManifest({ companyId, name: companyName, themeColor });
+    const already = getScannedCompanyIds().includes(companyId);
+    setWasNew(!already);
+    setFirmCount(getScannedCompanyIds().length);
 
     const inApp = isStandaloneDisplay() || Capacitor.isNativePlatform();
-    // Ana ekranda veya daha önce “ekledim / yükledim” → ikinci+ QR sadece listeye ekler
+
+    // Uygulama kurulu / ana ekranda → “Bu firmayı ekle” (otomatik ekleme yok)
     if (inApp || hasSaloonAppInstalled()) {
-      setShortcutPromptState(companyId, 'accepted');
-      setStep('added');
+      setStep(already ? 'added' : 'confirm-add');
       setOpen(true);
       return;
     }
@@ -86,7 +89,9 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
       setShortcutPromptState(companyId, 'pending');
     }
 
-    // İlk kurulum: tarayıcıda yükleme kapısı (URL’yi #/app yapma)
+    // İlk kurulum: bu firmayı şimdiden listeye al
+    addScannedCompanyId(companyId);
+    setFirmCount(getScannedCompanyIds().length);
     setStep(isIosDevice() ? 'ios' : 'ask');
     const t = window.setTimeout(() => setOpen(true), 200);
     return () => window.clearTimeout(t);
@@ -95,11 +100,13 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
   if (!enabled || !open) return null;
 
   const continueToSite = () => {
+    addScannedCompanyId(companyId);
     setShortcutPromptState(companyId, 'dismissed');
     setOpen(false);
   };
 
   const markInstalled = () => {
+    addScannedCompanyId(companyId);
     markSaloonAppInstalled();
     setShortcutPromptState(companyId, 'accepted');
     setOpen(false);
@@ -114,6 +121,14 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
   const stayHere = () => {
     setShortcutPromptState(companyId, 'accepted');
     setOpen(false);
+  };
+
+  const confirmAddFirm = () => {
+    addScannedCompanyId(companyId);
+    setWasNew(true);
+    setFirmCount(getScannedCompanyIds().length);
+    setShortcutPromptState(companyId, 'accepted');
+    setStep('added');
   };
 
   const accept = async () => {
@@ -149,7 +164,6 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
   };
 
   const accent = themeColor || '#4f46e5';
-  const firmCount = getScannedCompanyIds().length;
 
   return (
     <div className="fixed inset-0 z-[80] flex flex-col bg-slate-950 text-white">
@@ -175,18 +189,42 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
             {companyName}
           </h1>
 
+          {step === 'confirm-add' && (
+            <div className="mt-8 space-y-4">
+              <p className="text-center text-sm font-semibold leading-relaxed text-white/75">
+                Bu işletmeyi Saloon listenize ekleyin. Ana ekrandaki uygulamadan hepsine
+                ulaşabilirsiniz.
+              </p>
+              <p className="text-center text-xs font-bold text-white/45">
+                Şu an listede {firmCount} işletme
+              </p>
+              <div className="space-y-3 pt-2">
+                <Button
+                  block
+                  size="lg"
+                  onClick={confirmAddFirm}
+                  className="!min-h-14 !rounded-2xl !bg-white !text-slate-950 !font-black"
+                >
+                  Bu firmayı ekle
+                </Button>
+                <button
+                  type="button"
+                  onClick={stayHere}
+                  className="w-full py-3 text-sm font-bold text-white/55 hover:text-white/80"
+                >
+                  Eklemeden devam et
+                </button>
+              </div>
+            </div>
+          )}
+
           {step === 'added' && (
             <div className="mt-8 space-y-4">
               <p className="text-center text-sm font-semibold leading-relaxed text-white/75">
-                {wasNew
-                  ? 'Bu işletme listenize eklendi. Sonraki QR’ları da aynı uygulamaya ekleyebilirsiniz.'
-                  : 'Bu işletme zaten listenizde.'}
+                {wasNew ? 'Firma listesine eklendi.' : 'Bu işletme zaten listenizde.'}
               </p>
               <p className="text-center text-xs font-bold text-white/45">
                 Listenizde {firmCount} işletme
-                {!isStandaloneDisplay() && !Capacitor.isNativePlatform()
-                  ? ' · En güncel liste ana ekrandaki Saloon ikonunda'
-                  : ''}
               </p>
               <div className="space-y-3 pt-2">
                 <Button

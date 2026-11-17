@@ -102,9 +102,7 @@ function CompanyPage({ id }: { id: number }) {
             .finally(() => setPhoneHintBusy(false));
     }, [visitorGate, vf.phone]);
 
-    useEffect(() => {
-        if ((fromQr || searchParams.get('home') === '1') && id) addScannedCompanyId(id);
-    }, [fromQr, id, searchParams]);
+    // QR’da listeye ekleme ShortcutPrompt’ta (“Bu firmayı ekle”) — burada otomatik ekleme yok
 
     useEffect(() => {
         Promise.all([
