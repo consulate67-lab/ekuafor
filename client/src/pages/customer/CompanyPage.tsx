@@ -274,21 +274,22 @@ function CompanyPage({ id }: { id: number }) {
             : 'h-44';
 
     const hasFirmList = getScannedCompanyIds().length > 0;
+    const goFirmList = () => {
+      navigate('/app', { replace: true });
+    };
     const topBar = (
         <div className="absolute inset-x-0 top-0 safe-top z-10">
             <div className="max-w-lg mx-auto flex justify-between p-3">
-                {introMode && !hasFirmList ? (
-                    <span className="w-9" aria-hidden />
-                ) : (
-                    <RoundButton
-                        label="İşletmelerim"
-                        onClick={() => navigate('/app')}
-                    >
-                        ←
-                    </RoundButton>
-                )}
+                <span className="w-10" aria-hidden />
                 <div className="flex gap-2">
-                    <RoundButton label="Paylaş" onClick={share}>⤴</RoundButton>
+                    {hasFirmList && (
+                        <RoundButton label="İşletmelerim" onClick={goFirmList}>
+                            ↑
+                        </RoundButton>
+                    )}
+                    <RoundButton label="Paylaş" onClick={share}>
+                        ⤴
+                    </RoundButton>
                     {!introMode && (
                         <RoundButton label={favorite ? 'Favorilerden çıkar' : 'Favorilere ekle'} pressed={favorite} onClick={() => favorites.toggle(company.id)}>
                             <span className={favorite ? 'text-rose-500' : ''}>{favorite ? '♥' : '♡'}</span>

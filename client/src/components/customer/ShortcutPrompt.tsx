@@ -5,7 +5,6 @@ import { Button } from '../ui';
 import {
   applyCompanyManifest,
   getShortcutPromptState,
-  hasSaloonAppInstalled,
   isIosDevice,
   isStandaloneDisplay,
   markSaloonAppInstalled,
@@ -64,20 +63,13 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
     if (!enabled || !companyId) return;
     const before = getScannedCompanyIds();
     const fresh = !before.includes(companyId);
-    const alreadyHasOtherFirms = before.some(id => id !== companyId);
     setWasNew(fresh);
     addScannedCompanyId(companyId);
     applyCompanyManifest({ companyId, name: companyName, themeColor });
 
-    // Uygulama zaten var / listede başka firma var → tekrar “yükle” yok, sadece ekle
-    const appReady =
-      isStandaloneDisplay() ||
-      Capacitor.isNativePlatform() ||
-      hasSaloonAppInstalled() ||
-      alreadyHasOtherFirms;
-
-    if (appReady) {
-      markSaloonAppInstalled();
+    // Sadece gerçekten ana ekran / native uygulama içindeyse “yükle” atlanır
+    const inApp = isStandaloneDisplay() || Capacitor.isNativePlatform();
+    if (inApp) {
       setShortcutPromptState(companyId, 'accepted');
       setStep('added');
       setOpen(true);
@@ -85,12 +77,6 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
     }
 
     const prev = getShortcutPromptState(companyId);
-    if (prev === 'accepted') {
-      markSaloonAppInstalled();
-      setStep('added');
-      setOpen(true);
-      return;
-    }
     if (prev === 'dismissed' && !force) {
       setOpen(false);
       return;
@@ -99,17 +85,8 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
       setShortcutPromptState(companyId, 'pending');
     }
 
-    // iOS/Android “Ana ekrana ekle” mevcut URL’yi kaydeder — #/app olsun ki
-    // ikon her zaman firma seçim ekranını açsın (tek firmaya kilitlenmesin).
-    try {
-      const want = '#/app';
-      if (!window.location.hash.startsWith(want)) {
-        window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${want}`);
-      }
-    } catch {
-      /* ignore */
-    }
-
+    // Tarayıcıdayız ve ana ekranda değil → her QR’da yükleme kapısı
+    // (URL’yi #/app yapma: geri / liste butonu bozuluyordu)
     setStep(isIosDevice() ? 'ios' : 'ask');
     const t = window.setTimeout(() => setOpen(true), 200);
     return () => window.clearTimeout(t);
@@ -129,14 +106,12 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
   };
 
   const goPicker = () => {
-    markSaloonAppInstalled();
     setShortcutPromptState(companyId, 'accepted');
     setOpen(false);
     navigate('/app', { replace: true });
   };
 
   const stayHere = () => {
-    markSaloonAppInstalled();
     setShortcutPromptState(companyId, 'accepted');
     setOpen(false);
   };
@@ -204,8 +179,8 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
             <div className="mt-8 space-y-4">
               <p className="text-center text-sm font-semibold leading-relaxed text-white/75">
                 {wasNew
-                  ? 'Uygulama zaten hazır — bu işletme listenize eklendi. Açılışta hangi firmaya gideceğinizi seçersiniz.'
-                  : 'Bu işletme zaten listenizde. İsterseniz işletmeleriniz arasından seçin.'}
+                  ? 'Bu işletme uygulamanıza eklendi. Açılışta hangi firmaya gideceğinizi seçebilirsiniz.'
+                  : 'Bu işletme zaten listenizde.'}
               </p>
               <p className="text-center text-xs font-bold text-white/45">
                 Listenizde {firmCount} işletme
@@ -215,9 +190,12 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
                   block
                   size="lg"
                   onClick={goPicker}
-                  className="!min-h-14 !rounded-2xl !bg-white !text-slate-950 !font-black"
+                  className="!min-h-14 !rounded-2xl !bg-white !text-slate-950 !font-black !inline-flex !items-center !justify-center gap-2"
                 >
-                  {wasNew ? 'Firmayı ekledim — listeme git' : 'İşletmelerimden seç'}
+                  <span aria-hidden className="text-xl leading-none">
+                    ↑
+                  </span>
+                  İşletmelerim
                 </Button>
                 <button
                   type="button"
