@@ -8,6 +8,7 @@ import {
   hasSaloonAppInstalled,
   isIosDevice,
   isStandaloneDisplay,
+  markSaloonAppInstalled,
   setShortcutPromptState,
 } from '../../lib/pinnedCompany';
 import { addScannedCompanyId, getScannedCompanyIds } from '../../lib/scannedCompanies';
@@ -63,12 +64,20 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
     if (!enabled || !companyId) return;
     const before = getScannedCompanyIds();
     const fresh = !before.includes(companyId);
+    const alreadyHasOtherFirms = before.some(id => id !== companyId);
     setWasNew(fresh);
     addScannedCompanyId(companyId);
     applyCompanyManifest({ companyId, name: companyName, themeColor });
 
-    // Native / PWA / daha önce yüklenmiş: install kapısı yok — “listeye eklendi”
-    if (isStandaloneDisplay() || Capacitor.isNativePlatform() || hasSaloonAppInstalled()) {
+    // Uygulama zaten var / listede başka firma var → tekrar “yükle” yok, sadece ekle
+    const appReady =
+      isStandaloneDisplay() ||
+      Capacitor.isNativePlatform() ||
+      hasSaloonAppInstalled() ||
+      alreadyHasOtherFirms;
+
+    if (appReady) {
+      markSaloonAppInstalled();
       setShortcutPromptState(companyId, 'accepted');
       setStep('added');
       setOpen(true);
@@ -76,15 +85,18 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
     }
 
     const prev = getShortcutPromptState(companyId);
-    if (force && prev === 'dismissed') {
-      setShortcutPromptState(companyId, 'pending');
-    } else if (prev === 'accepted' && !force) {
+    if (prev === 'accepted') {
+      markSaloonAppInstalled();
       setStep('added');
       setOpen(true);
       return;
-    } else if (prev === 'dismissed' && !force) {
+    }
+    if (prev === 'dismissed' && !force) {
       setOpen(false);
       return;
+    }
+    if (force && prev === 'dismissed') {
+      setShortcutPromptState(companyId, 'pending');
     }
 
     // iOS/Android “Ana ekrana ekle” mevcut URL’yi kaydeder — #/app olsun ki
@@ -111,17 +123,20 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
   };
 
   const markInstalled = () => {
+    markSaloonAppInstalled();
     setShortcutPromptState(companyId, 'accepted');
     setOpen(false);
   };
 
   const goPicker = () => {
+    markSaloonAppInstalled();
     setShortcutPromptState(companyId, 'accepted');
     setOpen(false);
     navigate('/app', { replace: true });
   };
 
   const stayHere = () => {
+    markSaloonAppInstalled();
     setShortcutPromptState(companyId, 'accepted');
     setOpen(false);
   };
@@ -138,6 +153,7 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
         deferredInstall = null;
         setCanNativeInstall(false);
         if (choice.outcome === 'accepted') {
+          markSaloonAppInstalled();
           markInstalled();
           setBusy(false);
           return;
@@ -188,7 +204,7 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
             <div className="mt-8 space-y-4">
               <p className="text-center text-sm font-semibold leading-relaxed text-white/75">
                 {wasNew
-                  ? 'Bu işletme uygulamanıza eklendi. Açılışta hangi firmaya gideceğinizi seçebilirsiniz.'
+                  ? 'Uygulama zaten hazır — bu işletme listenize eklendi. Açılışta hangi firmaya gideceğinizi seçersiniz.'
                   : 'Bu işletme zaten listenizde. İsterseniz işletmeleriniz arasından seçin.'}
               </p>
               <p className="text-center text-xs font-bold text-white/45">
@@ -201,7 +217,7 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
                   onClick={goPicker}
                   className="!min-h-14 !rounded-2xl !bg-white !text-slate-950 !font-black"
                 >
-                  {firmCount > 1 ? 'İşletmelerimden seç' : 'İşletmelerim'}
+                  {wasNew ? 'Firmayı ekledim — listeme git' : 'İşletmelerimden seç'}
                 </Button>
                 <button
                   type="button"

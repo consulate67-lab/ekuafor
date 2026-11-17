@@ -1,5 +1,7 @@
 const PIN_KEY = 'saloon_pinned_company_v1';
 const PROMPT_KEY = 'saloon_shortcut_prompt_v1';
+/** Ana ekrana bir kez eklendiyse yeni QR’da tekrar “yükle” gösterme */
+const INSTALLED_KEY = 'saloon_pwa_installed_v1';
 
 export type ShortcutPromptState = 'pending' | 'accepted' | 'dismissed';
 
@@ -43,10 +45,19 @@ export function getShortcutPromptState(companyId: number): ShortcutPromptState {
   return promptMap()[String(companyId)] || 'pending';
 }
 
+export function markSaloonAppInstalled() {
+  try {
+    localStorage.setItem(INSTALLED_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Kullanıcı daha önce ana ekrana ekledi / PWA içinde — yeni QR sadece listeye eklenir */
 export function hasSaloonAppInstalled(): boolean {
   if (isStandaloneDisplay()) return true;
   try {
+    if (localStorage.getItem(INSTALLED_KEY) === '1') return true;
     return Object.values(promptMap()).some(s => s === 'accepted');
   } catch {
     return false;
@@ -57,6 +68,7 @@ export function setShortcutPromptState(companyId: number, state: ShortcutPromptS
   try {
     const next = { ...promptMap(), [String(companyId)]: state };
     localStorage.setItem(PROMPT_KEY, JSON.stringify(next));
+    if (state === 'accepted') markSaloonAppInstalled();
   } catch {
     /* ignore */
   }
