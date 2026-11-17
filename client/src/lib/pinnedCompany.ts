@@ -53,12 +53,15 @@ export function markSaloonAppInstalled() {
   }
 }
 
-/** Kullanıcı daha önce ana ekrana ekledi / PWA içinde — yeni QR sadece listeye eklenir */
+/**
+ * Kullanıcı ana ekrana eklediğini onayladı / PWA içinde.
+ * Sadece açık kurulum işareti — “accepted” prompt durumu kurulum sayılmaz
+ * (yoksa ikinci QR yükleme kapısını yanlışlıkla atlıyordu / karışıyordu).
+ */
 export function hasSaloonAppInstalled(): boolean {
   if (isStandaloneDisplay()) return true;
   try {
-    if (localStorage.getItem(INSTALLED_KEY) === '1') return true;
-    return Object.values(promptMap()).some(s => s === 'accepted');
+    return localStorage.getItem(INSTALLED_KEY) === '1';
   } catch {
     return false;
   }
@@ -68,7 +71,6 @@ export function setShortcutPromptState(companyId: number, state: ShortcutPromptS
   try {
     const next = { ...promptMap(), [String(companyId)]: state };
     localStorage.setItem(PROMPT_KEY, JSON.stringify(next));
-    if (state === 'accepted') markSaloonAppInstalled();
   } catch {
     /* ignore */
   }

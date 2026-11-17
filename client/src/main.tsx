@@ -10,42 +10,46 @@ migrateStorageKeys()
 
 const SESSION_READY = 'saloon_pwa_session_v1'
 
-/** Ana ekran ikonu çoğu zaman kurulumdaki #/firma/X adresini açar — seçim ekranına al. */
-function redirectStandaloneLaunchToPicker(): boolean {
+/**
+ * Açılış URL’sini düzelt — asla location.replace ile sayfayı kesme.
+ * (Hash-only replace React’i mount etmeden boş ekran bırakıyordu.)
+ */
+function prepareLaunch() {
   try {
+    const qrTarget = consumeQrLandingParams()
+    if (qrTarget && qrTarget !== window.location.href) {
+      const u = new URL(qrTarget)
+      window.history.replaceState(null, '', `${u.pathname}${u.search}${u.hash}`)
+    }
+
     const nav = window.navigator as Navigator & { standalone?: boolean }
     const standalone =
       window.matchMedia('(display-mode: standalone)').matches || !!nav.standalone
-    if (!standalone) return false
+    if (!standalone) return
 
     const hash = window.location.hash || ''
     const m = hash.match(/^#\/firma\/(\d+)/i)
     if (!m) {
       sessionStorage.setItem(SESSION_READY, '1')
-      return false
+      return
     }
 
     // Aynı oturumda firma sayfasındayken yenileme — kal
-    if (sessionStorage.getItem(SESSION_READY) === '1') return false
+    if (sessionStorage.getItem(SESSION_READY) === '1') return
 
     sessionStorage.setItem(SESSION_READY, '1')
     addScannedCompanyId(Number(m[1]))
     const base = `${window.location.pathname}${window.location.search}`
-    window.location.replace(`${base}#/app`)
-    return true
+    window.history.replaceState(null, '', `${base}#/app`)
   } catch {
-    return false
+    /* ignore */
   }
 }
 
-/** QR ?c=5 → #/firma/5 (kamera hash’i metin sanmasın diye query kullanıyoruz) */
-const qrTarget = consumeQrLandingParams()
-if (qrTarget && qrTarget !== window.location.href) {
-  window.location.replace(qrTarget)
-} else if (!redirectStandaloneLaunchToPicker()) {
-  ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>,
-  )
-}
+prepareLaunch()
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+)

@@ -80,6 +80,16 @@ export function QrScanSheet({ open, onClose, onCompanyId }: Props) {
 
     (async () => {
       try {
+        if (!window.jsQR) {
+          await new Promise<void>((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+            s.async = true;
+            s.onload = () => resolve();
+            s.onerror = () => reject(new Error('jsQR'));
+            document.head.appendChild(s);
+          });
+        }
         if (!navigator.mediaDevices?.getUserMedia) {
           setError('Bu cihazda kamera kullanılamıyor');
           return;
@@ -100,7 +110,13 @@ export function QrScanSheet({ open, onClose, onCompanyId }: Props) {
         }
         rafRef.current = requestAnimationFrame(tick);
       } catch {
-        if (!cancelled) setError('Kamera izni gerekli — ayarlardan izin verin');
+        if (!cancelled) {
+          setError(
+            window.jsQR
+              ? 'Kamera izni gerekli — ayarlardan izin verin'
+              : 'QR okuyucu yüklenemedi — interneti kontrol edin',
+          );
+        }
       }
     })();
 

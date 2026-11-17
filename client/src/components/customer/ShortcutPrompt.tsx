@@ -5,6 +5,7 @@ import { Button } from '../ui';
 import {
   applyCompanyManifest,
   getShortcutPromptState,
+  hasSaloonAppInstalled,
   isIosDevice,
   isStandaloneDisplay,
   markSaloonAppInstalled,
@@ -67,9 +68,9 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
     addScannedCompanyId(companyId);
     applyCompanyManifest({ companyId, name: companyName, themeColor });
 
-    // Sadece gerçekten ana ekran / native uygulama içindeyse “yükle” atlanır
     const inApp = isStandaloneDisplay() || Capacitor.isNativePlatform();
-    if (inApp) {
+    // Ana ekranda veya daha önce “ekledim / yükledim” → ikinci+ QR sadece listeye ekler
+    if (inApp || hasSaloonAppInstalled()) {
       setShortcutPromptState(companyId, 'accepted');
       setStep('added');
       setOpen(true);
@@ -85,8 +86,7 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
       setShortcutPromptState(companyId, 'pending');
     }
 
-    // Tarayıcıdayız ve ana ekranda değil → her QR’da yükleme kapısı
-    // (URL’yi #/app yapma: geri / liste butonu bozuluyordu)
+    // İlk kurulum: tarayıcıda yükleme kapısı (URL’yi #/app yapma)
     setStep(isIosDevice() ? 'ios' : 'ask');
     const t = window.setTimeout(() => setOpen(true), 200);
     return () => window.clearTimeout(t);
@@ -179,11 +179,14 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
             <div className="mt-8 space-y-4">
               <p className="text-center text-sm font-semibold leading-relaxed text-white/75">
                 {wasNew
-                  ? 'Bu işletme uygulamanıza eklendi. Açılışta hangi firmaya gideceğinizi seçebilirsiniz.'
+                  ? 'Bu işletme listenize eklendi. Sonraki QR’ları da aynı uygulamaya ekleyebilirsiniz.'
                   : 'Bu işletme zaten listenizde.'}
               </p>
               <p className="text-center text-xs font-bold text-white/45">
                 Listenizde {firmCount} işletme
+                {!isStandaloneDisplay() && !Capacitor.isNativePlatform()
+                  ? ' · En güncel liste ana ekrandaki Saloon ikonunda'
+                  : ''}
               </p>
               <div className="space-y-3 pt-2">
                 <Button

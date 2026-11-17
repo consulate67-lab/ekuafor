@@ -37,7 +37,7 @@
         }
       } catch (_) { /* guvenli: en kotu durumda sessiz gec */ }
     })();
-    // QR kamera: ?c=5 hemen #/firma/5'e (bundle yuklenmeden)
+    // QR kamera: ?c=5 → #/firma/5 (replaceState: sayfayı kesmeden; location.replace boş ekran yapıyordu)
     (function () {
       try {
         var q = new URLSearchParams(location.search);
@@ -45,7 +45,7 @@
         if (!c || !/^\d+$/.test(c)) return;
         var ref = q.get('ref') || 'qr';
         var install = (q.get('install') === '1' || ref === 'qr') ? '&install=1' : '';
-        location.replace(location.pathname + '#/firma/' + c + '?ref=' + encodeURIComponent(ref) + install);
+        history.replaceState(null, '', location.pathname + '#/firma/' + c + '?ref=' + encodeURIComponent(ref) + install);
       } catch (_) { /* ignore */ }
     })();
   </script>
