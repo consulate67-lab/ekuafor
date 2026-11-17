@@ -87,6 +87,17 @@ export function ShortcutPrompt({ companyId, companyName, themeColor, enabled = t
       return;
     }
 
+    // iOS/Android “Ana ekrana ekle” mevcut URL’yi kaydeder — #/app olsun ki
+    // ikon her zaman firma seçim ekranını açsın (tek firmaya kilitlenmesin).
+    try {
+      const want = '#/app';
+      if (!window.location.hash.startsWith(want)) {
+        window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${want}`);
+      }
+    } catch {
+      /* ignore */
+    }
+
     setStep(isIosDevice() ? 'ios' : 'ask');
     const t = window.setTimeout(() => setOpen(true), 200);
     return () => window.clearTimeout(t);
