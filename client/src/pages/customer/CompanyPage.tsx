@@ -276,17 +276,22 @@ function CompanyPage({ id }: { id: number }) {
       navigate('/app', { replace: true });
     };
     const topBar = (
-        <div className="absolute inset-x-0 top-0 safe-top z-10">
-            <div className="max-w-lg mx-auto flex justify-between p-3">
-                <span className="w-10" aria-hidden />
-                <div className="flex gap-2">
-                    {hasFirmList && (
+        <div className="absolute inset-x-0 top-0 safe-top z-30 pointer-events-none">
+            <div className="max-w-lg mx-auto flex justify-between items-start p-3">
+                {hasFirmList ? (
+                    <div className="pointer-events-auto">
                         <RoundButton label="İşletmelerim" onClick={goFirmList}>
                             ↑
                         </RoundButton>
-                    )}
+                    </div>
+                ) : (
+                    <span className="w-10" aria-hidden />
+                )}
+                <div className="pointer-events-auto flex gap-2">
                     <RoundButton label="Paylaş" onClick={share}>
-                        ⤴
+                        <span className="text-base leading-none" aria-hidden>
+                          📤
+                        </span>
                     </RoundButton>
                     {!introMode && (
                         <RoundButton label={favorite ? 'Favorilerden çıkar' : 'Favorilere ekle'} pressed={favorite} onClick={() => favorites.toggle(company.id)}>
@@ -299,7 +304,13 @@ function CompanyPage({ id }: { id: number }) {
     );
 
     const heroTitleBlock = (opts?: { onDark?: boolean; compact?: boolean }) => (
-        <div className={opts?.compact ? '' : 'relative z-10 flex h-full max-w-lg mx-auto flex-col justify-end px-4 pb-5 pt-12'}>
+        <div
+            className={
+                opts?.compact
+                    ? ''
+                    : 'relative z-10 flex h-full max-w-lg mx-auto flex-col justify-end px-4 pb-5 pt-14 pointer-events-none'
+            }
+        >
             <p
                 className={`text-[10px] font-black uppercase tracking-[0.22em] ${
                     opts?.onDark ? 'text-white/75' : 'text-slate-500'
@@ -322,7 +333,7 @@ function CompanyPage({ id }: { id: number }) {
                 <button
                     type="button"
                     onClick={() => setReviewsOpen(true)}
-                    className={`mt-2 w-fit text-xs font-bold ${opts?.onDark ? 'text-amber-300' : 'text-amber-600'}`}
+                    className={`pointer-events-auto mt-2 w-fit text-xs font-bold ${opts?.onDark ? 'text-amber-300' : 'text-amber-600'}`}
                 >
                     {rating} · yorumları gör
                 </button>
