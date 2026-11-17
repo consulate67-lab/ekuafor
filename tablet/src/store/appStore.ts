@@ -480,7 +480,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           note: `Abone program · ${formatDateRangeTr(plan.startDate, plan.endDate)}`,
           consumeRemaining: false,
         });
-        ids.push(id);
+        if (id) ids.push(id);
       }
     }
 
@@ -597,7 +597,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         campaignId: input.campaignId,
         note: input.campaignId ? 'Kampanya' : input.subscriberId ? 'Abone' : undefined,
       });
-      ids.push(id);
+      if (id) ids.push(id);
     }
 
     return {
