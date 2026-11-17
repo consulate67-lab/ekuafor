@@ -42,6 +42,22 @@ export const toMinutes = (hhmm: string) => {
   return h * 60 + m;
 };
 
+/** Takvim günü bugünden önce mi? */
+export const isPastDate = (date: string) => date < todayKey();
+
+/**
+ * Randevu başlangıcı geçmişte mi?
+ * Bugün: slot bitişi şu andan önce/eşitse geçmiş sayılır.
+ */
+export const isPastDateTime = (date: string, startTime: string, slotMinutes = 1) => {
+  const today = todayKey();
+  if (date < today) return true;
+  if (date > today) return false;
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  return toMinutes(startTime) + Math.max(1, slotMinutes) <= nowMin;
+};
+
 export const fromMinutes = (total: number) =>
   `${pad(Math.floor(total / 60))}:${pad(total % 60)}`;
 

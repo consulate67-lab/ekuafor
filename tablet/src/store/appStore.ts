@@ -17,7 +17,7 @@ import {
   subscriberLabel,
   subscriberRightsForService,
 } from '../lib/groupClass';
-import { formatDateRangeTr } from '../lib/dates';
+import { formatDateRangeTr, isPastDateTime } from '../lib/dates';
 import { endDateFromMonths, planSubscriberProgram } from '../lib/scheduleSubscriberProgram';
 import type {
   Campaign,
@@ -104,7 +104,7 @@ interface AppStore extends TabletState {
     campaignId?: string;
     /** false: program planında hak düşmez */
     consumeRemaining?: boolean;
-  }) => string;
+  }) => string | null;
   /** Kampanya/abone hizmetlerini güne yerleştirir; oluşturulan event id listesi */
   bookCampaignBlock: (input: {
     date: string;
@@ -506,6 +506,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   addAppointment: input => {
     const interval = get().company?.slotInterval || 30;
+    if (isPastDateTime(input.date, input.startTime, interval)) {
+      return null;
+    }
     const service = get().services.find(s => s.id === input.serviceId);
     const raw = input.durationMinutes || service?.durationMinutes || interval;
     const duration = input.allowShort ? Math.max(1, raw) : Math.max(interval, raw);

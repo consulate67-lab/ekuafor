@@ -8,6 +8,7 @@ import {
   monthLabel,
   parseKey,
   shiftMonth,
+  isPastDateTime,
   todayKey,
   toMinutes,
 } from '../lib/dates';
@@ -252,6 +253,10 @@ export function Board() {
     startTime: string,
     opts?: { insertUntil?: string; insertFromEventId?: string },
   ) => {
+    if (isPastDateTime(selectedDate, startTime, company.slotInterval || 30)) {
+      setBookMsg('Geçmiş bir saate randevu girilemez');
+      return;
+    }
     setCustomerName('');
     setCustomerPhone('');
     setSubscriberId('');
@@ -506,6 +511,10 @@ export function Board() {
   /** Kapıdan gelen: hizmete tek dokunuşla ekle; grup dersi → çalışana ata + abone paneli */
   const quickAddService = (id: string) => {
     if (!sheet || sheet.mode !== 'appointment') return;
+    if (isPastDateTime(selectedDate, sheet.startTime, company.slotInterval || 30)) {
+      setBookMsg('Geçmiş bir saate randevu girilemez');
+      return;
+    }
     setCampaignId('');
     const svc = services.find(s => s.id === id);
     if (isClassService(svc)) {
@@ -527,7 +536,7 @@ export function Board() {
       }
     }
     const isSub = !!subscriberId;
-    addAppointment({
+    const created = addAppointment({
       staffId: sheet.staffId,
       date: selectedDate,
       startTime: sheet.startTime,
@@ -540,6 +549,10 @@ export function Board() {
       subscriberId: subscriberId || undefined,
       note: sheet.insertFromEventId ? 'Araya iş (bekleme)' : undefined,
     });
+    if (!created) {
+      setBookMsg('Geçmiş bir saate randevu girilemez');
+      return;
+    }
     setSheet(null);
   };
 
@@ -674,6 +687,7 @@ export function Board() {
   };
 
   const isPastSlot = (slot: string) => {
+    if (selectedDate < todayKey()) return true;
     if (!isToday) return false;
     return toMinutes(slot) + slotStep <= currentMin;
   };
@@ -1213,11 +1227,15 @@ export function Board() {
                     >
                       <button
                         type="button"
-                        title={past ? 'Geçmiş saat' : 'Randevu ekle'}
-                        onClick={() => openAppointment(person.id, slot)}
+                        title={past ? 'Geçmiş saate randevu girilemez' : 'Randevu ekle'}
+                        disabled={past}
+                        onClick={() => {
+                          if (past) return;
+                          openAppointment(person.id, slot);
+                        }}
                         className={`flex-1 rounded-xl text-sm font-black ${
                           past
-                            ? 'bg-slate-100 text-slate-300'
+                            ? 'cursor-not-allowed bg-slate-100 text-slate-300'
                             : 'bg-slate-50 text-slate-300 hover:bg-brand-50 hover:text-brand-600'
                         }`}
                       >

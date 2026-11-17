@@ -364,6 +364,23 @@ function BookingPage({ id }: { id: string }) {
         setSubmitting(true);
         setError(null);
         try {
+            if (mode !== 'class' && selection.date && selection.time) {
+                const today = localDate(new Date());
+                if (selection.date < today) {
+                    setError('Geçmiş bir tarihe randevu alınamaz');
+                    setSubmitting(false);
+                    return;
+                }
+                if (selection.date === today) {
+                    const [sh, sm] = selection.time.split(':').map(Number);
+                    const now = new Date();
+                    if (sh * 60 + sm <= now.getHours() * 60 + now.getMinutes()) {
+                        setError('Geçmiş bir saate randevu alınamaz');
+                        setSubmitting(false);
+                        return;
+                    }
+                }
+            }
             const deviceId = isBusiness ? null : await getDeviceId();
             const cachedPhone = isBusiness ? null : localStorage.getItem('customer_phone');
             const phone = isBusiness

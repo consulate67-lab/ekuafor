@@ -452,7 +452,7 @@ export interface BookingInput {
     customerPhone?: string | null;
     deviceId?: string | null;
     clientRequestId?: string | null;
-    /** Firma kullanıcısı / board: çalışma saati dışına, geçmişe ve fiyat/süre değişikliğine izin verilir */
+    /** Firma kullanıcısı / board: çalışma saati dışına ve fiyat/süre değişikliğine izin (geçmişe asla) */
     byCompany: boolean;
 }
 
@@ -537,7 +537,7 @@ const insertBooking = async (input: BookingInput) => {
             if (service.booking_mode !== 'class') throw new BookingError(400, 'Bu seans grup dersine ait değil');
             if (session.status !== 'scheduled') throw new BookingError(409, 'Bu seans iptal edildi');
             const start = toMinutes(session.start_time);
-            if (!input.byCompany) {
+            {
                 const minStart = earliestStart(date);
                 if (minStart === null || start < minStart) throw new BookingError(409, 'Bu seansın kayıt süresi geçti');
             }
@@ -559,10 +559,14 @@ const insertBooking = async (input: BookingInput) => {
             if (mode === 'class') throw new BookingError(400, 'Grup dersi için seans seçilmelidir');
             const { windows } = await getOpening(client, input.companyId, date);
             const checkPublicSpan = (span: Interval) => {
-                if (input.byCompany) return;
                 const minStart = earliestStart(date);
-                if (minStart === null || span.start < minStart) throw new BookingError(409, 'Geçmiş bir saate randevu alınamaz');
-                if (!withinOpening(span, windows)) throw new BookingError(409, 'Seçilen saat çalışma saatleri dışında');
+                if (minStart === null || span.start < minStart) {
+                    throw new BookingError(409, 'Geçmiş bir saate randevu alınamaz');
+                }
+                // Firma paneli çalışma saati dışına izin verebilir; geçmişe asla
+                if (!input.byCompany && !withinOpening(span, windows)) {
+                    throw new BookingError(409, 'Seçilen saat çalışma saatleri dışında');
+                }
             };
 
             if (mode === 'resource') {
