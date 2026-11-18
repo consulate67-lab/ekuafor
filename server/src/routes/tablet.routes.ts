@@ -712,6 +712,14 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
         }
         const webTagline =
             profile.web_tagline != null ? String(profile.web_tagline).trim().slice(0, 300) : null;
+        const allowedPlacement = new Set(['about', 'contact', 'both', 'hero', 'hidden']);
+        const webSocialPlacement =
+            profile.web_social_placement != null
+                ? (() => {
+                      const p = String(profile.web_social_placement).trim().toLowerCase();
+                      return allowedPlacement.has(p) ? p : null;
+                  })()
+                : null;
 
         await pool.query(
             `ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_template_id VARCHAR(64)`,
@@ -731,6 +739,9 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
         );
         await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_gallery TEXT`);
         await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_tagline VARCHAR(300)`);
+        await pool.query(
+            `ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_social_placement VARCHAR(20)`,
+        );
 
         await pool.query(
             `UPDATE companies SET
@@ -752,6 +763,7 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
                 web_gallery = CASE WHEN $17::text IS NULL THEN web_gallery ELSE $17 END,
                 photo = CASE WHEN $18::text IS NULL THEN photo ELSE $18 END,
                 web_tagline = CASE WHEN $19::text IS NULL THEN web_tagline ELSE NULLIF($19, '') END,
+                web_social_placement = CASE WHEN $20::text IS NULL THEN web_social_placement ELSE $20 END,
                 updated_at = NOW()
              WHERE id = $1`,
             [
@@ -774,6 +786,7 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
                 webGalleryJson,
                 coverPhoto,
                 webTagline,
+                webSocialPlacement,
             ],
         );
 

@@ -260,12 +260,13 @@ class CompanyService {
                 await db.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS show_address BOOLEAN DEFAULT true`);
                 await db.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_gallery TEXT`);
                 await db.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_tagline VARCHAR(300)`);
+                await db.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_social_placement VARCHAR(20)`);
             } catch {
                 /* alter yetkisi yoksa devam */
             }
             try {
                 const fresh = await db.execute(sql`
-                    SELECT description, hide_prices, web_template_id, web_gallery, web_tagline, photo,
+                    SELECT description, hide_prices, web_template_id, web_gallery, web_tagline, web_social_placement, photo,
                            instagram_url, facebook_url, tiktok_url, contact_note,
                            show_phone, show_address, phone, email, website,
                            address_line, city, district
@@ -280,6 +281,7 @@ class CompanyService {
                         web_template_id: fr.web_template_id ?? company.web_template_id ?? null,
                         web_gallery: fr.web_gallery ?? company.web_gallery ?? null,
                         web_tagline: fr.web_tagline ?? company.web_tagline ?? null,
+                        web_social_placement: fr.web_social_placement ?? company.web_social_placement ?? null,
                         photo: fr.photo ?? company.photo ?? null,
                         instagram_url: fr.instagram_url ?? null,
                         facebook_url: fr.facebook_url ?? null,
@@ -698,6 +700,7 @@ const PUBLIC_COMPANY_FIELDS = [
     'web_template_id',
     'web_gallery',
     'web_tagline',
+    'web_social_placement',
     'hide_prices',
     'instagram_url',
     'facebook_url',

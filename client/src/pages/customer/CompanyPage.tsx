@@ -245,6 +245,15 @@ function CompanyPage({ id }: { id: number }) {
         { label: 'Facebook', href: socialHref('facebook', company.facebook_url) },
         { label: 'TikTok', href: socialHref('tiktok', company.tiktok_url) },
     ].filter((s): s is { label: string; href: string } => !!s.href);
+    const socialPlacement = (() => {
+        const p = String(company.web_social_placement || 'about').toLowerCase();
+        return ['about', 'contact', 'both', 'hero', 'hidden'].includes(p)
+            ? (p as 'about' | 'contact' | 'both' | 'hero' | 'hidden')
+            : 'about';
+    })();
+    const showSocialAbout = socialLinks.length > 0 && (socialPlacement === 'about' || socialPlacement === 'both');
+    const showSocialContact = socialLinks.length > 0 && (socialPlacement === 'contact' || socialPlacement === 'both');
+    const showSocialHero = socialLinks.length > 0 && socialPlacement === 'hero';
     const contactBits = [
         phone ? { label: 'Telefon', value: company.phone || phone, href: `tel:${phone}` } : null,
         company.email ? { label: 'E-posta', value: company.email, href: `mailto:${company.email}` } : null,
@@ -255,7 +264,9 @@ function CompanyPage({ id }: { id: number }) {
                   href: company.website.startsWith('http') ? company.website : `https://${company.website}`,
               }
             : null,
-        ...socialLinks.map(s => ({ label: s.label, value: s.href.replace(/^https?:\/\//, ''), href: s.href })),
+        ...(showSocialContact
+            ? socialLinks.map(s => ({ label: s.label, value: s.href.replace(/^https?:\/\//, ''), href: s.href }))
+            : []),
     ].filter(Boolean) as { label: string; value: string; href: string }[];
     const introMode = fromQr || searchParams.get('home') === '1';
 
@@ -355,6 +366,24 @@ function CompanyPage({ id }: { id: number }) {
             <p className={`mt-1.5 max-w-sm text-xs font-semibold sm:text-sm ${opts?.onDark ? 'text-white/85' : 'text-slate-600'}`}>
                 {webPack.tagline}
             </p>
+            {showSocialHero && (
+                <div className="pointer-events-auto mt-3 flex flex-wrap gap-2">
+                    {socialLinks.map(s => (
+                        <a
+                            key={s.label}
+                            href={s.href}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`rounded-full px-3 py-1.5 text-xs font-black ${
+                                opts?.onDark ? 'bg-white/20 text-white ring-1 ring-white/30' : 'text-white'
+                            }`}
+                            style={!opts?.onDark ? { backgroundColor: theme.accent } : undefined}
+                        >
+                            {s.label}
+                        </a>
+                    ))}
+                </div>
+            )}
             {rating && (
                 <button
                     type="button"
@@ -482,7 +511,7 @@ function CompanyPage({ id }: { id: number }) {
                     {contactNote ? (
                         <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">{contactNote}</p>
                     ) : null}
-                    {socialLinks.length > 0 && (
+                    {showSocialAbout && (
                         <div className="mt-4 flex flex-wrap gap-2">
                             {socialLinks.map(s => (
                                 <a

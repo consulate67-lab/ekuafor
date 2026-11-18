@@ -229,6 +229,11 @@ export interface WebPageProfile {
   gallery?: string[];
   /** Üst slogan — boşsa şablon tagline kullanılır */
   tagline?: string;
+  /**
+   * Sosyal ağlar nerede görünsün:
+   * about | contact | both | hero | hidden
+   */
+  socialPlacement?: 'about' | 'contact' | 'both' | 'hero' | 'hidden';
 }
 
 export interface CompanySetup {

@@ -202,6 +202,76 @@ export function WebTemplateEditor({ open, template, companyName, draft, onChange
               </label>
             </section>
 
+            <section className="space-y-3 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+              <div>
+                <p className="text-xs font-black uppercase text-slate-500">Sosyal ağlar</p>
+                <p className="mt-1 text-sm font-semibold text-slate-600">
+                  Hesapları girin ve müşteri sayfasında nerede görüneceğini seçin.
+                </p>
+              </div>
+              <label className="block text-xs font-black uppercase text-slate-400">
+                Instagram
+                <input
+                  value={draft.instagram || ''}
+                  onChange={e => onChange({ instagram: e.target.value })}
+                  placeholder="@kullanici veya https://instagram.com/…"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold"
+                />
+              </label>
+              <label className="block text-xs font-black uppercase text-slate-400">
+                Facebook
+                <input
+                  value={draft.facebook || ''}
+                  onChange={e => onChange({ facebook: e.target.value })}
+                  placeholder="sayfa veya https://facebook.com/…"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold"
+                />
+              </label>
+              <label className="block text-xs font-black uppercase text-slate-400">
+                TikTok
+                <input
+                  value={draft.tiktok || ''}
+                  onChange={e => onChange({ tiktok: e.target.value })}
+                  placeholder="@kullanici veya https://tiktok.com/@…"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold"
+                />
+              </label>
+              <fieldset className="space-y-2">
+                <legend className="text-xs font-black uppercase text-slate-400">Nerede görünsün?</legend>
+                {(
+                  [
+                    { id: 'about', label: 'Hakkında altında', hint: 'Tanıtım metninin hemen altında butonlar' },
+                    { id: 'contact', label: 'İletişim bölümünde', hint: 'Telefon / e-posta listesinde' },
+                    { id: 'both', label: 'Her ikisinde', hint: 'Hakkında + İletişim' },
+                    { id: 'hero', label: 'Üst kapak / slogan altında', hint: 'Sayfanın en üstünde, ismin yanında' },
+                    { id: 'hidden', label: 'Gizle', hint: 'Sayfada sosyal ağ gösterme' },
+                  ] as const
+                ).map(opt => {
+                  const active = (draft.socialPlacement || 'about') === opt.id;
+                  return (
+                    <label
+                      key={opt.id}
+                      className={`flex cursor-pointer items-start gap-3 rounded-2xl px-3 py-3 ring-1 ${
+                        active ? 'bg-brand-50 ring-brand-200' : 'bg-slate-50 ring-slate-100'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="socialPlacement"
+                        className="mt-1"
+                        checked={active}
+                        onChange={() => onChange({ socialPlacement: opt.id })}
+                      />
+                      <span>
+                        <span className="block text-sm font-black text-slate-900">{opt.label}</span>
+                        <span className="mt-0.5 block text-xs font-semibold text-slate-500">{opt.hint}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </fieldset>
+            </section>
+
             <section className="space-y-2 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
               <p className="text-xs font-black uppercase text-slate-500">Sayfada görünen alanlar</p>
               <Toggle

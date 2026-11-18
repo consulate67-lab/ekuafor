@@ -21,6 +21,8 @@ export interface PublicCompany {
     web_gallery?: string[] | string | null;
     /** Üst slogan */
     web_tagline?: string | null;
+    /** Sosyal ağ yerleşimi */
+    web_social_placement?: 'about' | 'contact' | 'both' | 'hero' | 'hidden' | string | null;
     address_line?: string | null;
     city?: string | null;
     district?: string | null;
