@@ -37,7 +37,9 @@ const REVIEW_SORTS: { key: ReviewSort; label: string }[] = [
 const durationText = (s: Service) =>
     s.booking_mode === 'resource' && s.duration_options?.length ? `${s.duration_options.join(' / ')} dk` : `${s.duration_minutes} dk`;
 
-function socialHref(kind: 'instagram' | 'facebook' | 'tiktok', raw?: string | null): string | null {
+type SocialKind = 'instagram' | 'facebook' | 'tiktok';
+
+function socialHref(kind: SocialKind, raw?: string | null): string | null {
     const v = (raw || '').trim();
     if (!v) return null;
     if (/^https?:\/\//i.test(v)) return v;
@@ -46,6 +48,61 @@ function socialHref(kind: 'instagram' | 'facebook' | 'tiktok', raw?: string | nu
     if (kind === 'instagram') return `https://instagram.com/${handle.replace(/^instagram\.com\//i, '')}`;
     if (kind === 'facebook') return `https://facebook.com/${handle.replace(/^facebook\.com\//i, '')}`;
     return `https://tiktok.com/@${handle.replace(/^tiktok\.com\/@?/i, '')}`;
+}
+
+function SocialIcon({ kind, className = 'h-5 w-5' }: { kind: SocialKind; className?: string }) {
+    if (kind === 'instagram') {
+        return (
+            <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                <path d="M7.5 2h9A5.5 5.5 0 0 1 22 7.5v9A5.5 5.5 0 0 1 16.5 22h-9A5.5 5.5 0 0 1 2 16.5v-9A5.5 5.5 0 0 1 7.5 2zm0 2A3.5 3.5 0 0 0 4 7.5v9A3.5 3.5 0 0 0 7.5 20h9a3.5 3.5 0 0 0 3.5-3.5v-9A3.5 3.5 0 0 0 16.5 4h-9zm9.75 1.25a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5zM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />
+            </svg>
+        );
+    }
+    if (kind === 'facebook') {
+        return (
+            <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                <path d="M14 9h3V6h-3c-2.2 0-4 1.8-4 4v2H7v3h3v7h3v-7h3l1-3h-4v-2c0-.6.4-1 1-1z" />
+            </svg>
+        );
+    }
+    return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            <path d="M14.5 3.2c.3 2.3 1.6 3.7 3.8 4v2.8c-1.4 0-2.7-.4-3.8-1.1v5.4c0 3.4-2.6 6.1-6 6.1S2.5 17.7 2.5 14.3s2.6-6.1 6-6.1c.3 0 .7 0 1 .1v2.9c-.3-.1-.6-.2-1-.2-1.8 0-3.2 1.5-3.2 3.3s1.4 3.3 3.2 3.3 3.2-1.5 3.2-3.3V3.2h2.8z" />
+        </svg>
+    );
+}
+
+function SocialButtons({
+    links,
+    accent,
+    onDark,
+}: {
+    links: { kind: SocialKind; label: string; href: string }[];
+    accent?: string;
+    onDark?: boolean;
+}) {
+    return (
+        <div className="flex flex-wrap gap-2">
+            {links.map(s => (
+                <a
+                    key={s.kind}
+                    href={s.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={s.label}
+                    title={s.label}
+                    className={`inline-flex h-11 w-11 items-center justify-center rounded-full transition ${
+                        onDark
+                            ? 'bg-white/20 text-white ring-1 ring-white/35 hover:bg-white/30'
+                            : 'text-white shadow-sm hover:opacity-90'
+                    }`}
+                    style={!onDark && accent ? { backgroundColor: accent } : undefined}
+                >
+                    <SocialIcon kind={s.kind} />
+                </a>
+            ))}
+        </div>
+    );
 }
 
 export default function CompanyPageRoute() {
@@ -240,11 +297,13 @@ function CompanyPage({ id }: { id: number }) {
         webPack.aboutFallback ||
         'Profesyonel ekibimizle randevu ve bakım hizmetlerinde yanınızdayız.';
     const contactNote = (company.contact_note || '').trim();
-    const socialLinks = [
-        { label: 'Instagram', href: socialHref('instagram', company.instagram_url) },
-        { label: 'Facebook', href: socialHref('facebook', company.facebook_url) },
-        { label: 'TikTok', href: socialHref('tiktok', company.tiktok_url) },
-    ].filter((s): s is { label: string; href: string } => !!s.href);
+    const socialLinks = (
+        [
+            { kind: 'instagram' as const, label: 'Instagram', href: socialHref('instagram', company.instagram_url) },
+            { kind: 'facebook' as const, label: 'Facebook', href: socialHref('facebook', company.facebook_url) },
+            { kind: 'tiktok' as const, label: 'TikTok', href: socialHref('tiktok', company.tiktok_url) },
+        ] as const
+    ).filter((s): s is { kind: SocialKind; label: string; href: string } => !!s.href);
     const socialPlacement = (() => {
         const p = String(company.web_social_placement || 'about').toLowerCase();
         return ['about', 'contact', 'both', 'hero', 'hidden'].includes(p)
@@ -265,9 +324,14 @@ function CompanyPage({ id }: { id: number }) {
               }
             : null,
         ...(showSocialContact
-            ? socialLinks.map(s => ({ label: s.label, value: s.href.replace(/^https?:\/\//, ''), href: s.href }))
+            ? socialLinks.map(s => ({
+                  label: s.label,
+                  value: s.href.replace(/^https?:\/\//, ''),
+                  href: s.href,
+                  kind: s.kind as SocialKind | undefined,
+              }))
             : []),
-    ].filter(Boolean) as { label: string; value: string; href: string }[];
+    ].filter(Boolean) as { label: string; value: string; href: string; kind?: SocialKind }[];
     const introMode = fromQr || searchParams.get('home') === '1';
 
     const goBook = (query = '') => {
@@ -367,21 +431,8 @@ function CompanyPage({ id }: { id: number }) {
                 {webPack.tagline}
             </p>
             {showSocialHero && (
-                <div className="pointer-events-auto mt-3 flex flex-wrap gap-2">
-                    {socialLinks.map(s => (
-                        <a
-                            key={s.label}
-                            href={s.href}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={`rounded-full px-3 py-1.5 text-xs font-black ${
-                                opts?.onDark ? 'bg-white/20 text-white ring-1 ring-white/30' : 'text-white'
-                            }`}
-                            style={!opts?.onDark ? { backgroundColor: theme.accent } : undefined}
-                        >
-                            {s.label}
-                        </a>
-                    ))}
+                <div className="pointer-events-auto mt-3">
+                    <SocialButtons links={socialLinks} accent={theme.accent} onDark={opts?.onDark} />
                 </div>
             )}
             {rating && (
@@ -512,19 +563,8 @@ function CompanyPage({ id }: { id: number }) {
                         <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">{contactNote}</p>
                     ) : null}
                     {showSocialAbout && (
-                        <div className="mt-4 flex flex-wrap gap-2">
-                            {socialLinks.map(s => (
-                                <a
-                                    key={s.label}
-                                    href={s.href}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="rounded-full px-3 py-1.5 text-xs font-black text-white"
-                                    style={{ backgroundColor: theme.accent }}
-                                >
-                                    {s.label}
-                                </a>
-                            ))}
+                        <div className="mt-4">
+                            <SocialButtons links={socialLinks} accent={theme.accent} />
                         </div>
                     )}
                 </section>
@@ -563,8 +603,22 @@ function CompanyPage({ id }: { id: number }) {
                         <ul className="mt-3 space-y-2">
                             {contactBits.map(c => (
                                 <li key={c.label}>
-                                    <a href={c.href} className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-800">
-                                        <span className="text-slate-400">{c.label}</span>
+                                    <a
+                                        href={c.href}
+                                        {...(c.kind ? { target: '_blank', rel: 'noreferrer' } : {})}
+                                        className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-800"
+                                    >
+                                        <span className="flex items-center gap-2 text-slate-400">
+                                            {c.kind ? (
+                                                <span
+                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white"
+                                                    style={{ backgroundColor: theme.accent }}
+                                                >
+                                                    <SocialIcon kind={c.kind} className="h-4 w-4" />
+                                                </span>
+                                            ) : null}
+                                            {c.label}
+                                        </span>
                                         <span className="truncate">{c.value}</span>
                                     </a>
                                 </li>
