@@ -156,15 +156,40 @@ function CompanyPage({ id }: { id: number }) {
               cta: selectedTemplate.theme.cta,
           }
         : LAYOUT_THEME[layoutGroup];
-    const webPack = selectedTemplate
-        ? {
-              tagline: selectedTemplate.tagline,
-              aboutFallback: selectedTemplate.about,
-              gallery: selectedTemplate.gallery,
-              news: selectedTemplate.news,
-          }
-        : fallbackPack;
-    const heroImage = company?.photo || webPack.gallery[0]?.src || null;
+    const customGallery = useMemo(() => {
+        const raw = company?.web_gallery;
+        let list: unknown[] = [];
+        if (Array.isArray(raw)) list = raw;
+        else if (typeof raw === 'string' && raw.trim()) {
+            try {
+                const parsed = JSON.parse(raw) as unknown;
+                if (Array.isArray(parsed)) list = parsed;
+            } catch {
+                list = [];
+            }
+        }
+        return list
+            .map(x => (typeof x === 'string' ? x.trim() : ''))
+            .filter(s => s.startsWith('data:image/') || s.startsWith('http'));
+    }, [company?.web_gallery]);
+
+    const webPack = useMemo(() => {
+        const base = selectedTemplate
+            ? {
+                  tagline: selectedTemplate.tagline,
+                  aboutFallback: selectedTemplate.about,
+                  gallery: selectedTemplate.gallery,
+                  news: selectedTemplate.news,
+              }
+            : fallbackPack;
+        const gallery = base.gallery.map((g, i) => ({
+            ...g,
+            src: customGallery[i] || g.src,
+        }));
+        return { ...base, gallery };
+    }, [selectedTemplate, fallbackPack, customGallery]);
+
+    const heroImage = company?.photo || customGallery[0] || webPack.gallery[0]?.src || null;
     const serviceImages = useMemo(
         () => assignServiceImages(services, { sectorSlug }),
         [services, sectorSlug],

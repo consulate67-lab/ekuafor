@@ -12,6 +12,7 @@ import { getSector, mergeCatalogServices } from '../lib/sectorCatalog';
 import { ServiceTransfer } from '../components/ServiceTransfer';
 import { WebTemplatePreview } from '../components/WebTemplatePreview';
 import { sectorSupportsGroupSessions } from '../lib/sectorSubscriberProfile';
+import { compressImageFile } from '../lib/compressImage';
 import {
   defaultStaffTitle,
   departmentNamesForSectors,
@@ -185,6 +186,44 @@ export function Settings() {
       templateId,
       about: prev.about?.trim() ? prev.about : tpl?.about || prev.about,
     }));
+  };
+
+  const selectedWebTemplate = useMemo(
+    () => (webDraft.templateId ? getWebTemplate(webDraft.templateId) : null),
+    [webDraft.templateId],
+  );
+  const gallerySlots = selectedWebTemplate?.gallery?.length
+    ? selectedWebTemplate.gallery
+    : [
+        { src: '', alt: 'Kapak' },
+        { src: '', alt: 'Galeri 2' },
+        { src: '', alt: 'Galeri 3' },
+        { src: '', alt: 'Galeri 4' },
+      ];
+
+  const setGallerySlot = (index: number, dataUrl: string | null) => {
+    setWebDraft(prev => {
+      const next = [...(prev.gallery || [])];
+      while (next.length < gallerySlots.length) next.push('');
+      if (dataUrl) next[index] = dataUrl;
+      else next[index] = '';
+      return { ...prev, gallery: next };
+    });
+  };
+
+  const onGalleryFile = async (index: number, file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setWebMsg('Yalnızca görsel dosyası yükleyin');
+      return;
+    }
+    try {
+      const dataUrl = await compressImageFile(file);
+      setGallerySlot(index, dataUrl);
+      setWebMsg('');
+    } catch {
+      setWebMsg('Görsel sıkıştırılamadı — başka bir foto deneyin');
+    }
   };
 
   const setCompanySector = (slug: string) => {
@@ -543,6 +582,73 @@ export function Settings() {
               <p className="rounded-2xl bg-amber-50 px-3 py-3 text-sm font-bold text-amber-800 ring-1 ring-amber-100">
                 Firma sektörü tanımlı değil; şablon gösterilemiyor. Kurulumda sektör seçin.
               </p>
+            )}
+
+            {webDraft.templateId && (
+              <div className="space-y-3 rounded-2xl bg-sky-50 p-4 ring-1 ring-sky-100">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-wide text-sky-800">
+                    Sayfa görselleri
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-sky-900/80">
+                    Seçtiğiniz şablonda yayınlanacak fotoğrafları yükleyin. Boş bırakılan
+                    yerler şablon görselleriyle kalır. İlk kare kapak (hero) olur.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {gallerySlots.map((slot, index) => {
+                    const custom = webDraft.gallery?.[index];
+                    const preview = custom || slot.src;
+                    const label =
+                      index === 0 ? 'Kapak' : slot.alt?.trim() || `Galeri ${index + 1}`;
+                    return (
+                      <label
+                        key={`${webDraft.templateId}-${index}`}
+                        className="group relative flex aspect-[4/3] cursor-pointer flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-sky-100"
+                      >
+                        {preview ? (
+                          <img
+                            src={preview}
+                            alt=""
+                            className="absolute inset-0 h-full w-full object-cover"
+                          />
+                        ) : (
+                          <span className="absolute inset-0 flex items-center justify-center bg-slate-100 text-xs font-bold text-slate-400">
+                            Foto seç
+                          </span>
+                        )}
+                        <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 pb-2 pt-6 text-[11px] font-black text-white">
+                          {label}
+                          {custom ? ' · yüklendi' : ' · şablon'}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          onChange={e => {
+                            const f = e.target.files?.[0] || null;
+                            void onGalleryFile(index, f);
+                            e.target.value = '';
+                          }}
+                        />
+                        {custom && (
+                          <button
+                            type="button"
+                            className="absolute right-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-bold text-white opacity-0 group-hover:opacity-100"
+                            onClick={e => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setGallerySlot(index, null);
+                            }}
+                          >
+                            Kaldır
+                          </button>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
             )}
 
             <div className="space-y-2 rounded-2xl bg-violet-50 p-4 ring-1 ring-violet-100">

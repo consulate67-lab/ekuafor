@@ -222,6 +222,11 @@ export interface WebPageProfile {
   showPhone?: boolean;
   /** false ise müşteri sayfasında adres gizlenir (varsayılan: göster) */
   showAddress?: boolean;
+  /**
+   * Sayfada yayınlanacak görseller (kapak + galeri).
+   * data:image/... veya https URL; boş slot şablon görseline düşer.
+   */
+  gallery?: string[];
 }
 
 export interface CompanySetup {

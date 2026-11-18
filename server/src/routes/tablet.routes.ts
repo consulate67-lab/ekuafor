@@ -676,6 +676,39 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
             ? profile.sector_slugs.map((s: unknown) => String(s).trim()).filter(Boolean)
             : [];
 
+        const normalizeGalleryItem = (raw: unknown): string | null => {
+            if (typeof raw !== 'string') return null;
+            const s = raw.trim();
+            if (
+                s.startsWith('data:image/') ||
+                s.startsWith('https://') ||
+                s.startsWith('http://')
+            ) {
+                return s.slice(0, 1_800_000);
+            }
+            return null;
+        };
+        let webGalleryJson: string | null = null;
+        let coverPhoto: string | null = null;
+        if (Array.isArray(profile.web_gallery)) {
+            const items = profile.web_gallery
+                .map(normalizeGalleryItem)
+                .filter((x): x is string => !!x)
+                .slice(0, 4);
+            webGalleryJson = JSON.stringify(items);
+            coverPhoto = items[0] || '';
+        } else if (profile.web_gallery === null) {
+            webGalleryJson = '[]';
+            coverPhoto = '';
+        }
+        if (typeof profile.photo === 'string') {
+            if (profile.photo.trim() === '') coverPhoto = '';
+            else {
+                const p = normalizeGalleryItem(profile.photo);
+                if (p) coverPhoto = p;
+            }
+        }
+
         await pool.query(
             `ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_template_id VARCHAR(64)`,
         );
@@ -692,6 +725,7 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
         await pool.query(
             `ALTER TABLE companies ADD COLUMN IF NOT EXISTS show_address BOOLEAN DEFAULT true`,
         );
+        await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_gallery TEXT`);
 
         await pool.query(
             `UPDATE companies SET
@@ -710,6 +744,8 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
                 contact_note = CASE WHEN $14::text IS NULL THEN contact_note ELSE NULLIF($14, '') END,
                 show_phone = CASE WHEN $15::boolean IS NULL THEN show_phone ELSE $15::boolean END,
                 show_address = CASE WHEN $16::boolean IS NULL THEN show_address ELSE $16::boolean END,
+                web_gallery = CASE WHEN $17::text IS NULL THEN web_gallery ELSE $17 END,
+                photo = CASE WHEN $18::text IS NULL THEN photo ELSE $18 END,
                 updated_at = NOW()
              WHERE id = $1`,
             [
@@ -729,6 +765,8 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
                 contactNote,
                 showPhone,
                 showAddress,
+                webGalleryJson,
+                coverPhoto,
             ],
         );
 

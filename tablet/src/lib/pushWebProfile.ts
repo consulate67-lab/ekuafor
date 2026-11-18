@@ -45,6 +45,12 @@ export async function pushWebProfile(state: TabletState): Promise<{ ok: boolean;
           tiktok_url: web.tiktok || null,
           show_phone: web.showPhone !== false,
           show_address: web.showAddress !== false,
+          web_gallery: Array.isArray(web.gallery)
+            ? web.gallery.filter(s => typeof s === 'string' && s.trim()).slice(0, 4)
+            : [],
+          photo: Array.isArray(web.gallery)
+            ? web.gallery.find(s => typeof s === 'string' && s.trim()) || ''
+            : null,
           sector_slugs:
             company.sectorSlugs?.length
               ? company.sectorSlugs
