@@ -588,19 +588,19 @@ export function Settings() {
               <div className="space-y-3 rounded-2xl bg-sky-50 p-4 ring-1 ring-sky-100">
                 <div>
                   <p className="text-xs font-black uppercase tracking-wide text-sky-800">
-                    Sayfa görselleri
+                    Salonumuz / Galeri görselleri
                   </p>
                   <p className="mt-1 text-sm font-semibold text-sky-900/80">
-                    Seçtiğiniz şablonda yayınlanacak fotoğrafları yükleyin. Boş bırakılan
-                    yerler şablon görselleriyle kalır. İlk kare kapak (hero) olur.
+                    Müşteri sayfasındaki <strong>Salonumuz</strong> bölümünün 4 karesi. Kendi
+                    salon fotoğraflarınızı yükleyin; boş bırakılan kareler şablon resmiyle kalır.
+                    1. kare aynı zamanda üst kapak görseli olur.
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  {gallerySlots.map((slot, index) => {
+                  {gallerySlots.slice(0, 4).map((slot, index) => {
                     const custom = webDraft.gallery?.[index];
                     const preview = custom || slot.src;
-                    const label =
-                      index === 0 ? 'Kapak' : slot.alt?.trim() || `Galeri ${index + 1}`;
+                    const label = `Salonumuz ${index + 1}`;
                     return (
                       <label
                         key={`${webDraft.templateId}-${index}`}

@@ -691,10 +691,12 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
         let webGalleryJson: string | null = null;
         let coverPhoto: string | null = null;
         if (Array.isArray(profile.web_gallery)) {
-            const items = profile.web_gallery
-                .map(normalizeGalleryItem)
-                .filter((x): x is string => !!x)
-                .slice(0, 4);
+            const items: string[] = [];
+            for (const raw of profile.web_gallery) {
+                const n = normalizeGalleryItem(raw);
+                if (n) items.push(n);
+                if (items.length >= 4) break;
+            }
             webGalleryJson = JSON.stringify(items);
             coverPhoto = items[0] || '';
         } else if (profile.web_gallery === null) {
