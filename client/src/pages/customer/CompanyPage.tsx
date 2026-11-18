@@ -297,13 +297,14 @@ function CompanyPage({ id }: { id: number }) {
         webPack.aboutFallback ||
         'Profesyonel ekibimizle randevu ve bakım hizmetlerinde yanınızdayız.';
     const contactNote = (company.contact_note || '').trim();
-    const socialLinks = (
-        [
-            { kind: 'instagram' as const, label: 'Instagram', href: socialHref('instagram', company.instagram_url) },
-            { kind: 'facebook' as const, label: 'Facebook', href: socialHref('facebook', company.facebook_url) },
-            { kind: 'tiktok' as const, label: 'TikTok', href: socialHref('tiktok', company.tiktok_url) },
-        ] as const
-    ).filter((s): s is { kind: SocialKind; label: string; href: string } => !!s.href);
+    const socialCandidates: { kind: SocialKind; label: string; href: string | null }[] = [
+        { kind: 'instagram', label: 'Instagram', href: socialHref('instagram', company.instagram_url) },
+        { kind: 'facebook', label: 'Facebook', href: socialHref('facebook', company.facebook_url) },
+        { kind: 'tiktok', label: 'TikTok', href: socialHref('tiktok', company.tiktok_url) },
+    ];
+    const socialLinks = socialCandidates.flatMap(s =>
+        s.href ? [{ kind: s.kind, label: s.label, href: s.href }] : [],
+    );
     const socialPlacement = (() => {
         const p = String(company.web_social_placement || 'about').toLowerCase();
         return ['about', 'contact', 'both', 'hero', 'hidden'].includes(p)
