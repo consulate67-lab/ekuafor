@@ -227,6 +227,8 @@ export interface WebPageProfile {
    * data:image/... veya https URL; boş slot şablon görseline düşer.
    */
   gallery?: string[];
+  /** Üst slogan — boşsa şablon tagline kullanılır */
+  tagline?: string;
 }
 
 export interface CompanySetup {

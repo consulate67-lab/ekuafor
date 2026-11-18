@@ -174,20 +174,21 @@ function CompanyPage({ id }: { id: number }) {
     }, [company?.web_gallery]);
 
     const webPack = useMemo(() => {
+        const customTagline = (company?.web_tagline || '').trim();
         const base = selectedTemplate
             ? {
-                  tagline: selectedTemplate.tagline,
+                  tagline: customTagline || selectedTemplate.tagline,
                   aboutFallback: selectedTemplate.about,
                   gallery: selectedTemplate.gallery,
                   news: selectedTemplate.news,
               }
-            : fallbackPack;
+            : { ...fallbackPack, tagline: customTagline || fallbackPack.tagline };
         const gallery = base.gallery.map((g, i) => ({
             ...g,
             src: customGallery[i] || g.src,
         }));
         return { ...base, gallery };
-    }, [selectedTemplate, fallbackPack, customGallery]);
+    }, [selectedTemplate, fallbackPack, customGallery, company?.web_tagline]);
 
     const heroImage = company?.photo || customGallery[0] || webPack.gallery[0]?.src || null;
     const serviceImages = useMemo(

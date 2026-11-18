@@ -710,6 +710,8 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
                 if (p) coverPhoto = p;
             }
         }
+        const webTagline =
+            profile.web_tagline != null ? String(profile.web_tagline).trim().slice(0, 300) : null;
 
         await pool.query(
             `ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_template_id VARCHAR(64)`,
@@ -728,6 +730,7 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
             `ALTER TABLE companies ADD COLUMN IF NOT EXISTS show_address BOOLEAN DEFAULT true`,
         );
         await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_gallery TEXT`);
+        await pool.query(`ALTER TABLE companies ADD COLUMN IF NOT EXISTS web_tagline VARCHAR(300)`);
 
         await pool.query(
             `UPDATE companies SET
@@ -748,6 +751,7 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
                 show_address = CASE WHEN $16::boolean IS NULL THEN show_address ELSE $16::boolean END,
                 web_gallery = CASE WHEN $17::text IS NULL THEN web_gallery ELSE $17 END,
                 photo = CASE WHEN $18::text IS NULL THEN photo ELSE $18 END,
+                web_tagline = CASE WHEN $19::text IS NULL THEN web_tagline ELSE NULLIF($19, '') END,
                 updated_at = NOW()
              WHERE id = $1`,
             [
@@ -769,6 +773,7 @@ router.patch('/tablet/company/profile', async (req: Request, res: Response) => {
                 showAddress,
                 webGalleryJson,
                 coverPhoto,
+                webTagline,
             ],
         );
 

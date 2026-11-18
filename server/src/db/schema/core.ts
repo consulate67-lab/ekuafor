@@ -113,6 +113,8 @@ export const companies = pgTable('companies', {
     photo: text(),
     /** Müşteri web galerisi — JSON dizi (data URL / https), kapak photo ile senkron */
     webGallery: text('web_gallery'),
+    /** Müşteri web sloganı — boşsa şablon tagline */
+    webTagline: varchar('web_tagline', { length: 300 }),
     verificationCode: varchar('verification_code', { length: 10 }),
     originalPrice: numeric('original_price', { precision: 10, scale: 2 }),
     collectedPrice: numeric('collected_price', { precision: 10, scale: 2 }),

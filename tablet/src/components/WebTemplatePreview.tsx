@@ -5,60 +5,91 @@ type Props = {
   companyName: string;
   selected?: boolean;
   onSelect?: () => void;
+  /** Seçili şablonu düzenle */
+  onEdit?: () => void;
+  /** Önizlemede özel kapak/galeri (yüklenen) */
+  galleryOverride?: string[];
+  taglineOverride?: string;
 };
 
 /** Şablon kartı — renk bloğu değil, küçültülmüş sayfa önizlemesi */
-export function WebTemplatePreview({ template, companyName, selected, onSelect }: Props) {
+export function WebTemplatePreview({
+  template,
+  companyName,
+  selected,
+  onSelect,
+  onEdit,
+  galleryOverride,
+  taglineOverride,
+}: Props) {
   const { theme, layout, gallery, tagline, styleName, ctaLabel } = template;
-  const hero = gallery[0]?.src;
+  const gallerySrcs = gallery.map((g, i) => {
+    const o = galleryOverride?.[i];
+    return o && o.trim() ? o : g.src;
+  });
+  const hero = gallerySrcs[0];
   const name = companyName.trim() || 'İşletmeniz';
   const dark = layout === 'dark-full' || theme.surface === '#111827';
+  const shownTagline = (taglineOverride || '').trim() || tagline;
 
   return (
-    <button
-      type="button"
-      onClick={onSelect}
+    <div
       className={`overflow-hidden rounded-2xl text-left ring-2 transition ${
         selected ? 'ring-brand-600 shadow-md' : 'ring-slate-200 hover:ring-slate-300'
       }`}
     >
-      <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
-        {/* Ölçeklenmiş mini sayfa */}
-        <div
-          className="absolute inset-0 origin-top-left"
-          style={{ transform: 'scale(0.42)', width: '238%', height: '238%' }}
-          aria-hidden
-        >
-          <MiniPage
-            layout={layout}
-            theme={theme}
-            hero={hero}
-            name={name}
-            tagline={tagline}
-            ctaLabel={ctaLabel}
-            dark={dark}
-            thumbs={gallery.slice(1, 3).map(g => g.src)}
-          />
+      <button type="button" onClick={onSelect} className="block w-full text-left">
+        <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
+          <div
+            className="absolute inset-0 origin-top-left"
+            style={{ transform: 'scale(0.42)', width: '238%', height: '238%' }}
+            aria-hidden
+          >
+            <MiniPage
+              layout={layout}
+              theme={theme}
+              hero={hero}
+              name={name}
+              tagline={shownTagline}
+              ctaLabel={ctaLabel}
+              dark={dark}
+              thumbs={gallerySrcs.slice(1, 3)}
+            />
+          </div>
+          {selected && (
+            <span className="absolute right-2 top-2 rounded-full bg-brand-600 px-2 py-0.5 text-[10px] font-black text-white shadow">
+              Seçili
+            </span>
+          )}
         </div>
-        {selected && (
-          <span className="absolute right-2 top-2 rounded-full bg-brand-600 px-2 py-0.5 text-[10px] font-black text-white shadow">
-            Seçili
-          </span>
-        )}
-      </div>
-      <div className={`border-t px-3 py-2.5 ${dark ? 'border-slate-800 bg-slate-900' : 'border-slate-100 bg-white'}`}>
-        <p className={`text-sm font-black ${dark ? 'text-white' : 'text-slate-900'}`}>
-          {template.name}
-        </p>
-        <p className={`mt-0.5 line-clamp-1 text-[11px] font-semibold ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
-          {styleName} yerleşim · {tagline}
-        </p>
-      </div>
-    </button>
+        <div className={`border-t px-3 py-2.5 ${dark ? 'border-slate-800 bg-slate-900' : 'border-slate-100 bg-white'}`}>
+          <p className={`text-sm font-black ${dark ? 'text-white' : 'text-slate-900'}`}>
+            {template.name}
+          </p>
+          <p className={`mt-0.5 line-clamp-1 text-[11px] font-semibold ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
+            {styleName} yerleşim · {shownTagline}
+          </p>
+        </div>
+      </button>
+      {selected && onEdit && (
+        <div className={`border-t px-3 pb-3 ${dark ? 'border-slate-800 bg-slate-900' : 'border-slate-100 bg-white'}`}>
+          <button
+            type="button"
+            onClick={onEdit}
+            className="mt-1 w-full rounded-xl bg-brand-600 py-2.5 text-sm font-black text-white shadow-sm"
+          >
+            Düzenle
+          </button>
+          <p className="mt-1.5 text-center text-[10px] font-semibold text-slate-500">
+            Kapak, Salonumuz görselleri, yazılar
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 
-function MiniPage({
+export function MiniPage({
   layout,
   theme,
   hero,

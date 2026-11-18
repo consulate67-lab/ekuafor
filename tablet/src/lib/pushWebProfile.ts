@@ -51,6 +51,7 @@ export async function pushWebProfile(state: TabletState): Promise<{ ok: boolean;
           photo: Array.isArray(web.gallery)
             ? web.gallery.find(s => typeof s === 'string' && s.trim()) || ''
             : null,
+          web_tagline: (web.tagline || '').trim().slice(0, 300) || '',
           sector_slugs:
             company.sectorSlugs?.length
               ? company.sectorSlugs

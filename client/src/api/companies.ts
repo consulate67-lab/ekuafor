@@ -19,6 +19,8 @@ export interface PublicCompany {
     photo?: string | null;
     /** Kapak + galeri görselleri (JSON dizi veya string[]) */
     web_gallery?: string[] | string | null;
+    /** Üst slogan */
+    web_tagline?: string | null;
     address_line?: string | null;
     city?: string | null;
     district?: string | null;
