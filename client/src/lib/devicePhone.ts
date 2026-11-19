@@ -10,6 +10,21 @@ export function normalizeTrMobile(raw: string): string {
   return digits.slice(0, 11);
 }
 
+/** Karşılaştırma anahtarı: 5XXXXXXXXX (10 hane). */
+export function phoneCompareKey(raw: string): string {
+  let digits = String(raw || '').replace(/\D/g, '');
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (digits.startsWith('90') && digits.length >= 12) digits = digits.slice(2);
+  if (digits.startsWith('0') && digits.length === 11) digits = digits.slice(1);
+  return digits.slice(0, 10);
+}
+
+export function phonesMatch(a: string, b: string): boolean {
+  const ka = phoneCompareKey(a);
+  const kb = phoneCompareKey(b);
+  return ka.length >= 10 && kb.length >= 10 && ka === kb;
+}
+
 function preferMobile(numbers: Array<string | null | undefined>): string | null {
   const normalized = numbers.map(n => normalizeTrMobile(n || '')).filter(n => n.length >= 10);
   if (!normalized.length) return null;

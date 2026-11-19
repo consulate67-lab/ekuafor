@@ -11,8 +11,10 @@ import { resolveSectorSlug } from '../lib/resolveSectorSlug';
 import {
     canRequestDevicePhone,
     normalizeTrMobile,
+    phoneCompareKey,
     phonePickButtonLabel,
     phonePickHelpText,
+    phonesMatch,
     requestDevicePhoneNumber,
 } from '../lib/devicePhone';
 
@@ -95,6 +97,15 @@ function BookingPage({ id }: { id: string }) {
     const [otpBusy, setOtpBusy] = useState(false);
     const [phoneHintBusy, setPhoneHintBusy] = useState(false);
     const phoneHintTried = useRef(false);
+    /** SIM/rehber veya kayıtlı ziyaretçi — SMS’te yazılan numara ile karşılaştırılır */
+    const requesterPhoneRef = useRef<string | null>(
+        !isBusiness
+            ? (() => {
+                  const v = loadVisitorProfile()?.phone || user?.phone || localStorage.getItem('customer_phone');
+                  return v && phoneCompareKey(v).length >= 10 ? normalizeTrMobile(v) : null;
+              })()
+            : null,
+    );
 
     const [stepIndex, setStepIndex] = useState(0);
     const [selection, setSelection] = useState<SelectionState>(() => {
@@ -320,6 +331,7 @@ function BookingPage({ id }: { id: string }) {
         try {
             const phone = await requestDevicePhoneNumber();
             if (phone) {
+                requesterPhoneRef.current = phone;
                 update({ customerPhone: phone });
                 setOtpSent(false);
                 setOtpCode('');
@@ -339,15 +351,49 @@ function BookingPage({ id }: { id: string }) {
     }, [step, isBusiness, needsPhoneOtp, selection.customerPhone, pickPhoneFromDevice]);
 
     const sendBookingOtp = async () => {
-        const phone = selection.customerPhone.replace(/\D/g, '');
-        if (phone.length < 10) {
+        const typed = normalizeTrMobile(selection.customerPhone);
+        if (phoneCompareKey(typed).length < 10) {
             setError('Geçerli bir telefon numarası girin');
             return;
         }
+
+        // Cihazdan seçilen / kayıtlı talepçi numarası ile yazılan alan aynı mı?
+        let reference = requesterPhoneRef.current;
+        if (!reference && canRequestDevicePhone()) {
+            setOtpBusy(true);
+            setError(null);
+            try {
+                const fromDevice = await requestDevicePhoneNumber();
+                if (fromDevice) {
+                    requesterPhoneRef.current = fromDevice;
+                    reference = fromDevice;
+                }
+            } finally {
+                setOtpBusy(false);
+            }
+        }
+        if (!reference) {
+            const known =
+                loadVisitorProfile()?.phone ||
+                user?.phone ||
+                localStorage.getItem('customer_phone') ||
+                '';
+            if (phoneCompareKey(known).length >= 10) reference = normalizeTrMobile(known);
+        }
+        if (reference && !phonesMatch(typed, reference)) {
+            setError(
+                canRequestDevicePhone()
+                    ? 'Yazdığınız numara, bu cihazdaki / seçilen numaradan farklı. SIM veya rehberden kendi numaranızı seçin ya da aynı numarayı yazın.'
+                    : 'Yazdığınız numara, bu cihazdaki kayıtlı talep numarasından farklı. Kendi numaranızı yazın veya güncelleyin.',
+            );
+            setOtpSent(false);
+            return;
+        }
+
         setOtpBusy(true);
         setError(null);
         try {
-            await api.post('/auth/send-otp', { phone });
+            await api.post('/auth/send-otp', { phone: typed.replace(/\D/g, '') });
             setOtpSent(true);
             setOtpTimer(60);
             setOtpCode('');
