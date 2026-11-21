@@ -1,5 +1,6 @@
 import type { TabletState } from '../types';
 import { deviceId } from './id';
+import { normalizeMediaSettings } from './idleMedia';
 
 const KEY = 'saloon_tablet_v1';
 /** Cihazda uygulama silinse bile kalması için paylaşılan klasör yedeği */
@@ -18,6 +19,7 @@ export const emptyState = (): TabletState => ({
   subscribers: [],
   groupSessions: [],
   syncQueue: [],
+  mediaSettings: normalizeMediaSettings(undefined),
 });
 
 function mergeState(parsed: Partial<TabletState> | null | undefined): TabletState {
@@ -41,6 +43,7 @@ function mergeState(parsed: Partial<TabletState> | null | undefined): TabletStat
     })),
     syncQueue: parsed.syncQueue || [],
     deviceId: parsed.deviceId || deviceId(),
+    mediaSettings: normalizeMediaSettings(parsed.mediaSettings),
   };
 }
 

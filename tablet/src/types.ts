@@ -289,6 +289,37 @@ export interface GroupSession {
   updatedAt?: string;
 }
 
+/** İnternet radyosu ön ayarı — frekans etiketi (ör. 96.2) görüntü içindir */
+export interface RadioPreset {
+  id: string;
+  name: string;
+  /** Gösterim: 88.0–108.0 FM etiketi */
+  frequency: number;
+  streamUrl: string;
+}
+
+/** Ücretsiz / yasal yayın kanalı (doğrudan akış URL’si) */
+export interface TvChannel {
+  id: string;
+  name: string;
+  streamUrl: string;
+}
+
+/** Tablet boştayken radyo / TV — cihaz ayarı, sunucuya gitmez */
+export interface IdleMediaSettings {
+  enabled: boolean;
+  /** Etkileşimsiz kalınca TV açılma süresi (sn) */
+  idleDelaySeconds: number;
+  radioEnabled: boolean;
+  radioPresets: RadioPreset[];
+  selectedRadioPresetId?: string;
+  tvEnabled: boolean;
+  tvChannels: TvChannel[];
+  selectedTvChannelId?: string;
+  /** Varsayılan kanal kataloğu sürümü — yükseltince URL’ler yenilenir */
+  catalogVersion?: number;
+}
+
 export interface TabletState {
   deviceId: string;
   company: CompanySetup | null;
@@ -303,6 +334,7 @@ export interface TabletState {
   groupSessions: GroupSession[];
   syncQueue: SyncPayload[];
   lastSyncAt?: string;
+  mediaSettings: IdleMediaSettings;
 }
 
 export interface SyncPayload {

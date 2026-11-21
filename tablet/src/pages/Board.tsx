@@ -37,7 +37,9 @@ import {
   speechErrorMessage,
   speechSupported,
 } from '../lib/speech';
-import { IconExpense, IconReport, IconSettings } from '../components/Icons';
+import { IconExpense, IconRadio, IconReport, IconSettings, IconTv } from '../components/Icons';
+import { IdleMediaPanel } from '../components/IdleMediaPanel';
+import { isOnline, normalizeMediaSettings } from '../lib/idleMedia';
 import {
   fetchPendingAppointments,
   setPendingAppointmentStatus,
@@ -95,6 +97,11 @@ export function Board() {
   const subscribers = useAppStore(s => s.subscribers);
   const deviceId = useAppStore(s => s.deviceId);
   const ingestApprovedWebAppointment = useAppStore(s => s.ingestApprovedWebAppointment);
+  const mediaSettingsRaw = useAppStore(s => s.mediaSettings);
+  const mediaSettings = useMemo(
+    () => normalizeMediaSettings(mediaSettingsRaw),
+    [mediaSettingsRaw],
+  );
 
   type Sheet =
     | {
@@ -145,6 +152,12 @@ export function Board() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calYear, setCalYear] = useState(() => parseKey(selectedDate).y);
   const [calMonth, setCalMonth] = useState(() => parseKey(selectedDate).m);
+  const [mediaOpen, setMediaOpen] = useState(false);
+  const [mediaMode, setMediaMode] = useState<'radio' | 'tv'>('radio');
+  const [mediaAutoTv, setMediaAutoTv] = useState(false);
+  const [lastActiveAt, setLastActiveAt] = useState(() => Date.now());
+  const [idleTick, setIdleTick] = useState(0);
+  const [online, setOnline] = useState(() => isOnline());
 
   const dayHours = useMemo(
     () => companyHoursForDate(company, selectedDate),
@@ -173,6 +186,28 @@ export function Board() {
 
   const isToday = selectedDate === todayKey();
   const currentMin = nowMinutes();
+  void tick;
+  void idleTick;
+
+  /** Şu an panoda takip edilen aktif (devam eden) randevu / izin var mı? */
+  const hasActiveTrackedEvent = useMemo(() => {
+    if (!isToday) return false;
+    return dayEvents.some(event => {
+      if (event.status !== 'planned') return false;
+      const start = toMinutes(event.startTime);
+      const end = toMinutes(event.endTime);
+      return start <= currentMin && currentMin < end;
+    });
+  }, [isToday, dayEvents, currentMin]);
+
+  const idleMediaAllowed =
+    mediaSettings.enabled &&
+    online &&
+    isToday &&
+    !hasActiveTrackedEvent &&
+    !sheet &&
+    !calendarOpen;
+
   /** Bugün: tüm gün saatleri (geçmiş + kalan); varsayılan kaydırma “şimdi”ye */
   const slots = allSlots;
   const scale = boardScale(staff.length);
@@ -201,7 +236,11 @@ export function Board() {
       activationKey: key,
       companyId,
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      if (res.message) setPendingMsg(res.message);
+      return;
+    }
+    setPendingMsg('');
     const next = res.data;
     const prevIds = knownPendingIdsRef.current;
     const hasNew = next.some(row => !prevIds.has(row.id));
@@ -217,6 +256,57 @@ export function Board() {
     const id = window.setInterval(() => setTick(t => t + 1), 60_000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setIdleTick(t => t + 1), 10_000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setOnline(isOnline());
+    window.addEventListener('online', sync);
+    window.addEventListener('offline', sync);
+    return () => {
+      window.removeEventListener('online', sync);
+      window.removeEventListener('offline', sync);
+    };
+  }, []);
+
+  useEffect(() => {
+    const mark = () => setLastActiveAt(Date.now());
+    const opts: AddEventListenerOptions = { capture: true, passive: true };
+    window.addEventListener('pointerdown', mark, opts);
+    window.addEventListener('keydown', mark, opts);
+    window.addEventListener('touchstart', mark, opts);
+    return () => {
+      window.removeEventListener('pointerdown', mark, opts);
+      window.removeEventListener('keydown', mark, opts);
+      window.removeEventListener('touchstart', mark, opts);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!idleMediaAllowed && mediaOpen) {
+      setMediaOpen(false);
+      setMediaAutoTv(false);
+    }
+  }, [idleMediaAllowed, mediaOpen]);
+
+  useEffect(() => {
+    if (!idleMediaAllowed || mediaOpen || !mediaSettings.tvEnabled) return;
+    const idleMs = mediaSettings.idleDelaySeconds * 1000;
+    if (Date.now() - lastActiveAt < idleMs) return;
+    setMediaMode('tv');
+    setMediaAutoTv(true);
+    setMediaOpen(true);
+  }, [
+    idleMediaAllowed,
+    mediaOpen,
+    mediaSettings.tvEnabled,
+    mediaSettings.idleDelaySeconds,
+    lastActiveAt,
+    idleTick,
+  ]);
 
   useEffect(() => {
     if (!isToday || !slots.length) {
@@ -771,6 +861,38 @@ export function Board() {
                 )}
               </button>
             )}
+            {idleMediaAllowed && mediaSettings.radioEnabled && (
+              <button
+                type="button"
+                title="Radyo"
+                aria-label="Radyo"
+                onClick={() => {
+                  setMediaMode('radio');
+                  setMediaAutoTv(false);
+                  setMediaOpen(true);
+                  setLastActiveAt(Date.now());
+                }}
+                className="btn btn-secondary btn-icon"
+              >
+                <IconRadio />
+              </button>
+            )}
+            {idleMediaAllowed && mediaSettings.tvEnabled && (
+              <button
+                type="button"
+                title="TV"
+                aria-label="TV"
+                onClick={() => {
+                  setMediaMode('tv');
+                  setMediaAutoTv(false);
+                  setMediaOpen(true);
+                  setLastActiveAt(Date.now());
+                }}
+                className="btn btn-secondary btn-icon"
+              >
+                <IconTv />
+              </button>
+            )}
             <button
               type="button"
               title="Rapor"
@@ -1317,6 +1439,35 @@ export function Board() {
           </p>
         )}
       </div>
+
+      {idleMediaAllowed && !mediaOpen && (
+        <button
+          type="button"
+          title="Radyo / TV"
+          aria-label="Radyo ve TV"
+          onClick={() => {
+            setMediaMode(mediaSettings.radioEnabled ? 'radio' : 'tv');
+            setMediaAutoTv(false);
+            setMediaOpen(true);
+            setLastActiveAt(Date.now());
+          }}
+          className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand-600 text-white shadow-lg shadow-brand-600/30 ring-4 ring-white active:scale-95"
+        >
+          {mediaSettings.radioEnabled ? <IconRadio className="h-6 w-6" /> : <IconTv className="h-6 w-6" />}
+        </button>
+      )}
+
+      {mediaOpen && idleMediaAllowed && (
+        <IdleMediaPanel
+          mode={mediaMode}
+          autoTv={mediaAutoTv}
+          onClose={() => {
+            setMediaOpen(false);
+            setMediaAutoTv(false);
+            setLastActiveAt(Date.now());
+          }}
+        />
+      )}
 
       {calendarOpen && (
         <Modal onClose={() => setCalendarOpen(false)}>
@@ -2013,7 +2164,7 @@ export function Board() {
         <Modal onClose={() => setSheet(null)}>
           <h3 className="text-lg font-black">Onay bekleyen randevular</h3>
           <p className="mt-1 text-sm font-semibold text-slate-500">
-            Web / QR talepleri · onayda müşteriye SMS gider · cevaplanmazsa 15 dk’da bir uyarı sesi
+            Müşteri SMS ile doğrular · siz tablette onaylayınca uygulama bildirimi gider · cevaplanmazsa 15 dk’da bir uyarı sesi
           </p>
           <div className="mt-4 max-h-[55vh] space-y-3 overflow-y-auto">
             {pendingList.length === 0 ? (

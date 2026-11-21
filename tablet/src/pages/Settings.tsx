@@ -24,8 +24,10 @@ import {
   getWebTemplate,
   listWebTemplatesForSectors,
 } from '@shared/webPageTemplates';
+import { clampFrequency, formatFrequency, normalizeMediaSettings } from '../lib/idleMedia';
+import type { RadioPreset, TvChannel } from '../types';
 
-type Tab = 'hours' | 'staff' | 'services' | 'webpage';
+type Tab = 'hours' | 'staff' | 'services' | 'webpage' | 'media';
 
 export function Settings() {
   const company = useAppStore(s => s.company)!;
@@ -33,7 +35,10 @@ export function Settings() {
   const services = useAppStore(s => s.services);
   const departments = useAppStore(s => s.departments);
   const deviceId = useAppStore(s => s.deviceId);
+  const mediaSettingsRaw = useAppStore(s => s.mediaSettings);
+  const media = useMemo(() => normalizeMediaSettings(mediaSettingsRaw), [mediaSettingsRaw]);
   const updateCompany = useAppStore(s => s.updateCompany);
+  const updateMediaSettings = useAppStore(s => s.updateMediaSettings);
   const upsertStaff = useAppStore(s => s.upsertStaff);
   const removeStaff = useAppStore(s => s.removeStaff);
   const upsertDepartment = useAppStore(s => s.upsertDepartment);
@@ -45,6 +50,8 @@ export function Settings() {
   const persist = useAppStore(s => s.persist);
 
   const [tab, setTab] = useState<Tab>('hours');
+  const [radioDraft, setRadioDraft] = useState({ name: '', frequency: 100, streamUrl: '' });
+  const [tvDraft, setTvDraft] = useState({ name: '', streamUrl: '' });
   const [draftStaff, setDraftStaff] = useState<Staff | null>(null);
   const [svcName, setSvcName] = useState('');
   const [svcDuration, setSvcDuration] = useState(30);
@@ -346,12 +353,13 @@ export function Settings() {
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-2 rounded-3xl bg-white p-2 shadow-sm sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 rounded-3xl bg-white p-2 shadow-sm sm:grid-cols-5">
           {([
             ['hours', 'Mesai'],
             ['staff', 'Çalışan'],
             ['services', 'Hizmet'],
             ['webpage', 'Web'],
+            ['media', 'Radyo/TV'],
           ] as const).map(([key, label]) => (
             <button
               key={key}
@@ -975,6 +983,213 @@ export function Settings() {
                 )}
               </label>
               <button type="button" onClick={addService} className="btn btn-primary btn-block !min-h-12">Kaydet</button>
+            </div>
+          </section>
+        )}
+
+        {tab === 'media' && (
+          <section className="space-y-4 rounded-3xl bg-white p-6 shadow-sm">
+            <div>
+              <h2 className="text-lg font-black">Radyo / TV (boşta)</h2>
+              <p className="mt-1 text-sm font-semibold text-slate-500">
+                Panoda aktif randevu yokken ve internet varken Türkiye radyo / TV yayınları. Randevu başlayınca kapanır.
+              </p>
+            </div>
+
+            <label className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+              <span className="font-bold text-slate-800">Boşta medya açık</span>
+              <input
+                type="checkbox"
+                checked={media.enabled}
+                onChange={e => updateMediaSettings({ enabled: e.target.checked })}
+                className="h-5 w-5 accent-brand-600"
+              />
+            </label>
+
+            <label className="block space-y-1">
+              <span className="text-xs font-black uppercase tracking-wide text-slate-400">
+                TV otomatik açılma (sn)
+              </span>
+              <input
+                type="number"
+                min={30}
+                max={600}
+                value={media.idleDelaySeconds}
+                onChange={e =>
+                  updateMediaSettings({
+                    idleDelaySeconds: Math.max(30, Math.min(600, Number(e.target.value) || 90)),
+                  })
+                }
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold"
+              />
+            </label>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+                <span className="font-bold text-slate-800">Radyo</span>
+                <input
+                  type="checkbox"
+                  checked={media.radioEnabled}
+                  onChange={e => updateMediaSettings({ radioEnabled: e.target.checked })}
+                  className="h-5 w-5 accent-brand-600"
+                />
+              </label>
+              <label className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+                <span className="font-bold text-slate-800">TV</span>
+                <input
+                  type="checkbox"
+                  checked={media.tvEnabled}
+                  onChange={e => updateMediaSettings({ tvEnabled: e.target.checked })}
+                  className="h-5 w-5 accent-brand-600"
+                />
+              </label>
+            </div>
+
+            <div className="space-y-3 rounded-2xl border border-slate-100 p-4">
+              <h3 className="font-black">Radyo frekansları</h3>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <input
+                  value={radioDraft.name}
+                  onChange={e => setRadioDraft(d => ({ ...d, name: e.target.value }))}
+                  placeholder="İstasyon adı"
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold"
+                />
+                <input
+                  type="number"
+                  step={0.1}
+                  min={87.5}
+                  max={108}
+                  value={radioDraft.frequency}
+                  onChange={e =>
+                    setRadioDraft(d => ({ ...d, frequency: clampFrequency(Number(e.target.value)) }))
+                  }
+                  placeholder="Frekans"
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold"
+                />
+                <input
+                  value={radioDraft.streamUrl}
+                  onChange={e => setRadioDraft(d => ({ ...d, streamUrl: e.target.value }))}
+                  placeholder="Akış URL"
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold sm:col-span-3"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const url = radioDraft.streamUrl.trim();
+                  if (!url) return;
+                  const preset: RadioPreset = {
+                    id: uid('radio'),
+                    name: radioDraft.name.trim() || formatFrequency(radioDraft.frequency),
+                    frequency: clampFrequency(radioDraft.frequency),
+                    streamUrl: url,
+                  };
+                  updateMediaSettings({
+                    radioPresets: [...media.radioPresets, preset],
+                    selectedRadioPresetId: preset.id,
+                  });
+                  setRadioDraft({ name: '', frequency: 100, streamUrl: '' });
+                }}
+                className="btn btn-primary !min-h-11"
+              >
+                Frekans kaydet
+              </button>
+              <ul className="space-y-2">
+                {media.radioPresets.map(p => (
+                  <li
+                    key={p.id}
+                    className="flex items-center justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-black">{p.name}</p>
+                      <p className="text-xs font-semibold text-slate-500">
+                        {formatFrequency(p.frequency)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-xl bg-white px-3 py-1 text-xs font-black text-rose-600 ring-1 ring-rose-100"
+                      onClick={() =>
+                        updateMediaSettings({
+                          radioPresets: media.radioPresets.filter(x => x.id !== p.id),
+                          selectedRadioPresetId:
+                            media.selectedRadioPresetId === p.id
+                              ? media.radioPresets.find(x => x.id !== p.id)?.id
+                              : media.selectedRadioPresetId,
+                        })
+                      }
+                    >
+                      Sil
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="space-y-3 rounded-2xl border border-slate-100 p-4">
+              <h3 className="font-black">TV kanalları</h3>
+              <p className="text-xs font-semibold text-slate-500">
+                Yasal ücretsiz .m3u8 / mp4 adresleri ekleyin (ör. TRT yayınları).
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <input
+                  value={tvDraft.name}
+                  onChange={e => setTvDraft(d => ({ ...d, name: e.target.value }))}
+                  placeholder="Kanal adı"
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold"
+                />
+                <input
+                  value={tvDraft.streamUrl}
+                  onChange={e => setTvDraft(d => ({ ...d, streamUrl: e.target.value }))}
+                  placeholder="Yayın URL"
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 font-bold"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const url = tvDraft.streamUrl.trim();
+                  const name = tvDraft.name.trim();
+                  if (!url || !name) return;
+                  const channel: TvChannel = { id: uid('tv'), name, streamUrl: url };
+                  updateMediaSettings({
+                    tvChannels: [...media.tvChannels, channel],
+                    selectedTvChannelId: channel.id,
+                  });
+                  setTvDraft({ name: '', streamUrl: '' });
+                }}
+                className="btn btn-primary !min-h-11"
+              >
+                Kanal ekle
+              </button>
+              <ul className="space-y-2">
+                {media.tvChannels.map(c => (
+                  <li
+                    key={c.id}
+                    className="flex items-center justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-black">{c.name}</p>
+                      <p className="truncate text-xs font-semibold text-slate-400">{c.streamUrl}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-xl bg-white px-3 py-1 text-xs font-black text-rose-600 ring-1 ring-rose-100"
+                      onClick={() =>
+                        updateMediaSettings({
+                          tvChannels: media.tvChannels.filter(x => x.id !== c.id),
+                          selectedTvChannelId:
+                            media.selectedTvChannelId === c.id
+                              ? media.tvChannels.find(x => x.id !== c.id)?.id
+                              : media.selectedTvChannelId,
+                        })
+                      }
+                    >
+                      Sil
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
           </section>
         )}

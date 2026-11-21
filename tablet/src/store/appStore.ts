@@ -25,6 +25,7 @@ import type {
   DayEvent,
   Department,
   GroupSession,
+  IdleMediaSettings,
   Screen,
   Service,
   Staff,
@@ -35,6 +36,7 @@ import type {
   SubscriberProgramPlan,
   TabletState,
 } from '../types';
+import { normalizeMediaSettings } from '../lib/idleMedia';
 
 interface AppStore extends TabletState {
   screen: Screen;
@@ -45,6 +47,7 @@ interface AppStore extends TabletState {
   persist: () => void;
   setScreen: (s: Screen) => void;
   setSelectedDate: (d: string) => void;
+  updateMediaSettings: (patch: Partial<IdleMediaSettings>) => void;
   completeSetup: (payload: {
     company: Omit<CompanySetup, 'setupCompletedAt'>;
     departments: Department[];
@@ -198,10 +201,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
       campaigns: data.campaigns || [],
       subscribers: data.subscribers || [],
       groupSessions: data.groupSessions || [],
+      mediaSettings: normalizeMediaSettings(data.mediaSettings),
       hydrated: true,
       screen: data.company ? 'board' : 'setup',
       selectedDate: today(),
     });
+    // Katalog URL’leri (radyo/TV) güncellendiyse diske yaz
+    get().persist();
   },
 
   persist: () => {
@@ -219,11 +225,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
       groupSessions: s.groupSessions || [],
       syncQueue: s.syncQueue,
       lastSyncAt: s.lastSyncAt,
+      mediaSettings: normalizeMediaSettings(s.mediaSettings),
     });
   },
 
   setScreen: screen => set({ screen }),
   setSelectedDate: selectedDate => set({ selectedDate }),
+
+  updateMediaSettings: patch => {
+    const current = normalizeMediaSettings(get().mediaSettings);
+    set({ mediaSettings: normalizeMediaSettings({ ...current, ...patch }) });
+    get().persist();
+  },
 
   completeSetup: async ({ company, departments, staff, services }) => {
     if (!navigator.onLine) {
