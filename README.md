@@ -28,7 +28,10 @@ npm install                 # kökten, workspaces ile client + server kurulur
 cp server/.env.example server/.env   # DATABASE_URL ve JWT_SECRET doldurun
 npm run server:dev          # http://localhost:3000
 npm run client:dev          # http://localhost:5173
+cd tablet && npm run dev    # http://localhost:5180 — tablet (APK ile aynı form)
 ```
+
+Canlı tablet paneli (deploy sonrası): `https://…/tablet` — offline tablet formu ile birebir, tarayıcıda online.
 
 Yerel PostgreSQL için `docker-compose up db` kullanılabilir. Sunucu açılışta `server/src/db/migrate.ts` ile şemayı günceller.
 
@@ -41,7 +44,7 @@ npm test --workspace=client
 
 ## Deploy (Railway)
 
-- `main` dalına push → Railway repo kökünden derler (`npm run build`), `npm start` ile sunucuyu başlatır. Sunucu istemcinin derlenmiş halini de servis eder.
+- `main` dalına push → Railway repo kökünden derler (`npm run build`), `npm start` ile sunucuyu başlatır. Sunucu istemci + tablet (`/tablet`) derlemesini de servis eder.
 - Ayarlar: `server/railway.toml`. Sağlık kontrolü: `/api/ping`.
 - Gerekli ortam değişkenleri: `DATABASE_URL`, `JWT_SECRET` (en az 32 karakter), `ALLOWED_ORIGINS`.
 - Opsiyonel: `REDIS_URL`, `FIREBASE_SERVICE_ACCOUNT_JSON`, `SMTP_*`, `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` (sadece boş kurulumda ilk admini oluşturur).

@@ -1,4 +1,4 @@
-const DEFAULT_API = 'https://web-production-db847.up.railway.app/api';
+import { apiBase } from './apiBase';
 
 export type PendingAppointment = {
   id: number;
@@ -16,10 +16,6 @@ export type PendingAppointment = {
   staff_name?: string;
 };
 
-function apiBase() {
-  return (import.meta.env.VITE_API_URL || DEFAULT_API).replace(/\/$/, '');
-}
-
 export async function fetchPendingAppointments(input: {
   deviceId: string;
   activationKey: string;
@@ -32,12 +28,8 @@ export async function fetchPendingAppointments(input: {
       deviceId: input.deviceId,
       activationKey: input.activationKey,
     });
-    const res = await fetch(`${apiBase()}/tablet/appointments/pending?${q}`, {
-      headers: {
-        'X-Device-Id': input.deviceId,
-        'X-Activation-Key': input.activationKey,
-      },
-    });
+    // Auth query'de (CORS preflight / özel header whitelist'e takılmasın)
+    const res = await fetch(`${apiBase()}/tablet/appointments/pending?${q}`);
     const json = await res.json().catch(() => ({}));
     if (!res.ok || !json?.success) {
       return { ok: false, data: [], message: json?.error || `Hata (${res.status})` };
@@ -57,13 +49,10 @@ export async function setPendingAppointmentStatus(input: {
 }): Promise<{ ok: boolean; message: string; data?: PendingAppointment }> {
   if (!navigator.onLine) return { ok: false, message: 'İnternet yok' };
   try {
+    // Cihaz/anahtar body'de — özel header CORS preflight kırılmasın
     const res = await fetch(`${apiBase()}/tablet/appointments/${input.appointmentId}/status`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Device-Id': input.deviceId,
-        'X-Activation-Key': input.activationKey,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         deviceId: input.deviceId,
         activationKey: input.activationKey,

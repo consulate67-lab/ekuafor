@@ -37,13 +37,23 @@ import type {
   TabletState,
 } from '../types';
 import { normalizeMediaSettings } from '../lib/idleMedia';
+import { isWebServerFirst } from '../lib/runtime';
+import { boardPayloadFromState, fetchBoard, saveBoard } from '../lib/boardApi';
 
 interface AppStore extends TabletState {
   screen: Screen;
   selectedDate: string;
   hydrated: boolean;
   lastFinalizeMessage?: string;
+  /** Railway board revision (web) */
+  boardRevision: number;
+  cloudSaveMessage?: string;
   hydrate: () => Promise<void>;
+  /** Web: anahtar + companyId ile Railway board yükle */
+  bootstrapFromServer: (activationKey: string, companyId?: number) => Promise<{
+    ok: boolean;
+    message: string;
+  }>;
   persist: () => void;
   setScreen: (s: Screen) => void;
   setSelectedDate: (d: string) => void;
@@ -187,11 +197,45 @@ const today = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+let cloudSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+function applyBoardPayload(
+  set: (partial: Partial<AppStore>) => void,
+  get: () => AppStore,
+  payload: NonNullable<Awaited<ReturnType<typeof fetchBoard>>['payload']>,
+  opts: { companyId: number; revision: number; activationKey: string },
+) {
+  const key = opts.activationKey.trim().toUpperCase();
+  const company = payload.company
+    ? {
+        ...payload.company,
+        activationKey: key || payload.company.activationKey,
+        serverCompanyId: opts.companyId || payload.company.serverCompanyId,
+      }
+    : null;
+  set({
+    company,
+    departments: payload.departments || [],
+    staff: payload.staff || [],
+    services: payload.services || [],
+    events: payload.events || [],
+    expenses: payload.expenses || [],
+    campaigns: payload.campaigns || [],
+    subscribers: payload.subscribers || [],
+    groupSessions: payload.groupSessions || [],
+    mediaSettings: normalizeMediaSettings(payload.mediaSettings),
+    boardRevision: opts.revision || 0,
+    lastSyncAt: new Date().toISOString(),
+    screen: company ? 'board' : get().screen,
+  });
+}
+
 export const useAppStore = create<AppStore>((set, get) => ({
   ...loadState(),
   screen: 'setup',
   selectedDate: today(),
   hydrated: false,
+  boardRevision: 0,
 
   hydrate: async () => {
     const data = await loadStateAsync();
@@ -202,17 +246,97 @@ export const useAppStore = create<AppStore>((set, get) => ({
       subscribers: data.subscribers || [],
       groupSessions: data.groupSessions || [],
       mediaSettings: normalizeMediaSettings(data.mediaSettings),
-      hydrated: true,
-      screen: data.company ? 'board' : 'setup',
+      boardRevision: 0,
       selectedDate: today(),
     });
-    // Katalog URL’leri (radyo/TV) güncellendiyse diske yaz
+
+    if (isWebServerFirst() && navigator.onLine) {
+      const key = String(data.company?.activationKey || '').trim();
+      if (key) {
+        const board = await fetchBoard({
+          deviceId: data.deviceId,
+          activationKey: key,
+          companyId: data.company?.serverCompanyId,
+        });
+        if (board.ok && board.payload?.company) {
+          applyBoardPayload(set, get, board.payload, {
+            companyId: board.companyId || data.company?.serverCompanyId || 0,
+            revision: board.revision || 0,
+            activationKey: key,
+          });
+          set({ hydrated: true, deviceId: data.deviceId });
+          // Önbellek (otorite sunucu)
+          try {
+            get().persist();
+          } catch {
+            /* ignore */
+          }
+          return;
+        }
+        if (board.ok && board.companyId) {
+          set({
+            company: data.company
+              ? { ...data.company, serverCompanyId: board.companyId, activationKey: key }
+              : data.company,
+            hydrated: true,
+            screen: data.company ? 'board' : 'setup',
+          });
+          return;
+        }
+      }
+    }
+
+    set({
+      hydrated: true,
+      screen: data.company ? 'board' : 'setup',
+    });
     get().persist();
+  },
+
+  bootstrapFromServer: async (activationKey, companyId) => {
+    if (!navigator.onLine) return { ok: false, message: 'İnternet gerekli' };
+    const key = activationKey.trim().toUpperCase();
+    const board = await fetchBoard({
+      deviceId: get().deviceId,
+      activationKey: key,
+      companyId,
+    });
+    if (!board.ok) return { ok: false, message: board.message || 'Board yüklenemedi' };
+
+    if (board.payload?.company) {
+      applyBoardPayload(set, get, board.payload, {
+        companyId: board.companyId || companyId || 0,
+        revision: board.revision || 0,
+        activationKey: key,
+      });
+      get().persist();
+      return { ok: true, message: board.message || 'Panel Railway’den yüklendi' };
+    }
+
+    if (board.companyId) {
+      set({
+        company: {
+          name: get().company?.name || 'Firma',
+          workStart: '09:00',
+          workEnd: '19:00',
+          slotInterval: 30,
+          location: null,
+          activationKey: key,
+          serverCompanyId: board.companyId,
+          setupCompletedAt: new Date().toISOString(),
+        },
+        screen: 'board',
+      });
+      get().persist();
+      return { ok: true, message: 'Firma bağlandı — panel hazır' };
+    }
+
+    return { ok: false, message: 'Firma board’u bulunamadı' };
   },
 
   persist: () => {
     const s = get();
-    saveState({
+    const snapshot: TabletState = {
       deviceId: s.deviceId,
       company: s.company,
       departments: s.departments,
@@ -226,7 +350,46 @@ export const useAppStore = create<AppStore>((set, get) => ({
       syncQueue: s.syncQueue,
       lastSyncAt: s.lastSyncAt,
       mediaSettings: normalizeMediaSettings(s.mediaSettings),
-    });
+    };
+
+    // APK: yerel otorite. Web: önbellek + Railway.
+    try {
+      saveState(snapshot);
+    } catch {
+      /* quota */
+    }
+
+    if (!isWebServerFirst()) return;
+
+    const companyId = s.company?.serverCompanyId;
+    const key = String(s.company?.activationKey || '').trim();
+    if (!companyId || !key || !navigator.onLine) return;
+
+    if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
+    cloudSaveTimer = setTimeout(() => {
+      void (async () => {
+        const cur = get();
+        const cid = cur.company?.serverCompanyId;
+        const akey = String(cur.company?.activationKey || '').trim();
+        if (!cid || !akey) return;
+        const result = await saveBoard({
+          deviceId: cur.deviceId,
+          activationKey: akey,
+          companyId: cid,
+          expectedRevision: cur.boardRevision || undefined,
+          payload: boardPayloadFromState(cur),
+        });
+        if (result.ok) {
+          set({
+            boardRevision: result.revision ?? cur.boardRevision,
+            lastSyncAt: new Date().toISOString(),
+            cloudSaveMessage: undefined,
+          });
+        } else {
+          set({ cloudSaveMessage: result.message });
+        }
+      })();
+    }, 700);
   },
 
   setScreen: screen => set({ screen }),
@@ -282,8 +445,22 @@ export const useAppStore = create<AppStore>((set, get) => ({
       subscribers: [],
       screen: 'board',
       lastFinalizeMessage: result.message,
+      boardRevision: 0,
     });
     get().persist();
+    // Web: ilk board’u hemen Railway’e yaz
+    if (isWebServerFirst() && navigator.onLine) {
+      const cur = get();
+      const saved = await saveBoard({
+        deviceId: cur.deviceId,
+        activationKey: String(cur.company?.activationKey || ''),
+        companyId: result.companyId,
+        payload: boardPayloadFromState(cur),
+      });
+      if (saved.ok && saved.revision) {
+        set({ boardRevision: saved.revision, lastSyncAt: new Date().toISOString() });
+      }
+    }
     return { ok: true, message: result.message || 'Firma sisteme kaydedildi' };
   },
 

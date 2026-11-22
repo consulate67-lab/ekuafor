@@ -20,7 +20,18 @@ npm install
 npm run dev
 ```
 
-http://localhost:5180 — tarayıcıda kalıcı yedek yok; kapanıp açılınca localStorage yeter.
+http://localhost:5180 — offline tablet formu ile birebir aynı UI; tarayıcıda localStorage ile kalır.
+
+## Web (online production)
+
+Sunucu derlemesinde tablet `server/public/tablet` altına kopyalanır. Canlı adres:
+
+`https://web-production-db847.up.railway.app/tablet`  
+veya FTP: `https://www.saloncebinde.com/tablet/`
+
+Aynı kurulum sihirbazı, board, ayarlar, radyo/TV — APK ile aynı form.
+
+**Veri:** Web’de randevu, hizmet, personel ve tüm ayarlar Railway `tablet_board_state` tablosunda tutulur (firma başına). APK hâlâ offline-first (cihaz depolaması). Kurulum anahtarı ile web paneli açılır; kayıtlar sunucuya yazılır.
 
 ## APK (Android)
 

@@ -1,7 +1,7 @@
 import { getWebTemplate } from '@shared/webPageTemplates';
 import type { CompanySetup } from '../types';
 
-const DEFAULT_API = 'https://web-production-db847.up.railway.app/api';
+import { apiBase } from './apiBase';
 
 /** Prompt alanında örnek metin (doğrudan kullanılabilir) */
 export const EXAMPLE_PROMPT =
@@ -81,7 +81,7 @@ export async function generateAboutAi(input: {
   const key = String(input.company.activationKey || '')
     .trim()
     .toUpperCase();
-  const base = (import.meta.env.VITE_API_URL || DEFAULT_API).replace(/\/$/, '');
+  const base = apiBase();
 
   try {
     const res = await fetch(`${base}/tablet/ai/about`, {

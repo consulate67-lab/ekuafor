@@ -1,6 +1,6 @@
 import type { TabletState, WebPageProfile } from '../types';
 
-const DEFAULT_API = 'https://web-production-db847.up.railway.app/api';
+import { apiBase } from './apiBase';
 
 /** Web sayfası alanlarını merkez firmaya yazar */
 export async function pushWebProfile(state: TabletState): Promise<{ ok: boolean; message: string }> {
@@ -15,7 +15,7 @@ export async function pushWebProfile(state: TabletState): Promise<{ ok: boolean;
   if (!navigator.onLine) return { ok: false, message: 'İnternet gerekli' };
 
   const web: WebPageProfile = company.webPage || {};
-  const base = (import.meta.env.VITE_API_URL || DEFAULT_API).replace(/\/$/, '');
+  const base = apiBase();
 
   try {
     const res = await fetch(`${base}/tablet/company/profile`, {

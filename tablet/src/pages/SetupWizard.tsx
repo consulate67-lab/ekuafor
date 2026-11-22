@@ -92,12 +92,25 @@ export function SetupWizard() {
     }
     setKeyBusy(true);
     const res = await activateTabletKey({ key: keyInput, deviceId });
-    setKeyBusy(false);
     if (!res.ok) {
+      setKeyBusy(false);
       setError(res.message);
       return;
     }
-    setActivationKey(res.key || keyInput.trim().toUpperCase());
+    const key = res.key || keyInput.trim().toUpperCase();
+    setActivationKey(key);
+    // Web / paylaşımlı anahtar: Railway board varsa doğrudan panele
+    if (res.companyId) {
+      const boot = await useAppStore.getState().bootstrapFromServer(key, res.companyId);
+      setKeyBusy(false);
+      if (boot.ok && useAppStore.getState().company) {
+        return;
+      }
+      setError(boot.message || 'Panel yüklenemedi; kuruluma devam edin.');
+      setStep('company');
+      return;
+    }
+    setKeyBusy(false);
     setStep('company');
   };
 

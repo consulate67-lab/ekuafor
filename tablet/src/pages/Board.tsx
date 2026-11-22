@@ -40,6 +40,7 @@ import {
 import { IconExpense, IconRadio, IconReport, IconSettings, IconTv } from '../components/Icons';
 import { IdleMediaPanel } from '../components/IdleMediaPanel';
 import { isOnline, normalizeMediaSettings } from '../lib/idleMedia';
+import { isWebServerFirst } from '../lib/runtime';
 import {
   fetchPendingAppointments,
   setPendingAppointmentStatus,
@@ -102,6 +103,9 @@ export function Board() {
     () => normalizeMediaSettings(mediaSettingsRaw),
     [mediaSettingsRaw],
   );
+  const cloudSaveMessage = useAppStore(s => s.cloudSaveMessage);
+  const lastSyncAt = useAppStore(s => s.lastSyncAt);
+  const webCloud = isWebServerFirst();
 
   type Sheet =
     | {
@@ -817,6 +821,14 @@ export function Board() {
                     <span className="ml-2 text-brand-600">· gelecek gün</span>
                   )}
                   <span className="ml-2 text-brand-600">· takvim</span>
+                  {webCloud && (
+                    <span
+                      className={`ml-2 ${cloudSaveMessage ? 'text-amber-600' : 'text-emerald-600'}`}
+                      title={cloudSaveMessage || (lastSyncAt ? `Son kayıt: ${lastSyncAt}` : 'Railway')}
+                    >
+                      · {cloudSaveMessage ? 'bulut kayıt hatası' : 'bulut'}
+                    </span>
+                  )}
                 </p>
               </button>
               <button type="button" aria-label="Sonraki gün" onClick={() => setSelectedDate(addDays(selectedDate, 1))} className="h-9 w-9 rounded-xl bg-slate-100 font-black">›</button>

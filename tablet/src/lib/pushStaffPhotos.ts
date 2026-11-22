@@ -1,6 +1,6 @@
 import type { TabletState } from '../types';
 
-const DEFAULT_API = 'https://web-production-db847.up.railway.app/api';
+import { apiBase } from './apiBase';
 
 /** Tabletteki çalışan fotoğraflarını merkez firmaya yazar */
 export async function pushStaffPhotos(state: TabletState): Promise<{ ok: boolean; message: string }> {
@@ -23,7 +23,7 @@ export async function pushStaffPhotos(state: TabletState): Promise<{ ok: boolean
     }));
   if (!staff.length) return { ok: false, message: 'Tablette kayıtlı çalışan fotoğrafı yok' };
 
-  const base = (import.meta.env.VITE_API_URL || DEFAULT_API).replace(/\/$/, '');
+  const base = apiBase();
   try {
     const res = await fetch(`${base}/tablet/company/staff-photos`, {
       method: 'PATCH',

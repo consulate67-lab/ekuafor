@@ -16,6 +16,7 @@ import kvkkRoutes from './kvkk.routes';
 import sectorRoutes from './sector.routes';
 import bookingRoutes from './booking.routes';
 import tabletRoutes from './tablet.routes';
+import mediaProxyRoutes from './mediaProxy.routes';
 
 const commonPing = (req: Request, res: Response) => res.json({
     status: 'pong',
@@ -67,6 +68,7 @@ export const mountRoutes = (app: Express) => {
     app.use('/api', sectorRoutes);
     app.use('/api', bookingRoutes);
     app.use('/api', tabletRoutes);
+    app.use('/api/tablet/media-proxy', mediaProxyRoutes);
 
     // 404 Catch-all
     app.all('*', (req: Request, res: Response) => {

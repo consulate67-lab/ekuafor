@@ -1,4 +1,4 @@
-import express, { Express } from 'express';
+import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
@@ -83,7 +83,17 @@ export const createApp = (): Express => {
         },
         credentials: false,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'X-No-Mock', 'X-Company-Id', 'X-Board-Key', 'X-Report-Key', 'X-Device-Id'],
+        allowedHeaders: [
+            'Content-Type',
+            'Authorization',
+            'X-No-Mock',
+            'X-Company-Id',
+            'X-Board-Key',
+            'X-Report-Key',
+            'X-Device-Id',
+            'X-Activation-Key',
+            'X-Tablet-Key-Secret',
+        ],
     }));
 
     // === Rate limit — global ===
@@ -131,10 +141,35 @@ export const createApp = (): Express => {
         res.redirect(302, `${base}/?c=${id}&ref=qr&install=1`);
     });
 
+    // === Media CORS proxy (tablet web HLS) — catch-all'dan önce ===
+    app.get('/media-proxy', async (req, res) => {
+        const { handleMediaProxy } = await import('./routes/mediaProxy.routes');
+        return handleMediaProxy(req, res);
+    });
+
     // === Static client bundle (Railway web service serves SPA from /public) ===
     // Production: build sırasında client/dist/* → server/public/ kopyalanır.
     // SPA: index.html hash routing kullanır, fallback'e gerek yok.
-    app.use(express.static(path.join(__dirname, '..', 'public')));
+    const publicDir = path.join(__dirname, '..', 'public');
+    app.use(express.static(publicDir));
+
+    // === Tablet SPA — müşteri web ile birebir aynı panel, /tablet altında ===
+    const tabletDir = path.join(publicDir, 'tablet');
+    app.use('/tablet', express.static(tabletDir));
+    const sendTabletIndex = (_req: Request, res: Response) => {
+        const indexPath = path.join(tabletDir, 'index.html');
+        res.sendFile(indexPath, err => {
+            if (err) {
+                res.status(404).type('text').send('Tablet paneli henüz derlenmedi (public/tablet).');
+            }
+        });
+    };
+    app.get('/tablet', sendTabletIndex);
+    app.get(/^\/tablet\/.*/, (req, res, next) => {
+        // Gerçek dosya (js/css) static'ten geldiyse buraya düşmez; SPA fallback
+        if (path.extname(req.path)) return next();
+        sendTabletIndex(req, res);
+    });
 
     // === All API routes (single mount point — /api/*) ===
     mountRoutes(app);

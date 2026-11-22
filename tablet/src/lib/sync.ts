@@ -1,12 +1,11 @@
 import type { TabletState, SyncPayload } from '../types';
 import { uid } from './id';
+import { apiBase as defaultApiBase } from './apiBase';
 
 /**
  * Raporlar için online senkron.
  * Veriler tablette kalır; internet varken özet sunucuya iletilir.
- * Ana Saloon API'sine bağlanacak uç nokta: POST /api/tablet/sync (sonra eklenecek).
  */
-const DEFAULT_API = 'https://web-production-db847.up.railway.app/api';
 
 export function buildSnapshot(state: TabletState): SyncPayload {
   return {
@@ -54,7 +53,7 @@ export function buildSnapshot(state: TabletState): SyncPayload {
 
 export async function pushSnapshot(
   state: TabletState,
-  apiBase = DEFAULT_API,
+  apiBase = defaultApiBase(),
 ): Promise<{ ok: boolean; message: string }> {
   const payload = buildSnapshot(state);
   try {

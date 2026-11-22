@@ -126,8 +126,14 @@ export default defineConfig({
   server: {
     port: 5180,
     strictPort: true,
+    host: true,
     fs: {
       allow: [rootDir, path.resolve(rootDir, '../shared')],
     },
+  },
+  preview: {
+    port: 5180,
+    strictPort: true,
+    host: true,
   },
 });

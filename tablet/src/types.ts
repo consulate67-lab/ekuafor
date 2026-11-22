@@ -305,7 +305,7 @@ export interface TvChannel {
   streamUrl: string;
 }
 
-/** Tablet boştayken radyo / TV — cihaz ayarı, sunucuya gitmez */
+/** Tablet boştayken radyo / TV — web’de board ile Railway’de saklanır */
 export interface IdleMediaSettings {
   enabled: boolean;
   /** Etkileşimsiz kalınca TV açılma süresi (sn) */

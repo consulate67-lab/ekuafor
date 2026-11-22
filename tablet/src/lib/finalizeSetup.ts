@@ -1,6 +1,6 @@
 import type { TabletState } from '../types';
 
-const DEFAULT_API = 'https://web-production-db847.up.railway.app/api';
+import { apiBase } from './apiBase';
 
 /** Kurulum bitince firmayı merkez sisteme kaydet */
 export async function finalizeCompanyOnServer(state: TabletState): Promise<{
@@ -8,7 +8,7 @@ export async function finalizeCompanyOnServer(state: TabletState): Promise<{
   message: string;
   companyId?: number;
 }> {
-  const base = (import.meta.env.VITE_API_URL || DEFAULT_API).replace(/\/$/, '');
+  const base = apiBase();
   if (!state.company) return { ok: false, message: 'Firma yok' };
   if (!navigator.onLine) {
     return { ok: false, message: 'Firma kaydı için internet yok; sonra Rapor’dan senkron deneyin.' };

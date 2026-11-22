@@ -33,6 +33,16 @@ async function ensureTabletTables() {
             meta JSONB
         )
     `);
+    /** Web tablet: randevu/hizmet/ayarlar Railway’de (firma başına tek board) */
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS tablet_board_state (
+            company_id INTEGER PRIMARY KEY,
+            payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+            revision INTEGER NOT NULL DEFAULT 1,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_by_device VARCHAR(80)
+        )
+    `);
 }
 
 function makeKey(): string {
@@ -155,18 +165,52 @@ router.post('/tablet/activate', async (req: Request, res: Response) => {
         }
 
         const found = await pool.query(
-            `SELECT id, key_code, status, device_id FROM tablet_activation_keys WHERE key_code = $1`,
+            `SELECT id, key_code, status, device_id, meta FROM tablet_activation_keys WHERE key_code = $1`,
             [key],
         );
         if (!found.rows.length) {
             return res.status(404).json({ success: false, error: 'Geçersiz kurulum anahtarı' });
         }
         const row = found.rows[0];
-        if (row.status === 'used' && row.device_id && row.device_id !== deviceId) {
-            return res.status(409).json({ success: false, error: 'Bu anahtar başka cihazda kullanılmış' });
-        }
         if (row.status === 'revoked') {
             return res.status(410).json({ success: false, error: 'Anahtar iptal edilmiş' });
+        }
+
+        const meta = (row.meta && typeof row.meta === 'object' ? row.meta : {}) as Record<
+            string,
+            unknown
+        >;
+        const companyId = Number(meta.company_id) || undefined;
+
+        // Web / ikinci cihaz: anahtar zaten tablete bağlıysa firma paneline paylaşimli erişim
+        if (row.status === 'used' && row.device_id && row.device_id !== deviceId) {
+            if (companyId) {
+                const webDevices = Array.isArray(meta.web_devices)
+                    ? (meta.web_devices as string[])
+                    : [];
+                if (!webDevices.includes(deviceId)) {
+                    webDevices.push(deviceId);
+                    await pool.query(
+                        `UPDATE tablet_activation_keys
+                         SET meta = COALESCE(meta, '{}'::jsonb) || $2::jsonb
+                         WHERE id = $1`,
+                        [row.id, JSON.stringify({ web_devices: webDevices.slice(-20) })],
+                    );
+                }
+                return res.json({
+                    success: true,
+                    message: 'Firma paneline bağlandı (web)',
+                    data: {
+                        key,
+                        device_id: deviceId,
+                        company_id: companyId,
+                        shared: true,
+                    },
+                });
+            }
+            return res
+                .status(409)
+                .json({ success: false, error: 'Bu anahtar başka cihazda kullanılmış' });
         }
 
         await pool.query(
@@ -179,7 +223,7 @@ router.post('/tablet/activate', async (req: Request, res: Response) => {
         res.json({
             success: true,
             message: 'Kurulum anahtarı onaylandı',
-            data: { key, device_id: deviceId },
+            data: { key, device_id: deviceId, company_id: companyId },
         });
     } catch (error) {
         console.error('[tablet/activate]', error);
@@ -518,7 +562,7 @@ router.get('/tablet/sync/:deviceId', async (req: Request, res: Response) => {
     }
 });
 
-/** Tablet cihazı + aktivasyon anahtarı → company_id doğrula */
+/** Tablet cihazı + aktivasyon anahtarı → company_id doğrula (web cihazları paylaşımlı) */
 async function assertTabletCompanyAccess(
     deviceId: string,
     activationKey: string,
@@ -540,15 +584,60 @@ async function assertTabletCompanyAccess(
     if (row.status === 'revoked') {
         return { ok: false, status: 410, error: 'Anahtar iptal edilmiş' };
     }
-    if (row.device_id && row.device_id !== deviceId) {
-        return { ok: false, status: 409, error: 'Anahtar başka cihaza bağlı' };
-    }
     const meta = (row.meta && typeof row.meta === 'object' ? row.meta : {}) as Record<string, unknown>;
     const linked = Number(meta.company_id);
     if (!linked || linked !== companyId) {
         return { ok: false, status: 403, error: 'Bu firma bu tablete bağlı değil' };
     }
+    const webDevices = Array.isArray(meta.web_devices) ? (meta.web_devices as string[]) : [];
+    const deviceOk =
+        !row.device_id ||
+        row.device_id === deviceId ||
+        webDevices.includes(deviceId);
+    if (!deviceOk) {
+        return { ok: false, status: 409, error: 'Anahtar başka cihaza bağlı' };
+    }
     return { ok: true };
+}
+
+/** Anahtar → company_id (board okuma) */
+async function resolveCompanyFromKey(
+    activationKey: string,
+    deviceId: string,
+): Promise<
+    | { ok: true; companyId: number }
+    | { ok: false; status: number; error: string }
+> {
+    await ensureTabletTables();
+    const key = activationKey.trim().toUpperCase().slice(0, 32);
+    if (!key || !deviceId) {
+        return { ok: false, status: 400, error: 'deviceId ve activationKey gerekli' };
+    }
+    const found = await pool.query(
+        `SELECT device_id, status, meta FROM tablet_activation_keys WHERE key_code = $1`,
+        [key],
+    );
+    if (!found.rows.length) {
+        return { ok: false, status: 404, error: 'Geçersiz kurulum anahtarı' };
+    }
+    const row = found.rows[0];
+    if (row.status === 'revoked') {
+        return { ok: false, status: 410, error: 'Anahtar iptal edilmiş' };
+    }
+    const meta = (row.meta && typeof row.meta === 'object' ? row.meta : {}) as Record<string, unknown>;
+    const companyId = Number(meta.company_id);
+    if (!companyId) {
+        return { ok: false, status: 404, error: 'Firma henüz kaydedilmemiş — kurulumu tamamlayın' };
+    }
+    const webDevices = Array.isArray(meta.web_devices) ? (meta.web_devices as string[]) : [];
+    const deviceOk =
+        !row.device_id ||
+        row.device_id === deviceId ||
+        webDevices.includes(deviceId);
+    if (!deviceOk) {
+        return { ok: false, status: 409, error: 'Anahtar başka cihaza bağlı' };
+    }
+    return { ok: true, companyId };
 }
 
 /** Hakkında metni — OPENAI_API_KEY varsa GPT, yoksa yerel şablon */
@@ -907,6 +996,284 @@ router.get('/tablet/appointments/pending', async (req: Request, res: Response) =
     } catch (error) {
         console.error('[tablet/appointments/pending]', error);
         res.status(500).json({ success: false, error: 'Bekleyen randevular alınamadı' });
+    }
+});
+
+/**
+ * Web tablet board — randevu, hizmet, personel, ayarlar Railway’de.
+ * GET: firma board’unu yükle
+ */
+router.get('/tablet/board', async (req: Request, res: Response) => {
+    try {
+        const deviceId = String(req.header('X-Device-Id') || req.query.deviceId || '').slice(0, 80);
+        const activationKey = String(
+            req.header('X-Activation-Key') || req.query.activationKey || '',
+        );
+        const resolved = await resolveCompanyFromKey(activationKey, deviceId);
+        if (!resolved.ok) {
+            return res.status(resolved.status).json({ success: false, error: resolved.error });
+        }
+
+        const qCompany = Number(req.query.companyId);
+        if (qCompany && qCompany !== resolved.companyId) {
+            return res.status(403).json({ success: false, error: 'Firma uyuşmuyor' });
+        }
+
+        const row = await pool.query(
+            `SELECT company_id, payload, revision, updated_at, updated_by_device
+             FROM tablet_board_state WHERE company_id = $1`,
+            [resolved.companyId],
+        );
+
+        if (row.rows.length) {
+            const r = row.rows[0];
+            return res.json({
+                success: true,
+                data: {
+                    company_id: Number(r.company_id),
+                    revision: Number(r.revision),
+                    payload: r.payload,
+                    updated_at: r.updated_at,
+                    updated_by_device: r.updated_by_device,
+                },
+            });
+        }
+
+        // Board yoksa merkez firmadan iskelet üret (APK kurulumu sonrası ilk web açılışı)
+        const seeded = await seedBoardPayloadFromCompany(resolved.companyId, activationKey);
+        res.json({
+            success: true,
+            data: {
+                company_id: resolved.companyId,
+                revision: 0,
+                payload: seeded,
+                updated_at: null,
+            },
+            message: seeded
+                ? 'Merkez firmadan yüklendi — ilk kayıtta board oluşur'
+                : 'Board henüz boş — kurulum sonrası oluşur',
+        });
+    } catch (error) {
+        console.error('[tablet/board GET]', error);
+        res.status(500).json({ success: false, error: 'Board okunamadı' });
+    }
+});
+
+async function seedBoardPayloadFromCompany(companyId: number, activationKey: string) {
+    const c = await pool.query(
+        `SELECT id, name, work_start_time, work_end_time, slot_interval,
+                latitude, longitude, description, phone, email, website,
+                address_line, city, district, web_template_id, hide_prices,
+                contact_note, instagram_url, facebook_url, tiktok_url,
+                show_phone, show_address, photo, web_gallery, web_tagline, web_social_placement
+         FROM companies WHERE id = $1`,
+        [companyId],
+    );
+    if (!c.rows.length) return null;
+    const co = c.rows[0];
+
+    const sectors = await pool.query(
+        `SELECT s.slug, s.name FROM company_sectors cs
+         JOIN sectors s ON s.id = cs.sector_id
+         WHERE cs.company_id = $1 ORDER BY cs.is_primary DESC NULLS LAST, s.name`,
+        [companyId],
+    );
+    const sectorSlugs = sectors.rows.map((r: { slug: string }) => r.slug);
+    const sectorNames = sectors.rows.map((r: { name: string }) => r.name);
+
+    const depts = await pool.query(
+        `SELECT id, name FROM departments WHERE company_id = $1 ORDER BY id`,
+        [companyId],
+    );
+    const staff = await pool.query(
+        `SELECT id, first_name, last_name, phone, photo, title, department_id
+         FROM users WHERE company_id = $1 ORDER BY id LIMIT 80`,
+        [companyId],
+    );
+    const services = await pool.query(
+        `SELECT id, name, duration_minutes, price, booking_mode
+         FROM services WHERE company_id = $1 AND COALESCE(is_active, true) ORDER BY id`,
+        [companyId],
+    );
+
+    const deptMap = new Map<number, string>();
+    const departments = depts.rows.map((d: { id: number; name: string }) => {
+        const localId = `dept_${d.id}`;
+        deptMap.set(Number(d.id), localId);
+        return { id: localId, name: d.name };
+    });
+
+    return {
+        company: {
+            name: co.name,
+            workStart: String(co.work_start_time || '09:00').slice(0, 5),
+            workEnd: String(co.work_end_time || '19:00').slice(0, 5),
+            slotInterval: Number(co.slot_interval) || 30,
+            location:
+                co.latitude != null && co.longitude != null
+                    ? {
+                          latitude: Number(co.latitude),
+                          longitude: Number(co.longitude),
+                          capturedAt: new Date().toISOString(),
+                      }
+                    : null,
+            sectorSlugs,
+            sectorNames,
+            sectorSlug: sectorSlugs[0],
+            sectorName: sectorNames[0],
+            activationKey: activationKey.trim().toUpperCase(),
+            serverCompanyId: companyId,
+            webPage: {
+                about: co.description || undefined,
+                phone: co.phone || undefined,
+                email: co.email || undefined,
+                website: co.website || undefined,
+                address: co.address_line || undefined,
+                city: co.city || undefined,
+                district: co.district || undefined,
+                templateId: co.web_template_id || undefined,
+                hidePrices: !!co.hide_prices,
+                contactNote: co.contact_note || undefined,
+                instagram: co.instagram_url || undefined,
+                facebook: co.facebook_url || undefined,
+                tiktok: co.tiktok_url || undefined,
+                showPhone: co.show_phone !== false,
+                showAddress: co.show_address !== false,
+                gallery: Array.isArray(co.web_gallery) ? co.web_gallery : undefined,
+                tagline: co.web_tagline || undefined,
+                socialPlacement: co.web_social_placement || undefined,
+            },
+            setupCompletedAt: new Date().toISOString(),
+        },
+        departments,
+        staff: staff.rows.map(
+            (u: {
+                id: number;
+                first_name: string;
+                last_name: string;
+                phone: string;
+                photo: string;
+                title: string;
+                department_id: number;
+            }) => ({
+                id: `stf_${u.id}`,
+                firstName: u.first_name || '',
+                lastName: u.last_name || '',
+                phone: u.phone || '',
+                photo: u.photo || undefined,
+                title: u.title || 'personel',
+                departmentId: deptMap.get(Number(u.department_id)) || departments[0]?.id || 'dept_0',
+                workStart: String(co.work_start_time || '09:00').slice(0, 5),
+                workEnd: String(co.work_end_time || '19:00').slice(0, 5),
+            }),
+        ),
+        services: services.rows.map(
+            (s: {
+                id: number;
+                name: string;
+                duration_minutes: number;
+                price: number;
+                booking_mode: string;
+            }) => ({
+                id: `svc_${s.id}`,
+                name: s.name,
+                durationMinutes: Number(s.duration_minutes) || 30,
+                price: Number(s.price) || 0,
+                bookingMode: s.booking_mode || 'staff',
+            }),
+        ),
+        events: [],
+        expenses: [],
+        campaigns: [],
+        subscribers: [],
+        groupSessions: [],
+        mediaSettings: null,
+    };
+}
+
+/**
+ * Web tablet board kaydet — tüm panel state (randevu/hizmet/ayar)
+ */
+router.put('/tablet/board', async (req: Request, res: Response) => {
+    try {
+        const deviceId = String(req.header('X-Device-Id') || req.body?.deviceId || '').slice(0, 80);
+        const activationKey = String(
+            req.header('X-Activation-Key') || req.body?.activationKey || '',
+        );
+        const companyId = Number(req.body?.companyId);
+        const payload = req.body?.payload;
+        const expectedRevision =
+            req.body?.expectedRevision != null ? Number(req.body.expectedRevision) : undefined;
+
+        if (!payload || typeof payload !== 'object') {
+            return res.status(400).json({ success: false, error: 'payload gerekli' });
+        }
+
+        const access = await assertTabletCompanyAccess(deviceId, activationKey, companyId);
+        if (!access.ok) {
+            return res.status(access.status).json({ success: false, error: access.error });
+        }
+
+        await ensureTabletTables();
+
+        const existing = await pool.query(
+            `SELECT revision FROM tablet_board_state WHERE company_id = $1`,
+            [companyId],
+        );
+
+        if (existing.rows.length) {
+            const currentRev = Number(existing.rows[0].revision);
+            if (
+                expectedRevision != null &&
+                Number.isFinite(expectedRevision) &&
+                expectedRevision > 0 &&
+                expectedRevision !== currentRev
+            ) {
+                return res.status(409).json({
+                    success: false,
+                    error: 'Board başka oturumda güncellendi — yenileyin',
+                    data: { revision: currentRev },
+                });
+            }
+            const upd = await pool.query(
+                `UPDATE tablet_board_state
+                 SET payload = $2::jsonb,
+                     revision = revision + 1,
+                     updated_at = NOW(),
+                     updated_by_device = $3
+                 WHERE company_id = $1
+                 RETURNING revision, updated_at`,
+                [companyId, JSON.stringify(payload), deviceId],
+            );
+            return res.json({
+                success: true,
+                message: 'Board kaydedildi',
+                data: {
+                    company_id: companyId,
+                    revision: Number(upd.rows[0].revision),
+                    updated_at: upd.rows[0].updated_at,
+                },
+            });
+        }
+
+        const ins = await pool.query(
+            `INSERT INTO tablet_board_state (company_id, payload, revision, updated_by_device)
+             VALUES ($1, $2::jsonb, 1, $3)
+             RETURNING revision, updated_at`,
+            [companyId, JSON.stringify(payload), deviceId],
+        );
+        res.json({
+            success: true,
+            message: 'Board oluşturuldu',
+            data: {
+                company_id: companyId,
+                revision: Number(ins.rows[0].revision),
+                updated_at: ins.rows[0].updated_at,
+            },
+        });
+    } catch (error) {
+        console.error('[tablet/board PUT]', error);
+        res.status(500).json({ success: false, error: 'Board kaydedilemedi' });
     }
 });
 
