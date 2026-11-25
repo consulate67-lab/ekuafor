@@ -3,7 +3,6 @@ import { sql } from 'drizzle-orm';
 import pool from '../config/database';
 import { appointments, appointmentServices } from '../db/schema/appointments';
 import { services } from '../db/schema/services';
-import smsService from './sms.service';
 import redis from '../config/redis';
 import { normalizePhone, formatPhoneWithSpaces } from '../utils/phone';
 import { logger } from '../utils/logger';
@@ -321,7 +320,6 @@ class AppointmentService {
                 const detailsRes = await db.execute(sql`
                     SELECT
                         c.name as company_name,
-                        c.sms_enabled,
                         st.first_name as staff_first,
                         st.last_name as staff_last,
                         s.name as service_name,
@@ -342,7 +340,6 @@ class AppointmentService {
                 if (!details) return updatedAppointment;
 
                 const phoneNum = details.app_phone || details.cust_phone;
-                const name = details.app_customer_name || (details.cust_first ? `${details.cust_first} ${details.cust_last || ''}`.trim() : 'Değerli Müşterimiz');
 
                 const rawDate = updatedAppointment.appointment_date;
                 const date = (rawDate && rawDate instanceof Date)
@@ -351,43 +348,32 @@ class AppointmentService {
                 const time = updatedAppointment.start_time;
 
                 const companyName = details.company_name || 'İşletme';
-                const isSmsEnabled = details.sms_enabled !== false; // Default true
                 const staffName = (details.staff_first || details.staff_last)
                     ? `${details.staff_first || ''} ${details.staff_last || ''}`.trim()
                     : 'Uzman personelimiz';
                 const serviceName = details.service_name || 'Hizmet';
 
-                // 1. SMS NOTIFICATION (Priority if enabled)
-                if (phoneNum && (status === 'approved' || status === 'cancelled')) {
-                    if (isSmsEnabled) {
-                        const message = status === 'approved'
-                            ? `Sayın ${name}, ${companyName} işletmesinde ${staffName} ile ${serviceName} hizmeti için ${date} ${time} randevunuz ONAYLANMIŞTIR. Bekliyoruz!`
-                            : `Sayın ${name}, ${companyName} işletmesindeki ${date} tarihli randevunuz İPTAL EDİLMİŞTİR.`;
-
-                        console.log(`[Notification] Attempting SMS for app ID ${id} to ${phoneNum}...`);
-                        await smsService.sendSms(updatedAppointment.company_id, phoneNum, message);
-                    } else {
-                        console.log(`[Notification] SMS is DISABLED for company ${updatedAppointment.company_id}. Skipping SMS.`);
-                    }
-                }
-
-                // 2. PUSH NOTIFICATION (Fallback or Parallel)
-                if (phoneNum && (status === 'approved' || status === 'cancelled')) {
+                // Onay / red → yalnızca uygulama bildirimi (SMS yok)
+                if (status === 'approved' || status === 'cancelled') {
                     const pushService = require('./push.service').default;
-                    const token = await pushService.getPushTokenByPhone(phoneNum);
+                    const title = status === 'approved' ? 'Randevunuz Onaylandı' : 'Randevunuz Reddedildi';
+                    const timeLabel = typeof time === 'string' ? time.substring(0, 5) : time;
+                    const body = status === 'approved'
+                        ? `${companyName}: ${serviceName} · ${staffName} · ${date} ${timeLabel} randevunuz onaylandı.`
+                        : `${companyName}: ${date} ${timeLabel} randevunuz reddedildi / iptal edildi.`;
 
-                    if (token) {
-                        console.log(`[Notification] Found push token, sending push notification...`);
-                        const title = status === 'approved' ? 'Randevunuz Onaylandı' : 'Randevunuz İptal Edildi';
-                        const body = status === 'approved'
-                            ? `Sayın ${name}, ${companyName} işletmesinde ${staffName} ile ${date} ${time} randevunuz onaylanmıştır.`
-                            : `Sayın ${name}, ${companyName} işletmesindeki ${date} ${time} randevunuz iptal edilmiştir.`;
-
-                        await pushService.sendNotification(token, title, body, {
-                            appointmentId: id.toString(),
-                            status: status
-                        }, phoneNum);
-                    }
+                    console.log(`[Notification] App push for appointment ${id} (no SMS)`);
+                    await pushService.notifyCustomer({
+                        phone: phoneNum,
+                        deviceId: updatedAppointment.device_id,
+                        title,
+                        body,
+                        data: {
+                            type: 'appointment_status',
+                            appointmentId: String(id),
+                            status,
+                        },
+                    });
                 }
             } catch (notifError) {
                 console.error(`[Notification] Error in notification flow:`, notifError);
@@ -610,12 +596,23 @@ class AppointmentService {
     }
 
     async getCustomerNotifications(phone: string) {
-        // UNION ALL → raw SQL
+        const { normalizePhone, formatPhoneTo12Digits } = require('../utils/phone');
+        const phone10 = normalizePhone(phone);
+        const phone12 = phone10 ? formatPhoneTo12Digits(phone10) : '';
+        // push_logs / sms_logs farklı formatlarda (10 / 12 hane) yazılmış olabilir
         const result = await db.execute(sql`
             SELECT * FROM (
-                (SELECT id, title, body as message, created_at, 'push' as type, status FROM push_logs WHERE phone_number = ${phone})
+                (SELECT id, title, body as message, created_at, 'push' as type, status
+                 FROM push_logs
+                 WHERE phone_number = ${phone10}
+                    OR phone_number = ${phone12}
+                    OR phone_number = ${phone})
                 UNION ALL
-                (SELECT id, 'SMS Bildirimi' as title, message, created_at, 'sms' as type, status FROM sms_logs WHERE phone_number = ${phone})
+                (SELECT id, 'SMS Bildirimi' as title, message, created_at, 'sms' as type, status
+                 FROM sms_logs
+                 WHERE phone_number = ${phone10}
+                    OR phone_number = ${phone12}
+                    OR phone_number = ${phone})
             ) AS combined
             ORDER BY created_at DESC
             LIMIT 50

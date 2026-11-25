@@ -9,7 +9,7 @@ const VERIFICATION_PHONE = '+908503058349';
 
 const FEATURES = [
     { icon: '📅', title: 'Online randevu', text: 'Müşterileriniz 7/24 uygun saati görüp randevu alır; çakışma ve çift satış olmaz.' },
-    { icon: '✅', title: 'Onay ve bildirim', text: 'Gelen talepleri tek dokunuşla onaylayın, müşteriye SMS ve bildirim gitsin.' },
+    { icon: '✅', title: 'Onay ve bildirim', text: 'Gelen talepleri tek dokunuşla onaylayın, müşteriye uygulama bildirimi gitsin.' },
     { icon: '📊', title: 'Masraf ve rapor', text: 'Günlük ciro, masraf ve personel bazında raporlar cebinizde.' },
     { icon: '📺', title: 'İşletme ekranı', text: 'Tablet veya TV’de günün tüm randevuları, sahaları ve dersleri tek bakışta.' },
 ];

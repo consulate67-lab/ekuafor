@@ -70,11 +70,16 @@ export function useAppointmentSync() {
     }, [notifyStatusChange]);
 
     useEffect(() => {
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+            // Onay/red uygulama bildirimi için izin (kullanıcı bir kez onaylar)
+            Notification.requestPermission().catch(() => {});
+        }
+
         getDeviceId().then(() => {
             syncAppointments();
         });
 
-        const interval = setInterval(syncAppointments, 30000);
+        const interval = setInterval(syncAppointments, 15000);
 
         return () => {
             clearInterval(interval);

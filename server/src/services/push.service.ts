@@ -186,10 +186,73 @@ class PushService {
                 .orderBy(desc(customerDevices.lastSync))
                 .limit(1);
 
-            return rows[0]?.pushToken || null;
+            const token = rows[0]?.pushToken || null;
+            return token && token.trim() ? token : null;
         } catch (error) {
             console.error('[PushService] Error fetching push token:', error);
             return null;
+        }
+    }
+
+    async getPushTokenByDeviceId(deviceId: string): Promise<string | null> {
+        if (!deviceId) return null;
+        try {
+            const rows = await db
+                .select({ pushToken: customerDevices.pushToken })
+                .from(customerDevices)
+                .where(
+                    and(
+                        eq(customerDevices.deviceId, deviceId),
+                        isNotNull(customerDevices.pushToken)
+                    )
+                )
+                .orderBy(desc(customerDevices.lastSync))
+                .limit(1);
+            const token = rows[0]?.pushToken || null;
+            return token && token.trim() ? token : null;
+        } catch (error) {
+            console.error('[PushService] Error fetching push token by device:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Müşteri uygulama bildirimi — FCM varsa gönderir, yoksa yine push_logs'a yazar
+     * (Bildirimler sekmesi + polling ile görünür). SMS göndermez.
+     */
+    async notifyCustomer(opts: {
+        phone?: string | null;
+        deviceId?: string | null;
+        title: string;
+        body: string;
+        data?: Record<string, unknown>;
+    }): Promise<boolean> {
+        const { normalizePhone, formatPhoneTo12Digits } = require('../utils/phone');
+        const phone10 = normalizePhone(opts.phone || '');
+        const phone12 = phone10 ? formatPhoneTo12Digits(phone10) : '';
+        const logPhone = phone12 || phone10 || null;
+
+        let token: string | null = null;
+        if (phone10) token = await this.getPushTokenByPhone(phone10);
+        if (!token && opts.deviceId) token = await this.getPushTokenByDeviceId(String(opts.deviceId));
+
+        if (token) {
+            return this.sendNotification(token, opts.title, opts.body, opts.data, logPhone || undefined);
+        }
+
+        console.log(`[PushService] No push token for phone=${phone10 || '-'} device=${opts.deviceId || '-'}; logging in-app only`);
+        try {
+            await db.insert(pushLogs).values({
+                phoneNumber: logPhone,
+                title: opts.title,
+                body: opts.body,
+                status: 'in_app',
+                errorMessage: 'No FCM token; visible in app notifications',
+            });
+            return true;
+        } catch (error: any) {
+            console.error('[PushService] in_app log failed:', error.message);
+            return false;
         }
     }
 }

@@ -801,7 +801,7 @@ export default function CompanyForm() {
 
                             {formData.sms_enabled !== false && (
                                 <div className="md:col-span-2 p-4 bg-violet-100 rounded-xl border border-violet-200">
-                                    <p className="text-sm text-violet-800 font-medium">Sistem merkezi NetGSM altyapısını kullanmaktadır. Bu firmaya ait randevular onaylandığında veya iptal edildiğinde, arka planda otomatik olarak müşteriye SMS gönderilecektir. Ekstra bir ayar yapmanıza gerek yoktur.</p>
+                                    <p className="text-sm text-violet-800 font-medium">Müşteri randevu alırken SMS ile telefonunu doğrular. Firma tablette onayladığında veya reddettiğinde müşteriye uygulama bildirimi gider (SMS değil).</p>
                                 </div>
                             )}
                         </div>
